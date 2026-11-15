@@ -5,8 +5,6 @@
  * Cuándo sincroniza (si está activa): al abrir la app, 4 s después de
  * guardar o eliminar, cada 2 minutos y al recuperar la conexión.
  */
-import { sortRecords } from '../core/record.js';
-import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
 import { syncMerge, syncFingerprint } from '../core/merge.js';
 import { clock } from '../core/clock.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
@@ -23,6 +21,7 @@ import {
 import { createSyncApi, syncOnce, SyncHttpError, createSyncCache } from '../sync/client.js';
 import { PROTOCOL_VERSION } from '../sync/protocol.js';
 import { logError } from './errorLog.js';
+import { readPatientItems, writePatientItems, readSpecialtyItems, writeSpecialtyItems, opaqueInSpecialty } from '../app/syncData.js';
 import { $, toast, copyText } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { html } from './html.js';
@@ -86,54 +85,19 @@ export function createSyncController(ctx) {
   }
 
   /** Fichas de pacientes (espacio común). */
-  function readPatients() {
-    return { items: store.loadPatients().map((p) => ({ id: p.id, updated: p.updated, kind: 'paciente', data: p })), tombstones: {} };
-  }
+  const readPatients = () => readPatientItems(store);
   function writePatients(items) {
-    store.savePatients(items.filter((i) => i.kind === 'paciente').map((i) => ({ ...i.data, id: i.id, updated: i.updated })));
+    writePatientItems(store, items);
     for (const i of items) clock.observe(i.updated);
     ctx.emit('datos');
   }
 
-  /** Todo lo que se sincroniza: atenciones, perfiles de médico y operativos. */
-  function readLocal() {
-    const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated, kind, data: x });
-    return {
-      items: [
-        ...store
-          .loadRecords()
-          .filter((r) => r.updated)
-          .map(wrap('atencion')),
-        // Atenciones de versiones más nuevas de la app: se sincronizan intactas.
-        ...store.loadFutureRecords().map(wrap('atencion')),
-        ...store.loadMedicos().map(wrap('medico')),
-        ...store.loadOperativos().map(wrap('operativo')),
-        ...store.loadAuditDocs().map(wrap('bitacora')),
-      ],
-      tombstones: store.loadTombstones(),
-    };
-  }
+  /** Todo lo que se sincroniza de la especialidad (ver app/syncData.js). */
+  const readLocal = () => readSpecialtyItems(store);
 
   /** Aplica cambios que llegaron de otros equipos al estado de la app. */
   function writeLocal(items, tombstones) {
-    const of = (kind) => items.filter((i) => i.kind === kind).map((i) => ({ ...i.data, id: i.id, updated: i.updated }));
-    store.saveRecords(sortRecords(of('atencion')));
-    store.saveAuditDocs(of('bitacora'));
-    store.saveMedicos(
-      byName(
-        of('medico')
-          .map((m) => makeMedico(m))
-          .filter(Boolean),
-      ),
-    );
-    store.saveOperativos(
-      byName(
-        of('operativo')
-          .map((o) => makeOperativo(o))
-          .filter(Boolean),
-      ),
-    );
-    store.saveTombstones(tombstones);
+    writeSpecialtyItems(store, items, tombstones);
     // Reloj lógico: las ediciones siguientes quedarán después de todo lo recibido.
     for (const i of items) clock.observe(i.updated);
     ctx.reloadCatalogs();
@@ -177,7 +141,7 @@ export function createSyncController(ctx) {
         api,
         readLocal,
         writeLocal,
-        opaqueIds: (id) => id.startsWith('m_'),
+        opaqueIds: opaqueInSpecialty,
         cache: st.caches.especialidad,
       });
       const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
