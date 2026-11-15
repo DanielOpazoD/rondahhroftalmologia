@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.12.1 — 2026-11-16
+
+### Interfaz
+- **Aviso de cambios sin guardar en el equipo** (#20). Si el almacenamiento falla (p. ej. disco lleno):
+  - aparece una barra roja con «Reintentar»;
+  - el chequeo del equipo lo marca en rojo, con la acción «Descargar respaldo»;
+  - al liberar espacio, todo se guarda y la barra desaparece.
+
+### Arquitectura y documentación
+- La correspondencia entre datos locales y elementos sincronizados pasa a la capa de aplicación (`app/syncData.js`), con pruebas de ida y vuelta (#21).
+- Diagramas de capas, de una pasada de sincronización y de dos PC editando el mismo paciente. Se corrige ARQUITECTURA, que aún decía «last-write-wins» (#22).
+
 ## 2.12.0 — 2026-11-16
 
 Versión de calidad: arquitectura, sincronización e ingeniería, en 14 PR revisados por la CI (#5 a #18). No cambian las salidas (PDF, Excel, nota ni exportación seudonimizada) ni la forma de usar la app.
