@@ -725,3 +725,39 @@ describe('versión de protocolo', () => {
     assert.equal(api.serverProtocol, PROTOCOL_VERSION);
   });
 });
+
+describe('servidor robusto', () => {
+  test('errores con código estable, 405 con Allow, 413 por tamaño, id de solicitud y registro sin datos', async () => {
+    const keys = await deriveTeamKeys(PASS, 1000);
+    const logs = [];
+    const handler = createSyncHandler({ store: memoryBlobStore(), tokenHash: tokenHash(keys.token), log: (e) => logs.push(e) });
+    const call = (path, init = {}) =>
+      handler(
+        new Request('https://x.test/api/sync/' + path, { ...init, headers: { authorization: 'Bearer ' + keys.token, ...init.headers } }),
+      );
+    const code = async (r) => (await r.json()).code;
+
+    const wrong = await call('list', { method: 'POST', body: '{}' });
+    assert.equal(wrong.status, 405);
+    assert.equal(wrong.headers.get('allow'), 'GET');
+    assert.equal(await code(wrong), 'metodo');
+    assert.equal(await code(await call('borrar', { method: 'POST', body: '{}' })), 'ruta');
+    assert.equal(await code(await call('put', { method: 'POST', body: '{no json' })), 'json_invalido');
+    const big = await call('put', { method: 'POST', body: 'x'.repeat(5_600_000) });
+    assert.equal(big.status, 413);
+    assert.equal(await code(big), 'demasiado_grande');
+    const denied = await handler(new Request('https://x.test/api/sync/list', { headers: { authorization: 'Bearer malo' } }));
+    assert.equal(await code(denied), 'token_invalido');
+
+    const ok = await call('list');
+    assert.equal(ok.status, 200);
+    assert.match(ok.headers.get('x-request-id'), /^[0-9a-f-]{16,}$/);
+    assert.notEqual(ok.headers.get('x-request-id'), denied.headers.get('x-request-id'));
+    assert.equal(ok.headers.get('x-content-type-options'), 'nosniff');
+
+    assert.equal(logs.length, 6);
+    assert.deepEqual(Object.keys(logs.at(-1)).sort(), ['action', 'esp', 'ms', 'reqId', 'status']);
+    assert.equal(logs.find((l) => l.status === 413).code, 'demasiado_grande');
+    assert.ok(!JSON.stringify(logs).includes(keys.token), 'el registro no contiene el token');
+  });
+});

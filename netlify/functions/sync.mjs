@@ -17,6 +17,8 @@ export default async (req) => {
   const handler = createSyncHandler({
     store: getStore({ name: 'hhr-rondas', consistency: 'strong' }),
     tokenHash: hashFor,
+    // Una línea JSON por solicitud (sin token ni datos): acción, especialidad, estado, duración, código.
+    log: (entry) => console.log(JSON.stringify({ fn: 'sync', ...entry })),
   });
   return handler(req);
 };

@@ -168,4 +168,8 @@ API (todas con `Authorization: Bearer <token>`):
 - `POST /api/sync/put`
 - `POST /api/sync/purge` (solo ids antiguos en claro)
 
-Cada solicitud admite hasta 200 elementos.
+Cada solicitud admite hasta 200 elementos y un cuerpo de hasta 5,5 MB (`413` si se excede).
+
+**Errores:** responden `{error, code}`. `error` es el texto para mostrar; `code` es un identificador estable para el cliente: `especialidad_invalida`, `no_configurado`, `token_invalido`, `cliente_antiguo`, `ruta`, `metodo` (con cabecera `Allow`), `json_invalido`, `demasiado_grande`, `lote_invalido`, `elemento_invalido`, `purga_invalida` e `interno`.
+
+**Diagnóstico:** cada respuesta lleva `x-request-id`. La función de Netlify escribe una línea JSON por solicitud con acción, especialidad, estado, duración y código; nunca el token ni datos.

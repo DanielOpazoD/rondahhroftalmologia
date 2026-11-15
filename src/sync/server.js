@@ -29,7 +29,49 @@
 import { sha256, toHex } from '../lib/sha256.js';
 import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
 
-export const LIMITS = Object.freeze({ itemsPerRequest: 200, ctMaxChars: 400_000, futureSkewMs: 24 * 3600 * 1000 });
+export const LIMITS = Object.freeze({
+  itemsPerRequest: 200,
+  ctMaxChars: 400_000,
+  futureSkewMs: 24 * 3600 * 1000,
+  /** Tamaño máximo del cuerpo de una solicitud (Netlify Functions acepta hasta ~6 MB). */
+  bodyMaxBytes: 5_500_000,
+});
+
+/** Método HTTP de cada acción. */
+const ROUTES = Object.freeze({ list: 'GET', get: 'POST', put: 'POST', purge: 'POST' });
+
+/**
+ * Respuesta de error con un `code` estable (para el cliente) y el texto para
+ * mostrar. Los códigos no cambian aunque cambie la redacción del mensaje.
+ */
+const fail = (status, code, error, extra = {}) => json(status, { error, code, ...extra });
+
+class BodyError extends Error {
+  constructor(status, code, message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/** Lee el cuerpo JSON con límite de tamaño. */
+async function readJson(req) {
+  const declared = Number(req.headers.get('content-length'));
+  if (declared > LIMITS.bodyMaxBytes) throw new BodyError(413, 'demasiado_grande', 'La solicitud es demasiado grande');
+  const text = await req.text();
+  if (text.length > LIMITS.bodyMaxBytes) throw new BodyError(413, 'demasiado_grande', 'La solicitud es demasiado grande');
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new BodyError(400, 'json_invalido', 'JSON inválido');
+  }
+}
+
+/** Id de solicitud para correlacionar registros (no contiene datos). */
+const requestId = () =>
+  typeof globalThis.crypto?.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const ESP_RE = /^[a-z][a-z0-9-]{1,39}$/;
@@ -123,43 +165,77 @@ function validItem(it, now, withPayload) {
  *   store: {list: Function, get: Function, setJSON: Function, delete: Function},
  *   tokenHash?: string | ((esp: string) => string | undefined),
  *   now?: () => number,
+ *   log?: (entry: {reqId: string, action: string, esp: string, status: number, ms: number, code?: string}) => void,
  * }} deps  `tokenHash` puede depender de la especialidad (contraseña distinta por ronda).
+ *   `log`: registro estructurado de cada solicitud (sin token ni datos; la función de Netlify lo escribe en sus logs).
  * @returns {(req: Request) => Promise<Response>}
  */
-export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now }) {
+export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now, log = () => {} }) {
   /**
    * Toda respuesta declara la versión de protocolo del servidor. Un cliente
    * que declara una versión menor a la mínima recibe 426 con el aviso de
    * actualizar. Los clientes anteriores a la 2.12 no la declaran y se aceptan.
    */
   return async function withProtocol(req) {
+    const started = Date.now();
+    const reqId = requestId();
     const declared = req.headers.get(PROTOCOL_HEADER);
     const res =
       declared !== null && !(Number(declared) >= MIN_CLIENT_PROTOCOL)
-        ? json(426, {
-            error: 'Esta versión de la app es demasiado antigua para el servidor. Recarga la página para actualizarla.',
-            minProtocol: MIN_CLIENT_PROTOCOL,
-          })
-        : await handle(req);
+        ? fail(
+            426,
+            'cliente_antiguo',
+            'Esta versión de la app es demasiado antigua para el servidor. Recarga la página para actualizarla.',
+            {
+              minProtocol: MIN_CLIENT_PROTOCOL,
+            },
+          )
+        : await handle(req, reqId);
     res.headers.set(PROTOCOL_HEADER, String(PROTOCOL_VERSION));
+    res.headers.set('x-request-id', reqId);
+    res.headers.set('x-content-type-options', 'nosniff');
+    const url = new URL(req.url);
+    let code;
+    if (res.status >= 400) {
+      code = (
+        await res
+          .clone()
+          .json()
+          .catch(() => ({}))
+      ).code;
+    }
+    log({
+      reqId,
+      action: url.pathname.split('/').filter(Boolean).pop() || '',
+      esp: url.searchParams.get('esp') || DEFAULT_ESP,
+      status: res.status,
+      ms: Date.now() - started,
+      ...(code ? { code } : {}),
+    });
     return res;
   };
 
-  async function handle(req) {
+  async function handle(req, reqId) {
     const url = new URL(req.url);
     const esp = url.searchParams.get('esp') || DEFAULT_ESP;
-    if (!ESP_RE.test(esp)) return json(400, { error: 'Especialidad inválida' });
+    if (!ESP_RE.test(esp)) return fail(400, 'especialidad_invalida', 'Especialidad inválida');
     const tokenHash = typeof tokenHashOpt === 'function' ? tokenHashOpt(esp) : tokenHashOpt;
     if (!tokenHash || !/^[0-9a-f]{64}$/.test(tokenHash)) {
-      return json(503, { error: 'Sincronización no configurada en el servidor (falta SYNC_TOKEN_SHA256).' });
+      return fail(503, 'no_configurado', 'Sincronización no configurada en el servidor (falta SYNC_TOKEN_SHA256).');
     }
     const auth = req.headers.get('authorization') || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
     if (!token || !safeEqual(toHex(sha256(token)), tokenHash)) {
-      return json(401, { error: 'Contraseña del equipo incorrecta para este servidor.' });
+      return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta para este servidor.');
     }
 
-    const action = url.pathname.split('/').filter(Boolean).pop();
+    const action = url.pathname.split('/').filter(Boolean).pop() || '';
+    if (!Object.hasOwn(ROUTES, action)) return fail(404, 'ruta', 'Ruta no encontrada');
+    if (req.method !== ROUTES[action]) {
+      const r = fail(405, 'metodo', `Usa ${ROUTES[action]} para ${action}`);
+      r.headers.set('allow', ROUTES[action]);
+      return r;
+    }
     const re = keyRe(esp);
     try {
       if (req.method === 'GET' && action === 'list') {
@@ -196,18 +272,13 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
       }
 
       if (req.method === 'POST' && (action === 'get' || action === 'put')) {
-        let body;
-        try {
-          body = await req.json();
-        } catch {
-          return json(400, { error: 'JSON inválido' });
-        }
+        const body = await readJson(req);
         const items = Array.isArray(body?.items) ? body.items : null;
         if (!items || items.length > LIMITS.itemsPerRequest) {
-          return json(400, { error: `Se esperan entre 0 y ${LIMITS.itemsPerRequest} elementos en "items"` });
+          return fail(400, 'lote_invalido', `Se esperan entre 0 y ${LIMITS.itemsPerRequest} elementos en "items"`);
         }
         const t = now();
-        if (!items.every((it) => validItem(it, t, action === 'put'))) return json(400, { error: 'Elemento inválido' });
+        if (!items.every((it) => validItem(it, t, action === 'put'))) return fail(400, 'elemento_invalido', 'Elemento inválido');
 
         if (action === 'get') {
           const out = await mapLimit(items, 16, async ({ id, u, h }) => {
@@ -242,15 +313,10 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
       }
 
       if (req.method === 'POST' && action === 'purge') {
-        let body;
-        try {
-          body = await req.json();
-        } catch {
-          return json(400, { error: 'JSON inválido' });
-        }
+        const body = await readJson(req);
         const ids = Array.isArray(body?.ids) ? body.ids : null;
         if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every((id) => typeof id === 'string' && LEGACY_ID_RE.test(id))) {
-          return json(400, { error: 'Solo se pueden borrar ids antiguos en claro' });
+          return fail(400, 'purga_invalida', 'Solo se pueden borrar ids antiguos en claro');
         }
         const purged = [];
         await mapLimit(ids, 8, async (id) => {
@@ -261,10 +327,11 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
         return json(200, { purged });
       }
 
-      return json(404, { error: 'Ruta no encontrada' });
+      return fail(404, 'ruta', 'Ruta no encontrada');
     } catch (e) {
-      console.error('sync error', e);
-      return json(500, { error: 'Error interno del servidor de sincronización' });
+      if (e instanceof BodyError) return fail(e.status, e.code, e.message);
+      console.error('sync error', reqId, e);
+      return fail(500, 'interno', 'Error interno del servidor de sincronización');
     }
   }
 }
