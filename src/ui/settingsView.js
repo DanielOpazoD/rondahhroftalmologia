@@ -89,10 +89,23 @@ export function initSettingsView(ctx) {
     if (!file) return;
     try {
       const incoming = parseBackup(await file.text());
-      const merged = mergeBackup(
-        { records: ctx.records, futureRecords: ctx.store.loadFutureRecords(), procs: ctx.procs, auditDocs: ctx.store.loadAuditDocs() },
-        incoming,
-      );
+      const localData = {
+        records: ctx.records,
+        futureRecords: ctx.store.loadFutureRecords(),
+        procs: ctx.procs,
+        auditDocs: ctx.store.loadAuditDocs(),
+      };
+      let merged = mergeBackup(localData, incoming);
+      if (merged.futureConflicts.length) {
+        const replace = await uiConfirm({
+          title: 'Atenciones de una versión más nueva',
+          message: `El respaldo trae ${merged.futureConflicts.length} atención(es) de una versión más nueva de la app que reemplazarían atenciones existentes en este equipo. Si no reconoces este archivo, no las reemplaces.`,
+          tone: 'warn',
+          okLabel: 'Reemplazar',
+          cancelLabel: 'Mantener las actuales',
+        });
+        if (replace) merged = mergeBackup(localData, incoming, { allowFutureOverride: true });
+      }
       ctx.store.saveRecords([...merged.records, ...merged.futureRecords]);
       ctx.store.saveAuditDocs(merged.auditDocs);
       ctx.store.saveProcs(merged.procs);

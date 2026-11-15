@@ -4,7 +4,11 @@
  */
 import { APP } from '../config/catalogs.js';
 import { normalizeRecord, sortRecords, isValidId } from './record.js';
-import { isFutureVersion } from './migrations.js';
+import { isFutureVersion, versionOf } from './migrations.js';
+import { SCHEMA_VERSION } from '../config/catalogs.js';
+
+/** Cuántas versiones de esquema por delante se aceptan en un respaldo. */
+export const MAX_FUTURE_STEPS = 3;
 import { mergeRecords, sameContent } from './merge.js';
 import { mergeAuditDocs } from './audit.js';
 
@@ -55,7 +59,8 @@ export function parseBackup(text) {
       .filter((r) => !isFutureVersion(r))
       .map(normalizeRecord)
       .filter((r) => r.id),
-    futureRecords: objects.filter((r) => isFutureVersion(r) && isValidId(r.id)),
+    // Solo versiones futuras plausibles (un archivo manipulado no puede declarar v999).
+    futureRecords: objects.filter((r) => isFutureVersion(r) && versionOf(r) <= SCHEMA_VERSION + MAX_FUTURE_STEPS && isValidId(r.id)),
     procs: Array.isArray(data.procs)
       ? data.procs
           .filter((p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())
@@ -70,9 +75,14 @@ export function parseBackup(text) {
  * Une un respaldo importado con los datos locales sin duplicar (por id).
  * Si una atención existe en ambos, se fusiona CAMPO A CAMPO (igual que la
  * sincronización): no se pierde lo que cada copia tenga. La bitácora se une.
- * @returns {{records: object[], futureRecords: object[], procs: object[], auditDocs: object[], added: number, updated: number, unchanged: number}}
+ * Una atención de versión FUTURA que reemplazaría a una atención actual con el
+ * mismo id NO se aplica salvo `allowFutureOverride` (la interfaz lo pregunta):
+ * un respaldo manipulado no puede ocultar atenciones existentes en silencio.
+ * @param {{allowFutureOverride?: boolean}} [opts]
+ * @returns {{records: object[], futureRecords: object[], procs: object[], auditDocs: object[], added: number, updated: number, unchanged: number, futureConflicts: string[]}}
  */
-export function mergeBackup(local, incoming) {
+export function mergeBackup(local, incoming, opts = {}) {
+  const { allowFutureOverride = false } = opts;
   const map = new Map(local.records.map((r) => [r.id, r]));
   let added = 0;
   let updated = 0;
@@ -95,7 +105,14 @@ export function mergeBackup(local, incoming) {
   }
   // Versiones futuras: se conservan intactas; entre dos, la más nueva.
   const future = new Map((local.futureRecords || []).map((r) => [r.id, r]));
+  const futureConflicts = [];
   for (const r of incoming.futureRecords || []) {
+    if (map.has(r.id)) {
+      // Reemplazaría una atención actual: solo con autorización explícita.
+      futureConflicts.push(r.id);
+      if (!allowFutureOverride) continue;
+      map.delete(r.id);
+    }
     if (!future.has(r.id) || (r.updated || 0) > (future.get(r.id).updated || 0)) future.set(r.id, r);
   }
   const audit = new Map((local.auditDocs || []).map((d) => [d.id, d]));
@@ -111,5 +128,6 @@ export function mergeBackup(local, incoming) {
     added,
     updated,
     unchanged,
+    futureConflicts,
   };
 }

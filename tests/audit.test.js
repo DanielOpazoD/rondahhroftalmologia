@@ -111,3 +111,24 @@ describe('respaldo v3', () => {
     assert.deepEqual(m.futureRecords, [futura]);
   });
 });
+
+describe('respaldo manipulado', () => {
+  test('una atención "futura" no reemplaza a una actual sin autorización, y se rechazan versiones implausibles', () => {
+    const actual = minimalRecord('a', { paciente_nombre: 'Real' }, { updated: 10 });
+    const falsa = { id: 'a', v: SCHEMA_VERSION + 1, updated: 99, f: { paciente_nombre: 'Falsa' } };
+    const absurda = { id: 'b', v: 999, updated: 1 };
+    const incoming = parseBackup(JSON.stringify({ atenciones: [falsa, absurda], procs: [] }));
+    assert.deepEqual(
+      incoming.futureRecords.map((r) => r.id),
+      ['a'],
+      'v999 se descarta',
+    );
+    const m = mergeBackup({ records: [actual], procs: [] }, incoming);
+    assert.deepEqual(m.futureConflicts, ['a']);
+    assert.equal(m.records[0].f.paciente_nombre, 'Real', 'por defecto se mantiene la actual');
+    assert.deepEqual(m.futureRecords, []);
+    const forced = mergeBackup({ records: [actual], procs: [] }, incoming, { allowFutureOverride: true });
+    assert.deepEqual(forced.records, []);
+    assert.equal(forced.futureRecords[0].f.paciente_nombre, 'Falsa');
+  });
+});
