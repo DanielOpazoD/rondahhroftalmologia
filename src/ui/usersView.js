@@ -268,6 +268,12 @@ export function initUsersView(ctx) {
     }
   }
 
+  /** Cuentas con nombre (también para el registro de accesos). */
+  ctx.loadAccountUsers = async () => {
+    await load();
+    return users;
+  };
+
   $('#usersAdd').addEventListener('click', () => create());
   $('#usersFromProfiles').addEventListener('click', createFromProfiles);
   $('#usersReload').addEventListener('click', () => void load());

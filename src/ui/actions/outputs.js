@@ -63,6 +63,7 @@ export function outputActions(ctx, store) {
         const r = await buildAttentionPdf(ctx.templateBytes(), rec, ctx.procs, ctx.pdfOptions());
         if (!withAnnexes) {
           download(r.bytes, pdfFileName(rec), 'application/pdf');
+          if (rec.id) ctx.accounts?.event('atencion.pdf', rec.id);
           toast(
             r.overflow.length ? `PDF descargado (con hoja complementaria: ${r.overflow.join(', ')})` : 'PDF descargado',
             r.overflow.length ? 4000 : 2200,
@@ -76,6 +77,7 @@ export function outputActions(ctx, store) {
         }
         const out = await appendAnnexes(r.bytes, anexos);
         download(out.bytes, pdfFileName(rec).replace(/\.pdf$/i, '_con_anexos.pdf'), 'application/pdf');
+        if (rec.id) ctx.accounts?.event('atencion.pdf', rec.id, { n: metas.length });
         const notes = [
           out.incrustados.length && `${out.incrustados.length} dentro del PDF (panel de adjuntos)`,
           out.faltantes.length && `${out.faltantes.length} aún no llegan a este equipo`,
@@ -86,6 +88,7 @@ export function outputActions(ctx, store) {
 
     async copyNote(rec) {
       const text = ctx.note(rec);
+      if (rec.id) ctx.accounts?.event('atencion.nota', rec.id);
       if (await copyText(text)) toast('Nota para Eloísa copiada');
       else {
         uiCopy({

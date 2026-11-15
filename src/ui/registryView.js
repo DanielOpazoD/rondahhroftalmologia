@@ -72,6 +72,7 @@ const sexLabel = (k) => SEXOS.find((s) => s.key === k)?.label || '';
 
 function showPatient(ctx, id) {
   ctx.openPatientId = id;
+  if (id) ctx.accounts?.event('ficha.ver', id);
   $('#patListView').hidden = Boolean(id);
   $('#patDetailView').hidden = !id;
   renderRegistry(ctx);

@@ -30,6 +30,7 @@ import { initHeaderFit } from './ui/headerFit.js';
 import { initAttachmentsView } from './ui/attachmentsView.js';
 import { createAccountsController } from './ui/accounts.js';
 import { initUsersView } from './ui/usersView.js';
+import { initAuditView } from './ui/auditView.js';
 import { applyPermissions, guardActions } from './ui/permissionsView.js';
 
 function getStorage() {
@@ -151,6 +152,7 @@ async function main() {
   initHeaderFit();
   initAttachmentsView(ctx);
   initUsersView(ctx);
+  initAuditView(ctx);
   guardActions(ctx);
   ctx.applyPermissions = () => applyPermissions(ctx);
   ctx.on('cuenta', () => applyPermissions(ctx));

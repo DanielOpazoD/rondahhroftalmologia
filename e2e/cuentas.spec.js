@@ -250,5 +250,32 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
   await tab(A, 'Atención');
   await expect(A.locator('#roBanner')).toBeHidden();
   await expect(A.locator('#plan')).toBeEnabled();
+
+  // Registro de accesos: lo que abrió y descargó Ana, con el nombre del paciente.
+  await syncNow(B); // envía los eventos pendientes
+  await expect
+    .poll(
+      async () =>
+        B.evaluate(() => Object.keys(localStorage).some((k) => k.endsWith('cuentas_eventos_v1') && localStorage.getItem(k) === '[]')),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+  await tab(A, 'Ajustes');
+  await expect(A.locator('#auditCard')).toBeVisible();
+  await A.locator('#audLoad').click();
+  const result = A.locator('#audResult');
+  await expect(result).toContainText('Sesiones', { timeout: 20_000 });
+  await A.locator('#audUser').selectOption({ label: 'Ana Admisión' });
+  await expect(result).toContainText('Abrió la ficha');
+  await expect(result).toContainText('Abrió la atención');
+  await expect(result).toContainText('Descargó el PDF');
+  await expect(result).toContainText('Paciente Clínico');
+  await expect(result).toContainText('Guardó cambios'); // su ingreso
+  await A.locator('#audGroup').selectOption('sesiones');
+  await expect(result).toContainText('Inició sesión');
+  const [xlsx] = await Promise.all([A.waitForEvent('download'), A.locator('#audXlsx').click()]);
+  expect(xlsx.suggestedFilename()).toMatch(/^registro_accesos_.*\.xlsx$/);
+  // Ana no ve el registro.
+  await expect(B.locator('#auditCard')).toBeHidden();
   await Promise.all([ca.close(), cb.close()]);
 });

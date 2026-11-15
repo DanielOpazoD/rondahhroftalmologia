@@ -69,6 +69,7 @@ export function exportStatsXlsx(ctx, button) {
       creator: 'Hospital Hanga Roa',
     });
     download(bytes, `estadistica_oftalmo_${suffix(ctx)}.xlsx`, XLSX_MIME);
+    ctx.accounts?.event('exportar.excel', undefined, { n: list.length });
     toast('Excel descargado');
   });
 }
@@ -89,6 +90,7 @@ async function exportPdfZip(ctx, button) {
       if (r.overflow.length) withAnnex.push(list[i]);
     }
     download(createZip(entries), `pdf_oftalmo_${suffix(ctx)}.zip`, 'application/zip');
+    ctx.accounts?.event('exportar.pdfs', undefined, { n: list.length });
     prog.textContent = `${list.length} PDF generados` + (withAnnex.length ? ` (${withAnnex.length} con hoja complementaria)` : '') + '.';
   });
 }
@@ -157,6 +159,7 @@ function exportAnon(ctx, format, button) {
     } else {
       download(buildXlsx(anonymizedSheets(result, ctx.procs), { title: 'Datos seudonimizados' }), name + '.xlsx', XLSX_MIME);
     }
+    ctx.accounts?.event('exportar.seudonimizado', undefined, { n: list.length });
     toast('Exportación seudonimizada descargada');
   });
 }
@@ -182,5 +185,6 @@ async function exportKeyTable(ctx, button) {
       `CONFIDENCIAL_correspondencia_${suffix(ctx)}.xlsx`,
       XLSX_MIME,
     );
+    ctx.accounts?.event('exportar.correspondencia', undefined, { n: list.length });
   });
 }
