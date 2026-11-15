@@ -71,3 +71,51 @@ test('adjuntos: respaldo incremental (cada parte una vez), con tope de tiempo, y
   assert.deepEqual(await restoreAttachments({ source: target, target: empty }), { partes: 4, escritas: 4 });
   assert.equal((await empty.get('oftalmologia-adjuntos/r/jx-3/100')).ct, 'PARTE3');
 });
+
+test('respaldo con adjuntos: ZIP con su contenido; al importar se verifica la huella y no se duplica', async () => {
+  const { buildBackup, parseBackup, packBackup, unpackBackup, attachmentsToImport } = await import('../src/core/backup.js');
+  const { sha256Hex } = await import('../src/core/attachments.js');
+  const foto = new Uint8Array([1, 2, 3, 4, 5]);
+  const informe = new Uint8Array([9, 8, 7]);
+  const meta = async (id, nombre, bytes) => ({
+    id,
+    atencionId: 'a1',
+    nombre,
+    tipo: 'image/png',
+    tamano: bytes.length,
+    sha256: await sha256Hex(bytes),
+    created: 1,
+  });
+  const metas = [
+    await meta('jfoto', 'fondo.png', foto),
+    await meta('jinf', 'informe.docx', informe),
+    await meta('jfalta', 'oct.pdf', foto),
+  ];
+  const backup = buildBackup({ records: [], procs: [], attachments: metas });
+  const zip = packBackup(
+    backup,
+    new Map([
+      ['jfoto', foto],
+      ['jinf', new Uint8Array([0, 0, 0])],
+    ]),
+  ); // informe dañado
+  const { text, contents } = unpackBackup(zip);
+  const incoming = parseBackup(text);
+  assert.equal(incoming.attachments.length, 3);
+  const r = await attachmentsToImport(incoming.attachments, contents, (id) => id === 'jfoto' && false);
+  assert.deepEqual(
+    r.metas.map((m) => m.id),
+    ['jfoto', 'jinf', 'jfalta'],
+  );
+  assert.deepEqual([...r.contents.keys()], ['jfoto'], 'solo el contenido que coincide con su huella');
+  assert.deepEqual(r.rechazados, ['informe.docx']);
+  // Lo que el equipo ya tiene no se vuelve a importar.
+  assert.deepEqual(
+    (await attachmentsToImport(incoming.attachments, contents, (id) => id === 'jfoto')).metas.map((m) => m.id),
+    ['jinf', 'jfalta'],
+  );
+  // Un respaldo JSON (anterior, o sin adjuntos) se sigue leyendo igual.
+  const plain = unpackBackup(new TextEncoder().encode(JSON.stringify(buildBackup({ records: [], procs: [] }))));
+  assert.equal(parseBackup(plain.text).attachments.length, 0);
+  assert.equal(plain.contents.size, 0);
+});

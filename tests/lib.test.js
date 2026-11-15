@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { sha256, hmacSha256, toHex } from '../src/lib/sha256.js';
-import { crc32, createZip } from '../src/lib/zip.js';
+import { crc32, createZip, readZip, isZip } from '../src/lib/zip.js';
 import { buildXlsx, columnLetter, sheetName, xmlEscape, STYLE } from '../src/lib/xlsx.js';
 import { readZipWithPython, sheetCells } from './helpers.js';
 
@@ -76,4 +76,20 @@ test('buildXlsx genera un libro legible con texto, números y estilos', () => {
   assert.ok(files['xl/worksheets/sheet1.xml'].includes('state="frozen"'));
   assert.ok(files['xl/worksheets/sheet1.xml'].includes('<autoFilter ref="A1:B4"/>'));
   assert.throws(() => buildXlsx([]));
+});
+
+test('readZip lee lo que escribe createZip y detecta daños', () => {
+  const zip = createZip([
+    { name: 'respaldo.json', data: '{"a":1}' },
+    { name: 'adjuntos/j1', data: new Uint8Array([0, 255, 7]) },
+  ]);
+  assert.ok(isZip(zip));
+  assert.equal(isZip(new TextEncoder().encode('{"app":1}')), false);
+  const files = readZip(zip);
+  assert.deepEqual([...files.keys()], ['respaldo.json', 'adjuntos/j1']);
+  assert.deepEqual([...files.get('adjuntos/j1')], [0, 255, 7]);
+  const bad = zip.slice();
+  bad[zip.indexOf(255)] = 254; // un byte del contenido
+  assert.throws(() => readZip(bad), /dañado/);
+  assert.throws(() => readZip(new Uint8Array([1, 2, 3])), /no es un ZIP/);
 });

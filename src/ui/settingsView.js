@@ -3,7 +3,8 @@
  */
 import { DEFAULT_PROCS } from '../specialties/activa/config.js';
 import { todayIso } from '../core/format.js';
-import { buildBackup, parseBackup, mergeBackup } from '../core/backup.js';
+import { buildBackup, parseBackup, mergeBackup, packBackup, unpackBackup, attachmentsToImport } from '../core/backup.js';
+import { fmtSize } from '../core/attachments.js';
 import { createSecret } from '../core/pseudonym.js';
 import { $, download, toast } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
@@ -72,19 +73,42 @@ export function initSettingsView(ctx) {
   ['#setFlatten', '#setFooter'].forEach((s) => $(s).addEventListener('change', saveSettings));
   ['#setPie', '#setDevice'].forEach((s) => $(s).addEventListener('change', saveSettings));
 
-  $('#bkExp').addEventListener('click', () => {
+  $('#bkExp').addEventListener('click', async () => {
+    const { store } = ctx;
+    const attachments = store.supportsAttachments() ? store.loadAttachments() : [];
     const data = buildBackup({
       records: ctx.records,
-      futureRecords: ctx.store.loadFutureRecords(),
+      futureRecords: store.loadFutureRecords(),
       procs: ctx.procs,
-      anonSecret: ctx.store.loadSecret(),
+      anonSecret: store.loadSecret(),
       practica: ctx.practice,
-      auditDocs: ctx.store.loadAuditDocs(),
-      patients: ctx.store.loadPatients(),
+      auditDocs: store.loadAuditDocs(),
+      patients: store.loadPatients(),
+      attachments,
     });
-    download(JSON.stringify(data), `respaldo_oftalmo_${todayIso()}.json`, 'application/json');
-    ctx.persist(() => ctx.store.saveLastBackup(Date.now()));
-    toast('Respaldo descargado');
+    // Con adjuntos, un ZIP con su contenido; sin adjuntos, el JSON de siempre.
+    /** @type {Map<string, Uint8Array>} */
+    const contents = new Map();
+    if (attachments.length) {
+      const have = new Set(await store.attachmentDataIds());
+      for (const a of attachments) {
+        const d = have.has(a.id) ? await store.loadAttachmentData(a.id) : undefined;
+        if (d) contents.set(a.id, d.bytes);
+      }
+    }
+    if (contents.size) {
+      const zip = packBackup(data, contents);
+      download(
+        new Blob([/** @type {BlobPart} */ (zip)], { type: 'application/zip' }),
+        `respaldo_oftalmo_${todayIso()}.zip`,
+        'application/zip',
+      );
+      toast(`Respaldo descargado (con ${contents.size} adjunto(s), ${fmtSize(zip.length)})`);
+    } else {
+      download(JSON.stringify(data), `respaldo_oftalmo_${todayIso()}.json`, 'application/json');
+      toast('Respaldo descargado');
+    }
+    ctx.persist(() => store.saveLastBackup(Date.now()));
   });
   $('#bkImpBtn').addEventListener('click', () => $('#bkImp').click());
   $('#bkImp').addEventListener('change', async (e) => {
@@ -92,7 +116,8 @@ export function initSettingsView(ctx) {
     e.target.value = '';
     if (!file) return;
     try {
-      const incoming = parseBackup(await file.text());
+      const { text, contents } = unpackBackup(new Uint8Array(await file.arrayBuffer()));
+      const incoming = parseBackup(text);
       // Los datos de ejemplo nunca entran a los datos reales (ni al revés).
       if (incoming.practica !== Boolean(ctx.practice)) {
         throw new Error(
@@ -123,6 +148,15 @@ export function initSettingsView(ctx) {
       ctx.store.saveAuditDocs(merged.auditDocs);
       ctx.store.savePatients(merged.patients);
       ctx.store.saveProcs(merged.procs);
+      // Adjuntos: primero el contenido (verificado), luego sus metadatos.
+      let attMsg = '';
+      if (incoming.attachments?.length && ctx.store.supportsAttachments()) {
+        const att = await attachmentsToImport(incoming.attachments, contents, (id) => Boolean(ctx.store.getAttachment(id)));
+        for (const [id, bytes] of att.contents) await ctx.store.saveAttachmentData(id, bytes);
+        ctx.store.saveAttachments(att.metas);
+        if (att.metas.length) attMsg = `\n\n${att.metas.length} adjunto(s) nuevo(s).`;
+        if (att.rechazados.length) attMsg += ` No se importó el contenido dañado de: ${att.rechazados.join(', ')}.`;
+      }
       let keyMsg = '';
       const local = ctx.store.loadSecret();
       if (incoming.anonSecret && !local) {
@@ -135,7 +169,7 @@ export function initSettingsView(ctx) {
       ctx.sync?.schedule();
       uiAlert({
         title: 'Respaldo importado',
-        message: `${merged.added} nuevas, ${merged.updated} actualizadas y ${merged.unchanged} sin cambios.${keyMsg}`,
+        message: `${merged.added} nuevas, ${merged.updated} actualizadas y ${merged.unchanged} sin cambios.${attMsg}${keyMsg}`,
         tone: 'ok',
       });
     } catch (err) {
