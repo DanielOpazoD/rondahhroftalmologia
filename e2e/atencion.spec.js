@@ -11,7 +11,8 @@ test('guardar una atención completa y verla en Pacientes', async ({ page }) => 
   await page.locator('#dxChips .chip[data-k="diagnostico_glaucoma"]').click();
   await page.locator('#procList .proc[data-id="t_aplan"] button[data-v="AO"]').click();
   await page.locator('#procList .proc[data-id="t_aplan"] input[data-e="od"]').fill('21');
-  await expect(page.locator('#tbState')).toHaveText('Sin guardar');
+  // Con guardado automático, el estado pasa solo a «Guardando…» y luego a «Guardada».
+  await expect(page.locator('#tbState')).toHaveText(/Guardando…|Guardada/);
   await save(page);
   await expect(page.locator('#toast')).toHaveText('Atención guardada');
   await expect(page.locator('#tbState')).toHaveText('Guardada');

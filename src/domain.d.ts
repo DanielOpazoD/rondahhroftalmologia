@@ -131,6 +131,8 @@ export interface AuditEntry {
   equipoId: string;
   autor?: string;
   autorId?: string;
+  /** Hora de la última edición juntada en esta entrada (guardado automático). */
+  hasta?: number;
   cambios: AuditChange[];
 }
 
