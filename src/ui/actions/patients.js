@@ -2,22 +2,14 @@
  * Acciones sobre pacientes: preingreso, nueva atención para un paciente,
  * completar datos desde su ficha y mantener las fichas al día.
  */
-import { blankRecord, normalizeRecord, newRecordId, applyBirthDate } from '../../core/record.js';
-import { stampChanges, mergeRecords, sameContent, ensureFt } from '../../core/merge.js';
-import {
-  patientFields,
-  missingPatients,
-  PATIENT_FIELDS,
-  resolvePatientId,
-  canonicalPatientId,
-  mergePatients,
-  patientLabel,
-} from '../../core/patient.js';
+import { blankRecord, applyBirthDate } from '../../core/record.js';
+import { patientFields, missingPatients, resolvePatientId, canonicalPatientId, mergePatients, patientLabel } from '../../core/patient.js';
 import { clock } from '../../core/clock.js';
 import { makeAuditEntry } from '../../core/audit.js';
 import { toast } from '../dom.js';
 import { syncAttentionView } from '../attentionView.js';
 import { confirmDiscard } from './attention.js';
+import { buildAdmission, nonEmpty, relinkRecord, patientUpdateFromRecord } from '../../app/attentions.js';
 import { uiConfirm } from '../modal.js';
 
 /**
@@ -35,7 +27,7 @@ export function patientActions(ctx, store) {
      * @returns {Promise<{ok: boolean, id?: string}>}
      */
     async admitPatient(data, { fecha, operativo = '' }) {
-      const f = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== ''));
+      const f = nonEmpty(data);
       if (!f.paciente_nombre && !f.paciente_rut) {
         toast('Escribe al menos el nombre o el RUT');
         return { ok: false };
@@ -49,14 +41,7 @@ export function patientActions(ctx, store) {
       }
       await ctx.ensureUser();
       const now = clock.tick();
-      const master = store.getPatient(pacienteId);
-      const rec = blankRecord({ op: operativo });
-      rec.f.fecha_atencion = fecha;
-      Object.assign(rec.f, patientFields(master?.f), f);
-      applyBirthDate(rec);
-      Object.assign(rec, { id: newRecordId(now), created: now, updated: now, pacienteId });
-      stampChanges(rec, { f: {} }, now);
-      const saved = normalizeRecord(rec);
+      const saved = buildAdmission({ fields: f, fecha, operativo, master: store.getPatient(pacienteId), pacienteId, now });
       const ok = ctx.persist(() => {
         ctx.records = store.upsertRecord(saved);
         ctx.syncPatientFromRecord(saved);
@@ -123,27 +108,8 @@ export function patientActions(ctx, store) {
      * el médico se conservan ambos.
      */
     syncPatientFromRecord(rec) {
-      if (!rec.pacienteId) return;
-      const fields = patientFields(rec.f);
-      const ft = {};
-      for (const k of PATIENT_FIELDS) {
-        const t = rec.ft?.['f.' + k] ?? (fields[k] ? rec.updated : undefined);
-        if (t) ft['f.' + k] = t;
-      }
-      const candidate = {
-        id: rec.pacienteId,
-        created: rec.created || rec.updated,
-        updated: rec.updated,
-        f: fields,
-        ft,
-        checks: {},
-        proc: {},
-      };
-      const current = store.getPatient(rec.pacienteId);
-      const next = current ? mergeRecords(current, candidate) : candidate;
-      if (current && sameContent(next, current)) return;
-      next.updated = Math.max(current?.updated || 0, rec.updated || 0, clock.tick());
-      store.upsertPatient(next);
+      const next = patientUpdateFromRecord(rec, rec.pacienteId ? store.getPatient(rec.pacienteId) : null, clock.tick());
+      if (next) store.upsertPatient(next);
     },
 
     /**
@@ -158,7 +124,7 @@ export function patientActions(ctx, store) {
       for (const p of missing) existing.set(p.id, p);
       const relinked = ctx.records
         .filter((r) => r.pacienteId && canonicalPatientId(existing, r.pacienteId) !== r.pacienteId)
-        .map((r) => relink(r, canonicalPatientId(existing, r.pacienteId), clock.tick()));
+        .map((r) => relinkRecord(r, canonicalPatientId(existing, r.pacienteId), clock.tick()));
       if (relinked.length) {
         for (const r of relinked) ctx.records = store.upsertRecord(r);
         ctx.sync?.schedule();
@@ -194,7 +160,7 @@ export function patientActions(ctx, store) {
       const done = ctx.persist(() => {
         store.savePatients([merged.keep, merged.drop]);
         for (const r of recs) {
-          const next = relink(r, keepId, at);
+          const next = relinkRecord(r, keepId, at);
           ctx.records = store.upsertRecord(next);
           const entry = makeAuditEntry({ tipo: 'editada', before: r, after: next, at: next.updated, ...ctx.author() });
           if (entry) store.addAuditEntry(next.id, entry);
@@ -216,12 +182,4 @@ export function patientActions(ctx, store) {
       ctx.refreshLists();
     },
   };
-}
-
-/** La atención pasa a la ficha `pacienteId` (cambio fechado: se sincroniza campo a campo). */
-function relink(r, pacienteId, at) {
-  const u = Math.max(at, (r.updated || 0) + 1);
-  // ensureFt: una atención antigua sin fechas por campo conserva las de sus otros campos.
-  const next = ensureFt(structuredClone(r));
-  return normalizeRecord({ ...next, pacienteId, updated: u, ft: { ...next.ft, pacienteId: u } });
 }

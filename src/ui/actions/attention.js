@@ -2,10 +2,11 @@
  * Acciones sobre la atención en edición: guardar, abrir, nueva, combinar con
  * otra del mismo paciente, recibir cambios de otro equipo y eliminar.
  */
-import { blankRecord, normalizeRecord, newRecordId, validateRecord, findDuplicate } from '../../core/record.js';
+import { blankRecord, normalizeRecord, validateRecord, findDuplicate } from '../../core/record.js';
 import { fmtDate } from '../../core/format.js';
-import { mergeRecords, ensureFt } from '../../core/merge.js';
-import { resolvePatientId, isAttended } from '../../core/patient.js';
+import { mergeRecords } from '../../core/merge.js';
+import { isAttended } from '../../core/patient.js';
+import { prepareSave } from '../../app/attentions.js';
 import { clock } from '../../core/clock.js';
 import { makeAuditEntry } from '../../core/audit.js';
 import { toast } from '../dom.js';
@@ -49,26 +50,8 @@ export function attentionActions(ctx, store) {
         if (!choice) return false;
         if (choice === 'ok') ctx.joinExisting(dup.id, { silent: true });
       }
-      const now = clock.tick();
-      let rec = normalizeRecord(ctx.rec);
-      if (!rec.id) {
-        rec.id = newRecordId(now);
-        rec.created = now;
-      }
-      // Si otro equipo cambió esta atención mientras se editaba, se fusiona campo a campo.
-      const stored = ctx.records.find((r) => r.id === rec.id);
-      if (stored) rec = normalizeRecord(mergeRecords(stored, rec));
-      // Vínculo con la ficha del paciente (unidad que agrupa sus atenciones).
-      // Por RUT entre las fichas (si se le agregó o corrigió el RUT, pasa a la ficha de ese RUT).
-      const prevPid = rec.pacienteId;
-      rec.pacienteId = resolvePatientId(rec.f, store.loadPatients(), rec.pacienteId) || undefined;
-      ensureFt(rec);
-      rec.updated = Math.max(now, (stored?.updated || 0) + 1);
-      // El vínculo con el paciente es un campo más: su cambio se fecha para que la fusión entre equipos lo respete.
-      if (rec.pacienteId !== prevPid) rec.ft.pacienteId = rec.updated;
-      rec.procNames = Object.fromEntries(
-        Object.keys(rec.proc).map((id) => [id, ctx.procs.find((p) => p.id === id)?.n || rec.procNames?.[id] || id]),
-      );
+      const stored = ctx.records.find((r) => r.id === ctx.rec.id) || null;
+      const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: clock.tick() });
       const ok = ctx.persist(() => {
         ctx.records = store.upsertRecord(rec);
         ctx.syncPatientFromRecord(rec);
