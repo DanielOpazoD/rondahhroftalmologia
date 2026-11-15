@@ -160,3 +160,72 @@ test('motor localStorage: JSON corrupto se lee como vacío', async () => {
   await repo.init();
   assert.deepEqual(repo.loadRecords(), []);
 });
+
+test('una escritura que falla no se da por guardada: se reintenta y no se pierde', async () => {
+  const base = await idbBackend('fallas', new IDBFactory());
+  let failNext = 0;
+  let puts = 0;
+  const flaky = {
+    ...base,
+    put: (c, d) => (puts++, failNext-- > 0 ? Promise.reject(Object.assign(new Error('disco'), { name: 'UnknownError' })) : base.put(c, d)),
+    putMany: (c, docs) => (failNext-- > 0 ? Promise.reject(new Error('disco')) : base.putMany(c, docs)),
+  };
+  const errors = [];
+  const repo = createRepo(flaky, { onError: (e) => errors.push(e), retries: 2, sleep: async () => {} });
+  await repo.init();
+
+  // Falla 2 veces y a la tercera funciona: reintento inmediato.
+  failNext = 2;
+  repo.upsertRecord(minimalRecord('a', { paciente_nombre: 'Ana' }));
+  await repo.flush();
+  assert.equal(errors.length, 0);
+  assert.equal(repo.failedCount(), 0);
+
+  // Falla más que los reintentos: se informa y queda PENDIENTE (no marcada como guardada).
+  failNext = 10;
+  repo.upsertRecord(minimalRecord('b', { paciente_nombre: 'Beto' }));
+  await repo.flush();
+  assert.equal(errors.length, 1);
+  assert.equal(repo.failedCount(), 1);
+  // Regresión: guardar el mismo contenido otra vez SÍ vuelve a intentar escribirlo.
+  failNext = 0;
+  const before = puts;
+  repo.upsertRecord(minimalRecord('b', { paciente_nombre: 'Beto' }));
+  assert.equal(puts, before + 1, 'se escribe en el acto (no quedó marcada como guardada)');
+  await repo.flush();
+  assert.equal(repo.failedCount(), 0);
+  const again = createRepo(base);
+  await again.init();
+  assert.deepEqual(
+    again
+      .loadRecords()
+      .map((r) => r.id)
+      .sort(),
+    ['a', 'b'],
+    'ambas quedaron en disco',
+  );
+});
+
+test('las escrituras pendientes se reintentan solas (flush / retryFailed)', async () => {
+  const base = await idbBackend('fallas2', new IDBFactory());
+  let down = true;
+  const flaky = {
+    ...base,
+    put: (c, d) => (down ? Promise.reject(new Error('no')) : base.put(c, d)),
+    putMany: (c, docs) => (down ? Promise.reject(new Error('no')) : base.putMany(c, docs)),
+  };
+  const repo = createRepo(flaky, { onError: () => {}, retries: 0, sleep: async () => {} });
+  await repo.init();
+  repo.upsertRecord(minimalRecord('c', { paciente_nombre: 'Cata' }));
+  await repo.flush();
+  assert.equal(repo.failedCount(), 1);
+  down = false;
+  await repo.flush(); // reintenta lo pendiente
+  assert.equal(repo.failedCount(), 0);
+  const again = createRepo(base);
+  await again.init();
+  assert.deepEqual(
+    again.loadRecords().map((r) => r.id),
+    ['c'],
+  );
+});

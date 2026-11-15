@@ -22,9 +22,15 @@ import { normalizePatient, patientLabel } from '../core/patient.js';
 
 /**
  * @param {Backend} backend
- * @param {{onError?: (e: Error) => void}} [opts] `onError`: avisa si falla una escritura en segundo plano
+ * @param {{onError?: (e: Error) => void, retries?: number, sleep?: (ms: number) => Promise<void>}} [opts]
+ *   `onError`: avisa si falla una escritura en segundo plano (tras los reintentos).
+ *   Una escritura fallida NO se da por guardada: queda pendiente y se reintenta
+ *   en el próximo `flush`/`retryFailed` (y la interfaz lo llama cada minuto).
  */
-export function createRepo(backend, { onError = (e) => console.error(e) } = {}) {
+export function createRepo(
+  backend,
+  { onError = (e) => console.error(e), retries = 2, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {},
+) {
   /** @type {Map<string, object>} */
   const records = new Map();
   /** Atenciones de una versión más nueva de la app: se conservan sin tocar. */
@@ -54,17 +60,80 @@ export function createRepo(backend, { onError = (e) => console.error(e) } = {}) 
     persisted.set(keyOf(col, doc.id), json);
     return true;
   };
+  /**
+   * Escrituras que fallaron tras los reintentos: clave -> {col, doc} (o {col, id, del}).
+   * Se vuelven a intentar en flush()/retryFailed(); mientras tanto los datos
+   * siguen en memoria y NO se marcan como guardados.
+   */
+  const failed = new Map();
+
+  /** Ejecuta `op` con reintentos inmediatos (retroceso corto) ante fallos. */
+  const withRetries = async (op) => {
+    for (let i = 0; ; i++) {
+      try {
+        return await op();
+      } catch (e) {
+        // Sin espacio: reintentar en el acto no sirve; queda pendiente para más tarde.
+        if (i >= retries || /** @type {any} */ (e)?.name === 'QuotaExceededError') throw e;
+        await sleep(100 * 2 ** i);
+      }
+    }
+  };
+
+  /** Escribe documentos; si falla, los desmarca y los deja pendientes. */
+  const write = (col, docs) =>
+    run(
+      withRetries(() => (docs.length === 1 ? backend.put(col, docs[0]) : backend.putMany(col, docs))).then(
+        () => {
+          for (const d of docs) failed.delete(keyOf(col, d.id));
+        },
+        (e) => {
+          for (const d of docs) {
+            persisted.delete(keyOf(col, d.id));
+            failed.set(keyOf(col, d.id), { col, doc: d });
+          }
+          throw e;
+        },
+      ),
+    );
+
   const putIfChanged = (col, doc) => {
-    if (markChanged(col, doc)) run(backend.put(col, doc));
+    if (markChanged(col, doc)) write(col, [doc]);
   };
   /** Escribe en UNA transacción todos los documentos que cambiaron (sincronización, importación). */
   const putManyIfChanged = (col, docs) => {
     const changed = docs.filter((d) => markChanged(col, d));
-    if (changed.length) run(backend.putMany(col, changed));
+    if (changed.length) write(col, changed);
   };
   const remove = (col, id) => {
     persisted.delete(keyOf(col, id));
-    run(backend.delete(col, id));
+    failed.delete(keyOf(col, id));
+    run(
+      withRetries(() => backend.delete(col, id)).catch((e) => {
+        failed.set(keyOf(col, id), { col, id, del: true });
+        throw e;
+      }),
+    );
+  };
+
+  /** Vuelve a intentar las escrituras pendientes (la versión más reciente de cada documento). */
+  const retryFailed = () => {
+    const items = [...failed.values()];
+    failed.clear();
+    const byCol = new Map();
+    for (const it of items) {
+      if (it.del) {
+        remove(it.col, it.id);
+        continue;
+      }
+      if (!byCol.has(it.col)) byCol.set(it.col, []);
+      byCol.get(it.col).push(it.doc);
+    }
+    for (const [col, docs] of byCol) {
+      for (const d of docs) persisted.set(keyOf(col, d.id), JSON.stringify(d));
+      write(col, docs);
+    }
+    return items.length;
   };
 
   /** Guarda una atención en memoria (separando las de versiones futuras). */
@@ -135,7 +204,14 @@ export function createRepo(backend, { onError = (e) => console.error(e) } = {}) 
     },
 
     /** Espera a que terminen las escrituras pendientes. */
-    flush: () => Promise.all([...pending]),
+    /** Espera las escrituras en curso (reintentando antes las que fallaron). */
+    flush: () => {
+      retryFailed();
+      return Promise.all([...pending].map((x) => x.catch(() => {})));
+    },
+    retryFailed,
+    /** Cuántas escrituras están pendientes por fallos (para avisar al usuario). */
+    failedCount: () => failed.size,
 
     /* ---------------------------------------------------------- atenciones */
 
