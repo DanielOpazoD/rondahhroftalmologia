@@ -584,6 +584,23 @@ input.warned {
   font-weight: 600;
   letter-spacing: 0.03em;
 }
+/* «PIO» en la lista de procedimientos: visible solo en los que la piden; en
+   los demás, «+ PIO» aparece al pasar el mouse o con el teclado. */
+.piotg:not(.on) {
+  border-color: transparent;
+  background: none;
+  color: var(--mut);
+  opacity: 0;
+}
+.it:hover .piotg:not(.on),
+.piotg:not(.on):focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .piotg:not(.on) {
+    opacity: 0.55;
+  }
+}
 
 .seg {
   display: inline-flex;
@@ -1725,6 +1742,21 @@ ol.hist ul li {
   color: var(--ink-2);
   font-size: 13px;
 }
+.patcard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.patcard #patNew {
+  flex: none;
+}
+.patsum {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--mut);
+}
 #patBack {
   margin-bottom: 10px;
 }
@@ -2301,4 +2333,48 @@ html.hdr-icons .userChip {
     animation: none;
     box-shadow: 0 0 0 2px var(--acc);
   }
+}
+
+/* Menú desplegable junto a un botón (ui/menu.js). */
+.menu {
+  position: fixed;
+  z-index: 55;
+  min-width: 220px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+}
+.menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.menu button:hover:not(:disabled),
+.menu button:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.menu button:disabled {
+  cursor: default;
+  color: var(--mut);
+}
+.menu .ml {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.menu .mh {
+  font-size: 12px;
+  color: var(--mut);
 }

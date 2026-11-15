@@ -40,7 +40,8 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
   // Los archivos descargados se distinguen.
   await tab(page, 'Ingreso');
   await page.locator('#ingList .pmain', { hasText: 'Ana Ejemplo Pakarati' }).click();
-  const [pdf] = await Promise.all([page.waitForEvent('download'), page.locator('#bPdf').click()]);
+  await page.locator('#bPdf').click();
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
   expect(pdf.suggestedFilename()).toMatch(/^PRACTICA_/);
   // Lo que se haga aquí no toca los datos reales.
   await page.locator('#bNew').click();

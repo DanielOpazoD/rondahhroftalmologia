@@ -176,9 +176,11 @@ describe('clinical', () => {
     assert.equal(eyeCount('XX'), 0);
   });
 
-  test('procedimiento que ya no está en la lista conserva su nombre guardado', () => {
+  test('procedimiento que se quitó de la lista: no se muestra ni se cuenta; al restaurarlo, vuelve', () => {
     const r = minimalRecord('a', {}, { proc: { viejo: { eye: 'OD', od: '20' } }, procNames: { viejo: 'Tonometría antigua' } });
-    const [p] = proceduresDone(r, PROCS);
+    assert.deepEqual(proceduresDone(r, PROCS), []);
+    assert.equal(r.proc.viejo.od, '20', 'el dato queda en la atención');
+    const [p] = proceduresDone(r, [...PROCS, { id: 'viejo', n: 'Tonometría antigua', pio: 1 }]);
     assert.equal(p.nombre, 'Tonometría antigua');
     assert.equal(p.pioOd, '20');
   });

@@ -22,12 +22,14 @@ export function procName(id, rec, procs) {
 
 /**
  * Procedimientos realizados, en el orden de la lista configurada (los que ya
- * no están en la lista van al final).
+ * no están en la lista no se incluyen).
  * @returns {{id: string, nombre: string, lado: string, oidos: number}[]}
  */
 export function proceduresDone(rec, procs) {
-  const ids = Object.keys(rec.proc || {});
-  const ordered = [...procs.filter((p) => rec.proc[p.id]).map((p) => p.id), ...ids.filter((id) => !procs.some((p) => p.id === id))];
+  // Solo los procedimientos de la lista configurada: uno que se quitó de la
+  // lista no se muestra ni se cuenta (el dato queda en la atención; si se
+  // restaura la lista, vuelve a aparecer).
+  const ordered = procs.filter((p) => rec.proc?.[p.id]).map((p) => p.id);
   return ordered.map((id) => ({ id, nombre: procName(id, rec, procs), lado: rec.proc[id].eye, oidos: sideCount(rec.proc[id].eye) }));
 }
 
