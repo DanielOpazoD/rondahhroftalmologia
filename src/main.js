@@ -28,6 +28,7 @@ import { startUpdateWatcher } from './ui/updateNotice.js';
 import { initErrorLog, logError } from './ui/errorLog.js';
 import { initHeaderFit } from './ui/headerFit.js';
 import { initAttachmentsView } from './ui/attachmentsView.js';
+import { createAccountsController } from './ui/accounts.js';
 
 function getStorage() {
   try {
@@ -125,9 +126,12 @@ async function main() {
   // Tras cada escritura que falla (aviso del repositorio), se muestra la barra.
   window.addEventListener('hhr:storage-error', () => setTimeout(saveBar, 0));
   initErrorLog(ctx);
-  // Bloqueo con PIN: antes de mostrar datos.
+  // Cuentas de usuario (ADR 0014) y bloqueo: antes de mostrar datos.
+  ctx.accounts = createAccountsController(ctx);
   ctx.lock = createLock(ctx);
-  ctx.lock.lock({ broadcast: false }); // abrir una pestaña nueva no bloquea las otras
+  ctx.accounts.start(); // con cuentas activadas, muestra el ingreso (o recupera la sesión de la pestaña)
+  // Con PIN: abrir una pestaña nueva no bloquea las otras. Con cuentas, el ingreso ya protege.
+  if (!ctx.accounts.active) ctx.lock.lock({ broadcast: false });
   $('#practiceEnter').addEventListener('click', () => location.assign(practiceUrl(true)));
   $('#appVersion').textContent = 'v' + ctx.version;
   $('#appVersionAj').textContent = ctx.version;
@@ -193,7 +197,7 @@ async function main() {
   registerServiceWorker();
   if (location.protocol !== 'file:') startUpdateWatcher(ctx);
   // Primero quién registra (si hay perfiles), luego el chequeo si hace días que no se usa.
-  ctx.lock.whenUnlocked(() => void ctx.askUserAtStart().then(() => autoCheck(ctx)));
+  ctx.accounts.whenReady(() => ctx.lock.whenUnlocked(() => void ctx.askUserAtStart().then(() => autoCheck(ctx))));
   // Termina de escribir lo pendiente al ocultar o cerrar la página.
   window.addEventListener('pagehide', () => {
     ctx.flushAutosave();

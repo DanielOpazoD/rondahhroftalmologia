@@ -80,6 +80,8 @@ export function createContext(store, templateB64) {
     lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
       null
     ),
+    /** Cuentas de usuario (lo asigna main.js; ver accounts.js y ADR 0014). @type {ReturnType<typeof import('./accounts.js').createAccountsController> | null} */
+    accounts: null,
     /** Perfil que registra en esta sesión (ver userView.js); null si no se eligió. */
     userId: /** @type {string | null} */ (null),
     /** Ya se preguntó quién registra en esta sesión. */
@@ -90,6 +92,9 @@ export function createContext(store, templateB64) {
     currentUser: () => (ctx.userId && ctx.medicos.find((m) => m.id === ctx.userId)) || null,
     /** Quién y desde dónde, para la bitácora. */
     author: () => {
+      // Con cuentas de usuario, el autor es la persona que entró (identidad verificada).
+      const acc = ctx.accounts?.user;
+      if (acc) return { equipo: ctx.deviceName(), equipoId: store.loadDeviceId(), autor: acc.nombre, autorId: acc.id };
       const u = ctx.currentUser();
       return {
         equipo: ctx.deviceName(),

@@ -234,6 +234,26 @@ export function createStore(storage, repo) {
     },
 
     /** Configuración de sincronización de este equipo, o null si está desactivada. */
+    /* ------------------------------------------------ cuentas (ADR 0014) */
+    loadAccountsOn: () => read(K.accountsOn, false) === true,
+    saveAccountsOn: (on) => write(K.accountsOn, Boolean(on)),
+    /** Cuentas que entraron en este PC: {[uid]: {uid, rut, sal, iter, localHash, nombre, rol, admin}}. */
+    loadLocalAccounts() {
+      const m = read(K.localAccounts, {});
+      return m && typeof m === 'object' && !Array.isArray(m) ? m : {};
+    },
+    saveLocalAccounts: (m) => write(K.localAccounts, m),
+    loadAccountEvents() {
+      const l = read(K.accountEvents, []);
+      return Array.isArray(l) ? l : [];
+    },
+    saveAccountEvents: (l) => write(K.accountEvents, l.slice(-500)),
+    loadSessionLockMinutes() {
+      const m = Number(read(K.sessionLock, 15));
+      return [5, 10, 15, 30, 60].includes(m) ? m : 15;
+    },
+    saveSessionLockMinutes: (m) => write(K.sessionLock, m),
+
     loadSyncConfig() {
       const c = read(K.sync, null);
       return c && typeof c.encKey === 'string' && typeof c.token === 'string' ? c : null;

@@ -308,6 +308,22 @@
       </details>
     </div>
   </div>
+  <div class="card" id="acctCard" hidden>
+    <h2>Cuentas de usuario <span class="badge" id="acctState"></span></h2>
+    <div id="acctActivate" hidden>
+      <p class="muted">Cada persona entra con su RUT y su clave; el historial de cambios y el registro de accesos quedan a su nombre. Al activarlas, <b>todos los PC</b> deberán entrar con una cuenta y la contraseña del equipo deja de servir para sincronizar.</p>
+      <button type="button" class="btn p sm" id="acctActivateBtn">Activar cuentas de usuario</button>
+    </div>
+    <div id="acctSession" hidden>
+      <p class="muted" id="acctWho"></p>
+      <div class="row u-gap8 u-wrap u-aic">
+        <button type="button" class="btn sm" id="acctPass">Cambiar mi clave</button>
+        <button type="button" class="btn sm" id="acctLogout">Cerrar sesión</button>
+        <label class="muted" for="acctLockMin">Bloquear tras</label>
+        <select id="acctLockMin" class="u-wauto"></select>
+      </div>
+    </div>
+  </div>
 
   <div class="card">
     <h2>Procedimientos realizados</h2>
@@ -404,9 +420,9 @@
   <div class="lockbox">
     <span class="logo"><svg aria-hidden="true"><use href="#i-lock"/></svg></span>
     <h3 id="lockTitle">Equipo bloqueado</h3>
-    <p class="muted">Ingresa el PIN de este equipo para continuar.</p>
+    <p class="muted" id="lockHint">Ingresa el PIN de este equipo para continuar.</p>
     <form id="lockForm" autocomplete="off">
-      <label class="sr" for="lockPin">PIN</label>
+      <label class="sr" for="lockPin" id="lockPinLabel">PIN</label>
       <input id="lockPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="PIN">
       <button type="submit" class="btn p" id="lockGo">Desbloquear</button>
     </form>
@@ -417,6 +433,33 @@
       <input id="lockCode" type="password" autocomplete="off" spellcheck="false">
       <button type="submit" class="btn" id="lockRecoverGo">Desbloquear y quitar el PIN</button>
     </form>
+  </div>
+</dialog>
+
+<dialog id="loginDlg" class="lockdlg" aria-labelledby="loginTitle">
+  <div class="lockbox loginbox">
+    <span class="logo"><svg aria-hidden="true"><use href="#i-user"/></svg></span>
+    <h3 id="loginTitle">Ingresar</h3>
+    <p class="muted">Rondas y operativos · Hospital Hanga Roa</p>
+    <form id="loginForm" autocomplete="on">
+      <label class="l" for="loginRut">RUT</label>
+      <input id="loginRut" autocomplete="username" spellcheck="false" placeholder="12.345.678-9">
+      <label class="l" for="loginPass">Clave</label>
+      <input id="loginPass" type="password" autocomplete="current-password">
+      <button type="submit" class="btn p" id="loginGo">Entrar</button>
+    </form>
+    <form id="pwForm" hidden autocomplete="off">
+      <p class="muted" id="pwHint">Es tu primer ingreso: crea tu clave personal.</p>
+      <label class="l" for="pwNew">Clave nueva</label>
+      <input id="pwNew" type="password" autocomplete="new-password" aria-describedby="pwRules">
+      <label class="l" for="pwNew2">Repite la clave nueva</label>
+      <input id="pwNew2" type="password" autocomplete="new-password">
+      <p class="hint" id="pwRules">Al menos 6 caracteres, con una mayúscula y un número.</p>
+      <button type="submit" class="btn p" id="pwGo">Guardar clave y entrar</button>
+    </form>
+    <p class="msg err" id="loginErr" role="alert"></p>
+    <p class="hint" id="loginFirst">¿Primer ingreso? Tu clave inicial es tu RUT sin dígito verificador.</p>
+    <button type="button" class="linkbtn" id="loginPractice">Practicar con datos de ejemplo</button>
   </div>
 </dialog>
 

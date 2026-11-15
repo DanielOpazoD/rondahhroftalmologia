@@ -7,6 +7,8 @@
  *   Si no hay perfiles creados, no se pregunta nada.
  * - La bitácora guarda ese perfil en cada cambio (además del equipo).
  * - Si el perfil es de un médico, las atenciones nuevas lo traen como médico.
+ * - Con cuentas de usuario (ADR 0014) no se pregunta: registra quien entró, y
+ *   el chip muestra su nombre con un menú (cambiar clave, bloquear, salir).
  */
 import { ESPECIALIDAD } from '../config/catalogs.js';
 import { blankRecord } from '../core/record.js';
@@ -17,6 +19,7 @@ import { openDialog } from './dialog.js';
 import { editProfile } from './catalogView.js';
 import { syncAttentionView } from './attentionView.js';
 import { PRACTICE_PREFIX } from './practice.js';
+import { openMenu } from './menu.js';
 
 const NEW = '__nuevo';
 const SKIP = '__ninguno';
@@ -51,13 +54,24 @@ export function initUserView(ctx) {
   ctx.ensureUser = () => ensureUser(ctx);
   /** Al abrir la app: se pregunta una vez por sesión (si hay perfiles), antes de empezar a escribir. */
   ctx.askUserAtStart = () => ensureUser(ctx);
-  $('#userChip').addEventListener('click', () => chooseUser(ctx));
+  $('#userChip').addEventListener('click', (e) => (ctx.accounts?.user ? accountMenu(ctx, e.currentTarget) : chooseUser(ctx)));
+  ctx.on('cuenta', () => renderUserChip(ctx));
   renderUserChip(ctx);
 }
 
 /** Chip del encabezado (solo si hay perfiles). */
 export function renderUserChip(ctx) {
   const chip = $('#userChip');
+  const acc = ctx.accounts?.user;
+  if (acc) {
+    chip.hidden = false;
+    setHtml(chip, html`<svg aria-hidden="true"><use href="#i-user"/></svg><span>${acc.nombre}</span>`);
+    chip.title = `Sesión de ${acc.nombre} (${rolLabel(acc.rol)}${acc.admin ? ', administrador/a' : ''}). Clic para opciones.`;
+    chip.setAttribute('aria-haspopup', 'menu');
+    chip.classList.remove('unset');
+    return;
+  }
+  chip.removeAttribute('aria-haspopup');
   chip.hidden = !ctx.medicos.length;
   const u = ctx.currentUser();
   setHtml(chip, html`<svg aria-hidden="true"><use href="#i-user"/></svg><span>${u ? u.nombre : 'Elegir perfil'}</span>`);
@@ -67,7 +81,7 @@ export function renderUserChip(ctx) {
 
 /** Pregunta quién registra si aún no se eligió en esta sesión (y hay perfiles). */
 async function ensureUser(ctx) {
-  if (ctx.userAsked || !ctx.medicos.length) return;
+  if (ctx.accounts?.active || ctx.userAsked || !ctx.medicos.length) return;
   await chooseUser(ctx);
 }
 
@@ -133,4 +147,20 @@ function setUser(ctx, id) {
     }
   }
   renderUserChip(ctx);
+}
+
+/** Menú de la sesión (con cuentas de usuario). @param {HTMLElement} anchor */
+async function accountMenu(ctx, anchor) {
+  const choice = await openMenu(
+    anchor,
+    [
+      { value: 'clave', label: 'Cambiar mi clave' },
+      { value: 'bloquear', label: 'Bloquear', hint: 'Pide tu clave para volver' },
+      { value: 'salir', label: 'Cerrar sesión' },
+    ],
+    { label: 'Sesión' },
+  );
+  if (choice === 'clave') ctx.accounts.changeMyPassword();
+  if (choice === 'bloquear') ctx.lock?.lock();
+  if (choice === 'salir') void ctx.accounts.logout('salir');
 }

@@ -8,30 +8,19 @@
  *   o, con la sincronización activa, la contraseña del equipo. Desbloquear
  *   así quita el PIN (hay que configurar uno nuevo).
  * - Es una protección de pantalla: no cifra los datos guardados (ver core/pin.js).
+ * - Con cuentas de usuario (ADR 0014) el bloqueo es de la SESIÓN: pide la
+ *   clave de la persona (verificada en el PC) y no usa el PIN del equipo.
  */
 import { createLockConfig, verifyPin, verifyRecovery, isLockConfig, lockoutMs, pinProblem, PIN_MINUTES } from '../core/pin.js';
 import { $, toast, nextFrame } from './dom.js';
 import { html, setHtml } from './html.js';
 import { openDialog } from './dialog.js';
 import { uiCopy, uiConfirm } from './modal.js';
+import { addGuard, showGuarded } from './guard.js';
 
 const ACTIVITY = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'input', 'scroll'];
 /** Cada cuánto se revisa la inactividad y se comparte la actividad entre pestañas. */
 const TICK_MS = 5_000;
-
-/**
- * Mientras está bloqueado, el bloqueo debe quedar SIEMPRE por encima de
- * cualquier otro diálogo modal (avisos de sincronización, «¿Quién registra?»,
- * el chequeo…). Se intercepta showModal: si se abre otro diálogo, el bloqueo
- * se vuelve a abrir encima en el mismo instante (sin intervalos ni saltos de foco).
- */
-/** @type {(d: HTMLDialogElement) => void} */
-let onAnyModal = () => {};
-const nativeShowModal = HTMLDialogElement.prototype.showModal;
-HTMLDialogElement.prototype.showModal = function showModal() {
-  nativeShowModal.call(this);
-  onAnyModal(this);
-};
 
 /** @param {any} ctx contexto de la aplicación (ver ui/context.js) */
 export function createLock(ctx) {
@@ -44,19 +33,36 @@ export function createLock(ctx) {
   };
   const dlg = $('#lockDlg');
   const root = document.documentElement;
-  onAnyModal = (d) => {
-    if (st.locked && d !== dlg) {
-      dlg.close();
-      nativeShowModal.call(dlg);
-      $('#lockPin').focus();
-    }
-  };
+  // Mientras está bloqueado, queda SIEMPRE por encima de cualquier otro diálogo.
+  addGuard(
+    dlg,
+    () => st.locked,
+    () => $('#lockPin').focus(),
+  );
+  /** ¿Bloqueo de la sesión de una cuenta (en vez del PIN del equipo)? */
+  const accountMode = () => Boolean(ctx.accounts?.user);
+  /** Configuración vigente: la de la cuenta (solo minutos) o la del PIN. */
+  const cfg = () => (accountMode() ? { minutes: store.loadSessionLockMinutes() } : st.config);
 
   // ----------------------------------------------------------- bloquear
   /** @param {{broadcast?: boolean}} [o] broadcast: avisar a las otras pestañas (lo hace quien bloquea). */
   function lock({ broadcast = true } = {}) {
-    if (!st.config || ctx.practice) return;
+    if (!cfg() || ctx.practice || st.locked) return;
     st.locked = true;
+    const acc = accountMode();
+    $('#lockTitle').textContent = acc ? 'Sesión bloqueada' : 'Equipo bloqueado';
+    $('#lockHint').textContent = acc
+      ? `Ingresa tu clave, ${ctx.accounts.user.nombre}, para continuar.`
+      : 'Ingresa el PIN de este equipo para continuar.';
+    const input = $('#lockPin');
+    input.inputMode = acc ? 'text' : 'numeric';
+    input.maxLength = acc ? 128 : 8;
+    input.placeholder = acc ? 'Clave' : 'PIN';
+    if (acc) input.removeAttribute('pattern');
+    else input.setAttribute('pattern', '[0-9]*');
+    $('#lockPinLabel').textContent = acc ? 'Clave' : 'PIN';
+    $('#lockForgot').textContent = acc ? 'Cerrar sesión (entrar con otra cuenta)' : 'Olvidé el PIN';
+    if (acc) ctx.accounts.event('sesion.bloqueo');
     // Oculta TODO lo demás, también al imprimir (Ctrl+P) y aunque el diálogo se cierre un instante.
     root.classList.add('locked');
     if (broadcast) ctx.persist(() => store.saveLockSignal(Date.now()));
@@ -64,12 +70,13 @@ export function createLock(ctx) {
     $('#lockErr').textContent = '';
     $('#lockRecover').hidden = true;
     $('#lockForgot').hidden = false;
-    if (!dlg.open) nativeShowModal.call(dlg);
+    if (!dlg.open) showGuarded(dlg);
     $('#lockPin').focus();
     render();
   }
 
   function unlock() {
+    if (st.locked && accountMode()) ctx.accounts.event('sesion.desbloqueo');
     st.locked = false;
     st.last = Date.now();
     root.classList.remove('locked');
@@ -101,12 +108,12 @@ export function createLock(ctx) {
     if (wait) return ($('#lockErr').textContent = wait);
     $('#lockGo').disabled = true;
     await nextFrame(); // deja dibujar el botón deshabilitado (la verificación tarda ~0,3 s)
-    const ok = verifyPin(st.config, $('#lockPin').value);
+    const ok = accountMode() ? await ctx.accounts.verifyPassword($('#lockPin').value) : verifyPin(st.config, $('#lockPin').value);
     $('#lockGo').disabled = false;
     if (ok) return unlock();
     failed();
     $('#lockPin').value = '';
-    $('#lockErr').textContent = waitMessage() || 'PIN incorrecto.';
+    $('#lockErr').textContent = waitMessage() || (accountMode() ? 'Clave incorrecta.' : 'PIN incorrecto.');
     $('#lockPin').focus();
   }
 
@@ -198,21 +205,22 @@ export function createLock(ctx) {
   const touch = () => {
     if (st.locked) return;
     st.last = Date.now();
-    if (st.config && st.last - shared > TICK_MS) {
+    if (cfg() && st.last - shared > TICK_MS) {
       shared = st.last;
       ctx.persist(() => store.saveLockActivity(shared));
     }
   };
   for (const ev of ACTIVITY) document.addEventListener(ev, touch, { capture: true, passive: true });
   const idleCheck = () => {
-    if (!st.config || st.locked) return;
+    const c = cfg();
+    if (!c || st.locked) return;
     const last = Math.max(st.last, store.loadLockActivity());
-    if (Date.now() - last >= st.config.minutes * 60_000) lock();
+    if (Date.now() - last >= c.minutes * 60_000) lock();
   };
   setInterval(idleCheck, TICK_MS);
   for (const ev of ['visibilitychange', 'focus', 'pageshow']) window.addEventListener(ev, idleCheck);
   window.addEventListener('storage', (e) => {
-    if (e.key === store.lockSignalKey && st.config) lock({ broadcast: false });
+    if (e.key === store.lockSignalKey && cfg()) lock({ broadcast: false });
   });
 
   // ----------------------------------------------------------- interfaz
@@ -236,18 +244,11 @@ export function createLock(ctx) {
   $('#lockForm').addEventListener('submit', tryUnlock);
   $('#lockRecover').addEventListener('submit', tryRecover);
   $('#lockForgot').addEventListener('click', () => {
+    if (accountMode()) return void ctx.accounts.logout('salir');
     $('#lockRecover').hidden = false;
     $('#lockForgot').hidden = true;
     $('#lockCodeLabel').textContent = ctx.sync?.enabled ? 'Código de recuperación o contraseña del equipo' : 'Código de recuperación';
     $('#lockCode').focus();
-  });
-  dlg.addEventListener('cancel', (e) => e.preventDefault()); // Escape no desbloquea
-  // Algunos navegadores cierran el diálogo con un segundo Escape: se reabre en el acto.
-  dlg.addEventListener('close', () => {
-    if (st.locked && !dlg.open) {
-      nativeShowModal.call(dlg);
-      $('#lockPin').focus();
-    }
   });
 
   function render() {
@@ -258,13 +259,15 @@ export function createLock(ctx) {
     $('#pinMinutes').hidden = !on;
     $('#pinMinutesLabel').hidden = !on;
     if (on) $('#pinMinutes').value = String(st.config.minutes);
-    $('#lockNow').hidden = !on || ctx.practice;
-    $('#pinCard').hidden = ctx.practice;
+    $('#lockNow').hidden = !(on || accountMode()) || ctx.practice;
+    // Con cuentas, el bloqueo es de la sesión (Ajustes → Cuentas); el PIN del equipo no se usa.
+    $('#pinCard').hidden = ctx.practice || accountMode();
   }
   render();
 
   return {
     lock,
+    render,
     /** Ejecuta `fn` cuando la pantalla esté desbloqueada (de inmediato si ya lo está). */
     whenUnlocked(fn) {
       if (st.locked) st.waiters.push(fn);

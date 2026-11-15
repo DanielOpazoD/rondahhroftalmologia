@@ -31,7 +31,9 @@ export function openDialog({ title, fields, okLabel = 'Guardar', onSave, onClose
     )}`,
   );
 
-  const values = () => Object.fromEntries(fields.map((f) => [f.id, $(`#dlg_${f.id}`).value.trim()]));
+  // Las claves no se recortan (un espacio al final es parte de la clave).
+  const values = () =>
+    Object.fromEntries(fields.map((f) => [f.id, f.type === 'password' ? $(`#dlg_${f.id}`).value : $(`#dlg_${f.id}`).value.trim()]));
   // Se notifica el cierre de inmediato (el evento "close" del navegador llega
   // de forma asíncrona y puede retrasarse); `done` evita avisar dos veces.
   let done = false;
