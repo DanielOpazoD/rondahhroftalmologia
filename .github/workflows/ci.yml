@@ -41,6 +41,17 @@ jobs:
         run: npm run build
       - name: dist/ está al día con el código fuente
         run: git diff --exit-code -- dist/ || (echo "::error::dist/ no coincide con el código. Ejecuta 'npm run build' y commitea dist/." && exit 1)
+      # Especialidad piloto: se construye en un directorio temporal (no toca dist/ ni se publica).
+      - name: Build de la especialidad piloto ORL (sin publicar)
+        env:
+          ESPECIALIDAD: orl
+        run: |
+          out="$RUNNER_TEMP/orl/index.html"
+          node scripts/build.mjs --out "$out"
+          grep -q 'id="otoscopia_od"' "$out" || (echo "::error::El build ORL no contiene el formulario ORL" && exit 1)
+          grep -q 'id="audiometria_od"' "$out" || (echo "::error::El build ORL no contiene el formulario ORL" && exit 1)
+          if grep -q 'id="od_pio"' "$out"; then echo "::error::El build ORL contiene el formulario de oftalmología" && exit 1; fi
+          git diff --exit-code -- dist/
 
   e2e:
     name: Pruebas en navegador (Playwright)

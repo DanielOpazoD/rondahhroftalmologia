@@ -1,0 +1,76 @@
+<!--
+  Especialidad OTORRINOLARINGOLOGÍA (piloto) — parte clínica del formulario de atención.
+  El build la inserta en src/index.html (marcador @FORMULARIO).
+  Los id de los campos coinciden con TEXT_FIELDS; los contenedores antChips, solChips,
+  dxChips, procList y procBadge los llena ui/attentionView.js.
+  cxBox, schBox, catBox y catSeg también los exige ui/attentionView.js (los nombra
+  fijos, pensados para oftalmología): schBox y catBox quedan vacíos y ocultos.
+  Ver docs/ESPECIALIDADES.md («Lo que el piloto encontró»).
+-->
+<div class="card">
+  <h2>Antecedentes</h2>
+  <div class="chips" id="antChips"></div>
+  <div class="g2">
+    <div id="cxBox" hidden>
+      <label class="l" for="antecedente_cirugia_detalle">Cirugía ORL: ¿cuál?</label><input id="antecedente_cirugia_detalle" />
+    </div>
+    <div><label class="l" for="antecedentes_otros">Otros antecedentes</label><input id="antecedentes_otros" /></div>
+  </div>
+  <label class="l" for="motivo_consulta">Motivo de consulta</label><textarea id="motivo_consulta" rows="2"></textarea>
+</div>
+
+<div class="card">
+  <h2>Examen físico</h2>
+  <div class="g2 eyes">
+    <div class="eye">
+      <h3>Oído derecho (OD)</h3>
+      <label class="l" for="otoscopia_od">Otoscopía</label><textarea id="otoscopia_od" rows="2"></textarea>
+      <label class="l" for="audiometria_od">Audiometría (PTP)</label
+      ><input id="audiometria_od" inputmode="decimal" placeholder="dB" /><small class="msg" data-msg="audiometria_od"></small>
+    </div>
+    <div class="eye">
+      <h3>Oído izquierdo (OI)</h3>
+      <label class="l" for="otoscopia_oi">Otoscopía</label><textarea id="otoscopia_oi" rows="2"></textarea>
+      <label class="l" for="audiometria_oi">Audiometría (PTP)</label
+      ><input id="audiometria_oi" inputmode="decimal" placeholder="dB" /><small class="msg" data-msg="audiometria_oi"></small>
+    </div>
+  </div>
+  <div class="g2">
+    <div><label class="l" for="rinoscopia">Rinoscopía</label><input id="rinoscopia" /></div>
+    <div><label class="l" for="orofaringe">Orofaringe</label><input id="orofaringe" /></div>
+  </div>
+  <label class="l" for="examen_obs">Observaciones</label><input id="examen_obs" />
+</div>
+
+<div class="card">
+  <h2>Procedimientos realizados <span class="badge" id="procBadge">0</span></h2>
+  <div id="procList" class="procs"></div>
+</div>
+
+<div class="card">
+  <h2>Exámenes solicitados</h2>
+  <div class="chips" id="solChips"></div>
+  <div id="schBox" hidden></div>
+  <label class="l" for="procedimientos_otros">Otros</label><input id="procedimientos_otros" />
+</div>
+
+<div class="card">
+  <h2>Diagnósticos</h2>
+  <div class="chips" id="dxChips"></div>
+  <div id="catBox" hidden><div id="catSeg"></div></div>
+  <label class="l" for="diagnosticos_otros">Otros diagnósticos</label><input id="diagnosticos_otros" />
+  <div class="g2">
+    <div><label class="l" for="ges">GES</label><input id="ges" /></div>
+    <div><label class="l" for="interconsulta">IC</label><input id="interconsulta" /></div>
+  </div>
+  <label class="l" for="receta">Receta</label><input id="receta" />
+</div>
+
+<div class="card">
+  <h2>Plan e indicaciones</h2>
+  <textarea id="plan" aria-label="Plan e indicaciones" rows="4"></textarea>
+  <div class="g2">
+    <div><label class="l" for="seguimiento">Seguimiento</label><input id="seguimiento" /></div>
+    <div><label class="l" for="alta">Alta</label><input id="alta" /></div>
+  </div>
+</div>

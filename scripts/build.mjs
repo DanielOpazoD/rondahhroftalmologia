@@ -13,10 +13,12 @@
  * El resultado funciona sin conexión abriéndolo con doble clic (file://),
  * que es como se usa en terreno.
  *
- * Uso: npm run build   (o: node scripts/build.mjs --out ruta/archivo.html)
+ * Uso: npm run build   (o: node scripts/build.mjs --out ruta/archivo.html, que escribe solo el HTML)
+ *      ESPECIALIDAD=orl node scripts/build.mjs --out /tmp/orl/index.html   (otra especialidad, sin tocar dist/)
  */
 import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -32,14 +34,19 @@ export const especialidadActiva = () => process.env.ESPECIALIDAD || 'oftalmologi
 /**
  * Redirige src/specialties/activa/* a la especialidad elegida
  * (por defecto oftalmologia). Así la plataforma no conoce la especialidad.
+ * La plantilla PDF es opcional: una especialidad que dibuja su PDF desde cero
+ * (p. ej. orl) no la tiene y recibe una plantilla vacía.
  */
 const especialidadPlugin = (id) => ({
   name: 'especialidad',
   setup(b) {
     b.onResolve({ filter: /^\.\.\/oftalmologia\// }, (args) => {
       if (!args.importer.includes(`${'/'}specialties${'/'}activa${'/'}`)) return undefined;
-      return { path: resolve(root, 'src/specialties', id, args.path.replace('../oftalmologia/', '')) };
+      const path = resolve(root, 'src/specialties', id, args.path.replace('../oftalmologia/', ''));
+      if (path.endsWith('plantilla.pdf') && !existsSync(path)) return { path, namespace: 'sin-plantilla' };
+      return { path };
     });
+    b.onLoad({ filter: /.*/, namespace: 'sin-plantilla' }, () => ({ contents: "export default '';", loader: 'js' }));
   },
 });
 
@@ -158,7 +165,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     await writeFile(outFile, html);
     console.log(`✔ ${outFile}`);
   } else {
-    const { html, buildId } = await buildSite();
-    console.log(`✔ dist/ (index.html ${(Buffer.byteLength(html) / 1024 / 1024).toFixed(2)} MB, build ${buildId})`);
+    // dist/ es el sitio publicado de oftalmología: otra especialidad se construye aparte (dist-<id>/).
+    const id = especialidadActiva();
+    const dir = id === 'oftalmologia' ? 'dist' : `dist-${id}`;
+    const { html, buildId } = await buildSite(resolve(root, dir));
+    console.log(`✔ ${dir}/ (index.html ${(Buffer.byteLength(html) / 1024 / 1024).toFixed(2)} MB, build ${buildId})`);
   }
 }
