@@ -272,6 +272,15 @@ function withOpaqueIds(deps) {
 }
 
 /**
+ * Una pasada de sincronización, en etapas:
+ *   1. preparar   — lista remota, ids en claro antiguos, estado local y plan
+ *   2. migrar     — baja los ids en claro aún no migrados (se aplican con id opaco)
+ *   3. fusionar   — antes de subir, fusiona con lo que también cambió en el servidor
+ *                   y resuelve conflictos (misma versión, distinta huella)
+ *   4. subir      — sube lo local más nuevo (y lo fusionado)
+ *   5. bajar      — baja lo más nuevo del servidor
+ *   6. aplicar    — aplica lo bajado sobre el estado local ACTUAL
+ * Cada etapa recibe el estado de la pasada (`PassState`) y lo deja explícito.
  * @param {Parameters<typeof syncOnce>[0] & {
  *   lids: Map<string, string> | null,
  *   wire: ((lid: string) => string) | null,
@@ -279,7 +288,32 @@ function withOpaqueIds(deps) {
  *   cache?: SyncCache,
  * }} deps
  */
-async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100, lids, wire, isLegacy, cache }) {
+async function syncPass(deps) {
+  const p = await preparePass(deps);
+  const legacyPulled = p.toMigrate.length ? await fetchItems(p, p.toMigrate, { fromLegacy: true }) : [];
+  const merged = deps.mergeFn ? await mergeBeforePush(p) : 0;
+  const { pushed, skipped } = await pushChanges(p);
+  p.pulled.push(...(await fetchItems(p, p.plan.pull)), ...legacyPulled);
+  const result = applyChanges(p);
+  return {
+    pushed,
+    skipped,
+    merged,
+    added: result.added,
+    updated: result.updated,
+    deleted: result.deleted,
+    // Lo migrado se sube con id opaco en la próxima pasada, y entonces se borra lo antiguo.
+    needsPush: result.needsPush || skipped > 0 || p.plan.conflicts.length > 0 || legacyPulled.length > 0,
+  };
+}
+
+/**
+ * @typedef {Awaited<ReturnType<typeof preparePass>>} PassState
+ */
+
+/** 1. Lista remota, ids en claro antiguos (se purgan los ya migrados), estado local y plan. */
+async function preparePass(deps) {
+  const { api, encKey, fingerprint, readLocal, lids, wire, isLegacy, cache } = deps;
   const remote = await listRemote(api, cache);
 
   // Ids en claro de versiones anteriores: no entran al plan. Si su versión
@@ -302,21 +336,20 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
     await api.purge(migrated.map((l) => l.id));
     for (const l of migrated) cache?.snapshot?.delete(l.id);
   }
-  const toMigrate = legacy.filter((l) => !isMigrated(l));
+
   const local0 = readLocal();
   const byId = new Map(local0.items.map((r) => [r.id, r]));
   const local = localVersions(local0.items, local0.tombstones);
 
   /**
-   * Huella del contenido local de un id. Se calcula en cada pasada (solo para
-   * ids con el mismo número de versión que el servidor): una caché entre
-   * pasadas podría quedar obsoleta al adoptar la versión del servidor.
+   * Huella del contenido local de un id (solo para ids con el mismo número de
+   * versión que el servidor). Si ya se verificó en una sincronización anterior
+   * (misma versión local y misma huella remota), no se recalcula: lo local
+   * solo cambia de contenido con una versión nueva o adoptando la del servidor.
    */
   const hashOf = (id) => {
     const v = local.get(id);
     const rec = byId.get(id);
-    // Ya verificado en una sincronización anterior: misma versión local y misma huella remota.
-    // (Lo local solo cambia de contenido con una versión nueva, o adoptando la del servidor.)
     const r = remote.get(id);
     const mark = `${v.u}|${v.deleted || !rec ? 'd' : 'r'}|${r?.h}`;
     if (cache && r?.h && cache.verified.get(id) === mark) return r.h;
@@ -327,101 +360,119 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
     if (cache && h === r?.h) cache.verified.set(id, mark);
     return h;
   };
-  const plan = planSync(local, remote, encKey && fingerprint ? hashOf : undefined);
-  const pulled = [];
-  const extraPush = [];
-  const tombBumps = {};
-
-  /** Baja y descifra versiones del servidor (`fromLegacy`: ids en claro que se migran a opacos). */
-  const fetchItems = async (list, { fromLegacy = false } = {}) => {
-    const out = [];
-    for (const batch of chunks(list, batchSize)) {
-      const res = await api.get(batch);
-      for (const it of res.items || []) {
-        if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
-        const content = await decryptPayload(key, it.id, it.u, it);
-        let id = it.id;
-        if (lids) {
-          // El id local viene dentro del contenido cifrado (o es el mismo id) y
-          // debe corresponder al id del servidor. El cifrado está atado al id
-          // del servidor, así que un elemento no se puede reubicar.
-          const lid = content.lid ?? it.id;
-          if (typeof lid !== 'string') continue;
-          if (fromLegacy) {
-            if (content.lid !== undefined || lid !== it.id) continue;
-            id = wire(lid);
-          } else if (wire(lid) !== it.id) continue;
-          lids.set(id, lid);
-        }
-        // `record` = formato de la v2.1 (solo atenciones)
-        const data = content.data ?? content.record;
-        out.push({
-          id,
-          u: it.u,
-          deleted: !!content.deleted,
-          kind: content.kind || 'atencion',
-          data: data && fromLegacy ? { ...data, id, updated: it.u } : data,
-        });
-      }
-    }
-    return out;
+  return {
+    deps,
+    remote,
+    local0,
+    byId,
+    plan: planSync(local, remote, encKey && fingerprint ? hashOf : undefined),
+    toMigrate: legacy.filter((l) => !isMigrated(l)),
+    /** Lo que se aplicará sobre el estado local al final. */
+    pulled: /** @type {object[]} */ ([]),
+    /** Ids a subir además del plan (fusionados, conflictos resueltos). */
+    extraPush: /** @type {string[]} */ ([]),
+    /** Eliminaciones locales que suben de versión para ganar un conflicto. */
+    tombBumps: /** @type {Record<string, number>} */ ({}),
   };
+}
 
-  const legacyPulled = toMigrate.length ? await fetchItems(toMigrate, { fromLegacy: true }) : [];
+/** Baja y descifra versiones del servidor (`fromLegacy`: ids en claro que se migran a opacos). */
+async function fetchItems(p, list, { fromLegacy = false } = {}) {
+  const { api, key, batchSize = 100, lids, wire } = p.deps;
+  const out = [];
+  for (const batch of chunks(list, batchSize)) {
+    const res = await api.get(batch);
+    for (const it of res.items || []) {
+      if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
+      const content = await decryptPayload(key, it.id, it.u, it);
+      let id = it.id;
+      if (lids) {
+        // El id local viene dentro del contenido cifrado (o es el mismo id) y
+        // debe corresponder al id del servidor. El cifrado está atado al id
+        // del servidor, así que un elemento no se puede reubicar.
+        const lid = content.lid ?? it.id;
+        if (typeof lid !== 'string') continue;
+        if (fromLegacy) {
+          if (content.lid !== undefined || lid !== it.id) continue;
+          id = wire(lid);
+        } else if (wire(lid) !== it.id) continue;
+        lids.set(id, lid);
+      }
+      // `record` = formato de la v2.1 (solo atenciones)
+      const data = content.data ?? content.record;
+      out.push({
+        id,
+        u: it.u,
+        deleted: !!content.deleted,
+        kind: content.kind || 'atencion',
+        data: data && fromLegacy ? { ...data, id, updated: it.u } : data,
+      });
+    }
+  }
+  return out;
+}
 
-  // 1. Fusionar antes de subir lo que también cambió en el servidor, y resolver
-  //    conflictos (mismo número de versión, distinto contenido).
+/**
+ * 3. Fusionar antes de subir lo que también cambió en el servidor, y resolver
+ * conflictos (mismo número de versión, distinto contenido).
+ * @returns {Promise<number>} cuántos elementos se fusionaron
+ */
+async function mergeBeforePush(p) {
+  const { mergeFn } = p.deps;
+  const { remote, byId, local0, plan, pulled, extraPush } = p;
   let merged = 0;
-  if (mergeFn) {
-    const isLiveLocal = (id) => byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated);
-    const both = plan.push
-      .filter((id) => remote.has(id) && isLiveLocal(id))
-      .map((id) => ({ id, u: remote.get(id).u, h: remote.get(id).h }));
-    const conflictIds = new Set(plan.conflicts.map((c) => c.id));
-    for (const r of await fetchItems([...both, ...plan.conflicts])) {
-      const localItem = byId.get(r.id);
-      const isConflict = conflictIds.has(r.id);
-      if (!localItem || !isLiveLocal(r.id) || r.deleted || r.kind !== localItem.kind) {
-        // Conflicto con una eliminación (o tipos distintos): se resuelve subiendo una versión nueva de lo local.
-        if (isConflict) bump(r.id, r.u);
-        continue;
-      }
-      const m = mergeFn(r.kind, localItem.data, { ...r.data, id: r.id, updated: r.u });
-      if (!m) {
-        if (isConflict) bump(r.id, r.u); // sin fusión posible: gana lo local con versión nueva
-        continue;
-      }
-      if (isConflict && m.sameAsRemote) {
-        // Lo local no aporta nada: se adopta la versión del servidor tal cual.
-        pulled.push({ id: r.id, u: r.u, kind: r.kind, data: { ...r.data, id: r.id, updated: r.u }, adopt: true });
-        continue;
-      }
-      const u = Math.max(localItem.updated, r.u) + 1;
-      const data = { ...m.data, id: r.id, updated: u };
-      byId.set(r.id, { ...localItem, updated: u, data });
-      pulled.push({ id: r.id, u, kind: r.kind, data });
-      if (isConflict) extraPush.push(r.id);
-      merged++;
+  const isLiveLocal = (id) => byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated);
+  const both = plan.push.filter((id) => remote.has(id) && isLiveLocal(id)).map((id) => ({ id, u: remote.get(id).u, h: remote.get(id).h }));
+  const conflictIds = new Set(plan.conflicts.map((c) => c.id));
+  for (const r of await fetchItems(p, [...both, ...plan.conflicts])) {
+    const localItem = byId.get(r.id);
+    const isConflict = conflictIds.has(r.id);
+    if (!localItem || !isLiveLocal(r.id) || r.deleted || r.kind !== localItem.kind) {
+      // Conflicto con una eliminación (o tipos distintos): se resuelve subiendo una versión nueva de lo local.
+      if (isConflict) bump(p, r.id, r.u);
+      continue;
     }
-  }
-
-  /** Sube lo local con una versión mayor que `remoteU` (desempate de conflictos). */
-  function bump(id, remoteU) {
-    const it = byId.get(id);
-    const tomb = local0.tombstones[id];
-    if (it && !(tomb >= it.updated)) {
-      const u = Math.max(it.updated, remoteU) + 1;
-      const data = { ...it.data, updated: u };
-      byId.set(id, { ...it, updated: u, data });
-      pulled.push({ id, u, kind: it.kind, data });
-    } else {
-      local0.tombstones[id] = Math.max(tomb || 0, remoteU) + 1;
-      tombBumps[id] = local0.tombstones[id];
+    const m = mergeFn(r.kind, localItem.data, { ...r.data, id: r.id, updated: r.u });
+    if (!m) {
+      if (isConflict) bump(p, r.id, r.u); // sin fusión posible: gana lo local con versión nueva
+      continue;
     }
-    extraPush.push(id);
+    if (isConflict && m.sameAsRemote) {
+      // Lo local no aporta nada: se adopta la versión del servidor tal cual.
+      pulled.push({ id: r.id, u: r.u, kind: r.kind, data: { ...r.data, id: r.id, updated: r.u }, adopt: true });
+      continue;
+    }
+    const u = Math.max(localItem.updated, r.u) + 1;
+    const data = { ...m.data, id: r.id, updated: u };
+    byId.set(r.id, { ...localItem, updated: u, data });
+    pulled.push({ id: r.id, u, kind: r.kind, data });
+    if (isConflict) extraPush.push(r.id);
+    merged++;
   }
+  return merged;
+}
 
-  // 2. Subir
+/** Sube lo local con una versión mayor que `remoteU` (desempate de conflictos). */
+function bump(p, id, remoteU) {
+  const { byId, local0, pulled, tombBumps, extraPush } = p;
+  const it = byId.get(id);
+  const tomb = local0.tombstones[id];
+  if (it && !(tomb >= it.updated)) {
+    const u = Math.max(it.updated, remoteU) + 1;
+    const data = { ...it.data, updated: u };
+    byId.set(id, { ...it, updated: u, data });
+    pulled.push({ id, u, kind: it.kind, data });
+  } else {
+    local0.tombstones[id] = Math.max(tomb || 0, remoteU) + 1;
+    tombBumps[id] = local0.tombstones[id];
+  }
+  extraPush.push(id);
+}
+
+/** 4. Subir lo local más nuevo (cifrado, con su huella de contenido). */
+async function pushChanges(p) {
+  const { api, key, encKey, fingerprint, batchSize = 100, lids, cache } = p.deps;
+  const { byId, local0, plan, extraPush } = p;
   let pushed = 0;
   let skipped = 0;
   for (const ids of chunks([...new Set([...plan.push, ...extraPush])], batchSize)) {
@@ -445,31 +496,21 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
     // Lo subido ya está en el servidor: se anota para no volver a compararlo.
     if (cache?.snapshot) {
       const saved = new Set(res.saved || []);
-      for (const p of payload) if (saved.has(p.id)) cache.snapshot.set(p.id, p.h ? { u: p.u, h: p.h } : { u: p.u });
+      for (const it of payload) if (saved.has(it.id)) cache.snapshot.set(it.id, it.h ? { u: it.u, h: it.h } : { u: it.u });
     }
     pushed += res.saved?.length || 0;
     skipped += res.skipped?.length || 0;
   }
+  return { pushed, skipped };
+}
 
-  // 3. Bajar lo que es más nuevo en el servidor (y lo migrado desde ids en claro)
-  pulled.push(...(await fetchItems(plan.pull)), ...legacyPulled);
-
-  // 4. Aplicar sobre el estado local ACTUAL (pudo cambiar mientras se esperaba la red).
-  let result = { added: 0, updated: 0, deleted: 0, needsPush: false };
-  if (pulled.length || Object.keys(tombBumps).length) {
-    const cur = readLocal();
-    const applied = applyPulled(cur.items, { ...cur.tombstones, ...tombBumps }, pulled, mergeFn);
-    writeLocal(applied.items, applied.tombstones);
-    result = applied;
-  }
-  return {
-    pushed,
-    skipped,
-    merged,
-    added: result.added,
-    updated: result.updated,
-    deleted: result.deleted,
-    // Lo migrado se sube con id opaco en la próxima pasada, y entonces se borra lo antiguo.
-    needsPush: result.needsPush || skipped > 0 || plan.conflicts.length > 0 || legacyPulled.length > 0,
-  };
+/** 6. Aplicar lo bajado sobre el estado local ACTUAL (pudo cambiar mientras se esperaba la red). */
+function applyChanges(p) {
+  const { readLocal, writeLocal, mergeFn } = p.deps;
+  const { pulled, tombBumps } = p;
+  if (!pulled.length && !Object.keys(tombBumps).length) return { added: 0, updated: 0, deleted: 0, needsPush: false };
+  const cur = readLocal();
+  const applied = applyPulled(cur.items, { ...cur.tombstones, ...tombBumps }, pulled, mergeFn);
+  writeLocal(applied.items, applied.tombstones);
+  return applied;
 }
