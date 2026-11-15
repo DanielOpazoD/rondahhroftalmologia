@@ -1716,6 +1716,11 @@ ol.hist ul li {
   background: var(--warn-soft);
   color: var(--warn);
 }
+/* Permisos por rol (ui/permissionsView.js): controles que la persona no puede usar. */
+body.perm-solo-lectura [data-perm~='clinico'],
+body.perm-sin-ajustes [data-perm~='ajustes'] {
+  display: none !important;
+}
 .state.bad {
   background: color-mix(in srgb, var(--bad) 12%, transparent);
   color: var(--bad);

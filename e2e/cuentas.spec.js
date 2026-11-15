@@ -189,3 +189,66 @@ test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre q
   await expect(B.locator('#pwForm')).toBeVisible();
   await Promise.all([ca.close(), cb.close()]);
 });
+
+/** Crea una cuenta desde el panel de usuarios (el administrador ya está en Ajustes). */
+async function createUser(page, { rut, nombre, rol }) {
+  await page.locator('#usersAdd').click();
+  await page.locator('#dlg_rut').fill(rut);
+  await page.locator('#dlg_nombre').fill(nombre);
+  await page.locator('#dlg_rol').selectOption(rol);
+  await page.locator('#dlgOk').click();
+  await expect(page.locator('#msgTitle')).toHaveText('Cuenta creada', { timeout: 20_000 });
+  await page.locator('#msgDlg').getByRole('button').first().click();
+}
+
+test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingreso y no cambia ajustes', async ({ browser }) => {
+  const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
+  const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
+  await adminReady(A);
+  await tab(A, 'Atención');
+  await A.locator('#bNew').click();
+  await fillPatient(A, { nombre: 'Paciente Clínico' });
+  await A.locator('#plan').fill('Control en 6 meses');
+  await save(A);
+  await syncNow(A);
+  await tab(A, 'Ajustes');
+  await createUser(A, { rut: '11.111.111-1', nombre: 'Ana Admisión', rol: 'administrativo' });
+
+  await B.goto('/');
+  await login(B, '11.111.111-1', '11111111');
+  await B.locator('#pwNew').fill('Admis1');
+  await B.locator('#pwNew2').fill('Admis1');
+  await B.locator('#pwGo').click();
+  await expect(B.locator('#loginDlg')).toBeHidden();
+  await syncNow(B);
+  // Ve la atención, en solo lectura.
+  await tab(B, 'Pacientes');
+  await B.locator('#regList .pmain', { hasText: 'Paciente Clínico' }).click();
+  await expect(B.locator('#patNew')).toBeHidden();
+  await expect(B.locator('#patAttentions [data-a="del"]')).toBeHidden();
+  await B.locator('#patAttentions .pmain').first().click();
+  await expect(B.locator('#roBanner')).toBeVisible();
+  await expect(B.locator('#plan')).toHaveValue('Control en 6 meses');
+  await expect(B.locator('#plan')).toBeDisabled();
+  await expect(B.locator('#paciente_nombre')).toBeDisabled();
+  await expect(B.locator('#bSave')).toBeHidden();
+  await expect(B.locator('#bNew')).toBeHidden();
+  await expect(B.locator('#attAdd')).toBeHidden();
+  // Puede descargar el PDF.
+  await B.locator('#bPdf').click();
+  const [pdf] = await Promise.all([B.waitForEvent('download'), B.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
+  expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
+  // Hace el ingreso.
+  await tab(B, 'Ingreso');
+  await B.locator('#ing_nombre').fill('Paciente Ingresado Por Admisión');
+  await B.locator('#ingAdd').click();
+  await expect(B.locator('#ingList')).toContainText('Paciente Ingresado Por Admisión');
+  // No cambia ajustes del sistema.
+  await tab(B, 'Ajustes');
+  for (const id of ['#ajAdd', '#bkImpBtn', '#medAdd', '#opAdd', '#wipe', '#usersCard']) await expect(B.locator(id)).toBeHidden();
+  // El administrador (médico) sí edita.
+  await tab(A, 'Atención');
+  await expect(A.locator('#roBanner')).toBeHidden();
+  await expect(A.locator('#plan')).toBeEnabled();
+  await Promise.all([ca.close(), cb.close()]);
+});

@@ -116,6 +116,7 @@ export function renderProcList(ctx) {
       ${p.pio ? html`<div class="pio">${['od', 'oi'].map((e) => html`<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${p.n}" placeholder="mmHg" inputmode="decimal"></label>`)}</div>` : ''}</div>`,
     )}`,
   );
+  ctx.applyPermissions?.(); // filas nuevas: solo lectura si la persona no edita lo clínico
 }
 
 const setPressed = (b, on) => {

@@ -188,7 +188,7 @@ function renderPatient(ctx, recs) {
             <div class="pact">
               <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${ICON('copy')}</button>
               <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu">${ICON('pdf')}</button>
-              <button type="button" class="ib sm danger" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
+              <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
             </div>
           </div>`;
   });

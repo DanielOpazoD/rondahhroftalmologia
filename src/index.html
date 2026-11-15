@@ -109,10 +109,10 @@
   <div class="toolbar">
     <div class="tb-title"><b id="tbName">Nueva atención</b><span id="tbState" role="status" aria-live="polite">Sin guardar</span></div>
     <div class="tb-actions">
-      <button type="button" class="ib" id="bNew" title="Nueva atención" aria-label="Nueva atención"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
+      <button type="button" class="ib" id="bNew" data-perm="clinico" title="Nueva atención" aria-label="Nueva atención"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
       <button type="button" class="ib" id="bCopy" title="Copiar nota para Eloísa" aria-label="Copiar nota para Eloísa"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
       <button type="button" class="ib" id="bPdf" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-pdf"/></svg></button>
-      <button type="button" class="btn p" id="bSave" title="Guardar (Ctrl/⌘ + S)"><svg aria-hidden="true"><use href="#i-check"/></svg><span>Guardar</span></button>
+      <button type="button" class="btn p" id="bSave" data-perm="clinico" title="Guardar (Ctrl/⌘ + S)"><svg aria-hidden="true"><use href="#i-check"/></svg><span>Guardar</span></button>
     </div>
   </div>
 
@@ -120,6 +120,8 @@
     <span id="remoteText"></span>
     <button type="button" class="btn sm" id="remoteClose">Entendido</button>
   </div>
+
+  <div class="banner" id="roBanner" hidden>Solo lectura: tu perfil puede ver las atenciones, no editarlas. El ingreso y los datos del paciente se registran en la pestaña Ingreso.</div>
 
   <div class="banner warn dupbar" id="dupBanner" hidden>
     <span id="dupText"></span>
@@ -154,7 +156,7 @@
     <p class="hint" id="attHint"></p>
     <ul class="attlist" id="attList"></ul>
     <input type="file" id="attInput" multiple hidden>
-    <button type="button" class="btn sm addbtn" id="attAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg>Adjuntar</button>
+    <button type="button" class="btn sm addbtn" id="attAdd" data-perm="clinico"><svg aria-hidden="true"><use href="#i-plus"/></svg>Adjuntar</button>
   </section>
 
   <details class="card history" id="histCard" hidden>
@@ -188,7 +190,7 @@
     <button type="button" class="btn sm" id="patBack">← Pacientes</button>
     <div class="card patcard" id="patCard">
       <div id="patCardInfo"></div>
-      <button type="button" class="btn p sm" id="patNew"><svg aria-hidden="true"><use href="#i-plus"/></svg>Nueva atención</button>
+      <button type="button" class="btn p sm" id="patNew" data-perm="clinico"><svg aria-hidden="true"><use href="#i-plus"/></svg>Nueva atención</button>
     </div>
     <div id="patAttentions" class="plist"></div>
   </div>
@@ -249,12 +251,12 @@
       <h2>Perfiles <span class="badge" id="medCount">0</span></h2>
       <p class="hint">Médicos y otros profesionales. Cada uno elige su perfil al registrar: el historial de cambios guarda quién hizo cada cambio.</p>
       <div class="list" id="medList"></div>
-      <button type="button" class="btn sm addbtn" id="medAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar perfil</button>
+      <button type="button" class="btn sm addbtn" id="medAdd" data-perm="ajustes"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar perfil</button>
     </div>
     <div class="card">
       <h2>Operativos <span class="badge" id="opCount">0</span></h2>
       <div class="list" id="opList"></div>
-      <button type="button" class="btn sm addbtn" id="opAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar operativo</button>
+      <button type="button" class="btn sm addbtn" id="opAdd" data-perm="ajustes"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar operativo</button>
     </div>
   </div>
 
@@ -341,7 +343,7 @@
     <h2>Procedimientos realizados</h2>
     <p class="muted">Agrega, ordena o quita procedimientos. «PIO» indica los que piden la presión intraocular por ojo. Un procedimiento quitado deja de mostrarse y de contarse (si lo restauras, vuelve con sus datos).</p>
     <div class="list" id="ajList"></div>
-    <div class="row u-mt10">
+    <div data-perm="ajustes" class="row u-mt10">
       <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" class="u-grow u-minw160">
       <label class="row muted u-gap4"><input type="checkbox" id="ajPio"> PIO</label>
       <button type="button" class="btn sm" id="ajAdd">Agregar</button>
@@ -361,7 +363,7 @@
       <p class="muted">Copia de las atenciones de este equipo (y sus adjuntos) en un archivo. Al importar se suman sin duplicar.</p>
       <div class="row">
         <button type="button" class="btn sm" id="bkExp">Descargar respaldo</button>
-        <button type="button" class="btn sm" id="bkImpBtn">Importar</button>
+        <button type="button" class="btn sm" id="bkImpBtn" data-perm="ajustes">Importar</button>
         <input type="file" id="bkImp" accept=".json,.zip,application/json,application/zip" hidden>
       </div>
     </div>
@@ -380,8 +382,8 @@
   <details class="card danger">
     <summary>Zona de cuidado</summary>
     <div class="row u-mt10">
-      <button type="button" class="btn d sm" id="anRegen">Nueva clave de seudonimización</button>
-      <button type="button" class="btn d sm" id="wipe">Borrar las atenciones de este equipo</button>
+      <button type="button" class="btn d sm" id="anRegen" data-perm="ajustes">Nueva clave de seudonimización</button>
+      <button type="button" class="btn d sm" id="wipe" data-perm="ajustes">Borrar las atenciones de este equipo</button>
     </div>
   </details>
   <p class="hint verfoot">Oftalmología · Rondas HHR · versión <span id="appVersionAj"></span></p>
