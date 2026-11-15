@@ -98,6 +98,10 @@ async function main() {
   const ctx = createContext(store, TEMPLATE_PDF_B64);
   ctx.practice = practice;
   ctx.storageKind = repo.kind;
+  // Pide al navegador no borrar los datos si le falta espacio (sin preguntar al usuario).
+  if (!practice) void navigator.storage?.persist?.().catch(() => {});
+  // Escrituras que fallaron (p. ej. disco lleno un momento): se reintentan cada minuto.
+  setInterval(() => repo.retryFailed?.(), 60_000);
   initErrorLog(ctx);
   // Bloqueo con PIN: antes de mostrar datos.
   ctx.lock = createLock(ctx);
