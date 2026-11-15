@@ -72,7 +72,7 @@ export function attentionActions(ctx, store) {
       ctx.snap = structuredClone(rec);
       ctx.dirty = false;
       syncAttentionView(ctx);
-      ctx.refreshLists();
+      ctx.emit('datos');
       ctx.sync?.schedule();
       toast(
         v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada',
@@ -170,7 +170,7 @@ export function attentionActions(ctx, store) {
         ctx.rec.id = null;
         syncAttentionView(ctx);
       }
-      ctx.refreshLists();
+      ctx.emit('datos');
       toast('Atención eliminada');
     },
   };

@@ -39,6 +39,8 @@ Las decisiones de fondo, con su porqué, están en el [registro de decisiones (A
 
 - **Paciente como unidad** (`core/patient.js`): cada atención es un episodio vinculado a la ficha de su paciente (`pacienteId`). Ver [MODELO_DATOS.md](MODELO_DATOS.md).
 
+- **Bus de eventos** (`ui/events.js`): las acciones y la sincronización anuncian qué cambió (`ctx.emit('datos')`) en vez de llamar a cada vista. Las vistas se suscriben, y los avisos de un mismo momento se agrupan: una sincronización que recibe 50 atenciones dibuja las listas una sola vez.
+
 Flujo típico: `evento → acción del contexto → store → render de las vistas afectadas`.
 
 ## Decisiones

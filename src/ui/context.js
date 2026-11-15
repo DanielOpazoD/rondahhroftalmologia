@@ -15,6 +15,7 @@ import { stampChanges } from '../core/merge.js';
 import { clock } from '../core/clock.js';
 import { $$, toast, base64ToBytes } from './dom.js';
 import { logError } from './errorLog.js';
+import { createBus, TOPICS } from './events.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
 import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
@@ -37,6 +38,7 @@ import { outputActions } from './actions/outputs.js';
  */
 export function createContext(store, templateB64) {
   let templateCache = null;
+  const bus = createBus();
 
   const ctx = {
     store,
@@ -121,6 +123,10 @@ export function createContext(store, templateB64) {
       if (ctx.currentTab === 't-exp') renderExportView(ctx);
     },
 
+    /** Anuncia un cambio (ver ui/events.js): las vistas suscritas se re-dibujan una vez. */
+    emit: (topic) => bus.emit(topic),
+    on: (topic, fn) => bus.on(topic, fn),
+
     /** Re-dibuja listas que dependen de los registros guardados. */
     refreshLists() {
       renderFilter(ctx);
@@ -143,7 +149,7 @@ export function createContext(store, templateB64) {
       renderProcList(ctx);
       renderSettings(ctx);
       syncAttentionView(ctx);
-      ctx.refreshLists();
+      ctx.emit(TOPICS.DATOS);
     },
 
     showTab(id) {
@@ -181,6 +187,8 @@ export function createContext(store, templateB64) {
     sync: null,
   };
   Object.assign(ctx, attentionActions(ctx, store), patientActions(ctx, store), catalogActions(ctx, store), outputActions(ctx, store));
+  // Las listas se re-dibujan cuando cambian los datos (agrupado por el bus).
+  bus.on(TOPICS.DATOS, () => ctx.refreshLists());
   ctx.snap = structuredClone(ctx.rec);
   return /** @type {typeof ctx & ReturnType<typeof attentionActions> & ReturnType<typeof patientActions> & ReturnType<typeof catalogActions> & ReturnType<typeof outputActions>} */ (
     ctx

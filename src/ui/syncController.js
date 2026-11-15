@@ -92,7 +92,7 @@ export function createSyncController(ctx) {
   function writePatients(items) {
     store.savePatients(items.filter((i) => i.kind === 'paciente').map((i) => ({ ...i.data, id: i.id, updated: i.updated })));
     for (const i of items) clock.observe(i.updated);
-    ctx.refreshLists();
+    ctx.emit('datos');
   }
 
   /** Todo lo que se sincroniza: atenciones, perfiles de médico y operativos. */
@@ -145,7 +145,7 @@ export function createSyncController(ctx) {
       if (fresh && fresh.updated !== ctx.rec.updated) ctx.absorbRemote(fresh);
       if (!fresh) toast('La atención abierta fue eliminada en otro equipo', 4000);
     }
-    ctx.refreshLists();
+    ctx.emit('datos');
   }
 
   async function syncNow({ quiet = true } = {}) {
