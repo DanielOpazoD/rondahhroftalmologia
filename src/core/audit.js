@@ -28,6 +28,7 @@ export function auditLabel(path, procs = []) {
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';
   if (path === 'pacienteId') return 'Paciente (vínculo)';
+  if (path.startsWith('adjunto.')) return 'Adjunto';
   if (path.startsWith('proc.')) {
     const rest = path.slice(5);
     const dot = rest.lastIndexOf('.');
@@ -78,6 +79,25 @@ export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, auto
     equipoId,
     ...(autor ? { autor: String(autor), autorId } : {}),
     cambios,
+  };
+}
+
+/**
+ * Entrada de bitácora por agregar o eliminar un adjunto (campo `adjunto.<id>`,
+ * con su nombre como valor nuevo o anterior).
+ * @param {{id: string, nombre: string, added: boolean, at: number, equipo: string, equipoId: string,
+ *   autor?: string, autorId?: string, rand?: () => number}} o
+ * @returns {import('../domain').AuditEntry}
+ */
+export function attachmentAuditEntry({ id, nombre, added, at, equipo, equipoId, autor, autorId, rand = Math.random }) {
+  return {
+    id: 'e' + at.toString(36) + rand().toString(36).slice(2, 8),
+    at,
+    tipo: 'editada',
+    equipo: equipo || 'Equipo sin nombre',
+    equipoId,
+    ...(autor ? { autor: String(autor), autorId } : {}),
+    cambios: [added ? { c: 'adjunto.' + id, d: nombre } : { c: 'adjunto.' + id, a: nombre }],
   };
 }
 

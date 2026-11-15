@@ -27,6 +27,7 @@ import { attentionActions } from './actions/attention.js';
 import { patientActions } from './actions/patients.js';
 import { catalogActions } from './actions/catalogs.js';
 import { outputActions } from './actions/outputs.js';
+import { attachmentActions } from './actions/attachments.js';
 
 /** Pausa al escribir tras la que se guarda solo (ms). */
 export const AUTOSAVE_MS = 1200;
@@ -211,7 +212,14 @@ export function createContext(store, templateB64) {
     /** Controlador de sincronización (se asigna en main.js). */
     sync: null,
   };
-  Object.assign(ctx, attentionActions(ctx, store), patientActions(ctx, store), catalogActions(ctx, store), outputActions(ctx, store));
+  Object.assign(
+    ctx,
+    attentionActions(ctx, store),
+    patientActions(ctx, store),
+    catalogActions(ctx, store),
+    outputActions(ctx, store),
+    attachmentActions(ctx, store),
+  );
   // Las listas se re-dibujan cuando cambian los datos (agrupado por el bus).
   bus.on(TOPICS.DATOS, () => ctx.refreshLists());
   ctx.snap = structuredClone(ctx.rec);
