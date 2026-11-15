@@ -9,6 +9,11 @@
  * Lo que se copia ya está CIFRADO en los equipos: el respaldo tampoco se
  * puede leer sin la contraseña del equipo. No se copian las marcas del índice
  * de cambios (`/c/`), que se reconstruyen solas, ni los contadores de intentos.
+ *
+ * Cuentas de usuario (ADR 0014): las cuentas, su índice por RUT y las sesiones
+ * (`_cuentas/…`, sin datos en claro) van en el documento diario. El registro
+ * de accesos (`_auditoria/…`) solo crece: se copia de forma incremental, como
+ * el contenido de los adjuntos (backupAuditLog).
  */
 
 export const KEEP_DAYS = 30;
@@ -18,7 +23,9 @@ const VERSION_KEY = /^[a-z][a-z0-9-]{1,39}\/r\//;
  * documento diario (puede pesar gigabytes): se respalda aparte, de forma
  * incremental, con backupAttachments (función programada cada hora).
  */
-const isBackedUp = (/** @type {string} */ key) => VERSION_KEY.test(key) && !/^[a-z0-9-]+-adjuntos\//.test(key);
+/** Cuentas, índice por RUT, configuración y sesiones (ADR 0014). */
+const ACCOUNT_KEY = /^_cuentas\//;
+const isBackedUp = (/** @type {string} */ key) => (VERSION_KEY.test(key) && !/^[a-z0-9-]+-adjuntos\//.test(key)) || ACCOUNT_KEY.test(key);
 const DAY_RE = /^(\d{4}-\d{2}-\d{2})\.json$/; // las claves `adjuntos/…` no son días
 
 /**
@@ -92,8 +99,11 @@ export async function restoreBackup({ source, target, day, dryRun = false }) {
   const doc = await source.get(`${day}.json`, { type: 'json' });
   if (!doc || typeof doc.claves !== 'object') throw new Error(`No hay respaldo del ${day}`);
   const entries = Object.entries(doc.claves).filter(([k]) => VERSION_KEY.test(k));
-  if (!dryRun) for (const [k, v] of entries) await target.setJSON(k, v);
-  return { claves: entries.length, escritas: dryRun ? 0 : entries.length };
+  // Cuentas: solo las que falten (nunca se pisa una cuenta vigente, p. ej. una clave cambiada después).
+  const present = new Set((await target.list({ prefix: '_cuentas/' })).blobs.map((b) => b.key));
+  const accounts = Object.entries(doc.claves).filter(([k]) => ACCOUNT_KEY.test(k) && !present.has(k));
+  if (!dryRun) for (const [k, v] of [...entries, ...accounts]) await target.setJSON(k, v);
+  return { claves: entries.length + accounts.length, escritas: dryRun ? 0 : entries.length + accounts.length };
 }
 
 /* ------------------------------------------------------------- adjuntos */
@@ -161,4 +171,45 @@ export async function restoreAttachments({ source, target, dryRun = false }) {
   const todo = backed.filter((k) => ATT_KEY.test(k) && !present.has(k));
   if (!dryRun) for (const k of todo) await target.setJSON(k, await source.get(ATT_PREFIX + k, { type: 'json' }));
   return { partes: todo.length, escritas: dryRun ? 0 : todo.length };
+}
+
+/* ------------------------------------------------ registro de accesos */
+
+const AUDIT_KEY = /^_auditoria\/\d{8}\//;
+const AUDIT_PREFIX = 'auditoria/';
+
+/**
+ * Respaldo INCREMENTAL del registro de accesos: cada evento una sola vez
+ * (`auditoria/<clave>`), con tope de tiempo por ejecución. Nunca se borra.
+ * @param {{source: BlobStore, target: BlobStore, budgetMs?: number, clock?: () => number}} o
+ * @returns {Promise<{copiados: number, pendientes: number}>}
+ */
+export async function backupAuditLog({ source, target, budgetMs = 10_000, clock = Date.now }) {
+  const started = clock();
+  const live = (await source.list({ prefix: '_auditoria/' })).blobs.map((b) => b.key).filter((k) => AUDIT_KEY.test(k));
+  const saved = new Set((await target.list({ prefix: AUDIT_PREFIX })).blobs.map((b) => b.key.slice(AUDIT_PREFIX.length)));
+  const missing = live.filter((k) => !saved.has(k));
+  let copiados = 0;
+  for (const k of missing) {
+    if (clock() - started > budgetMs) break;
+    const v = await source.get(k, { type: 'json' });
+    if (v !== null && v !== undefined) {
+      await target.setJSON(AUDIT_PREFIX + k, v);
+      copiados++;
+    }
+  }
+  return { copiados, pendientes: missing.length - copiados };
+}
+
+/**
+ * Repone los eventos del registro de accesos que falten en el servidor.
+ * @param {{source: BlobStore, target: BlobStore, dryRun?: boolean}} o `source`: respaldos; `target`: sincronización.
+ * @returns {Promise<{eventos: number, escritos: number}>}
+ */
+export async function restoreAuditLog({ source, target, dryRun = false }) {
+  const backed = (await source.list({ prefix: AUDIT_PREFIX })).blobs.map((b) => b.key.slice(AUDIT_PREFIX.length));
+  const present = new Set((await target.list({ prefix: '_auditoria/' })).blobs.map((b) => b.key));
+  const todo = backed.filter((k) => AUDIT_KEY.test(k) && !present.has(k));
+  if (!dryRun) for (const k of todo) await target.setJSON(k, await source.get(AUDIT_PREFIX + k, { type: 'json' }));
+  return { eventos: todo.length, escritos: dryRun ? 0 : todo.length };
 }

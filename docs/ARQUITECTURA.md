@@ -22,7 +22,7 @@ flowchart TD
   SPEC["specialties/activa/ → oftalmologia/<br/>catálogos, clínica, PDF, nota, Excel"]
   STORE["storage/ — repo (IndexedDB) · store (localStorage)"]
   LIB["lib/ — sha256, zip, xlsx"]
-  FN["netlify/functions/sync.mjs"]
+  FN["netlify/functions/ — sync · cuentas · respaldos"]
   UI --> APP & SYNC & CORE & SPEC & STORE
   APP --> CORE & SPEC
   SYNC --> CORE & LIB
@@ -40,6 +40,13 @@ flowchart TD
   - **Rendimiento medido:** guardar una atención toma unos 25 ms; una sincronización sin cambios con 20.000 atenciones, unos 140 ms (solo pide lo cambiado); la descarga inicial de 3.000 atenciones, unos 0,3 s.
 - **`ui/context.js`** guarda el estado (atención en edición, registros, filtro, ajustes) y lo transversal (persistir, re-dibujar, pestañas). Las acciones están en **`ui/actions/`**: `attention.js` (guardar, abrir, eliminar), `patients.js` (preingreso, fichas, unir duplicados), `catalogs.js` y `outputs.js` (PDF, nota). Las vistas llaman a esas acciones; nunca escriben en el almacenamiento directamente.
 - **HTML seguro** (`ui/html.js`): toda la interfaz arma su HTML con la plantilla `html\`…\``, que escapa sola cada dato interpolado, y lo escribe con `setHtml`. ESLint prohíbe asignar `innerHTML` directamente, así que un nombre de paciente con `<` o `&` nunca se interpreta como HTML.
+
+- **Cuentas de usuario** ([ADR 0014](adr/0014.md)):
+  - reglas puras en `core/accounts.js`, `core/permissions.js` y `core/accessLog.js`;
+  - criptografía del PC en `sync/accountCrypto.js`;
+  - servidor en `sync/accounts.js` (función `cuentas`), y la sincronización exige su sesión;
+  - interfaz: `ui/accounts.js` (ingreso, sesión, activación), `ui/usersView.js`, `ui/auditView.js` y `ui/permissionsView.js`;
+  - `ui/guard.js` mantiene el ingreso y el bloqueo por encima de cualquier diálogo.
 
 - **Paciente como unidad** (`core/patient.js`): cada atención es un episodio vinculado a la ficha de su paciente (`pacienteId`). Ver [MODELO_DATOS.md](MODELO_DATOS.md).
 

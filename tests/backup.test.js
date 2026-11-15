@@ -119,3 +119,30 @@ test('respaldo con adjuntos: ZIP con su contenido; al importar se verifica la hu
   assert.equal(parseBackup(plain.text).attachments.length, 0);
   assert.equal(plain.contents.size, 0);
 });
+
+test('cuentas y registro de accesos: las cuentas van en el respaldo diario y se reponen sin pisar las vigentes; el registro, incremental', async () => {
+  const { backupAuditLog, restoreAuditLog } = await import('../src/sync/backup.js');
+  const source = memoryBlobStore();
+  await source.setJSON('_cuentas/config', { activas: true });
+  await source.setJSON('_cuentas/u/uaaaaaaaaaaaaaaaa', { id: 'uaaaaaaaaaaaaaaaa', verificador: 'V1' });
+  await source.setJSON('_cuentas/rut/abc', { uid: 'uaaaaaaaaaaaaaaaa' });
+  await source.setJSON('_limites/cuentas/x', { fails: 3 }); // no se respalda
+  for (let i = 0; i < 3; i++) await source.setJSON(`_auditoria/20261115/${1000 + i}.r${i}`, { t: 1000 + i, ev: 'sesion.inicio' });
+  const target = memoryBlobStore();
+  const r = await dailyBackup({ source, target, now: T0 });
+  assert.equal(r.claves, 3);
+  const doc = await target.get(`${dayOf(T0)}.json`);
+  assert.ok(doc.claves['_cuentas/u/uaaaaaaaaaaaaaaaa']);
+  assert.equal(doc.claves['_limites/cuentas/x'], undefined);
+  assert.equal(doc.claves['_auditoria/20261115/1000.r0'], undefined, 'el registro va aparte (incremental)');
+  // Registro de accesos: cada evento una vez.
+  assert.deepEqual(await backupAuditLog({ source, target }), { copiados: 3, pendientes: 0 });
+  assert.deepEqual(await backupAuditLog({ source, target }), { copiados: 0, pendientes: 0 });
+  // Restaurar sobre un servidor donde la cuenta ya cambió su clave: no se pisa.
+  const live = memoryBlobStore();
+  await live.setJSON('_cuentas/u/uaaaaaaaaaaaaaaaa', { id: 'uaaaaaaaaaaaaaaaa', verificador: 'V2' });
+  const res = await restoreBackup({ source: target, target: live, day: dayOf(T0) });
+  assert.equal(res.escritas, 2, 'config e índice por RUT (faltaban)');
+  assert.equal((await live.get('_cuentas/u/uaaaaaaaaaaaaaaaa')).verificador, 'V2');
+  assert.deepEqual(await restoreAuditLog({ source: target, target: live }), { eventos: 3, escritos: 3 });
+});

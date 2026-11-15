@@ -34,7 +34,7 @@
  */
 import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { bytesToB64 } from './crypto.js';
-import { accountRut, loginState, USER_ID_RE, INITIAL_PASSWORD_DAYS, ACCOUNT_LOCK, SESSION_MS } from '../core/accounts.js';
+import { accountRut, loginState, newUserId, USER_ID_RE, INITIAL_PASSWORD_DAYS, ACCOUNT_LOCK, SESSION_MS } from '../core/accounts.js';
 import { ROLES } from '../config/catalogs.js';
 
 /** @typedef {import('./server.js').BlobStore} BlobStore */
@@ -648,11 +648,57 @@ export function createAccounts({
     return fail(404, 'ruta', 'Ruta no encontrada');
   }
 
+  /**
+   * Recuperación de un administrador SIN sesión (si se olvidaron todas las
+   * claves de administrador). Solo la usa un script con acceso al almacén y
+   * la contraseña del equipo (scripts/recover-admin.mjs; docs/OPERACION.md):
+   * la cuenta del RUT (o una nueva) queda como administradora activa con
+   * clave inicial, y sus sesiones abiertas se cierran.
+   * @param {{rut: string, rol?: string,
+   *   credentials: (uid: string, complemento: string) => Promise<{sal: string, iter: number, acceso: string, envuelta: {iv: string, ct: string}}>,
+   *   perfil?: (uid: string) => Promise<{iv: string, ct: string}>}} o
+   * @returns {Promise<{uid: string, creada: boolean}>}
+   */
+  async function recoverAdmin({ rut, rol = 'medico', credentials, perfil }) {
+    if (!ready) throw new Error('Falta el secreto del servidor');
+    if (!accountRut(rut)) throw new Error('RUT inválido');
+    if (!(await isActive())) throw new Error('Las cuentas de usuario no están activadas: no hay nada que recuperar.');
+    const t = now();
+    const u = await userByRut(rut);
+    const uid = u?.id || newUserId(rand);
+    const c = await credentials(uid, complementOf(uid));
+    if (!validCredentials(c)) throw new Error('Credenciales inválidas');
+    if (u) {
+      await putUser({
+        ...u,
+        admin: true,
+        estado: 'activo',
+        sal: c.sal,
+        iter: c.iter,
+        verificador: verifierOf(c.acceso),
+        envuelta: c.envuelta,
+        debeCambiar: true,
+        tempExpira: t + INITIAL_PASSWORD_DAYS * DAY_MS,
+        fallos: 0,
+        bloqueadaHasta: 0,
+        actualizado: t,
+      });
+      await closeSessionsOf(uid, 'clave_restablecida');
+    } else {
+      if (!perfil) throw new Error('No hay cuenta con ese RUT: indica el nombre para crearla.');
+      const acc = newAccount({ id: uid, rut, rol, admin: true, perfil: await perfil(uid), ...c }, null);
+      if (!(await insertAccount(acc))) throw new Error('No se pudo crear la cuenta');
+    }
+    await audit({ ev: 'usuario.recuperar', obj: uid });
+    return { uid, creada: !u };
+  }
+
   return {
     /** ¿Están activadas las cuentas? (desde ese momento la sincronización exige sesión) */
     active: isActive,
     authenticate,
     audit,
+    recoverAdmin,
     /** @param {Request} req */
     async handler(req) {
       const started = Date.now();
