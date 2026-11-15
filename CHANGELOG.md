@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.3.0 — 2026-11-14
+
+### Cambiado (solo interfaz; PDF, Excel y exportaciones no cambian)
+- Formulario más **compacto**:
+  - datos del paciente, operativo y fecha en una sola tarjeta;
+  - examen por ojo en una fila (AV, PIO, otro, resultado);
+  - procedimientos en dos columnas.
+- **Barra de la atención** fija arriba, con iconos para nueva, copiar nota, PDF y Guardar. Muestra el nombre del paciente y si hay cambios sin guardar. Reemplaza la barra inferior.
+- La pestaña **Registro** pasa a ser **Pacientes**: lista agrupada por día, con diagnósticos y número de procedimientos. Se abre tocando la fila, y cada fila tiene acciones con iconos.
+- Se quitó la pestaña **Nota**: la nota para Eloísa se copia con el botón de la barra o desde la lista.
+- La PIO de cada procedimiento indica el ojo («PIO OD», «PIO OI»).
+- Navegación en la misma línea que la marca en escritorio, y barra de pestañas inferior en el celular.
+
 ## 2.2.0 — 2026-11-14
 
 ### Cambiado

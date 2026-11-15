@@ -1,8 +1,11 @@
 /**
- * Pestaña Registro: búsqueda y acciones sobre atenciones guardadas.
+ * Pestaña Pacientes: lista de atenciones guardadas, agrupadas por día.
+ * Tocar una fila la abre; a la derecha, copiar nota, PDF y eliminar.
  */
+import { SEXOS } from '../config/catalogs.js';
 import { escapeHtml, fmtDate, normalizeText, cleanRut } from '../core/format.js';
 import { operativosOf } from '../core/stats.js';
+import { diagnosesList } from '../core/clinical.js';
 import { $ } from './dom.js';
 
 /** @param {import('./context.js').AppContext} ctx */
@@ -31,6 +34,43 @@ export function matchesQuery(rec, q) {
   return normalizeText(rec.f?.paciente_nombre).includes(nq) || (rq.length >= 3 && cleanRut(rec.f?.paciente_rut).includes(rq));
 }
 
+/** "viernes 14 de noviembre" (o la fecha dd-mm-aaaa si no se puede). */
+function dayLabel(iso) {
+  if (!iso) return 'Sin fecha';
+  const [y, m, d] = iso.split('-').map(Number);
+  try {
+    const s = new Date(y, m - 1, d).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  } catch {
+    return fmtDate(iso);
+  }
+}
+
+const ICON = (name) => `<svg><use href="#i-${name}"/></svg>`;
+
+function row(r, ctx) {
+  const f = r.f;
+  const id = escapeHtml(r.id);
+  const sexo = SEXOS.find((s) => s.key === f.paciente_sexo)?.key || '';
+  const meta = [f.paciente_rut, f.paciente_edad && `${f.paciente_edad} a`, sexo, f.operativo].filter(Boolean).map(escapeHtml).join(' · ');
+  const dx = diagnosesList(r, { withOthers: false });
+  const nProc = Object.keys(r.proc || {}).length;
+  const tags = [...dx.slice(0, 3).map((d) => `<span class="tag">${escapeHtml(d)}</span>`), nProc ? `<span class="tag soft">${nProc} proc.</span>` : ''].join('');
+  const active = ctx.rec.id === r.id ? ' active' : '';
+  return `<div class="prow${active}">
+    <button type="button" class="pmain" data-a="open" data-id="${id}" title="Abrir atención">
+      <span class="pname">${escapeHtml(f.paciente_nombre || '(sin nombre)')}</span>
+      <span class="pmeta">${meta}</span>
+      ${tags ? `<span class="ptags">${tags}</span>` : ''}
+    </button>
+    <div class="pact">
+      <button type="button" class="ib sm" data-a="copy" data-id="${id}" title="Copiar nota para Eloísa" aria-label="Copiar nota">${ICON('copy')}</button>
+      <button type="button" class="ib sm" data-a="pdf" data-id="${id}" title="Descargar PDF" aria-label="Descargar PDF">${ICON('pdf')}</button>
+      <button type="button" class="ib sm danger" data-a="del" data-id="${id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
+    </div>
+  </div>`;
+}
+
 export function renderRegistry(ctx) {
   const sel = $('#regOp');
   const ops = operativosOf(ctx.records);
@@ -42,18 +82,24 @@ export function renderRegistry(ctx) {
   const op = sel.value;
   const list = ctx.records.filter((r) => (!op || r.f.operativo === op) && matchesQuery(r, q));
   $('#regCount').textContent = list.length;
-  $('#regList').innerHTML = list.length
-    ? list
-        .map((r) => {
-          const f = r.f;
-          const n = Object.keys(r.proc || {}).length;
-          const meta = [f.paciente_rut, fmtDate(f.fecha_atencion), f.paciente_edad && f.paciente_edad + ' a', `${n} proc.`, f.operativo].filter(Boolean).map(escapeHtml).join(' · ');
-          return `<div class="it"><div class="t"><b>${escapeHtml(f.paciente_nombre || '(sin nombre)')}</b><span class="muted">${meta}</span></div>
-          <button type="button" class="btn sm" data-a="open" data-id="${escapeHtml(r.id)}">Abrir</button>
-          <button type="button" class="btn sm" data-a="pdf" data-id="${escapeHtml(r.id)}">PDF</button>
-          <button type="button" class="btn sm" data-a="copy" data-id="${escapeHtml(r.id)}">Nota</button>
-          <button type="button" class="btn d sm" data-a="del" data-id="${escapeHtml(r.id)}" aria-label="Eliminar atención">✕</button></div>`;
-        })
-        .join('')
-    : `<p class="muted">${ctx.records.length ? 'Sin resultados para esta búsqueda.' : 'Aún no hay atenciones guardadas.'}</p>`;
+
+  if (!list.length) {
+    $('#regList').innerHTML = `<div class="empty">${ctx.records.length ? 'Sin resultados para esta búsqueda.' : 'Aún no hay pacientes atendidos.<br>Las atenciones guardadas aparecerán aquí.'}</div>`;
+    return;
+  }
+  // ctx.records ya viene ordenado por fecha descendente.
+  const groups = new Map();
+  for (const r of list) {
+    const k = r.f.fecha_atencion || '';
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  $('#regList').innerHTML = [...groups]
+    .map(
+      ([day, recs]) => `<section class="pgroup">
+        <h3><span>${escapeHtml(dayLabel(day))}</span><span>${recs.length} ${recs.length === 1 ? 'paciente' : 'pacientes'}</span></h3>
+        ${recs.map((r) => row(r, ctx)).join('')}
+      </section>`,
+    )
+    .join('');
 }

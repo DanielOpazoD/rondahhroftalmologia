@@ -18,107 +18,118 @@
   <defs>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-form" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></symbol>
-    <symbol id="i-note" viewBox="0 0 24 24"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></symbol>
-    <symbol id="i-list" viewBox="0 0 24 24"><circle cx="5" cy="6" r="1.2"/><circle cx="5" cy="12" r="1.2"/><circle cx="5" cy="18" r="1.2"/><path d="M9 6h11M9 12h11M9 18h11"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.2 3.2 0 0 1 0 6.4M18 14.4c1.8.8 3 2.6 3 4.6"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
     <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5 12 17l2.5-2.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
   </defs>
 </svg>
 <header class="top">
   <div class="topin">
     <div class="brand">
       <span class="logo"><svg><use href="#i-eye"/></svg></span>
-      <div><b>Oftalmología</b><small>Rondas y operativos · Hospital Hanga Roa</small></div>
+      <div><b>Oftalmología</b><small>Rondas · Hospital Hanga Roa</small></div>
     </div>
+    <nav role="tablist" aria-label="Secciones">
+      <button type="button" role="tab" data-tab="t-at" class="on"><svg><use href="#i-form"/></svg><span>Atención</span></button>
+      <button type="button" role="tab" data-tab="t-reg"><svg><use href="#i-users"/></svg><span>Pacientes</span></button>
+      <button type="button" role="tab" data-tab="t-est"><svg><use href="#i-chart"/></svg><span>Estadística</span></button>
+      <button type="button" role="tab" data-tab="t-exp"><svg><use href="#i-export"/></svg><span>Exportar</span></button>
+      <button type="button" role="tab" data-tab="t-aj"><svg><use href="#i-gear"/></svg><span>Ajustes</span></button>
+    </nav>
     <div class="topr">
       <button type="button" class="syncBadge" id="syncBadge" hidden></button>
       <span class="ver" id="appVersion"></span>
     </div>
   </div>
-  <nav role="tablist" aria-label="Secciones">
-    <button type="button" role="tab" data-tab="t-at" class="on"><svg><use href="#i-form"/></svg><span>Atención</span></button>
-    <button type="button" role="tab" data-tab="t-nota"><svg><use href="#i-note"/></svg><span>Nota</span></button>
-    <button type="button" role="tab" data-tab="t-reg"><svg><use href="#i-list"/></svg><span>Registro</span></button>
-    <button type="button" role="tab" data-tab="t-est"><svg><use href="#i-chart"/></svg><span>Estadística</span></button>
-    <button type="button" role="tab" data-tab="t-exp"><svg><use href="#i-export"/></svg><span>Exportar</span></button>
-    <button type="button" role="tab" data-tab="t-aj"><svg><use href="#i-gear"/></svg><span>Ajustes</span></button>
-  </nav>
 </header>
 
 <main>
 <!-- ================= ATENCIÓN ================= -->
 <section id="t-at" class="tab on" role="tabpanel" aria-label="Atención">
-  <div class="banner warn" id="editing" hidden>Editando una atención ya guardada. «Guardar» la actualiza.</div>
-
-  <div class="card">
-    <h2>Operativo</h2>
-    <div class="grid">
-      <div><label class="l" for="operativo">Nombre del operativo / ronda</label><input id="operativo" list="opsList" placeholder="Ej: Operativo Oftalmología Nov 2026"><datalist id="opsList"></datalist></div>
-      <div><label class="l" for="fecha_atencion">Fecha atención</label><input id="fecha_atencion" type="date"><small class="msg" data-msg="fecha_atencion"></small></div>
+  <div class="toolbar">
+    <div class="tb-title"><b id="tbName">Nueva atención</b><span id="tbState">Sin guardar</span></div>
+    <div class="tb-actions">
+      <button type="button" class="ib" id="bNew" title="Nueva atención" aria-label="Nueva atención"><svg><use href="#i-plus"/></svg></button>
+      <button type="button" class="ib" id="bCopy" title="Copiar nota para Eloísa" aria-label="Copiar nota para Eloísa"><svg><use href="#i-copy"/></svg></button>
+      <button type="button" class="ib" id="bPdf" title="Descargar PDF" aria-label="Descargar PDF"><svg><use href="#i-pdf"/></svg></button>
+      <button type="button" class="btn p" id="bSave" title="Guardar (Ctrl/⌘ + S)"><svg><use href="#i-check"/></svg><span>Guardar</span></button>
     </div>
   </div>
 
   <div class="card">
-    <h2>Paciente</h2>
-    <label class="l" for="paciente_nombre">Nombre y apellidos</label><input id="paciente_nombre" autocomplete="off"><small class="msg" data-msg="paciente_nombre"></small>
-    <div class="grid">
+    <div class="g4">
+      <div class="span2"><label class="l" for="paciente_nombre">Paciente</label><input id="paciente_nombre" autocomplete="off" placeholder="Nombre y apellidos"><small class="msg" data-msg="paciente_nombre"></small></div>
       <div><label class="l" for="paciente_rut">RUT</label><input id="paciente_rut" autocomplete="off" placeholder="12.345.678-9"><small class="msg" data-msg="paciente_rut"></small></div>
-      <div><label class="l" for="paciente_edad">Edad (años)</label><input id="paciente_edad" inputmode="numeric"><small class="msg" data-msg="paciente_edad"></small></div>
+      <div><label class="l" for="paciente_edad">Edad</label><input id="paciente_edad" inputmode="numeric" placeholder="años"><small class="msg" data-msg="paciente_edad"></small></div>
+      <div><span class="l">Sexo</span><div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div></div>
       <div><label class="l" for="paciente_fono">Fono</label><input id="paciente_fono" inputmode="tel"></div>
+      <div><label class="l" for="operativo">Operativo / ronda</label><input id="operativo" list="opsList" placeholder="Ej: Operativo Nov 2026"><datalist id="opsList"></datalist></div>
+      <div><label class="l" for="fecha_atencion">Fecha</label><input id="fecha_atencion" type="date"><small class="msg" data-msg="fecha_atencion"></small></div>
     </div>
-    <span class="l">Sexo</span>
-    <div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div>
   </div>
 
   <div class="card">
     <h2>Antecedentes</h2>
     <div class="chips" id="antChips"></div>
-    <div id="cxBox" hidden><label class="l" for="antecedente_cirugia_detalle">Cirugía: ¿cuál?</label><input id="antecedente_cirugia_detalle"></div>
-    <label class="l" for="antecedentes_otros">Otros</label><input id="antecedentes_otros">
-  </div>
-
-  <div class="card">
-    <h2>Motivo de consulta</h2>
-    <textarea id="motivo_consulta" aria-label="Motivo de consulta" placeholder="Motivo de consulta"></textarea>
+    <div class="g2">
+      <div id="cxBox" hidden><label class="l" for="antecedente_cirugia_detalle">Cirugía: ¿cuál?</label><input id="antecedente_cirugia_detalle"></div>
+      <div><label class="l" for="antecedentes_otros">Otros antecedentes</label><input id="antecedentes_otros"></div>
+    </div>
+    <label class="l" for="motivo_consulta">Motivo de consulta</label><textarea id="motivo_consulta" rows="2"></textarea>
   </div>
 
   <div class="card">
     <h2>Examen físico</h2>
-    <div class="grid2">
+    <div class="g2 eyes">
       <div class="eye"><h3>OD</h3>
-        <div class="grid"><div><label class="l" for="od_av">AV</label><input id="od_av"></div><div><label class="l" for="od_pio">PIO (mmHg)</label><input id="od_pio" inputmode="decimal"><small class="msg" data-msg="od_pio"></small></div></div>
-        <div class="grid"><div><label class="l" for="od_otro_examen">Otro examen (sigla)</label><input id="od_otro_examen" maxlength="5" placeholder="Ej: AE"></div><div><label class="l" for="od_otro_resultado">Resultado</label><input id="od_otro_resultado"></div></div>
-        <label class="l" for="od_hallazgos">Hallazgos</label><textarea id="od_hallazgos"></textarea>
+        <div class="g4 tight">
+          <div><label class="l" for="od_av">AV</label><input id="od_av"></div>
+          <div><label class="l" for="od_pio">PIO</label><input id="od_pio" inputmode="decimal" placeholder="mmHg"><small class="msg" data-msg="od_pio"></small></div>
+          <div><label class="l" for="od_otro_examen">Otro</label><input id="od_otro_examen" maxlength="5" placeholder="sigla"></div>
+          <div><label class="l" for="od_otro_resultado">Result.</label><input id="od_otro_resultado"></div>
+        </div>
+        <label class="l" for="od_hallazgos">Hallazgos</label><textarea id="od_hallazgos" rows="2"></textarea>
       </div>
       <div class="eye"><h3>OI</h3>
-        <div class="grid"><div><label class="l" for="oi_av">AV</label><input id="oi_av"></div><div><label class="l" for="oi_pio">PIO (mmHg)</label><input id="oi_pio" inputmode="decimal"><small class="msg" data-msg="oi_pio"></small></div></div>
-        <div class="grid"><div><label class="l" for="oi_otro_examen">Otro examen (sigla)</label><input id="oi_otro_examen" maxlength="5" placeholder="Ej: AE"></div><div><label class="l" for="oi_otro_resultado">Resultado</label><input id="oi_otro_resultado"></div></div>
-        <label class="l" for="oi_hallazgos">Hallazgos</label><textarea id="oi_hallazgos"></textarea>
+        <div class="g4 tight">
+          <div><label class="l" for="oi_av">AV</label><input id="oi_av"></div>
+          <div><label class="l" for="oi_pio">PIO</label><input id="oi_pio" inputmode="decimal" placeholder="mmHg"><small class="msg" data-msg="oi_pio"></small></div>
+          <div><label class="l" for="oi_otro_examen">Otro</label><input id="oi_otro_examen" maxlength="5" placeholder="sigla"></div>
+          <div><label class="l" for="oi_otro_resultado">Result.</label><input id="oi_otro_resultado"></div>
+        </div>
+        <label class="l" for="oi_hallazgos">Hallazgos</label><textarea id="oi_hallazgos" rows="2"></textarea>
       </div>
     </div>
-    <label class="l" for="examen_obs">Observaciones del examen</label><input id="examen_obs">
+    <label class="l" for="examen_obs">Observaciones</label><input id="examen_obs">
   </div>
 
   <div class="card">
     <h2>Procedimientos realizados <span class="badge" id="procBadge">0</span></h2>
-    <p class="muted">Toca el ojo en que se hizo (vuelve a tocar para quitarlo). Alimenta la estadística y queda escrito en la hoja.</p>
-    <div id="procList"></div>
+    <div id="procList" class="procs"></div>
   </div>
 
   <div class="card">
     <h2>Procedimientos solicitados</h2>
     <div class="chips" id="solChips"></div>
-    <div id="schBox" hidden><label class="l" for="test_schirmer_detalle">Test Schirmer: detalle</label><input id="test_schirmer_detalle" maxlength="8"></div>
-    <label class="l" for="procedimientos_otros">Otros</label><input id="procedimientos_otros">
+    <div class="g2">
+      <div id="schBox" hidden><label class="l" for="test_schirmer_detalle">Test Schirmer: detalle</label><input id="test_schirmer_detalle" maxlength="8"></div>
+      <div><label class="l" for="procedimientos_otros">Otros</label><input id="procedimientos_otros"></div>
+    </div>
   </div>
 
   <div class="card">
     <h2>Diagnósticos</h2>
     <div class="chips" id="dxChips"></div>
-    <div id="catBox" hidden class="row" style="margin-top:10px"><span class="muted">Catarata:</span> <div class="seg" id="catSeg" role="group" aria-label="Ojo con catarata"></div><small class="msg" data-msg="catSeg"></small></div>
+    <div id="catBox" hidden class="inline"><span class="l">Catarata</span><div class="seg" id="catSeg" role="group" aria-label="Ojo con catarata"></div><small class="msg" data-msg="catSeg"></small></div>
     <label class="l" for="diagnosticos_otros">Otros diagnósticos</label><input id="diagnosticos_otros">
-    <div class="grid">
+    <div class="g4">
       <div><label class="l" for="ges">GES</label><input id="ges"></div>
       <div><label class="l" for="interconsulta">IC</label><input id="interconsulta"></div>
       <div><label class="l" for="receta">Receta</label><input id="receta"></div>
@@ -128,8 +139,8 @@
 
   <div class="card">
     <h2>Plan e indicaciones</h2>
-    <textarea id="plan" aria-label="Plan e indicaciones" style="min-height:110px"></textarea>
-    <div class="grid">
+    <textarea id="plan" aria-label="Plan e indicaciones" rows="4"></textarea>
+    <div class="g2">
       <div><label class="l" for="seguimiento">Seguimiento</label><input id="seguimiento"></div>
       <div><label class="l" for="alta">Alta</label><input id="alta"></div>
     </div>
@@ -137,32 +148,22 @@
 
   <div class="card">
     <h2>Médico</h2>
-    <div class="grid">
+    <div class="g2">
       <div><label class="l" for="medico_nombre">Nombre</label><input id="medico_nombre"></div>
       <div><label class="l" for="medico_rut">RUT</label><input id="medico_rut"><small class="msg" data-msg="medico_rut"></small></div>
     </div>
-    <p class="muted">Nombre, RUT y operativo quedan recordados para la siguiente atención. La firma va a mano en la hoja impresa.</p>
+    <p class="hint">Médico y operativo se recuerdan para la siguiente atención.</p>
   </div>
 </section>
 
-<!-- ================= NOTA ================= -->
-<section id="t-nota" class="tab" role="tabpanel" aria-label="Nota">
-  <div class="card">
-    <h2>Nota para Eloísa <button type="button" class="btn p sm" id="copyNote2">Copiar</button></h2>
-    <pre class="note" id="notePre"></pre>
+<!-- ================= PACIENTES ================= -->
+<section id="t-reg" class="tab" role="tabpanel" aria-label="Pacientes atendidos">
+  <div class="listhead">
+    <label class="search"><svg><use href="#i-search"/></svg><input id="regSearch" type="search" aria-label="Buscar paciente" placeholder="Buscar por nombre o RUT"></label>
+    <select id="regOp" aria-label="Operativo"></select>
   </div>
-</section>
-
-<!-- ================= REGISTRO ================= -->
-<section id="t-reg" class="tab" role="tabpanel" aria-label="Registro">
-  <div class="card">
-    <h2>Atenciones guardadas <span class="badge" id="regCount">0</span></h2>
-    <div class="grid">
-      <div><input id="regSearch" type="search" aria-label="Buscar" placeholder="Buscar nombre o RUT"></div>
-      <div><select id="regOp" aria-label="Operativo"></select></div>
-    </div>
-    <div class="list" id="regList" style="margin-top:6px"></div>
-  </div>
+  <p class="listcount"><b id="regCount">0</b> atenciones</p>
+  <div id="regList" class="plist"></div>
 </section>
 
 <!-- ================= ESTADÍSTICA ================= -->
@@ -298,12 +299,6 @@
   </div>
 </div>
 
-<div class="bar" id="bar"><div class="in">
-  <button type="button" class="btn" id="bNew">Nueva</button>
-  <button type="button" class="btn" id="bCopy">Copiar nota</button>
-  <button type="button" class="btn" id="bPdf">PDF</button>
-  <button type="button" class="btn p" id="bSave">Guardar</button>
-</div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <!-- @SCRIPT -->
 </body>

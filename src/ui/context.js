@@ -14,7 +14,7 @@ import { createSecret } from '../core/anonymize.js';
 import { buildAttentionPdf, pdfFileName } from '../pdf/attentionPdf.js';
 import { StorageError } from '../storage/store.js';
 import { $, $$, toast, download, copyText, withBusy, base64ToBytes } from './dom.js';
-import { syncAttentionView, renderProcList, showValidation } from './attentionView.js';
+import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
 import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
 import { renderExportView } from './exportView.js';
@@ -65,9 +65,10 @@ export function createContext(store, templateB64) {
     changed({ silent = false } = {}) {
       ctx.dirty = true;
       ctx.persist(() => store.saveDraft(ctx.rec));
-      if (silent) showValidation(ctx);
-      else syncAttentionView(ctx);
-      if (ctx.currentTab === 't-nota') $('#notePre').textContent = ctx.note(ctx.rec);
+      if (silent) {
+        showValidation(ctx);
+        renderToolbar(ctx);
+      } else syncAttentionView(ctx);
     },
 
     save() {
@@ -157,7 +158,9 @@ export function createContext(store, templateB64) {
     },
 
     async copyNote(rec) {
-      toast((await copyText(ctx.note(rec))) ? 'Nota copiada' : 'No se pudo copiar: selecciónala en la pestaña Nota');
+      const text = ctx.note(rec);
+      if (await copyText(text)) toast('Nota para Eloísa copiada');
+      else window.prompt('No se pudo copiar automáticamente. Copia el texto (Ctrl/⌘ + C):', text);
     },
 
     setProcs(procs) {
@@ -213,7 +216,6 @@ export function createContext(store, templateB64) {
         b.setAttribute('aria-selected', String(b.dataset.tab === id));
       });
       $$('.tab').forEach((t) => t.classList.toggle('on', t.id === id));
-      if (id === 't-nota') $('#notePre').textContent = ctx.note(ctx.rec);
       if (id === 't-reg') renderRegistry(ctx);
       if (id === 't-est' || id === 't-exp') {
         placeFilter(id);
@@ -221,7 +223,6 @@ export function createContext(store, templateB64) {
       }
       if (id === 't-est') renderStats(ctx);
       if (id === 't-exp') renderExportView(ctx);
-      $('#bar').hidden = !(id === 't-at' || id === 't-nota');
     },
 
     /** Restaura el borrador que quedó al cerrar la página. */

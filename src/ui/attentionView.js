@@ -88,7 +88,7 @@ export function renderProcList(ctx) {
     .map(
       (p) => `<div class="proc" data-id="${escapeHtml(p.id)}"><div class="nm">${escapeHtml(p.n)}</div>
       <div class="seg" role="group" aria-label="Ojo para ${escapeHtml(p.n)}">${OJOS.map((v) => `<button type="button" data-v="${v}" aria-pressed="false">${v}</button>`).join('')}</div>
-      ${p.pio ? `<div class="pio"><input data-e="od" aria-label="PIO OD ${escapeHtml(p.n)}" placeholder="PIO OD mmHg" inputmode="decimal"><input data-e="oi" aria-label="PIO OI ${escapeHtml(p.n)}" placeholder="PIO OI mmHg" inputmode="decimal"></div>` : ''}</div>`,
+      ${p.pio ? `<div class="pio">${['od', 'oi'].map((e) => `<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${escapeHtml(p.n)}" placeholder="mmHg" inputmode="decimal"></label>`).join('')}</div>` : ''}</div>`,
     )
     .join('');
 }
@@ -121,14 +121,24 @@ export function syncAttentionView(ctx) {
     row.querySelectorAll('.pio input').forEach((i) => {
       const v = p ? p[i.dataset.e] || '' : '';
       if (i.value !== v) i.value = v;
-      i.hidden = !!p && !coversEye(p.eye, i.dataset.e);
+      i.closest('.pf').hidden = !!p && !coversEye(p.eye, i.dataset.e);
     });
   });
   // Procedimientos guardados que ya no están en la lista configurada.
   n += Object.keys(rec.proc).filter((id) => !ctx.procs.some((p) => p.id === id)).length;
   $('#procBadge').textContent = n;
-  $('#editing').hidden = !rec.id;
+  renderToolbar(ctx);
   showValidation(ctx);
+}
+
+/** Título y estado de la barra superior: a quién se atiende y si hay cambios sin guardar. */
+export function renderToolbar(ctx) {
+  const f = ctx.rec.f;
+  $('#tbName').textContent = f.paciente_nombre?.trim() || (ctx.rec.id ? '(sin nombre)' : 'Nueva atención');
+  const state = ctx.dirty ? (ctx.rec.id ? 'Cambios sin guardar' : 'Sin guardar') : ctx.rec.id ? 'Guardada' : 'Sin datos';
+  const el = $('#tbState');
+  el.textContent = state;
+  el.className = ctx.dirty ? 'dirty' : ctx.rec.id ? 'saved' : '';
 }
 
 /**

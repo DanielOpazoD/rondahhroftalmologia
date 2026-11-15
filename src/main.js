@@ -39,7 +39,6 @@ function main() {
   $('#bNew').addEventListener('click', () => ctx.newAttention());
   $('#bSave').addEventListener('click', () => ctx.save());
   $('#bCopy').addEventListener('click', () => ctx.copyNote(ctx.rec));
-  $('#copyNote2').addEventListener('click', () => ctx.copyNote(ctx.rec));
   $('#bPdf').addEventListener('click', (e) => ctx.downloadPdf(ctx.rec, e.currentTarget));
   $('#stXlsx').addEventListener('click', (e) => exportStatsXlsx(ctx, e.currentTarget));
   $('#printSt').addEventListener('click', () => {
