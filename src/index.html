@@ -55,7 +55,7 @@
 </div>
 <header class="top">
   <div class="topin">
-    <div class="brand">
+    <div class="brand" title="Oftalmología · Rondas Hospital Hanga Roa">
       <span class="logo"><svg><use href="#i-eye"/></svg></span>
       <div><b>Oftalmología</b><small>Rondas · Hospital Hanga Roa</small></div>
     </div>
@@ -237,7 +237,8 @@
     </div>
   </div>
 
-  <div class="card" id="prepCard">
+  <div class="g2 cards">
+    <div class="card" id="prepCard">
     <h2>Antes del operativo</h2>
     <p class="hint">Revisa que este equipo esté listo (versión, sincronización, perfiles, respaldo…) o practica con datos de ejemplo sin tocar los reales.</p>
     <div class="row u-gap8 u-wrap">
@@ -245,7 +246,7 @@
       <button type="button" class="btn sm" id="practiceEnter">Abrir modo práctica</button>
     </div>
   </div>
-  <div class="card" id="pinCard">
+    <div class="card" id="pinCard">
     <h2>Bloqueo con PIN <span class="badge" id="pinState">Desactivado</span></h2>
     <p class="hint">Bloquea la pantalla de este equipo tras unos minutos sin uso, para que nadie vea los pacientes al pasar. Es una protección de pantalla: no cifra los datos guardados en el navegador.</p>
     <div class="row u-gap8 u-wrap u-aic">
@@ -254,6 +255,7 @@
       <label class="muted" for="pinMinutes" id="pinMinutesLabel" hidden>Bloquear tras</label>
       <select id="pinMinutes" hidden class="u-wauto"></select>
     </div>
+  </div>
   </div>
   <div class="card" id="syncCard">
     <h2>Sincronización entre equipos <span class="badge" id="syncState">Desactivada</span></h2>

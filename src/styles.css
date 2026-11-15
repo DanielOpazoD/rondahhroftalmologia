@@ -26,6 +26,7 @@
   --r: 12px;
   --r-sm: 8px;
   --h: 36px; /* alto de controles */
+  --page: 1040px; /* ancho de la página (cabecera y contenido) */
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   color-scheme: light;
@@ -108,7 +109,7 @@ header.top {
   border-bottom: 1px solid var(--line);
 }
 .topin {
-  max-width: 960px;
+  max-width: var(--page);
   margin: 0 auto;
   height: 52px;
   padding: 0 16px;
@@ -120,7 +121,7 @@ header.top {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-width: 0;
+  flex: none;
 }
 .brand b {
   display: block;
@@ -160,7 +161,8 @@ header.top {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex: none;
 }
 .ver {
   font-size: 11px;
@@ -172,6 +174,7 @@ nav {
   display: flex;
   gap: 2px;
   height: 100%;
+  flex: none;
 }
 nav button {
   position: relative;
@@ -308,7 +311,7 @@ nav button:focus-visible {
 
 /* ------------------------------------------------------------------ main */
 main {
-  max-width: 960px;
+  max-width: var(--page);
   margin: 0 auto;
   padding: 14px 16px 0;
 }
@@ -329,8 +332,8 @@ main {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 14px 16px 16px;
-  margin: 0 0 10px;
+  padding: 12px 14px 14px;
+  margin: 0 0 8px;
 }
 .card h2 {
   margin: 0 0 10px;
@@ -376,7 +379,7 @@ p.muted {
   font-size: 12px;
   font-weight: 500;
   color: var(--ink-2);
-  margin: 10px 0 4px;
+  margin: 8px 0 3px;
 }
 .g2 > div > .l:first-child,
 .g4 > div > .l:first-child,
@@ -424,7 +427,7 @@ select {
 }
 textarea {
   resize: vertical;
-  min-height: 56px;
+  min-height: 48px;
 }
 input[readonly] {
   background: var(--surface-2);
@@ -610,6 +613,7 @@ input.warned {
 }
 #sexSeg {
   display: flex;
+  max-width: 280px;
   height: var(--h);
   align-items: stretch;
 }
@@ -660,9 +664,9 @@ input.warned {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
-  padding: 6px 0;
+  padding: 3px 0;
   border-bottom: 1px solid var(--line);
-  min-height: 44px;
+  min-height: 38px;
   break-inside: avoid;
 }
 .proc .nm {
@@ -1018,7 +1022,7 @@ details.setup summary {
   text-align: left;
   background: none;
   border: 0;
-  padding: 10px 14px;
+  padding: 8px 12px;
   cursor: pointer;
   color: inherit;
   font: inherit;
@@ -1105,7 +1109,7 @@ details.setup summary {
   display: flex;
   gap: 6px;
   align-items: center;
-  padding: 8px 0;
+  padding: 5px 0;
   border-top: 1px solid var(--line);
   flex-wrap: wrap;
 }
@@ -2129,4 +2133,64 @@ html.locked body > *:not(#lockDlg) {
 .saveBar span {
   flex: 1;
   min-width: 180px;
+}
+
+/* ------------------------------------------------ cabecera adaptable (ui/headerFit.js) */
+/* Paso 1: si no cabe, solo el logo de la marca. */
+html.hdr-compact .brand > div {
+  display: none;
+}
+/* Paso 2: si aún no cabe, pestañas con ícono (el nombre sigue disponible para lectores de pantalla). */
+html.hdr-icons nav button span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+html.hdr-icons nav button {
+  padding: 0 12px;
+}
+html.hdr-icons .userChip {
+  max-width: 120px;
+}
+
+/* ------------------------------------------------ Ajustes compacto */
+#ajList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  column-gap: 28px;
+}
+#ajList .it,
+#ajList .it:first-child {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0;
+}
+#ajList .it:last-child {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  border-bottom: 0;
+  padding-top: 8px;
+}
+.card > .hint + .list {
+  margin-top: 8px;
+}
+.card > p.hint:first-of-type {
+  margin-top: 0;
+}
+#ajList .it {
+  flex-wrap: nowrap;
+}
+#ajList .it .t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card > .hint + .row,
+.card > p.hint + .row {
+  margin-top: 10px;
 }
