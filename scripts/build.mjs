@@ -61,11 +61,11 @@ export const cspHash = (content) => `'sha256-${createHash('sha256').update(conte
  * Política de seguridad de contenido. El único script permitido es el de la
  * app, identificado por su hash: un script inyectado (XSS) no se ejecuta.
  */
-export function contentSecurityPolicy(scriptHash) {
+export function contentSecurityPolicy(scriptHash, styleHash) {
   return [
     "default-src 'none'",
     `script-src ${scriptHash}`,
-    "style-src 'unsafe-inline'",
+    `style-src ${styleHash}`,
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "worker-src 'self'",
@@ -110,13 +110,15 @@ export async function buildHtml() {
     if (!html.includes(marker)) throw new Error(`src/index.html debe contener el marcador ${marker}`);
   }
   const scriptBody = `\n${js}`;
-  const csp = contentSecurityPolicy(cspHash(scriptBody));
+  const styleBody = `\n${css}`;
+  // Solo el script y la hoja de estilos de la app, identificados por su hash (sin 'unsafe-inline').
+  const csp = contentSecurityPolicy(cspHash(scriptBody), cspHash(styleBody));
   // Funciones de reemplazo: evitan que "$&" u otros patrones del código se interpreten.
   return html
     .replace('<html', () => `<html data-build="${appBuild}"`)
     .replace('<!-- @CSP -->', () => `<meta http-equiv="Content-Security-Policy" content="${csp}">`)
     .replace('<!-- @FORMULARIO -->', () => formHtml)
-    .replace('<!-- @STYLES -->', () => `<style>\n${css}</style>`)
+    .replace('<!-- @STYLES -->', () => `<style>${styleBody}</style>`)
     .replace('<!-- @SCRIPT -->', () => `<script>${scriptBody}</script>`);
 }
 

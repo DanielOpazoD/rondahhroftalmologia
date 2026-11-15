@@ -2074,3 +2074,41 @@ html.locked body > *:not(#lockDlg) {
   min-width: 180px;
   font-weight: 600;
 }
+
+/* ------------------------------------------------ utilidades (sin estilos en línea: CSP sin 'unsafe-inline') */
+.u-mt10 {
+  margin-top: 10px;
+}
+.u-mb10 {
+  margin: 0 0 10px;
+}
+.u-wauto {
+  width: auto;
+}
+.u-abs {
+  position: absolute;
+}
+.u-gap4 {
+  gap: 4px;
+}
+.u-gap8 {
+  gap: 8px;
+}
+.u-wrap {
+  flex-wrap: wrap;
+}
+.u-aic {
+  align-items: center;
+}
+.u-grow {
+  flex: 1;
+}
+.u-minw160 {
+  min-width: 160px;
+}
+.u-minw220 {
+  min-width: 220px;
+}
+.u-mono {
+  font-family: var(--mono);
+}

@@ -14,7 +14,7 @@
 <!-- @STYLES -->
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<svg width="0" height="0" aria-hidden="true" class="u-abs">
   <defs>
     <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-form" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></symbol>
@@ -164,7 +164,7 @@
   <div id="patDetailView" hidden>
     <button type="button" class="btn sm" id="patBack">← Pacientes</button>
     <div class="card patcard" id="patCard"></div>
-    <div class="row" style="margin:0 0 10px"><button type="button" class="btn p sm" id="patNew"><svg><use href="#i-plus"/></svg>Nueva atención para este paciente</button></div>
+    <div class="row u-mb10"><button type="button" class="btn p sm" id="patNew"><svg><use href="#i-plus"/></svg>Nueva atención para este paciente</button></div>
     <div id="patAttentions" class="plist"></div>
   </div>
 </section>
@@ -208,7 +208,7 @@
       <div><label class="l" for="anEdad">Edad</label><select id="anEdad"></select></div>
       <div><label class="l" for="anTexto">Textos libres</label><select id="anTexto"></select></div>
     </div>
-    <div class="row" style="margin-top:10px">
+    <div class="row u-mt10">
       <button type="button" class="btn sm" id="anPreview">Vista previa</button>
       <button type="button" class="btn d sm" id="anKey" title="Contiene nombres y RUT: no compartir">Tabla de correspondencia (confidencial)</button>
     </div>
@@ -236,7 +236,7 @@
   <div class="card" id="prepCard">
     <h2>Antes del operativo</h2>
     <p class="hint">Revisa que este equipo esté listo (versión, sincronización, perfiles, respaldo…) o practica con datos de ejemplo sin tocar los reales.</p>
-    <div class="row" style="gap:8px;flex-wrap:wrap">
+    <div class="row u-gap8 u-wrap">
       <button type="button" class="btn p sm" id="checkOpen"><svg><use href="#i-check"/></svg>Chequeo del equipo</button>
       <button type="button" class="btn sm" id="practiceEnter">Abrir modo práctica</button>
     </div>
@@ -244,11 +244,11 @@
   <div class="card" id="pinCard">
     <h2>Bloqueo con PIN <span class="badge" id="pinState">Desactivado</span></h2>
     <p class="hint">Bloquea la pantalla de este equipo tras unos minutos sin uso, para que nadie vea los pacientes al pasar. Es una protección de pantalla: no cifra los datos guardados en el navegador.</p>
-    <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="row u-gap8 u-wrap u-aic">
       <button type="button" class="btn p sm" id="pinSet">Configurar PIN</button>
       <button type="button" class="btn sm" id="pinOff" hidden>Quitar</button>
       <label class="muted" for="pinMinutes" id="pinMinutesLabel" hidden>Bloquear tras</label>
-      <select id="pinMinutes" hidden style="width:auto"></select>
+      <select id="pinMinutes" hidden class="u-wauto"></select>
     </div>
   </div>
   <div class="card" id="syncCard">
@@ -260,7 +260,7 @@
     <div id="syncSetup">
       <label class="l" for="syncPass" id="syncPassLabel">Contraseña del equipo</label>
       <div class="row">
-        <input id="syncPass" type="password" autocomplete="off" spellcheck="false" style="flex:1;min-width:220px;font-family:var(--mono)">
+        <input id="syncPass" type="password" autocomplete="off" spellcheck="false" class="u-grow u-minw220 u-mono">
         <button type="button" class="btn sm" id="syncShow">Mostrar</button>
         <button type="button" class="btn sm" id="syncGen" hidden>Generar</button>
         <button type="button" class="btn p sm" id="syncOn">Activar</button>
@@ -269,7 +269,7 @@
     </div>
     <div id="syncActive" hidden>
       <div class="row">
-        <span class="muted" id="syncInfo" style="flex:1"></span>
+        <span class="muted u-grow" id="syncInfo"></span>
         <button type="button" class="btn p sm" id="syncNowBtn">Sincronizar ahora</button>
         <button type="button" class="btn d sm" id="syncOff">Desactivar</button>
       </div>
@@ -286,9 +286,9 @@
     <h2>Procedimientos realizados</h2>
     <p class="muted">Agrega, ordena o quita procedimientos. «PIO» marcado pide la presión por ojo. Las atenciones guardadas conservan los suyos.</p>
     <div class="list" id="ajList"></div>
-    <div class="row" style="margin-top:10px">
-      <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" style="flex:1;min-width:160px">
-      <label class="row muted" style="gap:4px"><input type="checkbox" id="ajPio"> PIO</label>
+    <div class="row u-mt10">
+      <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" class="u-grow u-minw160">
+      <label class="row muted u-gap4"><input type="checkbox" id="ajPio"> PIO</label>
       <button type="button" class="btn sm" id="ajAdd">Agregar</button>
     </div>
   </div>
@@ -317,14 +317,14 @@
     <p class="hint">Errores de este equipo, para enviarlos a soporte si algo falla. No salen del equipo por sí solos. Pueden incluir algún dato: compártelo solo con soporte.</p>
     <p class="hint" id="errEmpty">Sin errores registrados.</p>
     <pre class="note" id="errText" tabindex="0" hidden></pre>
-    <div class="row" style="gap:8px">
+    <div class="row u-gap8">
       <button type="button" class="btn sm" id="errCopy">Copiar</button>
       <button type="button" class="btn sm" id="errClear">Vaciar</button>
     </div>
   </details>
   <details class="card danger">
     <summary>Zona de cuidado</summary>
-    <div class="row" style="margin-top:10px">
+    <div class="row u-mt10">
       <button type="button" class="btn d sm" id="anRegen">Nueva clave de seudonimización</button>
       <button type="button" class="btn d sm" id="wipe">Borrar las atenciones de este equipo</button>
     </div>

@@ -70,5 +70,11 @@ test('buildSite escribe el sitio para Netlify con service worker versionado', as
   JSON.parse(readFileSync(join(dir, 'manifest.webmanifest'), 'utf8'));
   const headers = readFileSync(join(dir, '_headers'), 'utf8');
   assert.match(headers, /Content-Security-Policy: default-src 'none'; script-src 'sha256-/);
+  // Estilos: solo la hoja de la app, por su hash (sin 'unsafe-inline').
+  assert.ok(!headers.includes('unsafe-inline'), "sin 'unsafe-inline'");
+  const html = readFileSync(join(dir, 'index.html'), 'utf8');
+  const style = /<style>([\s\S]*?)<\/style>/.exec(html)[1];
+  assert.ok(headers.includes(`style-src ${cspHash(style)}`), 'el hash de estilos corresponde a la hoja incluida');
+  assert.ok(!/\sstyle="/.test(html), 'sin atributos style en el HTML');
   assert.match(headers, /frame-ancestors 'none'/);
 });
