@@ -144,6 +144,17 @@ Colección `bitacora`, con un documento `b_<idAtención>` por atención:
 - **Dónde se ve:** en el **Historial de cambios** de cada atención: «Dra. Pérez (Box 1)».
 - **Respaldos:** incluyen la bitácora.
 
+### Adjuntos
+
+Cada atención puede tener archivos adjuntos (imágenes, PDF, Word…), con estos límites: 20 MB por archivo, y 60 MB y 30 archivos por atención (`core/attachments.js`).
+
+- **Metadatos** (colección `adjuntos`): `{id: 'j…', atencionId, nombre, tipo, tamano, sha256, partes, created, updated}`. Se sincronizan como el tipo `adjunto` en el espacio de la especialidad. Eliminar uno deja una lápida.
+- **Contenido** (colección `adjuntos_datos`, IndexedDB): los bytes, que se leen de a uno. Viaja **cifrado** en partes de 192 KiB al espacio `<especialidad>-adjuntos`. Al bajarlo se verifica su SHA-256. Al eliminarlo, se reemplaza en el servidor por una lápida pequeña.
+- **Fotos grandes** se reducen al adjuntar: lado mayor de 2400 px, en JPEG, solo si así pesan menos.
+- **PDF con anexos** (`core/pdfAnexos.js`): la hoja, un índice, las imágenes como páginas y los PDF con sus páginas. Lo que no puede ser página (Word, Excel) va **incrustado** en el PDF, y se abre desde el panel de adjuntos del visor.
+- Sin IndexedDB no se admiten adjuntos.
+- El **respaldo diario del servidor no incluye su contenido** (ver OPERACION.md).
+
 ### Almacenamiento y crecimiento a varios años
 
 Base IndexedDB `hhr-rondas-oftalmologia` (versión 2), un documento por elemento:

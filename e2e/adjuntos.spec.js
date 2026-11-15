@@ -103,3 +103,34 @@ test('adjuntos: viajan cifrados a otro equipo', async ({ browser }) => {
   await expect(B.locator('#attList')).not.toContainText('llega al sincronizar');
   await Promise.all([ca.close(), cb.close()]);
 });
+
+test('PDF con anexos: desde el botón PDF, la hoja y sus adjuntos en un solo documento', async ({ page }) => {
+  await openApp(page);
+  await page.locator('#paciente_nombre').fill('Paciente PDF Anexos');
+  await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
+  // Sin adjuntos: el PDF se descarga como siempre, sin preguntar.
+  const [plain] = await Promise.all([page.waitForEvent('download'), page.locator('#bPdf').click()]);
+  const plainPages = (await PDFDocument.load(await (await import('node:fs/promises')).readFile(await plain.path()))).getPageCount();
+  await attach(page, [
+    { name: 'retina.png', mimeType: 'image/png', buffer: PNG },
+    { name: 'oct.pdf', mimeType: 'application/pdf', buffer: await pdfBytes('OCT') },
+    {
+      name: 'informe.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      buffer: Buffer.from('PK'),
+    },
+  ]);
+  await expect(page.locator('#attCount')).toHaveText('3');
+  // «Solo la hoja»: igual que antes.
+  await page.locator('#bPdf').click();
+  await expect(page.locator('#msgTitle')).toHaveText('Descargar PDF');
+  const [only] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Solo la hoja' }).click()]);
+  expect(only.suggestedFilename()).not.toContain('con_anexos');
+  // «Con anexos»: hoja + índice + imagen + PDF adjunto; el Word va dentro.
+  await page.locator('#bPdf').click();
+  const [full] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Con anexos' }).click()]);
+  expect(full.suggestedFilename()).toMatch(/_con_anexos\.pdf$/);
+  const doc = await PDFDocument.load(await (await import('node:fs/promises')).readFile(await full.path()));
+  expect(doc.getPageCount()).toBe(plainPages + 3);
+  await expect(page.locator('#toast')).toContainText('1 dentro del PDF');
+});

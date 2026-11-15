@@ -25,6 +25,8 @@ Los campos de RUT muestran **✓ verde** si el dígito verificador es correcto y
 
 **Quién registra:** en Ajustes → Perfiles se crean los perfiles de médicos y otros profesionales (enfermería, TENS, tecnólogo, admisión). La primera vez que se guarda en una sesión, la app pregunta quién registra; el chip del encabezado lo muestra y permite cambiarlo. El historial de cambios guarda quién y desde qué equipo. Si quien registra es médico, las atenciones nuevas lo traen como médico.
 
+**Adjuntos:** cada atención admite imágenes, PDF o Word (tarjeta «Adjuntos»: botón o arrastrar). Las fotos grandes se reducen solas. Viajan cifrados a los otros PC. Al descargar el PDF de una atención con adjuntos se puede elegir **«Con anexos»**: la hoja, un índice y los adjuntos en el mismo documento. Las imágenes y los PDF van como páginas; Word va dentro del PDF y se abre desde el panel de adjuntos del visor.
+
 **Posibles duplicados:** si un paciente quedó registrado dos veces (por ejemplo, primero sin RUT), Pacientes lo avisa y permite unir las fichas sin perder atenciones, o marcarlas como personas distintas.
 
 ### Antes de cada operativo
