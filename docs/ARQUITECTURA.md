@@ -28,7 +28,8 @@ Las decisiones de fondo, con su porqué, están en el [registro de decisiones (A
                      lib/* (sha256, zip, xlsx) · config/catalogs.js
 ```
 
-- **`core/` y `lib/` no tocan el DOM ni `localStorage`.** Reciben datos y devuelven datos, así que se prueban directamente en Node (`tests/`).
+- **`app/` es la capa de aplicación:** las reglas de negocio de las acciones (preparar un guardado, preingresar, re-vincular una atención, actualizar la ficha del paciente) como funciones puras. `ui/actions/` solo orquesta: confirma con el usuario, persiste y re-dibuja. Así cada regla se prueba en Node (`tests/app.test.js`).
+- **`core/`, `app/` y `lib/` no tocan el DOM ni `localStorage`.** Reciben datos y devuelven datos, así que se prueban directamente en Node (`tests/`).
 - **Almacenamiento:**
   - `storage/repo.js` maneja los datos clínicos (atenciones, fichas de pacientes, eliminaciones, bitácora). Los mantiene en memoria y persiste en **IndexedDB** solo lo que cambió (`storage/backends.js`, con localStorage como respaldo).
   - `storage/store.js` guarda lo pequeño: ajustes, catálogos, borrador y sincronización. Recibe el `storage` por parámetro, y en las pruebas se usa uno en memoria (IndexedDB simulado con `fake-indexeddb`).

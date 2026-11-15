@@ -25,7 +25,7 @@ export default [
   { files: ['public/sw.js'], languageOptions: { globals: { ...globals.serviceworker } } },
   // Núcleo puro: no debe tocar el DOM ni el almacenamiento del navegador
   {
-    files: ['src/core/**/*.js', 'src/lib/**/*.js', 'src/sync/**/*.js', 'src/config/**/*.js'],
+    files: ['src/core/**/*.js', 'src/lib/**/*.js', 'src/sync/**/*.js', 'src/config/**/*.js', 'src/app/**/*.js'],
     rules: {
       'no-restricted-globals': ['error', 'document', 'window', 'localStorage', 'sessionStorage', 'alert', 'confirm', 'prompt'],
     },
