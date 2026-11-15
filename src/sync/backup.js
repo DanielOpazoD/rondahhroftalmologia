@@ -15,11 +15,11 @@ export const KEEP_DAYS = 30;
 const VERSION_KEY = /^[a-z][a-z0-9-]{1,39}\/r\//;
 /**
  * El contenido de los adjuntos (`<especialidad>-adjuntos`) no entra en el
- * respaldo diario: puede pesar gigabytes y la función programada tiene poco
- * tiempo. Está en cada PC que sincroniza (y sus metadatos sí se respaldan).
+ * documento diario (puede pesar gigabytes): se respalda aparte, de forma
+ * incremental, con backupAttachments (función programada cada hora).
  */
 const isBackedUp = (/** @type {string} */ key) => VERSION_KEY.test(key) && !/^[a-z0-9-]+-adjuntos\//.test(key);
-const DAY_RE = /^(\d{4}-\d{2}-\d{2})\.json$/;
+const DAY_RE = /^(\d{4}-\d{2}-\d{2})\.json$/; // las claves `adjuntos/…` no son días
 
 /**
  * @typedef {{
@@ -94,4 +94,71 @@ export async function restoreBackup({ source, target, day, dryRun = false }) {
   const entries = Object.entries(doc.claves).filter(([k]) => VERSION_KEY.test(k));
   if (!dryRun) for (const [k, v] of entries) await target.setJSON(k, v);
   return { claves: entries.length, escritas: dryRun ? 0 : entries.length };
+}
+
+/* ------------------------------------------------------------- adjuntos */
+
+/** Partes del contenido de adjuntos en el almacén de sincronización. */
+const ATT_KEY = /^[a-z][a-z0-9-]{0,39}-adjuntos\/r\//;
+const ATT_PREFIX = 'adjuntos/';
+const ORPHANS = 'adjuntos-huerfanos.json';
+
+/**
+ * Respaldo INCREMENTAL del contenido de los adjuntos. Las partes no cambian
+ * nunca: se copia cada una una sola vez (`adjuntos/<clave>` en el almacén de
+ * respaldos). Como una función programada tiene poco tiempo, cada ejecución
+ * copia lo que alcanza en `budgetMs` y la siguiente continúa.
+ * Las partes que ya no existen en el servidor (adjunto eliminado) se
+ * conservan `keepDays` días y luego se borran.
+ * @param {{source: BlobStore, target: BlobStore, now?: number, keepDays?: number, budgetMs?: number, clock?: () => number}} o
+ * @returns {Promise<{copiadas: number, pendientes: number, borradas: number}>}
+ */
+export async function backupAttachments({ source, target, now = Date.now(), keepDays = KEEP_DAYS, budgetMs = 20_000, clock = Date.now }) {
+  const started = clock();
+  const live = (await source.list()).blobs.map((b) => b.key).filter((k) => ATT_KEY.test(k));
+  const liveSet = new Set(live);
+  const saved = new Set((await target.list({ prefix: ATT_PREFIX })).blobs.map((b) => b.key.slice(ATT_PREFIX.length)));
+  let copiadas = 0;
+  const missing = live.filter((k) => !saved.has(k));
+  for (const k of missing) {
+    if (clock() - started > budgetMs) break;
+    const v = await source.get(k, { type: 'json' });
+    if (v !== null && v !== undefined) {
+      await target.setJSON(ATT_PREFIX + k, v);
+      copiadas++;
+    }
+  }
+  // Huérfanas: respaldadas pero ya no en el servidor. Se anota desde cuándo y se borran pasado el plazo.
+  /** @type {Record<string, string>} */
+  const orphans = (await target.get(ORPHANS, { type: 'json' })) || {};
+  const today = dayOf(now);
+  const limit = dayOf(now - keepDays * 24 * 3600 * 1000);
+  let borradas = 0;
+  for (const k of saved) {
+    if (liveSet.has(k)) {
+      delete orphans[k];
+      continue;
+    }
+    orphans[k] ||= today;
+    if (orphans[k] < limit) {
+      await target.delete(ATT_PREFIX + k);
+      delete orphans[k];
+      borradas++;
+    }
+  }
+  await target.setJSON(ORPHANS, orphans);
+  return { copiadas, pendientes: missing.length - copiadas, borradas };
+}
+
+/**
+ * Restaura el contenido de adjuntos respaldado que falte en el servidor.
+ * @param {{source: BlobStore, target: BlobStore, dryRun?: boolean}} o `source`: respaldos; `target`: sincronización.
+ * @returns {Promise<{partes: number, escritas: number}>}
+ */
+export async function restoreAttachments({ source, target, dryRun = false }) {
+  const backed = (await source.list({ prefix: ATT_PREFIX })).blobs.map((b) => b.key.slice(ATT_PREFIX.length));
+  const present = new Set((await target.list()).blobs.map((b) => b.key));
+  const todo = backed.filter((k) => ATT_KEY.test(k) && !present.has(k));
+  if (!dryRun) for (const k of todo) await target.setJSON(k, await source.get(ATT_PREFIX + k, { type: 'json' }));
+  return { partes: todo.length, escritas: dryRun ? 0 : todo.length };
 }

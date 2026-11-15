@@ -42,3 +42,32 @@ test('se conservan 30 días y se puede restaurar (sin borrar lo más nuevo)', as
   assert.equal((await empty.get('oftalmologia/r/a1/200.ffffffffffffffff')).ct, 'MAS-NUEVA', 'lo más nuevo sigue ahí');
   await assert.rejects(restoreBackup({ source: target, target: empty, day: '1999-01-01' }), /No hay respaldo/);
 });
+
+test('adjuntos: respaldo incremental (cada parte una vez), con tope de tiempo, y huérfanas borradas a los 30 días', async () => {
+  const { backupAttachments, restoreAttachments } = await import('../src/sync/backup.js');
+  const source = memoryBlobStore();
+  for (let i = 0; i < 5; i++) await source.setJSON(`oftalmologia-adjuntos/r/jx-${i}/100`, { iv: 'IV', ct: 'PARTE' + i });
+  await source.setJSON('oftalmologia/r/a1/100', { iv: 'IV', ct: 'ATENCION' }); // no es un adjunto
+  const target = memoryBlobStore();
+  // Tope de tiempo: solo alcanza para 2 partes; la siguiente ejecución continúa.
+  let t = 0;
+  const clock = () => (t += 10);
+  const r1 = await backupAttachments({ source, target, now: T0, budgetMs: 25, clock });
+  assert.equal(r1.copiadas, 2);
+  assert.equal(r1.pendientes, 3);
+  const r2 = await backupAttachments({ source, target, now: T0 });
+  assert.deepEqual([r2.copiadas, r2.pendientes], [3, 0]);
+  assert.equal((await backupAttachments({ source, target, now: T0 })).copiadas, 0, 'no se copia dos veces');
+  assert.equal(await target.get('adjuntos/oftalmologia/r/a1/100'), null);
+  // Se elimina un adjunto: su parte se conserva 30 días y luego se borra.
+  await source.delete('oftalmologia-adjuntos/r/jx-0/100');
+  assert.equal((await backupAttachments({ source, target, now: T0 + 5 * DAY })).borradas, 0);
+  assert.ok(await target.get('adjuntos/oftalmologia-adjuntos/r/jx-0/100'));
+  assert.equal((await backupAttachments({ source, target, now: T0 + 40 * DAY })).borradas, 1);
+  assert.equal(await target.get('adjuntos/oftalmologia-adjuntos/r/jx-0/100'), null);
+  assert.deepEqual(await listBackups(target), [], 'las partes no se confunden con días de respaldo');
+  // Desastre: se pierde el servidor; se reponen las partes respaldadas.
+  const empty = memoryBlobStore();
+  assert.deepEqual(await restoreAttachments({ source: target, target: empty }), { partes: 4, escritas: 4 });
+  assert.equal((await empty.get('oftalmologia-adjuntos/r/jx-3/100')).ct, 'PARTE3');
+});
