@@ -170,7 +170,12 @@ export function renderToolbar(ctx) {
       `${dup.f.paciente_nombre || dup.f.paciente_rut} ya tiene una atención este día (en este u otro equipo). Continúa en ella para no duplicar: lo que escribiste se agrega.`;
   }
   $('#tbName').textContent = f.paciente_nombre?.trim() || (ctx.rec.id ? '(sin nombre)' : 'Nueva atención');
-  const state = ctx.dirty ? (ctx.rec.id ? 'Cambios sin guardar' : 'Sin guardar') : ctx.rec.id ? 'Guardada' : 'Sin datos';
+  // Con guardado automático, «sin guardar» solo dura la pausa al escribir, salvo que algo lo impida.
+  let state = ctx.rec.id ? 'Guardada' : 'Sin datos';
+  if (ctx.dirty) {
+    const blocking = validateRecord(ctx.rec).errors[0];
+    state = blocking ? `Sin guardar · ${blocking}` : dup ? 'Sin guardar · continúa en la atención existente' : 'Guardando…';
+  }
   const el = $('#tbState');
   el.textContent = state;
   el.className = ctx.dirty ? 'dirty' : ctx.rec.id ? 'saved' : '';

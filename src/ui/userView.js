@@ -49,6 +49,8 @@ export function initUserView(ctx) {
   ctx.userId = s && s !== SKIP ? s : null;
   ctx.userAsked = Boolean(s);
   ctx.ensureUser = () => ensureUser(ctx);
+  /** Al abrir la app: se pregunta una vez por sesión (si hay perfiles), antes de empezar a escribir. */
+  ctx.askUserAtStart = () => ensureUser(ctx);
   $('#userChip').addEventListener('click', () => chooseUser(ctx));
   renderUserChip(ctx);
 }

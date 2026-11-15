@@ -138,7 +138,7 @@ Colección `bitacora`, con un documento `b_<idAtención>` por atención:
   ] }
 ```
 
-- **Cuándo se agrega:** cada guardado que cambia algo y cada eliminación agregan una entrada inmutable.
+- **Cuándo se agrega:** cada guardado que cambia algo y cada eliminación agregan una entrada. Con el **guardado automático**, las ediciones seguidas de la misma persona y equipo (menos de 10 minutos entre una y otra) se **juntan** en una sola entrada: conserva el valor anterior de cada campo, toma el nuevo y anota `hasta`. Al sincronizar, de una entrada así gana su versión más completa.
 - **Sincronización:** los documentos se sincronizan cifrados. Si dos PC agregan entradas a la vez, se unen sin perder ninguna.
 - **Quién y desde dónde:** cada entrada guarda el **perfil** que registró (ver «Perfiles» más abajo) y el **equipo** (Ajustes → «Nombre de este equipo»).
 - **Dónde se ve:** en el **Historial de cambios** de cada atención: «Dra. Pérez (Box 1)».

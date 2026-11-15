@@ -184,9 +184,14 @@ async function main() {
   ctx.sync.start();
   registerServiceWorker();
   if (location.protocol !== 'file:') startUpdateWatcher(ctx);
-  ctx.lock.whenUnlocked(() => autoCheck(ctx));
+  // Primero quién registra (si hay perfiles), luego el chequeo si hace días que no se usa.
+  ctx.lock.whenUnlocked(() => void ctx.askUserAtStart().then(() => autoCheck(ctx)));
   // Termina de escribir lo pendiente al ocultar o cerrar la página.
-  window.addEventListener('pagehide', () => void repo.flush());
+  window.addEventListener('pagehide', () => {
+    ctx.flushAutosave();
+    void repo.flush();
+  });
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && ctx.flushAutosave());
   if (!persistent) toast('Este navegador no permite guardar datos: las atenciones se perderán al cerrar.', 6000);
 }
 

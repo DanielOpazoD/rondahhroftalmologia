@@ -161,3 +161,55 @@ test('respaldo: la bitácora que recibe entradas nuevas sube de versión (para s
   const igual = mergeBackup({ records: [], procs: [], auditDocs: [otro] }, { records: [], procs: [], auditDocs: [local] });
   assert.equal(igual.auditDocs[0].updated, 10, 'sin entradas nuevas no cambia');
 });
+
+test('bitácora con guardado automático: las ediciones seguidas de la misma persona se juntan', async () => {
+  const { appendAuditEntry, COALESCE_MS } = await import('../src/core/audit.js');
+  const e = (id, at, cambios, extra = {}) => ({
+    id,
+    at,
+    tipo: 'editada',
+    equipo: 'Box 1',
+    equipoId: 'pc1',
+    autorId: 'm_a',
+    cambios,
+    ...extra,
+  });
+  let list = [{ id: 'c', at: 1, tipo: 'creada', equipo: 'Box 1', equipoId: 'pc1', cambios: [] }];
+  list = appendAuditEntry(list, e('e1', 100, [{ c: 'f.od_pio', a: '14', d: '1' }]));
+  list = appendAuditEntry(
+    list,
+    e('e2', 200, [
+      { c: 'f.od_pio', a: '1', d: '18' },
+      { c: 'f.plan', d: 'Control' },
+    ]),
+  );
+  assert.equal(list.length, 2, 'la creación no se junta; las dos ediciones sí');
+  assert.equal(list[1].id, 'e1');
+  assert.equal(list[1].hasta, 200);
+  assert.deepEqual(list[1].cambios, [
+    { c: 'f.od_pio', a: '14', d: '18' },
+    { c: 'f.plan', d: 'Control' },
+  ]);
+  // Volver al valor original: deja de ser un cambio.
+  list = appendAuditEntry(list, e('e3', 300, [{ c: 'f.od_pio', a: '18', d: '14' }]));
+  assert.deepEqual(list[1].cambios, [{ c: 'f.plan', d: 'Control' }]);
+  // Otra persona, otro equipo o pasado el plazo: entrada nueva.
+  assert.equal(appendAuditEntry(list, e('x', 310, [{ c: 'f.a', d: '1' }], { autorId: 'm_b' })).length, 3);
+  assert.equal(appendAuditEntry(list, e('x', 310, [{ c: 'f.a', d: '1' }], { equipoId: 'pc2' })).length, 3);
+  assert.equal(appendAuditEntry(list, e('x', 300 + COALESCE_MS + 1, [{ c: 'f.a', d: '1' }])).length, 3);
+});
+
+test('bitácora: al sincronizar una entrada que se fue juntando, gana su versión más completa', () => {
+  const v1 = { id: 'e1', at: 100, tipo: 'editada', equipo: 'B', equipoId: 'pc1', cambios: [{ c: 'f.a', d: '1' }] };
+  const v2 = { ...v1, hasta: 200, cambios: [{ c: 'f.a', d: '2' }] };
+  for (const [a, b] of [
+    [v1, v2],
+    [v2, v1],
+  ]) {
+    const m = mergeAuditDocs(
+      { id: 'b_x', atencionId: 'x', updated: 1, entries: [a] },
+      { id: 'b_x', atencionId: 'x', updated: 2, entries: [b] },
+    );
+    assert.deepEqual(m.entries, [v2]);
+  }
+});

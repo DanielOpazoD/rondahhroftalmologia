@@ -81,6 +81,46 @@ export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, auto
   };
 }
 
+/** Ventana para juntar ediciones seguidas de la misma persona en una sola entrada. */
+export const COALESCE_MS = 10 * 60_000;
+
+/**
+ * Agrega una entrada a la bitácora. Con el guardado automático, cada pausa al
+ * escribir es un guardado: las ediciones seguidas (misma persona y equipo,
+ * menos de COALESCE_MS desde la anterior) se JUNTAN en la última entrada, que
+ * conserva el valor anterior de cada campo y toma el nuevo, y anota `hasta`.
+ * Así el historial dice «editó X de A a B», no 20 pasos intermedios.
+ * @param {import('../domain').AuditEntry[]} entries
+ * @param {import('../domain').AuditEntry} entry
+ * @returns {import('../domain').AuditEntry[]}
+ */
+export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
+  const last = entries.at(-1);
+  const sameHand =
+    last &&
+    entry.tipo === 'editada' &&
+    last.tipo === 'editada' &&
+    last.equipoId === entry.equipoId &&
+    (last.autorId || '') === (entry.autorId || '') &&
+    entry.at >= last.at &&
+    entry.at - (last.hasta || last.at) <= coalesceMs;
+  if (!last || !sameHand) return [...entries, entry];
+  /** @type {Map<string, import('../domain').AuditChange>} */
+  const byField = new Map(last.cambios.map((c) => [c.c, { ...c }]));
+  for (const c of entry.cambios) {
+    const prev = byField.get(c.c);
+    if (!prev) {
+      byField.set(c.c, { ...c });
+      continue;
+    }
+    if ('d' in c) prev.d = c.d;
+    else delete prev.d;
+  }
+  // Un campo que volvió a su valor original ya no es un cambio.
+  const cambios = [...byField.values()].filter((c) => c.a !== c.d).sort((x, y) => (x.c < y.c ? -1 : x.c > y.c ? 1 : 0));
+  return [...entries.slice(0, -1), { ...last, hasta: entry.at, cambios }];
+}
+
 /**
  * Unión de dos documentos de bitácora de la misma atención (sin duplicar entradas).
  * @param {Partial<import('../domain').AuditDoc> | null | undefined} a
@@ -90,7 +130,12 @@ export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, auto
 export function mergeAuditDocs(a, b) {
   /** @type {Map<string, import('../domain').AuditEntry>} */
   const byId = new Map();
-  for (const e of [...(a?.entries || []), ...(b?.entries || [])]) if (e && typeof e.id === 'string') byId.set(e.id, e);
+  for (const e of [...(a?.entries || []), ...(b?.entries || [])]) {
+    if (!e || typeof e.id !== 'string') continue;
+    // Una entrada que se fue juntando (ver appendAuditEntry) tiene varias versiones: gana la más completa.
+    const cur = byId.get(e.id);
+    if (!cur || (e.hasta || e.at) >= (cur.hasta || cur.at)) byId.set(e.id, e);
+  }
   const entries = [...byId.values()].sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1));
   return { id: a?.id || b?.id, atencionId: a?.atencionId || b?.atencionId, updated: Math.max(a?.updated || 0, b?.updated || 0), entries };
 }

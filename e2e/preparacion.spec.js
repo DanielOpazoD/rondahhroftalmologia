@@ -28,6 +28,9 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
   await page.locator('#practiceEnter').click();
   await expect(page).toHaveURL(/\?practica/);
   await expect(page.locator('#practiceBar')).toBeVisible();
+  // Al abrir (hay perfiles de ejemplo) se pregunta quién registra, antes de empezar a escribir.
+  await expect(page.locator('#dlgTitle')).toHaveText('¿Quién registra?');
+  await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
   await tab(page, 'Ingreso');
   await expect(page.locator('#ingList .prow')).toHaveCount(6);
   await expect(page.locator('#ingPend')).toHaveText('5');
@@ -43,7 +46,6 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
   await page.locator('#bNew').click();
   await page.locator('#paciente_nombre').fill('Paciente Practicado');
   await page.locator('#bSave').click();
-  await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('#toast')).toContainText('Atención guardada');
   await page.locator('#practiceExit').click();
   await expect(page.locator('#practiceBar')).toBeHidden();
@@ -170,13 +172,14 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   await page.locator('#medAdd').click();
   await page.locator('#dlg_nombre').fill('Dra. Real');
   await page.locator('#dlg').getByRole('button', { name: 'Guardar' }).click();
-  // En práctica se elige un perfil de ejemplo y se descarga un respaldo.
+  // En práctica se elige (al abrir) un perfil de ejemplo y se descarga un respaldo.
   await page.locator('#practiceEnter').click();
+  await expect(page.locator('#dlgTitle')).toHaveText('¿Quién registra?');
+  await page.locator('#dlg_perfil').selectOption({ label: 'Dra. Ejemplo · Médico/a' });
+  await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
   await tab(page, 'Atención');
   await page.locator('#paciente_nombre').fill('Paciente de Práctica');
   await page.locator('#bSave').click();
-  await page.locator('#dlg_perfil').selectOption({ label: 'Dra. Ejemplo · Médico/a' });
-  await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('#toast')).toContainText('Atención guardada');
   await tab(page, 'Ajustes');
   const [bk] = await Promise.all([page.waitForEvent('download'), page.locator('#bkExp').click()]);
@@ -184,12 +187,10 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   const bkPath = await bk.path();
   await page.locator('#practiceExit').click();
   // De vuelta en la app real: se vuelve a preguntar quién registra (el perfil de práctica no cuenta).
-  await expect(page.locator('#userChip')).toHaveText('Elegir perfil');
-  await tab(page, 'Atención');
-  await page.locator('#paciente_nombre').fill('Paciente Real');
-  await page.locator('#bSave').click();
   await expect(page.locator('#dlgTitle')).toHaveText('¿Quién registra?');
+  await expect(page.locator('#dlg_perfil option', { hasText: 'Dra. Ejemplo' })).toHaveCount(0);
   await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.locator('#userChip')).toHaveText('Dra. Real');
   // El respaldo de práctica no se importa a los datos reales.
   await tab(page, 'Ajustes');
   await page.locator('#bkImp').setInputFiles(bkPath);

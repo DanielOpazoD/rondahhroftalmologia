@@ -28,6 +28,9 @@ import { patientActions } from './actions/patients.js';
 import { catalogActions } from './actions/catalogs.js';
 import { outputActions } from './actions/outputs.js';
 
+/** Pausa al escribir tras la que se guarda solo (ms). */
+export const AUTOSAVE_MS = 1200;
+
 /**
  * @typedef {ReturnType<typeof createContext>} AppContext
  */
@@ -38,6 +41,8 @@ import { outputActions } from './actions/outputs.js';
  */
 export function createContext(store, templateB64) {
   let templateCache = null;
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let autosaveTimer;
   const bus = createBus();
 
   const ctx = {
@@ -80,6 +85,7 @@ export function createContext(store, templateB64) {
     userAsked: false,
     /** Pregunta quién registra si hace falta (lo asigna userView.js). */
     ensureUser: /** @type {() => Promise<void>} */ (async () => {}),
+    askUserAtStart: /** @type {() => Promise<void>} */ (async () => {}),
     currentUser: () => (ctx.userId && ctx.medicos.find((m) => m.id === ctx.userId)) || null,
     /** Quién y desde dónde, para la bitácora. */
     author: () => {
@@ -113,6 +119,7 @@ export function createContext(store, templateB64) {
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = true;
       ctx.persist(() => store.saveDraft(ctx.rec));
+      ctx.scheduleAutosave();
       if (silent) {
         showValidation(ctx);
         renderToolbar(ctx);
@@ -123,6 +130,22 @@ export function createContext(store, templateB64) {
       renderFilter(ctx);
       if (ctx.currentTab === 't-est') renderStats(ctx);
       if (ctx.currentTab === 't-exp') renderExportView(ctx);
+    },
+
+    /**
+     * Guardado automático: cada cambio se guarda solo tras una pausa de
+     * AUTOSAVE_MS al escribir (si la atención ya se puede guardar).
+     */
+    scheduleAutosave() {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        if (ctx.dirty) void ctx.save({ auto: true });
+      }, AUTOSAVE_MS);
+    },
+    /** Guarda ya lo pendiente (al ocultar o cerrar la página). */
+    flushAutosave() {
+      clearTimeout(autosaveTimer);
+      if (ctx.dirty) void ctx.save({ auto: true });
     },
 
     /** Anuncia un cambio (ver ui/events.js): las vistas suscritas se re-dibujan una vez. */

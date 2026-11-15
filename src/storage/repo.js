@@ -11,6 +11,7 @@
  *
  * Los objetos devueltos son de solo lectura: para modificar, copiar y guardar.
  */
+import { appendAuditEntry } from '../core/audit.js';
 import { normalizeRecord, sortRecords, isValidId } from '../core/record.js';
 import { isFutureVersion } from '../core/migrations.js';
 import { normalizePatient, patientLabel } from '../core/patient.js';
@@ -312,7 +313,7 @@ export function createRepo(
     addAuditEntry(atencionId, entry) {
       const id = 'b_' + atencionId;
       const cur = audit.get(id);
-      const doc = { id, atencionId, updated: entry.at, entries: [...(cur?.entries || []), entry] };
+      const doc = { id, atencionId, updated: entry.at, entries: appendAuditEntry(cur?.entries || [], entry) };
       if (cur?.updated >= doc.updated) doc.updated = cur.updated + 1;
       audit.set(id, doc);
       putIfChanged('bitacora', doc);

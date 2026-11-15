@@ -10,7 +10,7 @@ import { prepareSave } from '../../app/attentions.js';
 import { clock } from '../../core/clock.js';
 import { makeAuditEntry } from '../../core/audit.js';
 import { toast } from '../dom.js';
-import { syncAttentionView, showValidation } from '../attentionView.js';
+import { syncAttentionView, showValidation, renderToolbar, renderHistory } from '../attentionView.js';
 import { uiConfirm, uiChoose } from '../modal.js';
 
 /** Pregunta antes de descartar cambios sin guardar. */
@@ -28,16 +28,26 @@ export const confirmDiscard = (what) =>
  */
 export function attentionActions(ctx, store) {
   return {
-    async save() {
+    /**
+     * Guarda la atención en edición.
+     * `auto`: guardado automático tras una pausa al escribir. Es silencioso:
+     * no muestra errores ni mensajes, y si la atención aún no se puede guardar
+     * (falta nombre/RUT o fecha) o duplicaría otra del mismo día, espera (la
+     * barra de estado dice por qué).
+     * @param {{auto?: boolean}} [o]
+     */
+    async save({ auto = false } = {}) {
       const v = validateRecord(ctx.rec);
       if (v.errors.length) {
+        if (auto) return false;
         showValidation(ctx, { showErrors: true });
         toast(v.errors[0]);
         return false;
       }
-      await ctx.ensureUser();
       // Atención NUEVA de un paciente que ya tiene una ese día (p. ej. creada en otro equipo).
       const dup = !ctx.rec.id && findDuplicate(ctx.rec, ctx.records);
+      if (dup && auto) return false; // la barra ofrece continuar en la existente
+      await ctx.ensureUser();
       if (dup) {
         const name = dup.f.paciente_nombre || dup.f.paciente_rut;
         const choice = await uiChoose({
@@ -71,9 +81,14 @@ export function attentionActions(ctx, store) {
       ctx.rec = rec;
       ctx.snap = structuredClone(rec);
       ctx.dirty = false;
-      syncAttentionView(ctx);
+      if (auto) {
+        // Sin re-dibujar el formulario mientras se escribe: solo estado e historial.
+        renderToolbar(ctx);
+        renderHistory(ctx);
+      } else syncAttentionView(ctx);
       ctx.emit('datos');
       ctx.sync?.schedule();
+      if (auto) return true;
       toast(
         v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada',
         v.warnings.length ? 3500 : 2200,

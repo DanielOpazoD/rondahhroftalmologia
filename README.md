@@ -6,7 +6,7 @@ Registro de atenciones de las **rondas y operativos de oftalmología**. Es un so
 
 1. Abre la app desde su dirección en Netlify. Si vas a trabajar sin sincronización, también puedes abrir **`dist/Hoja_Atencion_Oftalmologica.html`** con doble clic (Chrome, Edge o Safari).
 2. **Ingreso** (opcional, para trabajar en paralelo): una persona preingresa a los pacientes del día con sus datos (RUT, nombre, fecha de nacimiento, sexo, fono). Quedan en la lista como **Por atender**. Los médicos y otros profesionales abren a cada paciente desde esa lista y registran solo lo clínico; al guardar algún dato clínico pasa a **Atendido**. Si el RUT ya está registrado, se completan sus datos y se avisa cuántas atenciones previas tiene.
-3. **Atención**: elige el operativo y el médico de la lista (o crea uno nuevo desde la misma lista) y completa la hoja. La edad se calcula sola si ingresas la fecha de nacimiento. La barra superior muestra al paciente y si hay cambios sin guardar. Sus botones son:
+3. **Atención** (se guarda sola: cada cambio queda guardado tras una pausa al escribir; la barra dice «Guardando…» / «Guardada», o por qué aún no se puede guardar): elige el operativo y el médico de la lista (o crea uno nuevo desde la misma lista) y completa la hoja. La edad se calcula sola si ingresas la fecha de nacimiento. La barra superior muestra al paciente y si hay cambios sin guardar. Sus botones son:
    - **＋** nueva atención;
    - **copiar** la nota para Eloísa;
    - **PDF** de la hoja oficial;
