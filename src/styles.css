@@ -123,6 +123,17 @@ header.top {
   gap: 9px;
   flex: none;
 }
+/* Logo del Hospital Hanga Roa (amarillo): encabezado, ingreso y bloqueo. */
+.hhrlogo {
+  display: block;
+  flex: none;
+  width: auto;
+  height: 28px;
+}
+.hhrlogo.lg {
+  height: 52px;
+  margin-bottom: 4px;
+}
 .brand b {
   display: block;
   font-size: 14px;
@@ -142,20 +153,6 @@ header.top {
 /* Con el chip de quién registra, el encabezado se compacta. */
 .topin:has(.userChip:not([hidden])) .ver {
   display: none;
-}
-.logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--acc);
-  color: var(--acc-ink);
-  display: grid;
-  place-items: center;
-}
-.logo svg {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.1;
 }
 .topr {
   margin-left: auto;
@@ -1940,9 +1937,6 @@ body.practice .brand small {
   color: #6d28d9;
   font-weight: 600;
 }
-body.practice .logo {
-  background: #6d28d9;
-}
 
 /* ------------------------------------------------ chequeo del equipo */
 dialog.checkdlg {
@@ -2047,17 +2041,6 @@ dialog.lockdlg::backdrop {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-}
-.lockbox .logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-}
-.lockbox .logo svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
 }
 .lockbox h3 {
   margin: 4px 0 0;

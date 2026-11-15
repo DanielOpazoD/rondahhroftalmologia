@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.16.1 — 2026-11-15
+
+### Cambios visuales
+- **Logo del Hospital Hanga Roa** (amarillo) en el encabezado, la pantalla de ingreso y la de bloqueo. Va dentro del archivo de la app, sin cargar nada externo.
+
 ## 2.16.0 — 2026-11-15
 
 ### Nuevo: cuentas de usuario ([ADR 0014](docs/adr/0014.md))
