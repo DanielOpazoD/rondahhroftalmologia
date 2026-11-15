@@ -109,6 +109,8 @@ export async function buildHtml() {
   let js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const css = await readFile(resolve(root, 'src/styles.css'), 'utf8');
   const html = await readFile(resolve(root, 'src/index.html'), 'utf8');
+  // Logo del Hospital Hanga Roa: va dentro del HTML (la app es un solo archivo; la CSP admite imágenes data:).
+  const logo = `data:image/png;base64,${(await readFile(resolve(root, 'src/assets/logo-hhr.png'))).toString('base64')}`;
   // Identificador de esta compilación, que la app conoce (APP.build) y que el
   // sitio publica en version.json: así un equipo sabe si tiene la última.
   const appBuild = buildIdOf(js, css, html, formHtml);
@@ -125,6 +127,7 @@ export async function buildHtml() {
     .replace('<html', () => `<html data-build="${appBuild}"`)
     .replace('<!-- @CSP -->', () => `<meta http-equiv="Content-Security-Policy" content="${csp}">`)
     .replace('<!-- @FORMULARIO -->', () => formHtml)
+    .replaceAll('@LOGO_HHR', () => logo)
     .replace('<!-- @STYLES -->', () => `<style>${styleBody}</style>`)
     .replace('<!-- @SCRIPT -->', () => `<script>${scriptBody}</script>`);
 }
