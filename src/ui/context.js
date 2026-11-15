@@ -59,6 +59,8 @@ export function createContext(store, templateB64) {
     templateBytes: () => (templateCache ||= base64ToBytes(templateB64)),
     pdfOptions: () => ({ flatten: !!ctx.settings.pdfFlatten, footer: !!ctx.settings.pdfFooter }),
     note: (rec) => buildNote(rec, ctx.procs, { pie: ctx.settings.notaPie }),
+    /** Muestra el aviso de versión nueva (lo asigna updateNotice.js). */
+    showUpdate: /** @type {(version?: string) => void} */ (() => {}),
     /** Modo práctica (datos de ejemplo, sin sincronización; ver practice.js). */
     practice: false,
     /** Dónde se guardan los datos clínicos: 'indexeddb' o 'localstorage' (lo asigna main.js). */

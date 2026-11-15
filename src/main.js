@@ -24,6 +24,7 @@ import { isPractice, prefixedStorage, dbName, seedPractice, resetPractice, pract
 import { uiConfirm } from './ui/modal.js';
 import { initCheckView, autoCheck } from './ui/checkView.js';
 import { createLock } from './ui/lock.js';
+import { startUpdateWatcher } from './ui/updateNotice.js';
 
 function getStorage() {
   try {
@@ -157,6 +158,7 @@ async function main() {
   ctx.showTab('t-at');
   ctx.sync.start();
   registerServiceWorker();
+  if (location.protocol !== 'file:') startUpdateWatcher(ctx);
   ctx.lock.whenUnlocked(() => autoCheck(ctx));
   // Termina de escribir lo pendiente al ocultar o cerrar la página.
   window.addEventListener('pagehide', () => void repo.flush());

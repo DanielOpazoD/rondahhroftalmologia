@@ -2056,3 +2056,21 @@ html.locked body > *:not(#lockDlg) {
     display: none !important;
   }
 }
+
+/* ------------------------------------------------ aviso de versión nueva */
+.updateBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  background: var(--acc-soft);
+  color: var(--acc-text);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.updateBar span {
+  flex: 1;
+  min-width: 180px;
+  font-weight: 600;
+}

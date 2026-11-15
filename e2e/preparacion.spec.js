@@ -196,3 +196,16 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   await expect(page.locator('#msgTitle')).toHaveText('No se pudo importar');
   await expect(page.locator('#msgText')).toContainText('modo práctica');
 });
+
+test('aviso de versión nueva: aparece al volver a la pestaña si hay una publicada más nueva', async ({ page }) => {
+  await page.clock.install();
+  await openApp(page);
+  await page.route('**/version.json', (r) => r.fulfill({ json: { version: '9.9.9', build: 'ffffffffffff' } }));
+  await expect(page.locator('#updateBar')).toBeHidden();
+  await page.clock.fastForward('06:00');
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(page.locator('#updateBar')).toBeVisible();
+  await expect(page.locator('#updateText')).toContainText('9.9.9');
+  await page.locator('#updateLater').click();
+  await expect(page.locator('#updateBar')).toBeHidden();
+});
