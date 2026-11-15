@@ -15,7 +15,7 @@ import { syncFingerprint } from '../src/core/merge.js';
 /** Generador pseudoaleatorio reproducible. */
 function rng(seed) {
   let s = seed >>> 0;
-  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32;
 }
 
 async function world(seed = 1) {
@@ -44,7 +44,10 @@ async function world(seed = 1) {
           encKey: keys.encKey,
           mergeFn: syncMerge,
           fingerprint: syncFingerprint,
-          readLocal: () => ({ items: st.recs.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: structuredClone(r) })), tombstones: { ...st.tomb } }),
+          readLocal: () => ({
+            items: st.recs.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: structuredClone(r) })),
+            tombstones: { ...st.tomb },
+          }),
           writeLocal: (items, t) => {
             st.recs = items.map((i) => ({ ...i.data, id: i.id, updated: i.updated }));
             st.tomb = t;
@@ -90,14 +93,19 @@ test('3 PC sincronizando a la vez no pierden ediciones (caso reproducido)', asyn
 });
 
 // SEMILLAS=200 npm test  -> prueba de estrés con más escenarios.
-const SEEDS = Number(process.env.SEMILLAS || 0) > 0 ? Array.from({ length: Number(process.env.SEMILLAS) }, (_, i) => i + 1) : [1, 2, 3, 7, 42, 99, 123, 2026];
+const SEEDS =
+  Number(process.env.SEMILLAS || 0) > 0
+    ? Array.from({ length: Number(process.env.SEMILLAS) }, (_, i) => i + 1)
+    : [1, 2, 3, 7, 42, 99, 123, 2026];
 for (const seed of SEEDS) {
   test(`convergencia aleatoria: 4 PC, 3 pacientes, sincronizaciones concurrentes (semilla ${seed})`, async () => {
     const rand = rng(seed);
     const { pc } = await world(seed);
     const pcs = ['A', 'B', 'C', 'D'].map(pc);
     const t0 = Date.now();
-    for (const id of ['p1', 'p2', 'p3']) pcs[0].st.recs.push({ id, updated: t0, created: t0, ft: {}, f: { paciente_nombre: id }, checks: {}, proc: {} });
+    for (const id of ['p1', 'p2', 'p3']) {
+      pcs[0].st.recs.push({ id, updated: t0, created: t0, ft: {}, f: { paciente_nombre: id }, checks: {}, proc: {} });
+    }
     await pcs[0].sync();
     await Promise.all(pcs.map((p) => p.sync()));
 

@@ -55,7 +55,10 @@ function row(r, ctx) {
   const meta = [f.paciente_rut, f.paciente_edad && `${f.paciente_edad} a`, sexo, f.operativo].filter(Boolean).map(escapeHtml).join(' · ');
   const dx = diagnosesList(r, { withOthers: false });
   const nProc = Object.keys(r.proc || {}).length;
-  const tags = [...dx.slice(0, 3).map((d) => `<span class="tag">${escapeHtml(d)}</span>`), nProc ? `<span class="tag soft">${nProc} proc.</span>` : ''].join('');
+  const tags = [
+    ...dx.slice(0, 3).map((d) => `<span class="tag">${escapeHtml(d)}</span>`),
+    nProc ? `<span class="tag soft">${nProc} proc.</span>` : '',
+  ].join('');
   const active = ctx.rec.id === r.id ? ' active' : '';
   return `<div class="prow${active}">
     <button type="button" class="pmain" data-a="open" data-id="${id}" title="Abrir atención">
@@ -84,7 +87,8 @@ export function renderRegistry(ctx) {
   $('#regCount').textContent = list.length;
 
   if (!list.length) {
-    $('#regList').innerHTML = `<div class="empty">${ctx.records.length ? 'Sin resultados para esta búsqueda.' : 'Aún no hay pacientes atendidos.<br>Las atenciones guardadas aparecerán aquí.'}</div>`;
+    $('#regList').innerHTML =
+      `<div class="empty">${ctx.records.length ? 'Sin resultados para esta búsqueda.' : 'Aún no hay pacientes atendidos.<br>Las atenciones guardadas aparecerán aquí.'}</div>`;
     return;
   }
   // ctx.records ya viene ordenado por fecha descendente.

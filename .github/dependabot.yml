@@ -1,0 +1,15 @@
+# Propone actualizaciones de dependencias (las aplica solo si la CI pasa y alguien las aprueba).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      herramientas-desarrollo:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

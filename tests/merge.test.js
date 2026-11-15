@@ -6,7 +6,11 @@ import { minimalRecord } from './fixtures.js';
 
 const base = () =>
   normalizeRecord({
-    id: 'a1', created: 100, updated: 100, ft: {}, cat: '',
+    id: 'a1',
+    created: 100,
+    updated: 100,
+    ft: {},
+    cat: '',
     checks: { antecedente_hta: true },
     proc: { fo: { eye: 'AO' } },
     f: { paciente_nombre: 'Ana Tuki', paciente_rut: '12.345.678-5', fecha_atencion: '2026-11-14' },
@@ -128,7 +132,9 @@ test('normalizeRecord conserva ft válido y descarta basura', () => {
 });
 
 test('claves maliciosas (__proto__, constructor) no contaminan prototipos', () => {
-  const evil = JSON.parse('{"id":"a1","updated":9,"ft":{},"f":{"__proto__":"x","ok":"1"},"checks":{"constructor":true},"proc":{"__proto__":{"eye":"OD","polluted":"yes"},"fo":{"eye":"AO"}}}');
+  const evil = JSON.parse(
+    '{"id":"a1","updated":9,"ft":{},"f":{"__proto__":"x","ok":"1"},"checks":{"constructor":true},"proc":{"__proto__":{"eye":"OD","polluted":"yes"},"fo":{"eye":"AO"}}}',
+  );
   const m = mergeRecords(base(), evil);
   assert.equal({}.polluted, undefined);
   assert.equal(Object.prototype.eye, undefined);

@@ -13,7 +13,7 @@ import { fmtDate } from '../core/format.js';
 import { createSecret } from '../core/anonymize.js';
 import { buildAttentionPdf, pdfFileName } from '../pdf/attentionPdf.js';
 import { StorageError } from '../storage/store.js';
-import { $, $$, toast, download, copyText, withBusy, base64ToBytes } from './dom.js';
+import { $$, toast, download, copyText, withBusy, base64ToBytes } from './dom.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
 import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
@@ -31,7 +31,12 @@ import { seedCatalogs, upsert, byName } from '../core/catalog.js';
 
 /** Pregunta antes de descartar cambios sin guardar. */
 const confirmDiscard = (what) =>
-  uiConfirm({ title: 'Cambios sin guardar', message: `La atención actual tiene cambios sin guardar. ¿Descartarlos y ${what}?`, tone: 'warn', okLabel: 'Descartar' });
+  uiConfirm({
+    title: 'Cambios sin guardar',
+    message: `La atención actual tiene cambios sin guardar. ¿Descartarlos y ${what}?`,
+    tone: 'warn',
+    okLabel: 'Descartar',
+  });
 
 /**
  * @param {ReturnType<import('../storage/store.js').createStore>} store
@@ -119,7 +124,9 @@ export function createContext(store, templateB64) {
       const stored = ctx.records.find((r) => r.id === rec.id);
       if (stored) rec = normalizeRecord(mergeRecords(stored, rec));
       rec.updated = Math.max(now, (stored?.updated || 0) + 1);
-      rec.procNames = Object.fromEntries(Object.keys(rec.proc).map((id) => [id, ctx.procs.find((p) => p.id === id)?.n || rec.procNames?.[id] || id]));
+      rec.procNames = Object.fromEntries(
+        Object.keys(rec.proc).map((id) => [id, ctx.procs.find((p) => p.id === id)?.n || rec.procNames?.[id] || id]),
+      );
       const ok = ctx.persist(() => {
         ctx.records = store.upsertRecord(rec);
         store.saveMedico({ n: rec.f.medico_nombre, r: rec.f.medico_rut, op: rec.f.operativo });
@@ -132,7 +139,10 @@ export function createContext(store, templateB64) {
       syncAttentionView(ctx);
       ctx.refreshLists();
       ctx.sync?.schedule();
-      toast(v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada', v.warnings.length ? 3500 : 2200);
+      toast(
+        v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada',
+        v.warnings.length ? 3500 : 2200,
+      );
       return true;
     },
 
@@ -223,14 +233,23 @@ export function createContext(store, templateB64) {
       return withBusy(button, async () => {
         const r = await buildAttentionPdf(ctx.templateBytes(), rec, ctx.procs, ctx.pdfOptions());
         download(r.bytes, pdfFileName(rec), 'application/pdf');
-        toast(r.overflow.length ? `PDF descargado (con hoja complementaria: ${r.overflow.join(', ')})` : 'PDF descargado', r.overflow.length ? 4000 : 2200);
+        toast(
+          r.overflow.length ? `PDF descargado (con hoja complementaria: ${r.overflow.join(', ')})` : 'PDF descargado',
+          r.overflow.length ? 4000 : 2200,
+        );
       });
     },
 
     async copyNote(rec) {
       const text = ctx.note(rec);
       if (await copyText(text)) toast('Nota para Eloísa copiada');
-      else uiCopy({ title: 'Copiar nota', message: 'El navegador no permitió copiar automáticamente. El texto ya está seleccionado: cópialo con Ctrl/⌘ + C.', copyText: text });
+      else {
+        uiCopy({
+          title: 'Copiar nota',
+          message: 'El navegador no permitió copiar automáticamente. El texto ya está seleccionado: cópialo con Ctrl/⌘ + C.',
+          copyText: text,
+        });
+      }
     },
 
     setProcs(procs) {

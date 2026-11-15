@@ -7,16 +7,14 @@ import { APP, DIAGNOSTICOS, SEXOS } from '../config/catalogs.js';
 import { fmtDate, fmtDateTime } from './format.js';
 import { STYLE } from '../lib/xlsx.js';
 import { computeStats, sortedEntries, ageOf, ageGroup, ageGroupLabels, describeFilter } from './stats.js';
-import {
-  proceduresDone, pioFor, antecedentsList, requestedList, diagnosesList, procName,
-} from './clinical.js';
+import { proceduresDone, pioFor, antecedentsList, requestedList, diagnosesList, procName } from './clinical.js';
 
 const b = (v) => ({ v, s: STYLE.bold });
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);
 const sexLabel = (k) => SEXOS.find((s) => s.key === k)?.label || '';
 const num = (v) => {
   const n = Number(String(v ?? '').replace(',', '.'));
-  return v !== '' && v !== undefined && v !== null && Number.isFinite(n) ? n : v ?? '';
+  return v !== '' && v !== undefined && v !== null && Number.isFinite(n) ? n : (v ?? '');
 };
 
 /** Ids de procedimientos presentes: primero los de la lista, luego los históricos. */
@@ -30,31 +28,82 @@ function procColumns(records, procs) {
 export function atencionesSheet(records, procs) {
   const cols = procColumns(records, procs);
   const header = [
-    'ID atención', 'Fecha', 'Operativo', 'Nombre', 'RUT', 'Edad', 'Grupo etario', 'Sexo', 'Fono',
-    'Antecedentes', 'Motivo de consulta',
-    'AV OD', 'PIO OD', 'AV OI', 'PIO OI', 'Hallazgos OD', 'Hallazgos OI', 'Obs. examen',
+    'ID atención',
+    'Fecha',
+    'Operativo',
+    'Nombre',
+    'RUT',
+    'Edad',
+    'Grupo etario',
+    'Sexo',
+    'Fono',
+    'Antecedentes',
+    'Motivo de consulta',
+    'AV OD',
+    'PIO OD',
+    'AV OI',
+    'PIO OI',
+    'Hallazgos OD',
+    'Hallazgos OI',
+    'Obs. examen',
     ...cols.map((c) => c.nombre),
-    'N° procedimientos', 'N° ojos (proc.)',
+    'N° procedimientos',
+    'N° ojos (proc.)',
     'Proc. solicitados',
     ...DIAGNOSTICOS.map((d) => 'Dx ' + d.label),
-    'Catarata ojo', 'Otros diagnósticos', 'Diagnósticos (texto)',
-    'GES', 'IC', 'Receta', 'Otras acciones', 'Plan', 'Seguimiento', 'Alta', 'Médico', 'RUT médico',
+    'Catarata ojo',
+    'Otros diagnósticos',
+    'Diagnósticos (texto)',
+    'GES',
+    'IC',
+    'Receta',
+    'Otras acciones',
+    'Plan',
+    'Seguimiento',
+    'Alta',
+    'Médico',
+    'RUT médico',
   ];
   const rows = records.map((r) => {
     const f = r.f || {};
     const done = proceduresDone(r, procs);
     const age = ageOf(r);
     return [
-      r.id, fmtDate(f.fecha_atencion), f.operativo, f.paciente_nombre, f.paciente_rut, age ?? f.paciente_edad ?? '',
-      ageGroup(age), sexLabel(f.paciente_sexo), f.paciente_fono,
-      antecedentsList(r).join(', '), f.motivo_consulta,
-      f.od_av, num(pioFor(r, 'od', procs)), f.oi_av, num(pioFor(r, 'oi', procs)), f.od_hallazgos, f.oi_hallazgos, f.examen_obs,
+      r.id,
+      fmtDate(f.fecha_atencion),
+      f.operativo,
+      f.paciente_nombre,
+      f.paciente_rut,
+      age ?? f.paciente_edad ?? '',
+      ageGroup(age),
+      sexLabel(f.paciente_sexo),
+      f.paciente_fono,
+      antecedentsList(r).join(', '),
+      f.motivo_consulta,
+      f.od_av,
+      num(pioFor(r, 'od', procs)),
+      f.oi_av,
+      num(pioFor(r, 'oi', procs)),
+      f.od_hallazgos,
+      f.oi_hallazgos,
+      f.examen_obs,
       ...cols.map((c) => r.proc?.[c.id]?.eye || ''),
-      done.length, done.reduce((a, p) => a + p.ojos, 0),
+      done.length,
+      done.reduce((a, p) => a + p.ojos, 0),
       requestedList(r).join(', '),
       ...DIAGNOSTICOS.map((d) => (r.checks?.[d.key] ? 1 : 0)),
-      r.checks?.diagnostico_catarata ? r.cat : '', f.diagnosticos_otros, diagnosesList(r).join(', '),
-      f.ges, f.interconsulta, f.receta, f.diagnosticos_acciones_otros, f.plan, f.seguimiento, f.alta, f.medico_nombre, f.medico_rut,
+      r.checks?.diagnostico_catarata ? r.cat : '',
+      f.diagnosticos_otros,
+      diagnosesList(r).join(', '),
+      f.ges,
+      f.interconsulta,
+      f.receta,
+      f.diagnosticos_acciones_otros,
+      f.plan,
+      f.seguimiento,
+      f.alta,
+      f.medico_nombre,
+      f.medico_rut,
     ];
   });
   return { name: 'Atenciones', header: true, rows: [header, ...rows] };
@@ -62,14 +111,39 @@ export function atencionesSheet(records, procs) {
 
 /** Hoja "Prestaciones": una fila por procedimiento realizado (formato largo). */
 export function prestacionesSheet(records, procs) {
-  const header = ['Fecha', 'Operativo', 'ID atención', 'Nombre', 'RUT', 'Edad', 'Sexo', 'Procedimiento', 'Ojo', 'N° ojos', 'PIO OD', 'PIO OI', 'Médico'];
+  const header = [
+    'Fecha',
+    'Operativo',
+    'ID atención',
+    'Nombre',
+    'RUT',
+    'Edad',
+    'Sexo',
+    'Procedimiento',
+    'Ojo',
+    'N° ojos',
+    'PIO OD',
+    'PIO OI',
+    'Médico',
+  ];
   const rows = [];
   for (const r of records) {
     const f = r.f || {};
     for (const p of proceduresDone(r, procs)) {
       rows.push([
-        fmtDate(f.fecha_atencion), f.operativo, r.id, f.paciente_nombre, f.paciente_rut, ageOf(r) ?? '', sexLabel(f.paciente_sexo),
-        p.nombre, p.ojo, p.ojos, num(p.pioOd), num(p.pioOi), f.medico_nombre,
+        fmtDate(f.fecha_atencion),
+        f.operativo,
+        r.id,
+        f.paciente_nombre,
+        f.paciente_rut,
+        ageOf(r) ?? '',
+        sexLabel(f.paciente_sexo),
+        p.nombre,
+        p.ojo,
+        p.ojos,
+        num(p.pioOd),
+        num(p.pioOi),
+        f.medico_nombre,
       ]);
     }
   }
@@ -105,19 +179,46 @@ export function resumenSheet(S, filterText, now = new Date()) {
     return [k, o.pac, o.od, o.oi, o.ojos];
   });
   const tot = procRows.reduce((a, r) => [a[0] + r[1], a[1] + r[2], a[2] + r[3], a[3] + r[4]], [0, 0, 0, 0]);
-  table('Procedimientos realizados', ['Procedimiento', 'Pacientes', 'OD', 'OI', 'Ojos'], [...procRows, [b('Total'), b(tot[0]), b(tot[1]), b(tot[2]), b(tot[3])]]);
+  table(
+    'Procedimientos realizados',
+    ['Procedimiento', 'Pacientes', 'OD', 'OI', 'Ojos'],
+    [...procRows, [b('Total'), b(tot[0]), b(tot[1]), b(tot[2]), b(tot[3])]],
+  );
 
-  table('Diagnósticos', ['Diagnóstico', 'N°', '% atenciones'], sortedEntries(S.dx).map(([k, v]) => [k, v, pct(v, S.n)]));
-  table('Procedimientos solicitados', ['Procedimiento', 'N°', '% atenciones'], sortedEntries(S.sol).map(([k, v]) => [k, v, pct(v, S.n)]));
-  table('Antecedentes', ['Antecedente', 'N°', '% atenciones'], sortedEntries(S.ant).map(([k, v]) => [k, v, pct(v, S.n)]));
-  table('Gestiones', ['Gestión', 'N°', '% atenciones'], [
-    ['Con GES', S.gest.ges, pct(S.gest.ges, S.n)],
-    ['Con interconsulta', S.gest.ic, pct(S.gest.ic, S.n)],
-    ['Con receta', S.gest.receta, pct(S.gest.receta, S.n)],
-    ['Con seguimiento', S.gest.seguimiento, pct(S.gest.seguimiento, S.n)],
-    ['Con alta', S.gest.alta, pct(S.gest.alta, S.n)],
-  ]);
-  table('Sexo', ['Sexo', 'N°', '%'], [...SEXOS.map((s) => [s.label, S.sexo[s.key], pct(S.sexo[s.key], S.n)]), ['Sin dato', S.sexo['Sin dato'], pct(S.sexo['Sin dato'], S.n)]]);
+  table(
+    'Diagnósticos',
+    ['Diagnóstico', 'N°', '% atenciones'],
+    sortedEntries(S.dx).map(([k, v]) => [k, v, pct(v, S.n)]),
+  );
+  table(
+    'Procedimientos solicitados',
+    ['Procedimiento', 'N°', '% atenciones'],
+    sortedEntries(S.sol).map(([k, v]) => [k, v, pct(v, S.n)]),
+  );
+  table(
+    'Antecedentes',
+    ['Antecedente', 'N°', '% atenciones'],
+    sortedEntries(S.ant).map(([k, v]) => [k, v, pct(v, S.n)]),
+  );
+  table(
+    'Gestiones',
+    ['Gestión', 'N°', '% atenciones'],
+    [
+      ['Con GES', S.gest.ges, pct(S.gest.ges, S.n)],
+      ['Con interconsulta', S.gest.ic, pct(S.gest.ic, S.n)],
+      ['Con receta', S.gest.receta, pct(S.gest.receta, S.n)],
+      ['Con seguimiento', S.gest.seguimiento, pct(S.gest.seguimiento, S.n)],
+      ['Con alta', S.gest.alta, pct(S.gest.alta, S.n)],
+    ],
+  );
+  table(
+    'Sexo',
+    ['Sexo', 'N°', '%'],
+    [
+      ...SEXOS.map((s) => [s.label, S.sexo[s.key], pct(S.sexo[s.key], S.n)]),
+      ['Sin dato', S.sexo['Sin dato'], pct(S.sexo['Sin dato'], S.n)],
+    ],
+  );
   table('Atenciones por operativo', ['Operativo', 'N°'], sortedEntries(S.porOperativo));
   table('Atenciones por médico', ['Médico', 'N°'], sortedEntries(S.porMedico));
 

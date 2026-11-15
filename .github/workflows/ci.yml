@@ -1,0 +1,64 @@
+# Integración continua: cada push a main y cada pull request deben pasar todo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  calidad:
+    name: Lint, tipos, pruebas y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: Formato (Prettier)
+        run: npm run format:check
+      - name: Tipos (tsc --checkJs)
+        run: npm run typecheck
+      - name: Pruebas unitarias e integración
+        run: npm test
+      - name: Estrés de sincronización (200 escenarios concurrentes)
+        run: npm run test:stress
+      - name: Build
+        run: npm run build
+      - name: dist/ está al día con el código fuente
+        run: git diff --exit-code -- dist/ || (echo "::error::dist/ no coincide con el código. Ejecuta 'npm run build' y commitea dist/." && exit 1)
+
+  e2e:
+    name: Pruebas en navegador (Playwright)
+    needs: calidad
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

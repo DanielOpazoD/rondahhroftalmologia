@@ -9,8 +9,29 @@ import { readZipWithPython, sheetCells } from './helpers.js';
 const sample = () => [
   fullRecord(),
   // mismo paciente (RUT sin puntos), otro día
-  minimalRecord('b', { paciente_rut: '11111111-1', paciente_edad: '67', paciente_sexo: 'F', operativo: 'Operativo Prueba Nov 2026', fecha_atencion: '2026-11-15' }, { proc: { fo: { eye: 'OD' } }, checks: { diagnostico_glaucoma: true } }),
-  minimalRecord('c', { paciente_nombre: 'Pedro Hotus', paciente_edad: '8', paciente_sexo: 'M', operativo: 'Ronda Dic', fecha_atencion: '2026-12-01', interconsulta: 'IC' }, { checks: { diagnostico_miopia: true } }),
+  minimalRecord(
+    'b',
+    {
+      paciente_rut: '11111111-1',
+      paciente_edad: '67',
+      paciente_sexo: 'F',
+      operativo: 'Operativo Prueba Nov 2026',
+      fecha_atencion: '2026-11-15',
+    },
+    { proc: { fo: { eye: 'OD' } }, checks: { diagnostico_glaucoma: true } },
+  ),
+  minimalRecord(
+    'c',
+    {
+      paciente_nombre: 'Pedro Hotus',
+      paciente_edad: '8',
+      paciente_sexo: 'M',
+      operativo: 'Ronda Dic',
+      fecha_atencion: '2026-12-01',
+      interconsulta: 'IC',
+    },
+    { checks: { diagnostico_miopia: true } },
+  ),
   minimalRecord('d', { paciente_nombre: 'Sin Edad', fecha_atencion: '2026-12-02' }),
 ];
 
@@ -49,14 +70,20 @@ test('computeStats: pacientes distintos, procedimientos por ojo, dx, sexo, edad'
   assert.equal(S.edadSexo['Sin dato']['Sin dato'], 1);
   assert.equal(S.edad.mediana, 67);
   assert.equal(S.gest.ic, 2);
-  assert.deepEqual(S.porDia.map((d) => d.fecha), ['2026-11-14', '2026-11-15', '2026-12-01', '2026-12-02']);
+  assert.deepEqual(
+    S.porDia.map((d) => d.fecha),
+    ['2026-11-14', '2026-11-15', '2026-12-01', '2026-12-02'],
+  );
   assert.equal(computeStats([], PROCS).edad.promedio, null);
 });
 
 test('statsWorkbook arma las 5 hojas y produce un .xlsx válido', () => {
   const recs = sample();
   const sheets = statsWorkbook(recs, PROCS, { operativo: '' }, new Date(2026, 10, 20));
-  assert.deepEqual(sheets.map((s) => s.name), ['Resumen', 'Atenciones', 'Prestaciones', 'Por día', 'Edad y sexo']);
+  assert.deepEqual(
+    sheets.map((s) => s.name),
+    ['Resumen', 'Atenciones', 'Prestaciones', 'Por día', 'Edad y sexo'],
+  );
   const at = sheets[1];
   assert.equal(at.rows.length, 5);
   const head = at.rows[0];

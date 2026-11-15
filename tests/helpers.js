@@ -38,7 +38,13 @@ export function sheetCells(xml) {
   for (const m of xml.matchAll(/<c r="([A-Z]+\d+)"[^>]*?(?:\/>|>(.*?)<\/c>)/g)) {
     const inner = m[2] || '';
     const t = inner.match(/<t[^>]*>(.*?)<\/t>/s) || inner.match(/<v>(.*?)<\/v>/);
-    if (t) cells[m[1]] = t[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+    if (t) {
+      cells[m[1]] = t[1]
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&');
+    }
   }
   return cells;
 }

@@ -2,7 +2,13 @@
  * Utilidades de interfaz: selección de elementos, avisos, descargas y portapapeles.
  */
 
+/**
+ * Busca un elemento. Tipado como `any`: la interfaz accede a propiedades de
+ * inputs/selects por id; los ids se verifican en tests/build.test.js.
+ * @returns {any}
+ */
 export const $ = (sel, root = document) => root.querySelector(sel);
+/** @returns {any[]} */
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 let toastTimer;
@@ -41,7 +47,7 @@ export async function copyText(text) {
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    let ok = false;
+    let ok;
     try {
       ok = document.execCommand('copy');
     } catch {
@@ -71,7 +77,9 @@ export async function withBusy(button, fn) {
   } catch (e) {
     console.error(e);
     // Import dinámico para no crear una dependencia circular dom ↔ modal.
-    import('./modal.js').then(({ uiAlert }) => uiAlert({ title: 'No se pudo completar la acción', message: String(e?.message || e), tone: 'danger' }));
+    import('./modal.js').then(({ uiAlert }) =>
+      uiAlert({ title: 'No se pudo completar la acción', message: String(e?.message || e), tone: 'danger' }),
+    );
     return undefined;
   } finally {
     if (button) button.disabled = false;

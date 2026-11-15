@@ -22,7 +22,11 @@ test('wrapText respeta ancho y corta palabras largas', async () => {
 });
 
 test('atención breve: 1 página, campos rellenos (no aplanado)', async () => {
-  const rec = minimalRecord('a1', { paciente_nombre: 'Juan Prueba', paciente_rut: '12.345.678-5', motivo_consulta: 'Control', plan: 'Lentes' }, { checks: { antecedente_hta: true }, proc: { fo: { eye: 'AO' } } });
+  const rec = minimalRecord(
+    'a1',
+    { paciente_nombre: 'Juan Prueba', paciente_rut: '12.345.678-5', motivo_consulta: 'Control', plan: 'Lentes' },
+    { checks: { antecedente_hta: true }, proc: { fo: { eye: 'AO' } } },
+  );
   const r = await buildAttentionPdf(TEMPLATE, rec, PROCS, { flatten: false, now: NOW });
   assert.equal(r.pages, 1);
   assert.deepEqual(r.overflow, []);

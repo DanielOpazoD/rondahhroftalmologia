@@ -3,9 +3,7 @@
  */
 import { fmtDate, doctorName } from './format.js';
 import { SEXOS } from '../config/catalogs.js';
-import {
-  antecedentsList, requestedList, diagnosesList, proceduresDone, procLabel, eyeSummary, actionsList,
-} from './clinical.js';
+import { antecedentsList, requestedList, diagnosesList, proceduresDone, procLabel, eyeSummary, actionsList } from './clinical.js';
 
 /**
  * @param {object} rec registro de atención
@@ -89,5 +87,7 @@ export function buildNote(rec, procs, opts = {}) {
   }
   if (opts.pie) L.push(opts.pie);
 
-  return L.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return L.join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }

@@ -57,7 +57,9 @@ export function wrapText(text, font, size, width) {
 export function pdfFileName(rec) {
   const f = rec.f || {};
   const rut = rutKey(f.paciente_rut);
-  return ['Oftalmo', f.fecha_atencion || 'sin_fecha', rut || null, fileSafe(f.paciente_nombre || 'paciente')].filter(Boolean).join('_') + '.pdf';
+  return (
+    ['Oftalmo', f.fecha_atencion || 'sin_fecha', rut || null, fileSafe(f.paciente_nombre || 'paciente')].filter(Boolean).join('_') + '.pdf'
+  );
 }
 
 /**
@@ -91,6 +93,7 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   const setSize = (fl, size) => fl.acroField.setDefaultAppearance(`0 g /Helv ${Math.round(size * 2) / 2} Tf`);
 
   /** Campo de una línea: reduce la letra hasta que quepa; si no cabe, recorta. */
+  /** @param {string} name @param {string} value @param {{max?: number, title?: string}} [opts] */
   const setSingle = (name, value, { max = MAX_PT, title } = {}) => {
     const fl = field(name);
     const s = toWinAnsi(value).replace(/\n+/g, ' ').trim();
@@ -110,6 +113,7 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   };
 
   /** Texto repartido en varios campos de una línea (motivo, plan, observaciones). */
+  /** @returns {{fits: boolean, lines: string[], size?: number}} */
   const fitLines = (names, value) => {
     const fls = names.map(field).filter(Boolean);
     if (!fls.length || !value?.trim()) return { fits: true, lines: [] };
@@ -120,6 +124,7 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
     }
     return { fits: false, lines: wrapText(value, font, MIN_LINE_PT, w), size: MIN_LINE_PT };
   };
+  /** @param {string[]} names @param {{lines: string[], size?: number}} fit */
   const writeLines = (names, { lines, size }) => {
     names.map(field).forEach((fl, i) => {
       if (!fl) return;
@@ -167,7 +172,15 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   };
 
   /* ---- datos del paciente ---- */
-  for (const k of ['paciente_nombre', 'paciente_rut', 'paciente_edad', 'paciente_fono', 'medico_nombre', 'medico_rut', 'test_schirmer_detalle']) {
+  for (const k of [
+    'paciente_nombre',
+    'paciente_rut',
+    'paciente_edad',
+    'paciente_fono',
+    'medico_nombre',
+    'medico_rut',
+    'test_schirmer_detalle',
+  ]) {
     setSingle(k, f[k]);
   }
   setSingle('fecha_atencion', fmtDate(f.fecha_atencion));
@@ -198,7 +211,9 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
       writeLines(obsNames, r);
     } else {
       procsInAnnex = done.length > 0;
-      const short = [obs, done.length ? `Proc. realizados (${done.length}): ver detalle en hoja complementaria.` : ''].filter(Boolean).join(' | ');
+      const short = [obs, done.length ? `Proc. realizados (${done.length}): ver detalle en hoja complementaria.` : '']
+        .filter(Boolean)
+        .join(' | ');
       setLines(obsNames, short, 'Observaciones del examen');
       // si `short` tampoco cabe, setLines ya agregó las observaciones completas al anexo
     }
@@ -214,7 +229,14 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
 
   /* ---- plan ---- */
   setLines(
-    ['plan_indicaciones_1', 'plan_indicaciones_2', 'plan_indicaciones_3', 'plan_indicaciones_4', 'plan_indicaciones_5', 'plan_indicaciones_6'],
+    [
+      'plan_indicaciones_1',
+      'plan_indicaciones_2',
+      'plan_indicaciones_3',
+      'plan_indicaciones_4',
+      'plan_indicaciones_5',
+      'plan_indicaciones_6',
+    ],
     f.plan,
     'Plan e indicaciones',
   );
@@ -260,7 +282,11 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   doc.setModificationDate(now);
 
   const bytes = await doc.save();
-  return { bytes, pages: doc.getPageCount(), overflow: [...annex.map((a) => a[0]), ...(procsInAnnex ? ['Procedimientos realizados'] : [])] };
+  return {
+    bytes,
+    pages: doc.getPageCount(),
+    overflow: [...annex.map((a) => a[0]), ...(procsInAnnex ? ['Procedimientos realizados'] : [])],
+  };
 }
 
 /* --------------------------------------------------- hoja complementaria */
@@ -271,8 +297,9 @@ function drawAnnex(doc, fonts, rec, procs, sections, done) {
   const M = 54; // margen
   const W = width - 2 * M;
   const f = rec.f || {};
+  /** @type {import('pdf-lib').PDFPage} */
   let page;
-  let y;
+  let y = 0;
 
   const newPage = () => {
     page = doc.addPage([width, height]);
@@ -325,7 +352,10 @@ function drawAnnex(doc, fonts, rec, procs, sections, done) {
       page.drawLine({ start: { x: M, y: y - rowH }, end: { x: M + W, y: y - rowH }, thickness: 0.4, color: GREY });
       y -= rowH;
     };
-    row(cols.map((c) => c.t), bold);
+    row(
+      cols.map((c) => c.t),
+      bold,
+    );
     done.forEach((p) => row([p.nombre, p.ojo, p.pioOd, p.pioOi], font));
     y -= 6;
     page.drawText(`Total: ${done.length} procedimientos, ${done.reduce((a, p) => a + p.ojos, 0)} ojos.`, { x: M, y: y - 4, size: 9, font });

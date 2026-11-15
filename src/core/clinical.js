@@ -38,10 +38,7 @@ function procHasPio(id, rec, procs) {
  */
 export function proceduresDone(rec, procs) {
   const ids = Object.keys(rec.proc || {});
-  const ordered = [
-    ...procs.filter((p) => rec.proc[p.id]).map((p) => p.id),
-    ...ids.filter((id) => !procs.some((p) => p.id === id)),
-  ];
+  const ordered = [...procs.filter((p) => rec.proc[p.id]).map((p) => p.id), ...ids.filter((id) => !procs.some((p) => p.id === id))];
   return ordered.map((id) => {
     const v = rec.proc[id];
     const pio = procHasPio(id, rec, procs);
@@ -121,7 +118,10 @@ export function eyeSummary(rec, e, procs) {
   const pio = pioFor(rec, e, procs);
   if (av) parts.push('AV ' + av);
   if (pio) parts.push('PIO ' + pio + (/mm/i.test(pio) ? '' : ' mmHg'));
-  const otro = [f[`${e}_otro_examen`], f[`${e}_otro_resultado`]].map((x) => (x || '').trim()).filter(Boolean).join(' ');
+  const otro = [f[`${e}_otro_examen`], f[`${e}_otro_resultado`]]
+    .map((x) => (x || '').trim())
+    .filter(Boolean)
+    .join(' ');
   if (otro) parts.push(otro);
   if (f[`${e}_hallazgos`]?.trim()) parts.push(f[`${e}_hallazgos`].trim().replace(/\n+/g, '; '));
   return parts.join(' | ');
@@ -137,4 +137,3 @@ export function actionsList(rec) {
     f.diagnosticos_acciones_otros?.trim() && 'Otros: ' + f.diagnosticos_acciones_otros.trim(),
   ].filter(Boolean);
 }
-

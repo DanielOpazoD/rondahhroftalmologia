@@ -151,7 +151,13 @@ export function computeStats(records, procs) {
     },
     porDia: Object.entries(porDia)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([fecha, d]) => ({ fecha, atenciones: d.atenciones, pacientes: d.pacientes.size, procedimientos: d.procedimientos, ojos: d.ojos })),
+      .map(([fecha, d]) => ({
+        fecha,
+        atenciones: d.atenciones,
+        pacientes: d.pacientes.size,
+        procedimientos: d.procedimientos,
+        ojos: d.ojos,
+      })),
     porMedico,
     porOperativo,
   };

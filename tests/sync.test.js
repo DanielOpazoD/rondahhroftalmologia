@@ -1,7 +1,15 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  generatePassphrase, normalizePassphrase, passphraseProblem, deriveTeamKeys, tokenHash, importEncKey, encryptPayload, decryptPayload, DecryptError,
+  generatePassphrase,
+  normalizePassphrase,
+  passphraseProblem,
+  deriveTeamKeys,
+  tokenHash,
+  importEncKey,
+  encryptPayload,
+  decryptPayload,
+  DecryptError,
 } from '../src/sync/crypto.js';
 import { localVersions, remoteVersions, planSync, applyPulled } from '../src/sync/protocol.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
@@ -50,10 +58,20 @@ describe('protocolo', () => {
   test('planSync y applyPulled con last-write-wins y lápidas', () => {
     const it = (id, updated, data = {}) => ({ id, updated, kind: 'atencion', data });
     const local = localVersions([it('a', 10), it('b', 10)], { c: 30 });
-    const remote = remoteVersions([{ id: 'a', u: 5 }, { id: 'b', u: 20 }, { id: 'c', u: 40 }, { id: 'd', u: 1 }, { id: 'd', u: 2 }]);
+    const remote = remoteVersions([
+      { id: 'a', u: 5 },
+      { id: 'b', u: 20 },
+      { id: 'c', u: 40 },
+      { id: 'd', u: 1 },
+      { id: 'd', u: 2 },
+    ]);
     const plan = planSync(local, remote);
     assert.deepEqual(plan.push, ['a']);
-    assert.deepEqual(plan.pull, [{ id: 'b', u: 20 }, { id: 'c', u: 40 }, { id: 'd', u: 2 }]);
+    assert.deepEqual(plan.pull, [
+      { id: 'b', u: 20 },
+      { id: 'c', u: 40 },
+      { id: 'd', u: 2 },
+    ]);
 
     const r = applyPulled([it('a', 10), it('b', 10)], {}, [
       { id: 'b', u: 20, deleted: true },
@@ -65,7 +83,10 @@ describe('protocolo', () => {
     assert.deepEqual(r.items.map((x) => x.id).sort(), ['a', 'n']);
     assert.deepEqual(r.tombstones, { b: 20 });
     assert.deepEqual([r.added, r.updated, r.deleted], [1, 0, 1]);
-    assert.deepEqual(r.items.find((x) => x.id === 'n'), { id: 'n', updated: 7, kind: 'medico', data: { nombre: 'Dra. Nueva', id: 'n', updated: 7 } });
+    assert.deepEqual(
+      r.items.find((x) => x.id === 'n'),
+      { id: 'n', updated: 7, kind: 'medico', data: { nombre: 'Dra. Nueva', id: 'n', updated: 7 } },
+    );
   });
 });
 
@@ -90,7 +111,8 @@ async function setup() {
           key,
           readLocal: () => ({ items: toItems(structuredClone(state.records)), tombstones: { ...state.tombstones } }),
           mergeFn: syncMerge,
-          writeLocal: (items, tombstones) => Object.assign(state, { records: items.map((i) => ({ ...i.data, id: i.id, updated: i.updated })), tombstones }),
+          writeLocal: (items, tombstones) =>
+            Object.assign(state, { records: items.map((i) => ({ ...i.data, id: i.id, updated: i.updated })), tombstones }),
           batchSize: 2,
         }),
     };
@@ -137,7 +159,15 @@ describe('convergencia de varios PC', () => {
 
     // Cada PC registra sus pacientes.
     pcs.forEach((p, i) => {
-      for (let j = 0; j < 3; j++) p.state.records.push(minimalRecord(`pc${i}_${j}`, { paciente_nombre: `Paciente Secreto ${i}${j}`, paciente_rut: '12.345.678-5' }, { updated: t0 + i * 10 + j }));
+      for (let j = 0; j < 3; j++) {
+        p.state.records.push(
+          minimalRecord(
+            `pc${i}_${j}`,
+            { paciente_nombre: `Paciente Secreto ${i}${j}`, paciente_rut: '12.345.678-5' },
+            { updated: t0 + i * 10 + j },
+          ),
+        );
+      }
     });
     for (const p of pcs) await p.sync();
     for (const p of pcs) await p.sync();
@@ -169,7 +199,10 @@ describe('convergencia de varios PC', () => {
     const serverText = [...store._map.entries()].join('\n');
     assert.ok(!/Paciente|Secreto|Editado|12\.345|345678/.test(serverText));
     assert.equal(store._map.size, 12, '11 atenciones + 1 eliminación, una versión cada una');
-    assert.ok([...store._map.keys()].every((k) => k.startsWith('oftalmologia/r/')), 'separado por especialidad');
+    assert.ok(
+      [...store._map.keys()].every((k) => k.startsWith('oftalmologia/r/')),
+      'separado por especialidad',
+    );
 
     // Sincronizar de nuevo no cambia nada.
     const again = await pcs[1].sync();
@@ -180,7 +213,12 @@ describe('convergencia de varios PC', () => {
     const { fetchFn } = await setup();
     const wrong = await deriveTeamKeys('una contraseña distinta y larga', 1000);
     await assert.rejects(
-      syncOnce({ api: createSyncApi({ token: wrong.token, fetchFn }), key: await importEncKey(wrong.encKey), readLocal: () => ({ items: [], tombstones: {} }), writeLocal() {} }),
+      syncOnce({
+        api: createSyncApi({ token: wrong.token, fetchFn }),
+        key: await importEncKey(wrong.encKey),
+        readLocal: () => ({ items: [], tombstones: {} }),
+        writeLocal() {},
+      }),
       (e) => e.status === 401,
     );
   });
@@ -295,7 +333,11 @@ describe('huella de contenido', () => {
     assert.equal(contentHash(encKey, 'a', 10, 'atencion', same), h, 'determinista para el mismo id y versión');
     assert.notEqual(contentHash(encKey, 'b', 10, 'atencion', same), h, 'otro registro, mismo contenido → otra huella');
     assert.notEqual(contentHash(encKey, 'a', 11, 'atencion', same), h, 'otra versión, mismo contenido → otra huella');
-    assert.notEqual(contentHash(encKey, 'x', 1, 'eliminado', ''), contentHash(encKey, 'y', 1, 'eliminado', ''), 'eliminaciones no reconocibles');
+    assert.notEqual(
+      contentHash(encKey, 'x', 1, 'eliminado', ''),
+      contentHash(encKey, 'y', 1, 'eliminado', ''),
+      'eliminaciones no reconocibles',
+    );
     const other = (await deriveTeamKeys('Q2W3E-R4T5Y-6Y7U8-P9Q0Z', 1000)).encKey;
     assert.notEqual(contentHash(other, 'a', 10, 'atencion', same), h, 'depende de la clave del equipo');
   });

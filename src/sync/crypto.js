@@ -91,7 +91,9 @@ export async function deriveTeamKeys(passphrase, iterations = PBKDF2_ITERATIONS)
   const master = await subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: utf8(SALT), iterations }, base, 256);
   const hkdfKey = await subtle.importKey('raw', master, 'HKDF', false, ['deriveBits']);
   const expand = async (label) =>
-    new Uint8Array(await subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: utf8(`${SALT}:${label}`) }, hkdfKey, 256));
+    new Uint8Array(
+      await subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: utf8(`${SALT}:${label}`) }, hkdfKey, 256),
+    );
   return { encKey: bytesToB64(await expand('cifrado')), token: toHex(await expand('acceso')) };
 }
 
@@ -123,7 +125,11 @@ export async function encryptPayload(key, id, u, obj) {
  */
 export async function decryptPayload(key, id, u, { iv, ct }) {
   try {
-    const pt = await globalThis.crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64ToBytes(iv), additionalData: aad(id, u) }, key, b64ToBytes(ct));
+    const pt = await globalThis.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: b64ToBytes(iv), additionalData: aad(id, u) },
+      key,
+      b64ToBytes(ct),
+    );
     return JSON.parse(new TextDecoder().decode(pt));
   } catch {
     throw new DecryptError('No se pudo descifrar: la contraseña del equipo no coincide o el dato fue alterado');

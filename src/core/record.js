@@ -94,6 +94,7 @@ export function validateRecord(rec, now = new Date()) {
   const f = rec.f || {};
   const errors = [];
   const warnings = [];
+  /** @type {Record<string, {msg: string, level: 'error'|'warn'}>} */
   const fields = {};
   const warn = (field, msg) => {
     warnings.push(msg);
@@ -118,8 +119,11 @@ export function validateRecord(rec, now = new Date()) {
 
   if (f.paciente_fnac) {
     if (!isIsoDate(f.paciente_fnac)) warn('paciente_fnac', 'Fecha de nacimiento no válida');
-    else if (isIsoDate(f.fecha_atencion) && f.paciente_fnac > f.fecha_atencion) warn('paciente_fnac', 'Nacimiento posterior a la fecha de atención');
-    else if (ageAt(f.paciente_fnac, f.fecha_atencion || todayIso(now)) > LIMITS.edadMax) warn('paciente_fnac', 'Fecha de nacimiento implausible');
+    else if (isIsoDate(f.fecha_atencion) && f.paciente_fnac > f.fecha_atencion) {
+      warn('paciente_fnac', 'Nacimiento posterior a la fecha de atención');
+    } else if (ageAt(f.paciente_fnac, f.fecha_atencion || todayIso(now)) > LIMITS.edadMax) {
+      warn('paciente_fnac', 'Fecha de nacimiento implausible');
+    }
   }
   if (f.paciente_edad?.trim()) {
     const e = parseNumber(f.paciente_edad);
@@ -167,9 +171,7 @@ export function patientKey(rec) {
  */
 export function findDuplicate(rec, records) {
   const key = patientKey(rec).key;
-  return records.find(
-    (r) => r.id !== rec.id && r.f?.fecha_atencion === rec.f?.fecha_atencion && patientKey(r).key === key,
-  );
+  return records.find((r) => r.id !== rec.id && r.f?.fecha_atencion === rec.f?.fecha_atencion && patientKey(r).key === key);
 }
 
 /** Ordena atenciones: fecha más reciente primero; a igual fecha, la última creada primero. */

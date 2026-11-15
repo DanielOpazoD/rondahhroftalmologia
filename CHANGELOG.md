@@ -1,5 +1,31 @@
 # Cambios
 
+## 2.6.0 — 2026-11-14
+
+### Calidad y proceso (sin cambios visibles para el usuario)
+- **CI en GitHub Actions** en cada push y pull request:
+  - ESLint, Prettier y `tsc --checkJs`;
+  - pruebas y estrés de sincronización (200 escenarios);
+  - build, y verificación de que `dist/` esté al día;
+  - pruebas en navegador con Playwright.
+- **ESLint** con reglas de corrección y de capas: el núcleo no puede usar el DOM ni `localStorage`, y la interfaz no puede usar `alert`, `confirm` ni `prompt`.
+- **Prettier**: formato uniforme en todo el código (reformateo único).
+- **Verificación de tipos** sobre JSDoc. Se corrigieron 50 inconsistencias de tipos.
+- **Pruebas en navegador (Playwright)**, 11 escenarios:
+  - guardar y ver en Pacientes;
+  - validación;
+  - edad desde la fecha de nacimiento;
+  - descarga del PDF y de Excel;
+  - copiar la nota;
+  - eliminar con el diálogo propio;
+  - crear un médico;
+  - dos PC que editan el mismo paciente y se fusionan;
+  - continuar en una atención existente;
+  - vista de celular.
+- **Versión con una sola fuente** (`package.json`). Todas las dependencias con versión exacta.
+- **Dependabot** para proponer actualizaciones mensuales.
+- `CONTRIBUTING.md` con el proceso y las reglas de la base de código.
+
 ## 2.5.1 — 2026-11-14
 
 ### Corregido (crítico)

@@ -18,7 +18,12 @@ import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const port = Number(process.env.PORT || 8787);
 const handler = createSyncHandler({ store: memoryBlobStore(), tokenHash: (process.env.SYNC_TOKEN_SHA256 || '').toLowerCase() });
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript',
+  '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json',
+};
 
 createServer(async (req, res) => {
   try {

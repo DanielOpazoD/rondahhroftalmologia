@@ -51,7 +51,13 @@ test('ids de catálogo deterministas (sin duplicados entre equipos)', () => {
 
 test('makeMedico / makeOperativo normalizan y validan', () => {
   const m = makeMedico({ nombre: '  Dra. Ana Pérez ', rut: '222222222' }, 10);
-  assert.deepEqual(m, { id: medicoId('Dra. Ana Pérez', '22.222.222-2'), nombre: 'Dra. Ana Pérez', rut: '22.222.222-2', created: 10, updated: 10 });
+  assert.deepEqual(m, {
+    id: medicoId('Dra. Ana Pérez', '22.222.222-2'),
+    nombre: 'Dra. Ana Pérez',
+    rut: '22.222.222-2',
+    created: 10,
+    updated: 10,
+  });
   assert.equal(makeMedico({ nombre: ' ' }), null);
   const o = makeOperativo({ nombre: ' Ronda   Dic ' }, 5);
   assert.equal(o.nombre, 'Ronda Dic');
@@ -65,8 +71,14 @@ test('seedCatalogs toma médicos y operativos de atenciones antiguas sin duplica
     minimalRecord('c', { medico_nombre: 'Luis Rapu', operativo: 'Ronda Dic' }),
   ];
   const r = seedCatalogs({ records, recordado: { n: 'Luis Rapu', op: 'Ronda Dic' } }, 1);
-  assert.deepEqual(r.medicos.map((m) => m.nombre), ['Ana Pérez', 'Luis Rapu']);
-  assert.deepEqual(r.operativos.map((o) => o.nombre), ['Op Nov', 'Ronda Dic']);
+  assert.deepEqual(
+    r.medicos.map((m) => m.nombre),
+    ['Ana Pérez', 'Luis Rapu'],
+  );
+  assert.deepEqual(
+    r.operativos.map((o) => o.nombre),
+    ['Op Nov', 'Ronda Dic'],
+  );
   assert.equal(r.added, 4);
   assert.equal(seedCatalogs({ records, medicos: r.medicos, operativos: r.operativos }).added, 0, 'idempotente');
 });
@@ -79,7 +91,10 @@ test('findMedico por RUT o por nombre; upsert y orden', () => {
   const edited = upsert(meds, { ...meds[1], nombre: 'Aaron Rapu', created: 999 });
   assert.equal(edited.length, 2);
   assert.equal(edited[1].created, meds[1].created, 'conserva la fecha de creación');
-  assert.deepEqual(byName(edited).map((m) => m.nombre), ['Aaron Rapu', 'Ana Pérez']);
+  assert.deepEqual(
+    byName(edited).map((m) => m.nombre),
+    ['Aaron Rapu', 'Ana Pérez'],
+  );
 });
 
 test('store guarda y lee catálogos, descartando entradas inválidas', () => {

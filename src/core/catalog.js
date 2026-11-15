@@ -30,7 +30,12 @@ export function operativoId(nombre) {
 /** @typedef {{id: string, nombre: string, rut: string, created: number, updated: number}} Medico */
 /** @typedef {{id: string, nombre: string, created: number, updated: number}} Operativo */
 
-/** Crea o normaliza un perfil de médico; null si no es válido. */
+/**
+ * Crea o normaliza un perfil de médico; null si no es válido.
+ * @param {{nombre?: string, rut?: string, id?: string, created?: number, updated?: number}} [m]
+ * @param {number} [now]
+ * @returns {Medico|null}
+ */
 export function makeMedico({ nombre, rut = '', id, created, updated } = {}, now = Date.now()) {
   const n = String(nombre ?? '').trim();
   if (!n) return null;
@@ -39,9 +44,16 @@ export function makeMedico({ nombre, rut = '', id, created, updated } = {}, now 
   return { id: mid, nombre: n, rut: r, created: created || now, updated: updated || now };
 }
 
-/** Crea o normaliza un operativo; null si no es válido. */
+/**
+ * Crea o normaliza un operativo; null si no es válido.
+ * @param {{nombre?: string, id?: string, created?: number, updated?: number}} [o]
+ * @param {number} [now]
+ * @returns {Operativo|null}
+ */
 export function makeOperativo({ nombre, id, created, updated } = {}, now = Date.now()) {
-  const n = String(nombre ?? '').replace(/\s+/g, ' ').trim();
+  const n = String(nombre ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!n) return null;
   return { id: isValidId(id) ? id : operativoId(n), nombre: n, created: created || now, updated: updated || now };
 }
@@ -64,11 +76,13 @@ export function upsert(list, item) {
  * Siembra los catálogos a partir de atenciones ya guardadas y del último
  * médico/operativo recordado (migración desde versiones sin catálogos).
  * Solo agrega lo que falta; no modifica entradas existentes.
+ * @param {{records?: object[], recordado?: {n?: string, r?: string, op?: string}, medicos?: Medico[], operativos?: Operativo[]}} input
+ * @param {number} [now]
  * @returns {{medicos: Medico[], operativos: Operativo[], added: number}}
  */
 export function seedCatalogs({ records = [], recordado = {}, medicos = [], operativos = [] }, now = Date.now()) {
-  let meds = [...medicos];
-  let ops = [...operativos];
+  const meds = [...medicos];
+  const ops = [...operativos];
   let added = 0;
   const addMed = (nombre, rut) => {
     const m = makeMedico({ nombre, rut }, now);

@@ -116,18 +116,25 @@ export function renderCatalogSelects(ctx) {
   $('#medicoSel').innerHTML =
     '<option value="">Sin médico</option>' +
     (hasOther ? `<option value="${CUR}">${escapeHtml(f.medico_nombre)}</option>` : '') +
-    ctx.medicos.map((x) => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.nombre)}${x.rut ? ' · ' + escapeHtml(x.rut) : ''}</option>`).join('') +
+    ctx.medicos
+      .map((x) => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.nombre)}${x.rut ? ' · ' + escapeHtml(x.rut) : ''}</option>`)
+      .join('') +
     `<option value="${NEW}">＋ Nuevo médico…</option>`;
   $('#medicoSel').value = m ? m.id : hasOther ? CUR : '';
 }
 
 /** Listas de médicos y operativos en Ajustes. */
 export function renderCatalogSettings(ctx) {
-  const row = (x, sub) => `<div class="it"><div class="t"><b>${escapeHtml(x.nombre)}</b>${sub ? `<span class="muted">${escapeHtml(sub)}</span>` : ''}</div>
+  const row = (
+    x,
+    sub,
+  ) => `<div class="it"><div class="t"><b>${escapeHtml(x.nombre)}</b>${sub ? `<span class="muted">${escapeHtml(sub)}</span>` : ''}</div>
     <button type="button" class="ib sm" data-a="edit" data-id="${escapeHtml(x.id)}" title="Editar" aria-label="Editar">${ICON('edit')}</button>
     <button type="button" class="ib sm danger" data-a="del" data-id="${escapeHtml(x.id)}" title="Eliminar" aria-label="Eliminar">${ICON('trash')}</button></div>`;
   $('#medList').innerHTML = ctx.medicos.length ? ctx.medicos.map((m) => row(m, m.rut)).join('') : '<p class="hint">Aún no hay médicos.</p>';
-  $('#opList').innerHTML = ctx.operativos.length ? ctx.operativos.map((o) => row(o)).join('') : '<p class="hint">Aún no hay operativos.</p>';
+  $('#opList').innerHTML = ctx.operativos.length
+    ? ctx.operativos.map((o) => row(o)).join('')
+    : '<p class="hint">Aún no hay operativos.</p>';
   $('#medCount').textContent = ctx.medicos.length;
   $('#opCount').textContent = ctx.operativos.length;
 }

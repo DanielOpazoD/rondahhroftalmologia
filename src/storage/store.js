@@ -11,7 +11,12 @@ import { makeMedico, makeOperativo } from '../core/catalog.js';
 
 export class StorageError extends Error {}
 
-/** Almacenamiento en memoria con la misma interfaz que localStorage (tests / fallback). */
+/** @typedef {Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>} KeyValueStorage */
+
+/**
+ * Almacenamiento en memoria con la misma interfaz que localStorage (tests / fallback).
+ * @returns {KeyValueStorage}
+ */
 export function memoryStorage() {
   const m = new Map();
   return {
@@ -22,7 +27,7 @@ export function memoryStorage() {
 }
 
 /**
- * @param {Storage} storage normalmente window.localStorage
+ * @param {KeyValueStorage} storage normalmente window.localStorage
  */
 export function createStore(storage) {
   const read = (key, fallback) => {

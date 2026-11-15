@@ -14,7 +14,13 @@ export function initSettingsView(ctx) {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.id === 'ajReset') {
-      if (await uiConfirm({ title: 'Restaurar lista', message: '¿Volver a la lista original de procedimientos? Las atenciones guardadas no cambian.', okLabel: 'Restaurar' })) {
+      if (
+        await uiConfirm({
+          title: 'Restaurar lista',
+          message: '¿Volver a la lista original de procedimientos? Las atenciones guardadas no cambian.',
+          okLabel: 'Restaurar',
+        })
+      ) {
         ctx.setProcs(structuredClone(DEFAULT_PROCS));
       }
       return;
@@ -22,7 +28,16 @@ export function initSettingsView(ctx) {
     const i = Number(b.dataset.i);
     const procs = [...ctx.procs];
     if (b.dataset.a === 'rm') {
-      if (!(await uiConfirm({ title: 'Quitar procedimiento', message: `«${procs[i].n}» se quitará de la lista. Las atenciones ya guardadas lo conservan.`, tone: 'danger', okLabel: 'Quitar' }))) return;
+      if (
+        !(await uiConfirm({
+          title: 'Quitar procedimiento',
+          message: `«${procs[i].n}» se quitará de la lista. Las atenciones ya guardadas lo conservan.`,
+          tone: 'danger',
+          okLabel: 'Quitar',
+        }))
+      ) {
+        return;
+      }
       procs.splice(i, 1);
     } else if (b.dataset.a === 'up' && i > 0) {
       [procs[i - 1], procs[i]] = [procs[i], procs[i - 1]];
@@ -44,7 +59,12 @@ export function initSettingsView(ctx) {
   });
 
   const saveSettings = () => {
-    ctx.settings = { ...ctx.settings, pdfFlatten: $('#setFlatten').checked, pdfFooter: $('#setFooter').checked, notaPie: $('#setPie').value };
+    ctx.settings = {
+      ...ctx.settings,
+      pdfFlatten: $('#setFlatten').checked,
+      pdfFooter: $('#setFooter').checked,
+      notaPie: $('#setPie').value,
+    };
     ctx.store.saveSettings(ctx.settings);
   };
   ['#setFlatten', '#setFooter'].forEach((s) => $(s).addEventListener('change', saveSettings));
@@ -75,7 +95,11 @@ export function initSettingsView(ctx) {
       }
       ctx.reload();
       ctx.sync?.schedule();
-      uiAlert({ title: 'Respaldo importado', message: `${merged.added} nuevas, ${merged.updated} actualizadas y ${merged.unchanged} sin cambios.${keyMsg}`, tone: 'ok' });
+      uiAlert({
+        title: 'Respaldo importado',
+        message: `${merged.added} nuevas, ${merged.updated} actualizadas y ${merged.unchanged} sin cambios.${keyMsg}`,
+        tone: 'ok',
+      });
     } catch (err) {
       uiAlert({ title: 'No se pudo importar', message: err.message, tone: 'danger' });
     }
@@ -84,7 +108,8 @@ export function initSettingsView(ctx) {
   $('#anRegen').addEventListener('click', async () => {
     const ok = await uiConfirm({
       title: 'Nueva clave de seudonimización',
-      message: 'Con una clave nueva, los mismos pacientes tendrán códigos distintos en las próximas exportaciones, y las anteriores ya no coincidirán.',
+      message:
+        'Con una clave nueva, los mismos pacientes tendrán códigos distintos en las próximas exportaciones, y las anteriores ya no coincidirán.',
       tone: 'warn',
       okLabel: 'Generar clave nueva',
     });
@@ -96,7 +121,9 @@ export function initSettingsView(ctx) {
   $('#wipe').addEventListener('click', async () => {
     const n = ctx.records.length;
     if (!n) return toast('No hay atenciones que borrar');
-    const syncNote = ctx.sync?.enabled ? '\n\nSolo se borran en ESTE equipo: con la sincronización activa, las atenciones de los demás equipos se volverán a descargar.' : '';
+    const syncNote = ctx.sync?.enabled
+      ? '\n\nSolo se borran en ESTE equipo: con la sincronización activa, las atenciones de los demás equipos se volverán a descargar.'
+      : '';
     const ok = await uiConfirm({
       title: 'Borrar atenciones de este equipo',
       message: `Se borrarán las ${n} atenciones guardadas en este equipo. Descarga un respaldo antes.${syncNote}`,
@@ -119,7 +146,8 @@ export function renderSettings(ctx) {
         <button type="button" class="ib sm" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : ' disabled'}><svg><use href="#i-up"/></svg></button>
         <button type="button" class="ib sm danger" data-a="rm" data-i="${i}" title="Quitar" aria-label="Quitar"><svg><use href="#i-trash"/></svg></button></div>`,
       )
-      .join('') + '<div class="it"><div class="t"></div><button type="button" class="btn sm" id="ajReset">Restaurar lista original</button></div>';
+      .join('') +
+    '<div class="it"><div class="t"></div><button type="button" class="btn sm" id="ajReset">Restaurar lista original</button></div>';
   $('#setFlatten').checked = !!ctx.settings.pdfFlatten;
   $('#setFooter').checked = !!ctx.settings.pdfFooter;
   $('#setPie').value = ctx.settings.notaPie || '';

@@ -86,8 +86,13 @@ function validItem(it, now, withPayload) {
   if (it.h !== undefined && !H_RE.test(it.h)) return false;
   if (!withPayload) return true;
   return (
-    typeof it.iv === 'string' && B64_RE.test(it.iv) && it.iv.length === 16 &&
-    typeof it.ct === 'string' && B64_RE.test(it.ct) && it.ct.length > 0 && it.ct.length <= LIMITS.ctMaxChars
+    typeof it.iv === 'string' &&
+    B64_RE.test(it.iv) &&
+    it.iv.length === 16 &&
+    typeof it.ct === 'string' &&
+    B64_RE.test(it.ct) &&
+    it.ct.length > 0 &&
+    it.ct.length <= LIMITS.ctMaxChars
   );
 }
 

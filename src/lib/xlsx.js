@@ -17,13 +17,15 @@ const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
 /** Escapa texto para XML y quita caracteres de control inválidos. */
 export function xmlEscape(value) {
-  return String(value)
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return (
+    String(value)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+  );
 }
 
 /** 0 -> A, 25 -> Z, 26 -> AA ... */
@@ -40,7 +42,11 @@ export function columnLetter(index) {
 
 /** Nombre de hoja válido para Excel: máx. 31 caracteres, sin []:*?/\ y único. */
 export function sheetName(name, used = new Set()) {
-  const base = String(name || 'Hoja').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31) || 'Hoja';
+  const base =
+    String(name || 'Hoja')
+      .replace(/[[\]:*?/\\]/g, ' ')
+      .trim()
+      .slice(0, 31) || 'Hoja';
   let candidate = base;
   let i = 2;
   while (used.has(candidate.toLowerCase())) {
@@ -114,7 +120,9 @@ function autoWidth(rows, col) {
   let max = 8;
   for (const row of rows.slice(0, 500)) {
     const v = normCell(row[col] ?? '').v;
-    const len = String(v ?? '').split('\n').reduce((a, l) => Math.max(a, l.length), 0);
+    const len = String(v ?? '')
+      .split('\n')
+      .reduce((a, l) => Math.max(a, l.length), 0);
     if (len > max) max = len;
   }
   return Math.min(60, max + 2);

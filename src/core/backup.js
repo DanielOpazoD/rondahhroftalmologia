@@ -34,7 +34,10 @@ export function parseBackup(text) {
   if (data.app && data.app !== APP.id) throw new Error(`El respaldo es de otra aplicación (${data.app})`);
   return {
     // normalizeRecord anula ids inválidos; esos registros se descartan.
-    records: data.atenciones.filter((r) => r && typeof r === 'object').map(normalizeRecord).filter((r) => r.id),
+    records: data.atenciones
+      .filter((r) => r && typeof r === 'object')
+      .map(normalizeRecord)
+      .filter((r) => r.id),
     procs: Array.isArray(data.procs)
       ? data.procs
           .filter((p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())

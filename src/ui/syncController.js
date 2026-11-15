@@ -12,7 +12,13 @@ import { clock } from '../core/clock.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
 import { fmtDateTime } from '../core/format.js';
 import {
-  cryptoAvailable, deriveTeamKeys, tokenHash, importEncKey, generatePassphrase, passphraseProblem, DecryptError,
+  cryptoAvailable,
+  deriveTeamKeys,
+  tokenHash,
+  importEncKey,
+  generatePassphrase,
+  passphraseProblem,
+  DecryptError,
 } from '../sync/crypto.js';
 import { createSyncApi, syncOnce, SyncHttpError } from '../sync/client.js';
 import { $, toast, copyText } from './dom.js';
@@ -61,7 +67,10 @@ export function createSyncController(ctx) {
     st.skewMin = Math.abs(skew) > 3 * 60 * 1000 ? Math.round(skew / 60000) : 0;
     if (st.skewMin && !st.skewWarned) {
       st.skewWarned = true;
-      toast(`La hora de este equipo está ${Math.abs(st.skewMin)} min ${st.skewMin > 0 ? 'adelantada' : 'atrasada'}. Ajústala en el sistema.`, 6000);
+      toast(
+        `La hora de este equipo está ${Math.abs(st.skewMin)} min ${st.skewMin > 0 ? 'adelantada' : 'atrasada'}. Ajústala en el sistema.`,
+        6000,
+      );
     }
   }
 
@@ -70,7 +79,10 @@ export function createSyncController(ctx) {
     const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated, kind, data: x });
     return {
       items: [
-        ...store.loadRecords().filter((r) => r.updated).map(wrap('atencion')),
+        ...store
+          .loadRecords()
+          .filter((r) => r.updated)
+          .map(wrap('atencion')),
         ...store.loadMedicos().map(wrap('medico')),
         ...store.loadOperativos().map(wrap('operativo')),
       ],
@@ -82,8 +94,20 @@ export function createSyncController(ctx) {
   function writeLocal(items, tombstones) {
     const of = (kind) => items.filter((i) => i.kind === kind).map((i) => ({ ...i.data, id: i.id, updated: i.updated }));
     store.saveRecords(sortRecords(of('atencion')));
-    store.saveMedicos(byName(of('medico').map((m) => makeMedico(m)).filter(Boolean)));
-    store.saveOperativos(byName(of('operativo').map((o) => makeOperativo(o)).filter(Boolean)));
+    store.saveMedicos(
+      byName(
+        of('medico')
+          .map((m) => makeMedico(m))
+          .filter(Boolean),
+      ),
+    );
+    store.saveOperativos(
+      byName(
+        of('operativo')
+          .map((o) => makeOperativo(o))
+          .filter(Boolean),
+      ),
+    );
     store.saveTombstones(tombstones);
     // Reloj lógico: las ediciones siguientes quedarán después de todo lo recibido.
     for (const i of items) clock.observe(i.updated);
@@ -124,12 +148,19 @@ export function createSyncController(ctx) {
       setStatus('idle');
       const got = res.added + res.updated + res.deleted;
       if (!quiet || got) {
-        toast(got ? `Sincronizado: ${got} ${got === 1 ? 'cambio recibido' : 'cambios recibidos'} de otros equipos` : 'Sincronizado', got ? 3500 : 1800);
+        toast(
+          got ? `Sincronizado: ${got} ${got === 1 ? 'cambio recibido' : 'cambios recibidos'} de otros equipos` : 'Sincronizado',
+          got ? 3500 : 1800,
+        );
       }
     } catch (e) {
       if (e instanceof SyncHttpError && e.status === 0) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
-      else if (e instanceof DecryptError) setStatus('error', 'Hay datos en el servidor que no se pueden descifrar con esta contraseña. Revisa que sea la misma en todos los PC.');
-      else setStatus('error', e.message || String(e));
+      else if (e instanceof DecryptError) {
+        setStatus(
+          'error',
+          'Hay datos en el servidor que no se pueden descifrar con esta contraseña. Revisa que sea la misma en todos los PC.',
+        );
+      } else setStatus('error', e.message || String(e));
       if (!quiet) toast(st.message, 4000);
     } finally {
       st.running = false;
@@ -248,7 +279,9 @@ export function createSyncController(ctx) {
     $('#syncOn').addEventListener('click', () => activate($('#syncPass').value));
     $('#syncOff').addEventListener('click', deactivate);
     $('#syncNowBtn').addEventListener('click', () => syncNow({ quiet: false }));
-    $('#syncCopyHash').addEventListener('click', async () => toast((await copyText(st.config?.hash || '')) ? 'Valor copiado' : 'No se pudo copiar'));
+    $('#syncCopyHash').addEventListener('click', async () =>
+      toast((await copyText(st.config?.hash || '')) ? 'Valor copiado' : 'No se pudo copiar'),
+    );
     $('#syncBadge').addEventListener('click', () => ctx.showTab('t-aj'));
     window.addEventListener('online', () => syncNow());
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncNow());
@@ -284,5 +317,14 @@ export function createSyncController(ctx) {
     }
   }
 
-  return { init, start, render, schedule, syncNow, get enabled() { return !!st.config; } };
+  return {
+    init,
+    start,
+    render,
+    schedule,
+    syncNow,
+    get enabled() {
+      return !!st.config;
+    },
+  };
 }

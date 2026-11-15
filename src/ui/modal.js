@@ -17,9 +17,9 @@ let pending = null;
 /**
  * Muestra el diálogo de mensajes.
  * `html` solo con texto de la propia app (nunca datos ingresados sin escapar).
- * @param {{title: string, message?: string, html?: string, tone?: 'info'|'ok'|'warn'|'danger',
+ * @param {{title: string, message?: string, html?: string, tone?: 'info'|'ok'|'warn'|'danger', altLabel?: string,
  *   okLabel?: string, cancelLabel?: string|null, copyText?: string}} o
- * @returns {Promise<boolean>} true si se aceptó
+ * @returns {Promise<any>} true/false (o 'ok'|'alt'|false si hay `altLabel`)
  */
 function show(o) {
   const dlg = $('#msgDlg');

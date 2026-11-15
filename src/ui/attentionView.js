@@ -12,7 +12,9 @@ import { $, $$ } from './dom.js';
 /** @param {import('./context.js').AppContext} ctx */
 export function initAttentionView(ctx) {
   const chips = (el, defs) => {
-    el.innerHTML = defs.map((d) => `<button type="button" class="chip" data-k="${d.key}" aria-pressed="false">${escapeHtml(d.label)}</button>`).join('');
+    el.innerHTML = defs
+      .map((d) => `<button type="button" class="chip" data-k="${d.key}" aria-pressed="false">${escapeHtml(d.label)}</button>`)
+      .join('');
     el.addEventListener('click', (e) => {
       const b = e.target.closest('.chip');
       if (!b) return;
@@ -26,7 +28,9 @@ export function initAttentionView(ctx) {
   chips($('#dxChips'), DIAGNOSTICOS);
 
   const seg = (el, values, labels, onPick) => {
-    el.innerHTML = values.map((v, i) => `<button type="button" data-v="${v}" aria-pressed="false">${escapeHtml(labels[i])}</button>`).join('');
+    el.innerHTML = values
+      .map((v, i) => `<button type="button" data-v="${v}" aria-pressed="false">${escapeHtml(labels[i])}</button>`)
+      .join('');
     el.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (b) onPick(b.dataset.v);
@@ -36,10 +40,15 @@ export function initAttentionView(ctx) {
     ctx.rec.cat = ctx.rec.cat === v ? '' : v;
     ctx.changed();
   });
-  seg($('#sexSeg'), SEXOS.map((s) => s.key), ['F', 'M', 'Otro'], (v) => {
-    ctx.rec.f.paciente_sexo = ctx.rec.f.paciente_sexo === v ? '' : v;
-    ctx.changed();
-  });
+  seg(
+    $('#sexSeg'),
+    SEXOS.map((s) => s.key),
+    ['F', 'M', 'Otro'],
+    (v) => {
+      ctx.rec.f.paciente_sexo = ctx.rec.f.paciente_sexo === v ? '' : v;
+      ctx.changed();
+    },
+  );
   $$('#sexSeg button').forEach((b, i) => (b.title = SEXOS[i].label));
 
   renderProcList(ctx);
@@ -65,12 +74,13 @@ export function initAttentionView(ctx) {
 
   // Campos de texto: un solo listener delegado.
   document.addEventListener('input', (e) => {
-    const k = e.target.id;
+    const target = /** @type {HTMLInputElement} */ (e.target);
+    const k = target.id;
     if (TEXT_FIELDS.includes(k) && k !== 'paciente_sexo') {
-      ctx.rec.f[k] = e.target.value;
+      ctx.rec.f[k] = target.value;
       // La edad se calcula sola desde la fecha de nacimiento.
       const ageChanged = (k === 'paciente_fnac' || k === 'fecha_atencion') && applyBirthDate(ctx.rec);
-      if (k === 'paciente_fnac' && !isIsoDate(e.target.value)) $('#paciente_edad').readOnly = false;
+      if (k === 'paciente_fnac' && !isIsoDate(target.value)) $('#paciente_edad').readOnly = false;
       ctx.changed({ silent: !ageChanged && k !== 'paciente_fnac' });
     }
   });
@@ -102,7 +112,7 @@ const setPressed = (b, on) => {
 export function syncAttentionView(ctx) {
   const rec = ctx.rec;
   for (const k of TEXT_FIELDS) {
-    const el = document.getElementById(k);
+    const el = /** @type {HTMLInputElement | null} */ (document.getElementById(k));
     if (el && el.value !== (rec.f[k] || '')) el.value = rec.f[k] || '';
   }
   $$('.chip').forEach((c) => setPressed(c, !!rec.checks[c.dataset.k]));
@@ -143,7 +153,8 @@ export function renderToolbar(ctx) {
   $('#dupBanner').hidden = !dup;
   if (dup) {
     $('#dupBanner').dataset.id = dup.id;
-    $('#dupText').textContent = `${dup.f.paciente_nombre || dup.f.paciente_rut} ya tiene una atención este día (en este u otro equipo). Continúa en ella para no duplicar: lo que escribiste se agrega.`;
+    $('#dupText').textContent =
+      `${dup.f.paciente_nombre || dup.f.paciente_rut} ya tiene una atención este día (en este u otro equipo). Continúa en ella para no duplicar: lo que escribiste se agrega.`;
   }
   $('#tbName').textContent = f.paciente_nombre?.trim() || (ctx.rec.id ? '(sin nombre)' : 'Nueva atención');
   const state = ctx.dirty ? (ctx.rec.id ? 'Cambios sin guardar' : 'Sin guardar') : ctx.rec.id ? 'Guardada' : 'Sin datos';

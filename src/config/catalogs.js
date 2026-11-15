@@ -6,12 +6,14 @@
  * formulario PDF (assets/plantilla_hoja_atencion.pdf). No cambiarlas sin
  * actualizar la plantilla.
  */
+import pkg from '../../package.json' with { type: 'json' };
 
 export const APP = Object.freeze({
   id: 'oftalmo-operativos',
   nombre: 'Atención Oftalmológica · Rondas y Operativos',
   establecimiento: 'Hospital Hanga Roa',
-  version: '2.5.1',
+  /** Única fuente de verdad: package.json (se incrusta al construir). */
+  version: pkg.version,
 });
 
 /**
@@ -130,25 +132,61 @@ export const PIO_SUFFIX = { t_aplan: 'Apl', t_neum: 'Neu' };
  * El id del elemento <input>/<textarea> en la interfaz es el mismo.
  */
 export const TEXT_FIELDS = [
-  'operativo', 'fecha_atencion',
-  'paciente_nombre', 'paciente_rut', 'paciente_fnac', 'paciente_edad', 'paciente_sexo', 'paciente_fono',
-  'antecedente_cirugia_detalle', 'antecedentes_otros',
+  'operativo',
+  'fecha_atencion',
+  'paciente_nombre',
+  'paciente_rut',
+  'paciente_fnac',
+  'paciente_edad',
+  'paciente_sexo',
+  'paciente_fono',
+  'antecedente_cirugia_detalle',
+  'antecedentes_otros',
   'motivo_consulta',
-  'od_av', 'od_pio', 'od_otro_examen', 'od_otro_resultado', 'od_hallazgos',
-  'oi_av', 'oi_pio', 'oi_otro_examen', 'oi_otro_resultado', 'oi_hallazgos',
+  'od_av',
+  'od_pio',
+  'od_otro_examen',
+  'od_otro_resultado',
+  'od_hallazgos',
+  'oi_av',
+  'oi_pio',
+  'oi_otro_examen',
+  'oi_otro_resultado',
+  'oi_hallazgos',
   'examen_obs',
-  'test_schirmer_detalle', 'procedimientos_otros',
-  'diagnosticos_otros', 'ges', 'interconsulta', 'receta', 'diagnosticos_acciones_otros',
-  'plan', 'seguimiento', 'alta',
-  'medico_nombre', 'medico_rut',
+  'test_schirmer_detalle',
+  'procedimientos_otros',
+  'diagnosticos_otros',
+  'ges',
+  'interconsulta',
+  'receta',
+  'diagnosticos_acciones_otros',
+  'plan',
+  'seguimiento',
+  'alta',
+  'medico_nombre',
+  'medico_rut',
 ];
 
 /** Campos de texto libre que pueden contener datos identificatorios. */
 export const FREE_TEXT_FIELDS = [
-  'antecedente_cirugia_detalle', 'antecedentes_otros', 'motivo_consulta',
-  'od_hallazgos', 'oi_hallazgos', 'od_otro_resultado', 'oi_otro_resultado', 'examen_obs',
-  'procedimientos_otros', 'diagnosticos_otros', 'ges', 'interconsulta', 'receta',
-  'diagnosticos_acciones_otros', 'plan', 'seguimiento', 'alta',
+  'antecedente_cirugia_detalle',
+  'antecedentes_otros',
+  'motivo_consulta',
+  'od_hallazgos',
+  'oi_hallazgos',
+  'od_otro_resultado',
+  'oi_otro_resultado',
+  'examen_obs',
+  'procedimientos_otros',
+  'diagnosticos_otros',
+  'ges',
+  'interconsulta',
+  'receta',
+  'diagnosticos_acciones_otros',
+  'plan',
+  'seguimiento',
+  'alta',
 ];
 
 /** Grupos etarios para estadística (límites inferiores; el último es abierto). */

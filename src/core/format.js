@@ -46,7 +46,9 @@ function pad2(n) {
 
 /** Deja solo dígitos y K (mayúscula). */
 export function cleanRut(rut) {
-  return String(rut ?? '').replace(/[^0-9kK]/g, '').toUpperCase();
+  return String(rut ?? '')
+    .replace(/[^0-9kK]/g, '')
+    .toUpperCase();
 }
 
 /** Dígito verificador (módulo 11) para la parte numérica de un RUT. */

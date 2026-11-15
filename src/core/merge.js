@@ -31,7 +31,9 @@ export const isSafeKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/
 /** Valores presentes de la atención como mapa ruta -> valor (vacíos y `false` se omiten). */
 export function flatten(rec) {
   const m = new Map();
-  for (const [k, v] of Object.entries(rec?.f || {})) if (isSafeKey(k) && v !== undefined && v !== null && v !== '') m.set('f.' + k, String(v));
+  for (const [k, v] of Object.entries(rec?.f || {})) {
+    if (isSafeKey(k) && v !== undefined && v !== null && v !== '') m.set('f.' + k, String(v));
+  }
   for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
   if (rec?.cat) m.set('cat', String(rec.cat));
   for (const [id, p] of Object.entries(rec?.proc || {})) {

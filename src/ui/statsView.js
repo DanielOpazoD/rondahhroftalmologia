@@ -36,7 +36,10 @@ const bars = (entries, total) => {
   if (!entries.length) return '<p class="hint">Sin datos.</p>';
   const max = Math.max(1, ...entries.map((e) => e[1]));
   return `<table class="st bars">${entries
-    .map(([k, v]) => `<tr><td>${escapeHtml(k)}</td><td class="bar"><div class="hb" style="width:${(v / max) * 100}%"></div></td><td>${v}</td><td class="pct">${total ? Math.round((v / total) * 100) : 0}%</td></tr>`)
+    .map(
+      ([k, v]) =>
+        `<tr><td>${escapeHtml(k)}</td><td class="bar"><div class="hb" style="width:${(v / max) * 100}%"></div></td><td>${v}</td><td class="pct">${total ? Math.round((v / total) * 100) : 0}%</td></tr>`,
+    )
     .join('')}</table>`;
 };
 const kpi = (v, label) => `<div class="kpi"><b>${v}</b><span>${label}</span></div>`;
@@ -55,8 +58,14 @@ export function renderStats(ctx) {
   const sexKeys = ['F', 'M', 'O', 'Sin dato'];
   const fmt1 = (x) => (x === null ? '—' : Math.round(x * 10) / 10);
   const gest = [
-    ['GES', S.gest.ges], ['Interconsulta', S.gest.ic], ['Receta', S.gest.receta], ['Seguimiento', S.gest.seguimiento], ['Alta', S.gest.alta],
-  ].map(([k, v]) => `<span><b>${v}</b> ${k}</span>`).join('');
+    ['GES', S.gest.ges],
+    ['Interconsulta', S.gest.ic],
+    ['Receta', S.gest.receta],
+    ['Seguimiento', S.gest.seguimiento],
+    ['Alta', S.gest.alta],
+  ]
+    .map(([k, v]) => `<span><b>${v}</b> ${k}</span>`)
+    .join('');
 
   const procTable = rows.length
     ? `<div class="tw"><table class="st"><tr><th>Procedimiento</th><th>Pac.</th><th>OD</th><th>OI</th><th>Ojos</th></tr>
@@ -75,7 +84,10 @@ export function renderStats(ctx) {
     <tr class="tot"><td>Total</td>${sexKeys.map((k) => `<td>${S.sexo[k]}</td>`).join('')}<td>${S.n}</td></tr></table></div>`;
 
   const dayTable = `<div class="tw"><table class="st"><tr><th>Fecha</th><th>Atenciones</th><th>Pacientes</th><th>Proc.</th><th>Ojos</th></tr>${S.porDia
-    .map((d) => `<tr><td>${escapeHtml(fmtDate(d.fecha) || d.fecha)}</td><td>${d.atenciones}</td><td>${d.pacientes}</td><td>${d.procedimientos}</td><td>${d.ojos}</td></tr>`)
+    .map(
+      (d) =>
+        `<tr><td>${escapeHtml(fmtDate(d.fecha) || d.fecha)}</td><td>${d.atenciones}</td><td>${d.pacientes}</td><td>${d.procedimientos}</td><td>${d.ojos}</td></tr>`,
+    )
     .join('')}</table></div>`;
 
   $('#stOut').innerHTML = `

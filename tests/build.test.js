@@ -19,7 +19,10 @@ test('el build produce un HTML autocontenido y sin recursos externos', async () 
 test('cada id que usa la interfaz existe en el HTML', () => {
   const html = readFileSync(new URL('../src/index.html', import.meta.url), 'utf8');
   const dir = new URL('../src/ui/', import.meta.url);
-  const sources = [...readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8')), readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')];
+  const sources = [
+    ...readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8')),
+    readFileSync(new URL('../src/main.js', import.meta.url), 'utf8'),
+  ];
   const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_]+)/g)].map((m) => m[1])));
   const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
   assert.deepEqual(missing, []);
@@ -27,14 +30,22 @@ test('cada id que usa la interfaz existe en el HTML', () => {
 
 test('la interfaz no usa alert/confirm/prompt del navegador (usa ui/modal.js)', () => {
   const dir = new URL('../src/ui/', import.meta.url);
-  const offenders = readdirSync(dir).filter((f) => /(^|[^\w.])(window\.)?(alert|confirm|prompt)\(/.test(readFileSync(new URL(f, dir), 'utf8')));
+  const offenders = readdirSync(dir).filter((f) =>
+    /(^|[^\w.])(window\.)?(alert|confirm|prompt)\(/.test(readFileSync(new URL(f, dir), 'utf8')),
+  );
   assert.deepEqual(offenders, []);
 });
 
 test('buildSite escribe el sitio para Netlify con service worker versionado', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'oft-site-'));
   const { buildId } = await buildSite(dir);
-  assert.deepEqual(readdirSync(dir).sort(), ['Hoja_Atencion_Oftalmologica.html', 'icon.svg', 'index.html', 'manifest.webmanifest', 'sw.js']);
+  assert.deepEqual(readdirSync(dir).sort(), [
+    'Hoja_Atencion_Oftalmologica.html',
+    'icon.svg',
+    'index.html',
+    'manifest.webmanifest',
+    'sw.js',
+  ]);
   const sw = readFileSync(join(dir, 'sw.js'), 'utf8');
   assert.ok(sw.includes(`oftalmo-${buildId}`) && !sw.includes('__BUILD_ID__'));
   assert.ok(sw.includes("startsWith('/api/')"), 'la API no se guarda en caché');

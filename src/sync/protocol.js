@@ -63,7 +63,7 @@ export function planSync(local, remote, localHash) {
  * Los elementos son genéricos: {id, updated, kind, data}, donde `kind` es
  * 'atencion' | 'medico' | 'operativo'. La aplicación los separa por tipo.
  * @param {{id: string, updated: number, kind: string, data: object}[]} items
- * @param {{id: string, u: number, deleted?: boolean, kind?: string, data?: object}[]} pulled
+ * @param {{id: string, u: number, deleted?: boolean, kind?: string, data?: object, adopt?: boolean}[]} pulled
  * @param {MergeFn} [mergeFn] fusión por tipo (atenciones: campo a campo). Sin ella, gana la versión más nueva entera.
  * @returns {{items: object[], tombstones: Record<string, number>, added: number, updated: number, deleted: number, needsPush: boolean}}
  */

@@ -1,23 +1,35 @@
 {
   "name": "hoja-atencion-oftalmologica",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "private": true,
   "description": "Hoja de atención oftalmológica offline para rondas y operativos del Hospital Hanga Roa.",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev-server.mjs",
     "test": "node --test \"tests/*.test.js\"",
-    "check": "npm test && npm run build",
-    "dev": "node scripts/dev-server.mjs"
+    "test:stress": "SEMILLAS=200 node --test tests/convergence.test.js",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p jsconfig.json",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
     "esbuild": "0.25.10",
-    "pdf-lib": "1.17.1"
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "pdf-lib": "1.17.1",
+    "prettier": "3.10.1",
+    "typescript": "5.9.3"
   },
   "dependencies": {
-    "@netlify/blobs": "^11.1.9"
+    "@netlify/blobs": "11.1.9"
   }
 }

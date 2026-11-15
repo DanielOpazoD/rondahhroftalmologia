@@ -51,7 +51,16 @@ test('columnLetter, sheetName y xmlEscape', () => {
 test('buildXlsx genera un libro legible con texto, números y estilos', () => {
   const bytes = buildXlsx(
     [
-      { name: 'Datos', header: true, rows: [['Nombre', 'N°'], ['Ñuñoa <&>', 3], ['vacío', null], [{ v: 'Total', s: STYLE.bold }, 4.5]] },
+      {
+        name: 'Datos',
+        header: true,
+        rows: [
+          ['Nombre', 'N°'],
+          ['Ñuñoa <&>', 3],
+          ['vacío', null],
+          [{ v: 'Total', s: STYLE.bold }, 4.5],
+        ],
+      },
       { name: 'Otra', rows: [['solo texto']] },
     ],
     { title: 'Prueba', date: new Date('2026-11-14T12:00:00Z') },

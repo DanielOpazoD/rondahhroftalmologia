@@ -11,14 +11,26 @@ test('store: CRUD de atenciones con orden por fecha', () => {
   store.upsertRecord(minimalRecord('a', { fecha_atencion: '2026-01-01' }));
   store.upsertRecord(minimalRecord('b', { fecha_atencion: '2026-02-01' }));
   const updated = minimalRecord('a', { fecha_atencion: '2026-03-01', paciente_nombre: 'Editado' });
-  assert.deepEqual(store.upsertRecord(updated).map((r) => r.id), ['a', 'b']);
+  assert.deepEqual(
+    store.upsertRecord(updated).map((r) => r.id),
+    ['a', 'b'],
+  );
   assert.equal(store.loadRecords()[0].f.paciente_nombre, 'Editado');
-  assert.deepEqual(store.deleteRecord('a').map((r) => r.id), ['b']);
+  assert.deepEqual(
+    store.deleteRecord('a').map((r) => r.id),
+    ['b'],
+  );
 });
 
 test('store: lee datos de la v1 con las mismas claves', () => {
   const mem = memoryStorage();
-  mem.setItem(STORAGE_KEYS.records, JSON.stringify([{ id: 'old1', f: { paciente_nombre: 'Antiguo', fecha_atencion: '2025-05-01' }, checks: {}, proc: { fo: { eye: 'OD' } } }, { sinId: true }]));
+  mem.setItem(
+    STORAGE_KEYS.records,
+    JSON.stringify([
+      { id: 'old1', f: { paciente_nombre: 'Antiguo', fecha_atencion: '2025-05-01' }, checks: {}, proc: { fo: { eye: 'OD' } } },
+      { sinId: true },
+    ]),
+  );
   const recs = createStore(mem).loadRecords();
   assert.equal(recs.length, 1);
   assert.equal(recs[0].v, 3);
@@ -41,7 +53,13 @@ test('store: JSON corrupto no rompe y almacenamiento lleno lanza StorageError', 
   const mem = memoryStorage();
   mem.setItem(STORAGE_KEYS.records, '{no es json');
   assert.deepEqual(createStore(mem).loadRecords(), []);
-  const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError'); }, removeItem() {} };
+  const full = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+    removeItem() {},
+  };
   assert.throws(() => createStore(full).saveRecords([]), StorageError);
 });
 
@@ -52,19 +70,38 @@ test('backup: ida y vuelta, compatibilidad v1 y unión sin duplicar', () => {
   assert.equal(parsed.records.length, 2);
   assert.equal(parsed.anonSecret, 'c'.repeat(64));
 
-  const v1 = JSON.stringify({ app: 'oftalmo-operativos', v: 1, procs: [{ id: 'nuevo', n: 'Proc nuevo' }], atenciones: [
-    { id: 'a', f: { paciente_nombre: 'más nuevo' }, updated: 20 },
-    { id: 'b', f: {}, updated: 5 },
-    { id: 'c', f: {}, updated: 1 },
-  ] });
+  const v1 = JSON.stringify({
+    app: 'oftalmo-operativos',
+    v: 1,
+    procs: [{ id: 'nuevo', n: 'Proc nuevo' }],
+    atenciones: [
+      { id: 'a', f: { paciente_nombre: 'más nuevo' }, updated: 20 },
+      { id: 'b', f: {}, updated: 5 },
+      { id: 'c', f: {}, updated: 1 },
+    ],
+  });
   const m = mergeBackup(local, parseBackup(v1));
   assert.deepEqual([m.added, m.updated, m.unchanged], [1, 1, 1]);
   assert.equal(m.records.find((r) => r.id === 'a').f.paciente_nombre, 'más nuevo');
   assert.ok(m.procs.some((p) => p.id === 'nuevo'));
 
   // Respaldo manipulado: ids con HTML se descartan; procedimientos se sanean.
-  const evil = parseBackup(JSON.stringify({ atenciones: [{ id: 'x" onmouseover="alert(1)', f: {} }, { id: 'ok_1', f: {} }], procs: [{ id: '"><img>', n: 'Malo' }, { id: 'p1', n: ' Bueno ', pio: 'sí', extra: '<b>' }] }));
-  assert.deepEqual(evil.records.map((r) => r.id), ['ok_1']);
+  const evil = parseBackup(
+    JSON.stringify({
+      atenciones: [
+        { id: 'x" onmouseover="alert(1)', f: {} },
+        { id: 'ok_1', f: {} },
+      ],
+      procs: [
+        { id: '"><img>', n: 'Malo' },
+        { id: 'p1', n: ' Bueno ', pio: 'sí', extra: '<b>' },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    evil.records.map((r) => r.id),
+    ['ok_1'],
+  );
   assert.deepEqual(evil.procs, [{ id: 'p1', n: 'Bueno', pio: 1 }]);
 
   assert.throws(() => parseBackup('nada'), /JSON/);

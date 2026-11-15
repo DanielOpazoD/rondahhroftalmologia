@@ -4,7 +4,14 @@
 import { todayIso, fileSafe } from '../core/format.js';
 import { statsWorkbook } from '../core/reports.js';
 import {
-  ANON_DEFAULTS, ANON_OPTIONS, anonymizeRecords, anonymizedJson, anonymizedSheets, correspondenciaSheets, findLeaks, secretFingerprint,
+  ANON_DEFAULTS,
+  ANON_OPTIONS,
+  anonymizeRecords,
+  anonymizedJson,
+  anonymizedSheets,
+  correspondenciaSheets,
+  findLeaks,
+  secretFingerprint,
 } from '../core/anonymize.js';
 import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createZip } from '../lib/zip.js';
@@ -59,7 +66,10 @@ export function exportStatsXlsx(ctx, button) {
   const list = requireData(ctx);
   if (!list) return;
   return withBusy(button, async () => {
-    const bytes = buildXlsx(statsWorkbook(list, ctx.procs, ctx.filter), { title: 'Estadística oftalmología', creator: 'Hospital Hanga Roa' });
+    const bytes = buildXlsx(statsWorkbook(list, ctx.procs, ctx.filter), {
+      title: 'Estadística oftalmología',
+      creator: 'Hospital Hanga Roa',
+    });
     download(bytes, `estadistica_oftalmo_${suffix(ctx)}.xlsx`, XLSX_MIME);
     toast('Excel descargado');
   });
@@ -104,7 +114,10 @@ function runAnon(ctx, list) {
     box.className = 'banner warn';
     box.textContent =
       `Atención: se encontraron ${leaks.length} posible(s) identificador(es) en los textos (` +
-      leaks.slice(0, 6).map((l) => `${l.tipo} ${l.muestra}`).join(', ') +
+      leaks
+        .slice(0, 6)
+        .map((l) => `${l.tipo} ${l.muestra}`)
+        .join(', ') +
       '). Puede ser una coincidencia con una palabra común; revisa la vista previa o elige «Excluir textos libres».';
   } else {
     box.className = 'banner ok';
@@ -120,7 +133,8 @@ function preview(ctx) {
   const { result } = runAnon(ctx, list);
   const pre = $('#anPre');
   pre.hidden = false;
-  pre.textContent = JSON.stringify(result.registros.slice(0, 3), null, 2) + (result.registros.length > 3 ? `\n… y ${result.registros.length - 3} más` : '');
+  pre.textContent =
+    JSON.stringify(result.registros.slice(0, 3), null, 2) + (result.registros.length > 3 ? `\n… y ${result.registros.length - 3} más` : '');
 }
 
 function exportAnon(ctx, format, button) {
@@ -130,8 +144,15 @@ function exportAnon(ctx, format, button) {
     const { result, leaks } = runAnon(ctx, list);
     if (
       leaks.length &&
-      !(await uiConfirm({ title: 'Posibles identificadores', message: 'La verificación encontró posibles identificadores en los textos (detalle bajo la lista). ¿Descargar igual?', tone: 'warn', okLabel: 'Descargar igual' }))
-    ) return;
+      !(await uiConfirm({
+        title: 'Posibles identificadores',
+        message: 'La verificación encontró posibles identificadores en los textos (detalle bajo la lista). ¿Descargar igual?',
+        tone: 'warn',
+        okLabel: 'Descargar igual',
+      }))
+    ) {
+      return;
+    }
     const name = `oftalmo_seudonimizado_${suffix(ctx)}`;
     if (format === 'json') {
       download(JSON.stringify(anonymizedJson(result), null, 2), name + '.json', 'application/json');
@@ -148,13 +169,20 @@ async function exportKeyTable(ctx, button) {
   if (
     !(await uiConfirm({
       title: 'Tabla de correspondencia',
-      message: 'Contiene nombres y RUT: permite volver a identificar a los pacientes. Guárdala en un lugar seguro, separada de los datos seudonimizados, y no la subas a servicios externos.',
+      message:
+        'Contiene nombres y RUT: permite volver a identificar a los pacientes. Guárdala en un lugar seguro, separada de los datos seudonimizados, y no la subas a servicios externos.',
       tone: 'warn',
       okLabel: 'Descargar',
     }))
-  ) return;
+  ) {
+    return;
+  }
   return withBusy(button, async () => {
     const result = anonymizeRecords(list, ctx.procs, { ...anonOptions(), secret: secret(ctx) });
-    download(buildXlsx(correspondenciaSheets(result), { title: 'CONFIDENCIAL' }), `CONFIDENCIAL_correspondencia_${suffix(ctx)}.xlsx`, XLSX_MIME);
+    download(
+      buildXlsx(correspondenciaSheets(result), { title: 'CONFIDENCIAL' }),
+      `CONFIDENCIAL_correspondencia_${suffix(ctx)}.xlsx`,
+      XLSX_MIME,
+    );
   });
 }

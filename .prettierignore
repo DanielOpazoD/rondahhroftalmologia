@@ -1,0 +1,9 @@
+dist/
+node_modules/
+assets/
+package-lock.json
+playwright-report/
+test-results/
+.netlify/
+*.md
+src/index.html

@@ -1,7 +1,20 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  fmtDate, isIsoDate, todayIso, daysBetween, isValidRut, formatRut, rutKey, rutCheckDigit, toWinAnsi, fileSafe, normalizeText, parseNumber, doctorName, escapeHtml,
+  fmtDate,
+  isIsoDate,
+  todayIso,
+  daysBetween,
+  isValidRut,
+  formatRut,
+  rutKey,
+  rutCheckDigit,
+  toWinAnsi,
+  fileSafe,
+  normalizeText,
+  parseNumber,
+  doctorName,
+  escapeHtml,
 } from '../src/core/format.js';
 import { blankRecord, normalizeRecord, validateRecord, patientKey, findDuplicate, sortRecords, newRecordId } from '../src/core/record.js';
 import { proceduresDone, pioFor, procLabel, diagnosesList, requestedList, antecedentsList, eyeCount } from '../src/core/clinical.js';
@@ -60,10 +73,15 @@ describe('record', () => {
   });
 
   test('normalizeRecord migra registros v1 incompletos sin perder datos', () => {
-    const v1 = { id: 'a1', f: { paciente_nombre: 'X', paciente_edad: 70, nulo: null }, proc: { fo: { eye: 'AO' }, malo: { eye: 'XX' } }, cat: 'ZZ' };
+    const v1 = {
+      id: 'a1',
+      f: { paciente_nombre: 'X', paciente_edad: 70, nulo: null },
+      proc: { fo: { eye: 'AO' }, malo: { eye: 'XX' } },
+      cat: 'ZZ',
+    };
     const r = normalizeRecord(v1);
     assert.equal(r.v, 3);
-    assert.equal(r.especialidad, "oftalmologia", "datos antiguos quedan en oftalmología");
+    assert.equal(r.especialidad, 'oftalmologia', 'datos antiguos quedan en oftalmología');
     assert.equal(r.f.paciente_edad, '70');
     assert.ok(!('nulo' in r.f));
     assert.deepEqual(Object.keys(r.proc), ['fo']);
@@ -83,15 +101,28 @@ describe('record', () => {
 
     const ok = validateRecord(fullRecord(), now);
     assert.deepEqual(ok.errors, []);
-    assert.ok(ok.warnings.some((w) => /fuera de rango/.test(w)), 'PIO 99 de un procedimiento');
+    assert.ok(
+      ok.warnings.some((w) => /fuera de rango/.test(w)),
+      'PIO 99 de un procedimiento',
+    );
 
-    const bad = validateRecord(minimalRecord('y', { paciente_nombre: 'A', paciente_rut: '12.345.678-4', paciente_edad: '200', od_pio: '120', fecha_atencion: '2026-12-01' }, { checks: { diagnostico_catarata: true } }), now);
+    const bad = validateRecord(
+      minimalRecord(
+        'y',
+        { paciente_nombre: 'A', paciente_rut: '12.345.678-4', paciente_edad: '200', od_pio: '120', fecha_atencion: '2026-12-01' },
+        { checks: { diagnostico_catarata: true } },
+      ),
+      now,
+    );
     assert.deepEqual(bad.errors, []);
     for (const k of ['paciente_rut', 'paciente_edad', 'od_pio', 'fecha_atencion', 'catSeg']) assert.equal(bad.fields[k]?.level, 'warn', k);
   });
 
   test('patientKey prioriza RUT y normaliza nombre', () => {
-    assert.deepEqual(patientKey(minimalRecord('a', { paciente_rut: '12.345.678-5', paciente_nombre: 'X' })), { key: 'rut:12345678-5', basis: 'rut' });
+    assert.deepEqual(patientKey(minimalRecord('a', { paciente_rut: '12.345.678-5', paciente_nombre: 'X' })), {
+      key: 'rut:12345678-5',
+      basis: 'rut',
+    });
     assert.equal(patientKey(minimalRecord('a', { paciente_nombre: 'José  PÉREZ' })).key, 'nombre:jose perez');
     assert.equal(patientKey(minimalRecord('z')).basis, 'id');
   });
@@ -107,20 +138,32 @@ describe('record', () => {
 
   test('sortRecords y newRecordId', () => {
     const s = sortRecords([minimalRecord('a', { fecha_atencion: '2026-01-01' }), minimalRecord('b', { fecha_atencion: '2026-02-01' })]);
-    assert.deepEqual(s.map((r) => r.id), ['b', 'a']);
-    assert.match(newRecordId(1000, () => 0.123456), /^a[0-9a-z]+$/);
+    assert.deepEqual(
+      s.map((r) => r.id),
+      ['b', 'a'],
+    );
+    assert.match(
+      newRecordId(1000, () => 0.123456),
+      /^a[0-9a-z]+$/,
+    );
   });
 });
 
 describe('clinical', () => {
   test('proceduresDone: orden de la lista, PIO solo del ojo cubierto', () => {
     const done = proceduresDone(fullRecord(), PROCS);
-    assert.deepEqual(done.map((p) => p.id), ['autorref', 't_aplan', 't_neum', 'fo', 'oct']);
+    assert.deepEqual(
+      done.map((p) => p.id),
+      ['autorref', 't_aplan', 't_neum', 'fo', 'oct'],
+    );
     const neum = done.find((p) => p.id === 't_neum');
     assert.equal(neum.pioOd, '18');
     assert.equal(neum.pioOi, '', 'OI ignorado porque se hizo solo OD');
     assert.equal(procLabel(done[1]), 'T. Aplanática AO (OD 14 / OI 16 mmHg)');
-    assert.equal(done.reduce((a, p) => a + p.ojos, 0), 2 + 2 + 1 + 2 + 1);
+    assert.equal(
+      done.reduce((a, p) => a + p.ojos, 0),
+      2 + 2 + 1 + 2 + 1,
+    );
     assert.equal(eyeCount('XX'), 0);
   });
 
@@ -147,7 +190,20 @@ describe('clinical', () => {
 
   test('buildNote incluye las secciones y no deja "undefined"', () => {
     const note = buildNote(fullRecord(), PROCS, { pie: '(pie)' });
-    for (const s of ['ATENCIÓN OFTALMOLÓGICA', 'Fecha: 14-11-2026', 'Femenino', 'ANTECEDENTES: DM2', 'EXAMEN FÍSICO:', 'OD: AV 20/80 | PIO 14 Apl', 'PROCEDIMIENTOS REALIZADOS:', '- T. Neumática OD (OD 18 mmHg)', 'DIAGNÓSTICOS:', 'GES: Catarata', 'Dra. Ana Pérez Soto – RUT 22.222.222-2', '(pie)']) {
+    for (const s of [
+      'ATENCIÓN OFTALMOLÓGICA',
+      'Fecha: 14-11-2026',
+      'Femenino',
+      'ANTECEDENTES: DM2',
+      'EXAMEN FÍSICO:',
+      'OD: AV 20/80 | PIO 14 Apl',
+      'PROCEDIMIENTOS REALIZADOS:',
+      '- T. Neumática OD (OD 18 mmHg)',
+      'DIAGNÓSTICOS:',
+      'GES: Catarata',
+      'Dra. Ana Pérez Soto – RUT 22.222.222-2',
+      '(pie)',
+    ]) {
       assert.ok(note.includes(s), `falta: ${s}`);
     }
     assert.ok(!/undefined|null/.test(note));

@@ -57,6 +57,8 @@ npm test
 npm run build
 ```
 
+Antes de subir un cambio: `npm run check`, que corre lint, formato, tipos, pruebas y build. Ver [CONTRIBUTING.md](CONTRIBUTING.md).
+
 `npm run build` genera el sitio en `dist/`: `index.html`, la copia `Hoja_Atencion_Oftalmologica.html` para usar con doble clic, y el service worker. `npm run check` ejecuta los tests y luego el build.
 
 Para probar la sincronización en local sin Netlify:

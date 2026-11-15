@@ -95,15 +95,19 @@ export function pseudonym(secret, key, prefix = 'P', length = 8) {
 /** Expresión que encuentra una palabra sin importar tildes ni mayúsculas. */
 function wordRegex(word) {
   const variants = { a: '[aáàä]', e: '[eéèë]', i: '[iíìï]', o: '[oóòö]', u: '[uúùü]', n: '[nñ]' };
-  const body = [...normalizeText(word)]
-    .map((c) => variants[c] || c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('');
+  const body = [...normalizeText(word)].map((c) => variants[c] || c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('');
   return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, 'giu');
 }
 
 /** Palabras de un nombre que vale la pena buscar (3+ letras). */
 export function nameTokens(name) {
-  return [...new Set(normalizeText(name).split(/[^\p{L}]+/u).filter((t) => t.length >= 3))];
+  return [
+    ...new Set(
+      normalizeText(name)
+        .split(/[^\p{L}]+/u)
+        .filter((t) => t.length >= 3),
+    ),
+  ];
 }
 
 /**
@@ -157,7 +161,10 @@ const DATE_FIELD = { mes: 'mes', relativa: 'dia_relativo', exacta: 'fecha', omit
 export function anonymizeRecords(records, procs, options) {
   const opt = { ...ANON_DEFAULTS, ...options };
   const { secret } = opt;
-  const dates = records.map((r) => r.f?.fecha_atencion).filter(Boolean).sort();
+  const dates = records
+    .map((r) => r.f?.fecha_atencion)
+    .filter(Boolean)
+    .sort();
   const firstDate = dates[0] || null;
   const correspondencia = new Map();
 
@@ -170,7 +177,11 @@ export function anonymizeRecords(records, procs, options) {
     const txt = (v) => (opt.texto === 'excluir' ? undefined : scrubText((v || '').trim(), { names }) || undefined);
 
     const entry = correspondencia.get(codigo) || {
-      codigo_paciente: codigo, nombre: f.paciente_nombre || '', rut: f.paciente_rut || '', base_codigo: pk.basis, atenciones: 0,
+      codigo_paciente: codigo,
+      nombre: f.paciente_nombre || '',
+      rut: f.paciente_rut || '',
+      base_codigo: pk.basis,
+      atenciones: 0,
     };
     entry.atenciones++;
     correspondencia.set(codigo, entry);
@@ -255,7 +266,9 @@ export function findLeaks(outputText, records) {
     const rut = cleanRut(f.paciente_rut).slice(0, -1);
     if (rut.length >= 7 && digits.includes(rut)) found.set('r:' + rut, { tipo: 'RUT', muestra: mask(rut) });
     const fono = String(f.paciente_fono || '').replace(/\D/g, '');
-    if (fono.length >= 8 && digits.replace(/ /g, '').includes(fono.slice(-8))) found.set('f:' + fono, { tipo: 'Teléfono', muestra: mask(fono) });
+    if (fono.length >= 8 && digits.replace(/ /g, '').includes(fono.slice(-8))) {
+      found.set('f:' + fono, { tipo: 'Teléfono', muestra: mask(fono) });
+    }
   }
   return [...found.values()];
 }
@@ -306,14 +319,24 @@ export function anonymizedSheets(result, procs, now = new Date()) {
   const regs = result.registros;
   const dateHeader = { mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null }[result.opciones.fechas];
   const dateKey = DATE_FIELD[result.opciones.fechas];
-  const procNames = [...new Set([...procs.map((p) => p.n), ...regs.flatMap((r) => r.procedimientos_realizados.map((p) => p.procedimiento))])];
+  const procNames = [
+    ...new Set([...procs.map((p) => p.n), ...regs.flatMap((r) => r.procedimientos_realizados.map((p) => p.procedimiento))]),
+  ];
   const withText = result.opciones.texto !== 'excluir';
 
   const header = [
-    'Código paciente', 'Código atención', 'Operativo', ...(dateHeader ? [dateHeader] : []), 'Edad', 'Sexo',
+    'Código paciente',
+    'Código atención',
+    'Operativo',
+    ...(dateHeader ? [dateHeader] : []),
+    'Edad',
+    'Sexo',
     ...ANTECEDENTES.map((d) => 'Ant ' + d.label),
     ...(withText ? ['Motivo de consulta'] : []),
-    'AV OD', 'PIO OD', 'AV OI', 'PIO OI',
+    'AV OD',
+    'PIO OD',
+    'AV OI',
+    'PIO OI',
     ...(withText ? ['Hallazgos OD', 'Hallazgos OI'] : []),
     ...procNames,
     'N° procedimientos',
@@ -325,24 +348,46 @@ export function anonymizedSheets(result, procs, now = new Date()) {
   ];
   const flag = (list, label) => (list.includes(label) ? 1 : 0);
   const rows = regs.map((r) => [
-    r.codigo_paciente, r.codigo_atencion, r.operativo || '', ...(dateKey ? [r[dateKey] ?? ''] : []), r.edad ?? '', r.sexo || '',
+    r.codigo_paciente,
+    r.codigo_atencion,
+    r.operativo || '',
+    ...(dateKey ? [r[dateKey] ?? ''] : []),
+    r.edad ?? '',
+    r.sexo || '',
     ...ANTECEDENTES.map((d) => flag(r.antecedentes, d.label)),
     ...(withText ? [r.motivo_consulta || ''] : []),
-    r.examen?.od?.av || '', r.examen?.od?.pio || '', r.examen?.oi?.av || '', r.examen?.oi?.pio || '',
+    r.examen?.od?.av || '',
+    r.examen?.od?.pio || '',
+    r.examen?.oi?.av || '',
+    r.examen?.oi?.pio || '',
     ...(withText ? [r.examen?.od?.hallazgos || '', r.examen?.oi?.hallazgos || ''] : []),
     ...procNames.map((n) => r.procedimientos_realizados.find((p) => p.procedimiento === n)?.ojo || ''),
     r.procedimientos_realizados.length,
     ...SOLICITADOS.map((d) => flag(r.procedimientos_solicitados, d.label)),
     ...DIAGNOSTICOS.map((d) => flag(r.diagnosticos, d.label)),
     r.catarata_ojo || '',
-    ...(withText ? [r.diagnosticos_otros || '', r.ges || '', r.interconsulta || '', r.receta || '', r.plan || '', r.seguimiento || '', r.alta || ''] : []),
+    ...(withText
+      ? [r.diagnosticos_otros || '', r.ges || '', r.interconsulta || '', r.receta || '', r.plan || '', r.seguimiento || '', r.alta || '']
+      : []),
     r.codigo_medico || '',
   ]);
 
-  const prest = [['Código paciente', 'Código atención', ...(dateHeader ? [dateHeader] : []), 'Edad', 'Sexo', 'Procedimiento', 'Ojo', 'PIO OD', 'PIO OI']];
+  const prest = [
+    ['Código paciente', 'Código atención', ...(dateHeader ? [dateHeader] : []), 'Edad', 'Sexo', 'Procedimiento', 'Ojo', 'PIO OD', 'PIO OI'],
+  ];
   for (const r of regs) {
     for (const p of r.procedimientos_realizados) {
-      prest.push([r.codigo_paciente, r.codigo_atencion, ...(dateKey ? [r[dateKey] ?? ''] : []), r.edad ?? '', r.sexo || '', p.procedimiento, p.ojo, p.pio_od || '', p.pio_oi || '']);
+      prest.push([
+        r.codigo_paciente,
+        r.codigo_atencion,
+        ...(dateKey ? [r[dateKey] ?? ''] : []),
+        r.edad ?? '',
+        r.sexo || '',
+        p.procedimiento,
+        p.ojo,
+        p.pio_od || '',
+        p.pio_oi || '',
+      ]);
     }
   }
 
@@ -359,7 +404,10 @@ export function anonymizedSheets(result, procs, now = new Date()) {
     ['Los textos libres se limpian automáticamente, pero conviene revisarlos antes de compartir.'],
     ['Sin la tabla de correspondencia (archivo aparte, confidencial) los códigos no permiten identificar pacientes.'],
     [],
-    [{ v: 'Variable', s: STYLE.bold }, { v: 'Descripción', s: STYLE.bold }],
+    [
+      { v: 'Variable', s: STYLE.bold },
+      { v: 'Descripción', s: STYLE.bold },
+    ],
     ...DICCIONARIO,
   ];
 

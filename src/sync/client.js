@@ -64,10 +64,12 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
  *   readLocal: () => {items: {id: string, updated: number, kind: string, data: object}[], tombstones: Record<string, number>},
  *   writeLocal: (items: object[], tombstones: Record<string, number>) => void,
  *   mergeFn?: import('./protocol.js').MergeFn,
- *   encKey?: string,       clave del equipo (base64): calcula la huella de contenido de cada versión
- *   fingerprint?: (kind: string, data: object) => string,  representación canónica del contenido
+ *   encKey?: string,
+ *   fingerprint?: (kind: string, data: object) => string,
  *   batchSize?: number,
  * }} deps
+ *   `encKey`: clave del equipo (base64), para la huella de contenido de cada versión;
+ *   `fingerprint`: representación canónica del contenido (ver core/merge.js).
  * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
  */
 export async function syncOnce(deps) {
@@ -102,6 +104,7 @@ export function contentHash(encKey, id, u, kind, fingerprint) {
   return toHex(hmacSha256(fingerprintKey(encKey), `${id}\n${u}\n${kind}\n${fingerprint}`)).slice(0, 16);
 }
 
+/** @param {Parameters<typeof syncOnce>[0]} deps */
 async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100 }) {
   const { items } = await api.list();
   const remote = remoteVersions(items || []);
@@ -117,7 +120,9 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
   const hashOf = (id) => {
     const v = local.get(id);
     const rec = byId.get(id);
-    return v.deleted || !rec ? contentHash(encKey, id, v.u, 'eliminado', '') : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
+    return v.deleted || !rec
+      ? contentHash(encKey, id, v.u, 'eliminado', '')
+      : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
   };
   const plan = planSync(local, remote, encKey && fingerprint ? hashOf : undefined);
   const pulled = [];
@@ -133,7 +138,13 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
         if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
         const content = await decryptPayload(key, it.id, it.u, it);
         // `record` = formato de la v2.1 (solo atenciones)
-        out.push({ id: it.id, u: it.u, deleted: !!content.deleted, kind: content.kind || 'atencion', data: content.data ?? content.record });
+        out.push({
+          id: it.id,
+          u: it.u,
+          deleted: !!content.deleted,
+          kind: content.kind || 'atencion',
+          data: content.data ?? content.record,
+        });
       }
     }
     return out;
@@ -144,7 +155,9 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
   let merged = 0;
   if (mergeFn) {
     const isLiveLocal = (id) => byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated);
-    const both = plan.push.filter((id) => remote.has(id) && isLiveLocal(id)).map((id) => ({ id, u: remote.get(id).u, h: remote.get(id).h }));
+    const both = plan.push
+      .filter((id) => remote.has(id) && isLiveLocal(id))
+      .map((id) => ({ id, u: remote.get(id).u, h: remote.get(id).h }));
     const conflictIds = new Set(plan.conflicts.map((c) => c.id));
     for (const r of await fetchItems([...both, ...plan.conflicts])) {
       const localItem = byId.get(r.id);
@@ -199,7 +212,12 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
         const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
-        const h = encKey && fingerprint ? (content.deleted ? contentHash(encKey, id, u, 'eliminado', '') : contentHash(encKey, id, u, rec.kind, fingerprint(rec.kind, rec.data))) : undefined;
+        const h =
+          encKey && fingerprint
+            ? content.deleted
+              ? contentHash(encKey, id, u, 'eliminado', '')
+              : contentHash(encKey, id, u, rec.kind, fingerprint(rec.kind, rec.data))
+            : undefined;
         return { id, u, ...(h ? { h } : {}), ...(await encryptPayload(key, id, u, content)) };
       }),
     );

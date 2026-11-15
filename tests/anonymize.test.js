@@ -1,8 +1,19 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  base32, pseudonym, createSecret, secretFingerprint, scrubText, generalizeAge, generalizeDate,
-  anonymizeRecords, anonymizedJson, anonymizedSheets, correspondenciaSheets, findLeaks, nameTokens,
+  base32,
+  pseudonym,
+  createSecret,
+  secretFingerprint,
+  scrubText,
+  generalizeAge,
+  generalizeDate,
+  anonymizeRecords,
+  anonymizedJson,
+  anonymizedSheets,
+  correspondenciaSheets,
+  findLeaks,
+  nameTokens,
 } from '../src/core/anonymize.js';
 import { buildXlsx } from '../src/lib/xlsx.js';
 import { fullRecord, minimalRecord, PROCS } from './fixtures.js';
@@ -36,9 +47,12 @@ describe('códigos seudónimos', () => {
 
 describe('limpieza de textos', () => {
   test('reemplaza RUT, teléfonos, correos, fechas y nombres', () => {
-    const t = scrubText('Pac. María José Tepano, RUT 11.111.111-1 / 11111111-1, fono +56 9 8765 4321, mail a.b@x.cl, cx el 03/05/2019. AV 20/40, PIO 14.', {
-      names: ['María José Tepano Pakarati', 'Ana Pérez'],
-    });
+    const t = scrubText(
+      'Pac. María José Tepano, RUT 11.111.111-1 / 11111111-1, fono +56 9 8765 4321, mail a.b@x.cl, cx el 03/05/2019. AV 20/40, PIO 14.',
+      {
+        names: ['María José Tepano Pakarati', 'Ana Pérez'],
+      },
+    );
     assert.ok(!/Mar[ií]a|Jos[eé]|Tepano|11\.111|8765|a\.b@/.test(t), t);
     for (const m of ['[NOMBRE]', '[RUT]', '[NÚMERO]', '[EMAIL]', '[FECHA]']) assert.ok(t.includes(m), `falta ${m}: ${t}`);
     assert.ok(t.includes('AV 20/40, PIO 14'), 'no toca datos clínicos');
@@ -70,7 +84,13 @@ describe('generalización', () => {
 describe('anonymizeRecords', () => {
   const records = () => [
     fullRecord(),
-    minimalRecord('b', { paciente_rut: '11111111-1', paciente_nombre: 'María J. Tepano', fecha_atencion: '2026-11-16', medico_nombre: 'Dra. Ana Pérez Soto', medico_rut: '22222222-2' }),
+    minimalRecord('b', {
+      paciente_rut: '11111111-1',
+      paciente_nombre: 'María J. Tepano',
+      fecha_atencion: '2026-11-16',
+      medico_nombre: 'Dra. Ana Pérez Soto',
+      medico_rut: '22222222-2',
+    }),
     minimalRecord('c', { paciente_nombre: 'Pedro Hotus', paciente_fono: '987650000', paciente_edad: '45' }),
   ];
 
@@ -78,7 +98,19 @@ describe('anonymizeRecords', () => {
     const recs = records();
     const res = anonymizeRecords(recs, PROCS, { secret: SECRET });
     const out = JSON.stringify(anonymizedJson(res));
-    for (const s of ['Tepano', 'Pakarati', 'María', 'Hotus', 'Pedro', '11.111.111', '11111111', '8765', '987650000', 'Pérez', '22.222.222']) {
+    for (const s of [
+      'Tepano',
+      'Pakarati',
+      'María',
+      'Hotus',
+      'Pedro',
+      '11.111.111',
+      '11111111',
+      '8765',
+      '987650000',
+      'Pérez',
+      '22.222.222',
+    ]) {
       assert.ok(!out.includes(s), `se filtró: ${s}`);
     }
     assert.deepEqual(findLeaks(out, recs), []);

@@ -13,3 +13,5 @@ atenciones_oftalmo*.csv
 *.xlsx
 .playwright-mcp/
 .netlify/
+playwright-report/
+test-results/
