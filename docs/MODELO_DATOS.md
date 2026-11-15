@@ -1,12 +1,13 @@
 # Modelo de datos
 
-## Atención (esquema v2)
+## Atención (esquema v3)
 
 Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conserva el nombre de la v1 para no perder datos.
 
 ```jsonc
 {
-  "v": 2,                          // versión de esquema
+  "v": 3,                          // versión de esquema
+  "especialidad": "oftalmologia",  // separa datos de distintas rondas
   "id": "amhz3k2a9x1",             // único; se genera al guardar
   "created": 1763150000000,        // epoch ms
   "updated": 1763150000000,        // decide qué versión gana al unir respaldos
@@ -14,7 +15,8 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
     "operativo": "Operativo Nov 2026",
     "fecha_atencion": "2026-11-14",
     "paciente_nombre": "…", "paciente_rut": "12.345.678-5",
-    "paciente_edad": "67", "paciente_sexo": "F",   // F | M | O  (nuevo en v2)
+    "paciente_fnac": "1959-03-20",                 // fecha de nacimiento (v3)
+    "paciente_edad": "67", "paciente_sexo": "F",   // edad: se calcula sola si hay fecha de nacimiento
     "paciente_fono": "…",
     "od_av": "20/40", "od_pio": "14", "od_hallazgos": "…",
     "oi_av": "…", "...": "…",
@@ -38,6 +40,20 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
 - `procNames` guarda el nombre del procedimiento al momento de guardar. Así, si después se quita de la lista en Ajustes, la estadística sigue mostrando su nombre.
 - `normalizeRecord()` acepta registros v1 o incompletos y los lleva a v2 sin perder datos: convierte números a texto y descarta lateralidades inválidas.
 
+### Especialidades
+
+Cada atención guarda `especialidad`. Las claves de `localStorage` llevan el prefijo de la especialidad (`oft_`), y en el servidor cada especialidad tiene su propio espacio (`<especialidad>/r/...`).
+
+Para agregar la ronda de otra especialidad hay que crear su propia configuración en `src/config/catalogs.js`: `ESPECIALIDAD` (id, nombre, prefijo), catálogos clínicos y plantilla PDF. Sus datos nunca se mezclan con los de oftalmología.
+
+### Médicos y operativos
+
+Son catálogos compartidos que se ofrecen como menú en el formulario. Elegir un médico copia su nombre y RUT a la atención, y elegir un operativo copia su nombre. Por eso, editar o eliminar un perfil después no cambia las atenciones ya guardadas (ni sus PDF o Excel).
+
+Los ids son deterministas: `m_` + huella del RUT (o del nombre) y `o_` + huella del nombre. Así, si dos PC crean el mismo médico u operativo por separado, no se duplica.
+
+Al abrir la app por primera vez con esta versión, los catálogos se completan con los médicos y operativos de las atenciones existentes.
+
 ## Otras claves de `localStorage`
 
 | Clave | Contenido |
@@ -48,6 +64,8 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
 | `oft_ajustes_v1` | `{pdfFlatten, pdfFooter, notaPie}`. |
 | `oft_secreto_anon_v1` | Clave de seudonimización del equipo (64 caracteres hex). |
 | `oft_eliminadas_v1` | Atenciones eliminadas, `{id: fecha ms}`: propagan la eliminación a los otros PC. |
+| `oft_medicos_v1` | Perfiles de médico `[{id, nombre, rut, created, updated}]`. Se sincronizan. |
+| `oft_operativos_v1` | Operativos `[{id, nombre, created, updated}]`. Se sincronizan. |
 | `oft_sync_v1` | Sincronización activa: clave AES derivada, token, huella para el servidor y última sincronización. No guarda la contraseña. |
 
 ## Respaldo (`respaldo_oftalmo_AAAA-MM-DD.json`)

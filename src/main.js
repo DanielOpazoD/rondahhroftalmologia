@@ -12,6 +12,7 @@ import { initFilter } from './ui/statsView.js';
 import { initExportView, exportStatsXlsx } from './ui/exportView.js';
 import { initSettingsView, renderSettings } from './ui/settingsView.js';
 import { createSyncController } from './ui/syncController.js';
+import { initCatalogView, renderCatalogSettings } from './ui/catalogView.js';
 
 function getStorage() {
   try {
@@ -34,6 +35,8 @@ function main() {
   initFilter(ctx);
   initExportView(ctx);
   initSettingsView(ctx);
+  initCatalogView(ctx);
+  ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
   $('#bNew').addEventListener('click', () => ctx.newAttention());
@@ -41,11 +44,6 @@ function main() {
   $('#bCopy').addEventListener('click', () => ctx.copyNote(ctx.rec));
   $('#bPdf').addEventListener('click', (e) => ctx.downloadPdf(ctx.rec, e.currentTarget));
   $('#stXlsx').addEventListener('click', (e) => exportStatsXlsx(ctx, e.currentTarget));
-  $('#printSt').addEventListener('click', () => {
-    $('#t-est').classList.add('printme');
-    window.print();
-    setTimeout(() => $('#t-est').classList.remove('printme'), 500);
-  });
 
   // Ctrl/Cmd + S guarda la atención.
   document.addEventListener('keydown', (e) => {
@@ -66,6 +64,7 @@ function main() {
 
   ctx.restoreDraft();
   renderSettings(ctx);
+  renderCatalogSettings(ctx);
   syncAttentionView(ctx);
   ctx.refreshLists();
   ctx.showTab('t-at');

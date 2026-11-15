@@ -148,3 +148,14 @@ export function doctorName(name) {
   if (!n) return '';
   return /^dr(a)?\.?\s|^dr\(a\)/i.test(n) ? n : 'Dr(a). ' + n;
 }
+
+/**
+ * Edad en años cumplidos a una fecha de referencia (ambas ISO).
+ * @returns {number|null} null si alguna fecha no es válida o la referencia es anterior al nacimiento
+ */
+export function ageAt(birthIso, refIso) {
+  if (!isIsoDate(birthIso) || !isIsoDate(refIso) || refIso < birthIso) return null;
+  const [by, bm, bd] = birthIso.split('-').map(Number);
+  const [ry, rm, rd] = refIso.split('-').map(Number);
+  return ry - by - (rm < bm || (rm === bm && rd < bd) ? 1 : 0);
+}

@@ -21,7 +21,7 @@ test('store: lee datos de la v1 con las mismas claves', () => {
   mem.setItem(STORAGE_KEYS.records, JSON.stringify([{ id: 'old1', f: { paciente_nombre: 'Antiguo', fecha_atencion: '2025-05-01' }, checks: {}, proc: { fo: { eye: 'OD' } } }, { sinId: true }]));
   const recs = createStore(mem).loadRecords();
   assert.equal(recs.length, 1);
-  assert.equal(recs[0].v, 2);
+  assert.equal(recs[0].v, 3);
   assert.equal(recs[0].f.paciente_nombre, 'Antiguo');
 });
 

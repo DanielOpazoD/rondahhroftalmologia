@@ -7,6 +7,7 @@
  */
 import { STORAGE_KEYS as K, DEFAULT_PROCS, DEFAULT_SETTINGS } from '../config/catalogs.js';
 import { normalizeRecord, sortRecords } from '../core/record.js';
+import { makeMedico, makeOperativo } from '../core/catalog.js';
 
 export class StorageError extends Error {}
 
@@ -114,6 +115,23 @@ export function createStore(storage) {
     },
     addTombstone(id, at = Date.now()) {
       write(K.tombstones, { ...this.loadTombstones(), [id]: at });
+    },
+
+    /** Perfiles de médico (catálogo compartido). */
+    loadMedicos() {
+      const l = read(K.medicos, []);
+      return Array.isArray(l) ? l.map((m) => makeMedico(m)).filter(Boolean) : [];
+    },
+    saveMedicos(l) {
+      write(K.medicos, l);
+    },
+    /** Operativos / rondas (catálogo compartido). */
+    loadOperativos() {
+      const l = read(K.operativos, []);
+      return Array.isArray(l) ? l.map((o) => makeOperativo(o)).filter(Boolean) : [];
+    },
+    saveOperativos(l) {
+      write(K.operativos, l);
     },
 
     /** Configuración de sincronización de este equipo, o null si está desactivada. */

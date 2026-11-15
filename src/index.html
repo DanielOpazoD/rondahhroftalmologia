@@ -27,6 +27,9 @@
     <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5 12 17l2.5-2.5"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
   </defs>
 </svg>
@@ -63,15 +66,23 @@
     </div>
   </div>
 
+  <div class="card ctxcard">
+    <div class="g3">
+      <div><label class="l" for="operativoSel">Operativo</label><select id="operativoSel"></select></div>
+      <div><label class="l" for="fecha_atencion">Fecha de atención</label><input id="fecha_atencion" type="date"><small class="msg" data-msg="fecha_atencion"></small></div>
+      <div><label class="l" for="medicoSel">Médico</label><select id="medicoSel"></select></div>
+    </div>
+  </div>
+
   <div class="card">
+    <h2>Paciente</h2>
     <div class="g4">
-      <div class="span2"><label class="l" for="paciente_nombre">Paciente</label><input id="paciente_nombre" autocomplete="off" placeholder="Nombre y apellidos"><small class="msg" data-msg="paciente_nombre"></small></div>
+      <div class="span2"><label class="l" for="paciente_nombre">Nombre y apellidos</label><input id="paciente_nombre" autocomplete="off"><small class="msg" data-msg="paciente_nombre"></small></div>
       <div><label class="l" for="paciente_rut">RUT</label><input id="paciente_rut" autocomplete="off" placeholder="12.345.678-9"><small class="msg" data-msg="paciente_rut"></small></div>
-      <div><label class="l" for="paciente_edad">Edad</label><input id="paciente_edad" inputmode="numeric" placeholder="años"><small class="msg" data-msg="paciente_edad"></small></div>
-      <div><span class="l">Sexo</span><div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div></div>
       <div><label class="l" for="paciente_fono">Fono</label><input id="paciente_fono" inputmode="tel"></div>
-      <div><label class="l" for="operativo">Operativo / ronda</label><input id="operativo" list="opsList" placeholder="Ej: Operativo Nov 2026"><datalist id="opsList"></datalist></div>
-      <div><label class="l" for="fecha_atencion">Fecha</label><input id="fecha_atencion" type="date"><small class="msg" data-msg="fecha_atencion"></small></div>
+      <div><label class="l" for="paciente_fnac">Fecha de nacimiento</label><input id="paciente_fnac" type="date"><small class="msg" data-msg="paciente_fnac"></small></div>
+      <div><label class="l" for="paciente_edad">Edad</label><input id="paciente_edad" inputmode="numeric" placeholder="años"><small class="msg" data-msg="paciente_edad"></small></div>
+      <div class="span2"><span class="l">Sexo</span><div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div></div>
     </div>
   </div>
 
@@ -146,14 +157,6 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2>Médico</h2>
-    <div class="g2">
-      <div><label class="l" for="medico_nombre">Nombre</label><input id="medico_nombre"></div>
-      <div><label class="l" for="medico_rut">RUT</label><input id="medico_rut"><small class="msg" data-msg="medico_rut"></small></div>
-    </div>
-    <p class="hint">Médico y operativo se recuerdan para la siguiente atención.</p>
-  </div>
 </section>
 
 <!-- ================= PACIENTES ================= -->
@@ -168,101 +171,90 @@
 
 <!-- ================= ESTADÍSTICA ================= -->
 <section id="t-est" class="tab" role="tabpanel" aria-label="Estadística">
-  <div class="filterSlot"></div>
-  <div class="row noprint" style="margin:0 0 4px">
-    <button type="button" class="btn sm" id="stXlsx">Excel estadística (.xlsx)</button>
-    <button type="button" class="btn sm" id="printSt">Imprimir</button>
+  <div class="viewhead">
+    <div class="filterSlot"></div>
+    <button type="button" class="btn sm noprint" id="stXlsx" title="Descargar estadística en Excel"><svg><use href="#i-export"/></svg>Excel</button>
   </div>
   <div id="stOut"></div>
 </section>
 
 <!-- ================= EXPORTAR ================= -->
 <section id="t-exp" class="tab" role="tabpanel" aria-label="Exportar">
-  <div class="filterSlot"></div>
+  <div class="viewhead"><div class="filterSlot"></div></div>
 
-  <div class="card">
-    <h2>1 · PDF de atenciones</h2>
-    <p class="muted">Un PDF por atención sobre la hoja oficial, nombrado <code>Oftalmo_fecha_RUT_nombre.pdf</code>, listo para subir a la ficha de cada paciente. Si algo no cabe en la hoja, se agrega una hoja complementaria.</p>
-    <div class="row">
-      <button type="button" class="btn p sm" id="expPdfZip">Descargar ZIP con PDFs</button>
-      <span class="muted" id="expPdfProg" aria-live="polite"></span>
+  <div class="xlist">
+    <div class="xrow">
+      <span class="xi"><svg><use href="#i-pdf"/></svg></span>
+      <div class="xt"><b>PDF de cada atención</b><small>Hoja oficial por paciente, en un archivo ZIP. <span id="expPdfProg" aria-live="polite"></span></small></div>
+      <button type="button" class="btn sm" id="expPdfZip">Descargar</button>
+    </div>
+    <div class="xrow">
+      <span class="xi"><svg><use href="#i-chart"/></svg></span>
+      <div class="xt"><b>Estadística</b><small>Excel: resumen, atenciones, prestaciones, por día, edad y sexo.</small></div>
+      <button type="button" class="btn sm" id="expXlsx">Descargar</button>
+    </div>
+    <div class="xrow">
+      <span class="xi"><svg><use href="#i-shield"/></svg></span>
+      <div class="xt"><b>Datos seudonimizados</b><small>Sin nombre, RUT ni teléfono; cada paciente con un código. Para análisis o IA.</small></div>
+      <div class="xbtns"><button type="button" class="btn sm" id="anXlsx">Excel</button><button type="button" class="btn sm" id="anJson">JSON</button></div>
     </div>
   </div>
+  <div id="anCheck" class="banner" hidden></div>
 
-  <div class="card">
-    <h2>2 · Estadística (Excel)</h2>
-    <p class="muted">Libro .xlsx con hojas: <b>Resumen</b> (indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, sexo, operativo y médico), <b>Atenciones</b> (una fila por atención), <b>Prestaciones</b> (una fila por procedimiento realizado), <b>Por día</b> y <b>Edad y sexo</b>.</p>
-    <button type="button" class="btn p sm" id="expXlsx">Descargar Excel (.xlsx)</button>
-  </div>
-
-  <div class="card">
-    <h2>3 · Datos seudonimizados (análisis / IA)</h2>
-    <p class="muted">Sin nombre, RUT, teléfono ni médico. Cada paciente recibe un código estable (<code>P-XXXXXXXX</code>): el mismo paciente tiene el mismo código en todas sus atenciones y exportaciones de este equipo. Los textos libres se limpian de RUT, teléfonos, correos, fechas y nombres.</p>
-    <div class="grid">
+  <details class="xopts">
+    <summary>Opciones de seudonimización</summary>
+    <div class="g3">
       <div><label class="l" for="anFechas">Fechas</label><select id="anFechas"></select></div>
       <div><label class="l" for="anEdad">Edad</label><select id="anEdad"></select></div>
       <div><label class="l" for="anTexto">Textos libres</label><select id="anTexto"></select></div>
     </div>
-    <div class="row" style="margin-top:12px">
+    <div class="row" style="margin-top:10px">
       <button type="button" class="btn sm" id="anPreview">Vista previa</button>
-      <button type="button" class="btn p sm" id="anXlsx">Excel seudonimizado</button>
-      <button type="button" class="btn p sm" id="anJson">JSON para IA</button>
+      <button type="button" class="btn d sm" id="anKey" title="Contiene nombres y RUT: no compartir">Tabla de correspondencia (confidencial)</button>
     </div>
-    <div id="anCheck" class="banner" hidden></div>
+    <p class="hint">La tabla de correspondencia relaciona cada código con el paciente. Guárdala aparte y no la subas a servicios externos. Huella de la clave: <code id="anFp">—</code></p>
     <pre class="note" id="anPre" hidden></pre>
-    <details class="conf">
-      <summary>Tabla de correspondencia (confidencial)</summary>
-      <p class="muted">Relaciona cada código con el nombre y RUT. Sirve para volver a identificar a un paciente si el análisis lo requiere. <b>Guárdala separada de los datos y no la subas a servicios externos.</b></p>
-      <p class="muted">Huella de la clave de este equipo: <code id="anFp">—</code></p>
-      <button type="button" class="btn d sm" id="anKey">Descargar tabla de correspondencia</button>
-    </details>
-  </div>
+  </details>
 </section>
 
 <!-- ================= AJUSTES ================= -->
 <section id="t-aj" class="tab" role="tabpanel" aria-label="Ajustes">
-  <div class="card">
-    <h2>Lista de procedimientos realizados</h2>
-    <p class="muted">Agrega, ordena o quita procedimientos. Marca «PIO» en los que piden valor por cada ojo (tonometrías). Las atenciones ya guardadas conservan sus procedimientos.</p>
-    <div class="list" id="ajList"></div>
-    <div class="row" style="margin-top:10px">
-      <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" style="flex:1;min-width:160px">
-      <label class="row muted" style="gap:4px"><input type="checkbox" id="ajPio" style="width:auto"> PIO</label>
-      <button type="button" class="btn p sm" id="ajAdd">Agregar</button>
+  <div class="g2 cards">
+    <div class="card">
+      <h2>Médicos <span class="badge" id="medCount">0</span></h2>
+      <div class="list" id="medList"></div>
+      <button type="button" class="btn sm addbtn" id="medAdd"><svg><use href="#i-plus"/></svg>Agregar médico</button>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>PDF y nota</h2>
-    <label class="check"><input type="checkbox" id="setFlatten"> PDF no editable (aplanado). Recomendado para subir a la ficha.</label>
-    <label class="check"><input type="checkbox" id="setFooter"> Pie de página con ID de atención y fecha de emisión.</label>
-    <label class="l" for="setPie">Línea final de la nota (vacío = sin línea)</label>
-    <input id="setPie">
+    <div class="card">
+      <h2>Operativos <span class="badge" id="opCount">0</span></h2>
+      <div class="list" id="opList"></div>
+      <button type="button" class="btn sm addbtn" id="opAdd"><svg><use href="#i-plus"/></svg>Agregar operativo</button>
+    </div>
   </div>
 
   <div class="card" id="syncCard">
     <h2>Sincronización entre equipos <span class="badge" id="syncState">Desactivada</span></h2>
-    <p class="muted">Mantiene iguales los datos de varios PC a través del servidor (Netlify). Cada atención se <b>cifra en este equipo</b> con la contraseña del equipo antes de enviarse: el servidor no puede leer nombres, RUT ni datos clínicos. Sin internet se sigue trabajando y se sincroniza al volver la conexión.</p>
-    <div id="syncUnavailable" class="banner warn" hidden>La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa «Respaldo y unión de equipos».</div>
+    <p class="muted">Atenciones, médicos y operativos se comparten entre los PC a través del servidor. Todo se <b>cifra en este equipo</b> antes de enviarse: el servidor no puede leer nombres, RUT ni datos clínicos. Sin internet se sigue trabajando.</p>
+    <div id="syncUnavailable" class="banner warn" hidden>La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa el respaldo.</div>
     <div id="syncSetup">
       <label class="l" for="syncPass">Contraseña del equipo (la misma en todos los PC)</label>
       <div class="row">
-        <input id="syncPass" type="password" autocomplete="off" spellcheck="false" style="flex:1;min-width:220px;font-family:ui-monospace,Menlo,monospace">
-        <button type="button" class="btn sm" id="syncGen">Generar</button>
+        <input id="syncPass" type="password" autocomplete="off" spellcheck="false" style="flex:1;min-width:220px;font-family:var(--mono)">
         <button type="button" class="btn sm" id="syncShow">Mostrar</button>
+        <button type="button" class="btn sm" id="syncGen">Generar</button>
+        <button type="button" class="btn p sm" id="syncOn">Activar</button>
       </div>
-      <p class="muted">Genérala con «Generar» en el primer PC (solo se aceptan contraseñas generadas) y escríbela igual en los demás. Guárdala en un lugar seguro: si se pierde, los datos del servidor no se pueden descifrar (los de cada PC no se pierden).</p>
-      <button type="button" class="btn p sm" id="syncOn">Activar en este PC</button>
+      <p class="hint">Si se pierde la contraseña, los datos del servidor no se pueden descifrar (los de cada PC no se pierden).</p>
     </div>
     <div id="syncActive" hidden>
-      <p class="muted" id="syncInfo"></p>
       <div class="row">
+        <span class="muted" id="syncInfo" style="flex:1"></span>
         <button type="button" class="btn p sm" id="syncNowBtn">Sincronizar ahora</button>
-        <button type="button" class="btn d sm" id="syncOff">Desactivar en este PC</button>
+        <button type="button" class="btn d sm" id="syncOff">Desactivar</button>
       </div>
       <details class="setup">
-        <summary>Configuración del servidor (una sola vez)</summary>
-        <p class="muted">En Netlify → <i>Site configuration → Environment variables</i>, crea la variable <code>SYNC_TOKEN_SHA256</code> con este valor y vuelve a publicar el sitio. Es una huella del permiso de acceso: no contiene la clave de cifrado y, con una contraseña generada, no permite deducirla.</p>
+        <summary>Configuración del servidor</summary>
+        <p class="muted">Valor de la variable <code>SYNC_TOKEN_SHA256</code> en Netlify. Es una huella del permiso de acceso: no contiene la clave de cifrado.</p>
         <pre class="note" id="syncHash"></pre>
         <button type="button" class="btn sm" id="syncCopyHash">Copiar valor</button>
       </details>
@@ -270,34 +262,63 @@
   </div>
 
   <div class="card">
-    <h2>Respaldo y unión de equipos</h2>
-    <p class="muted">Los datos quedan solo en este dispositivo y navegador. Descarga un respaldo al terminar cada jornada. Para juntar la estadística de varios equipos, importa los respaldos en uno solo: se suman sin duplicar.</p>
-    <div class="row">
-      <button type="button" class="btn p sm" id="bkExp">Descargar respaldo</button>
-      <button type="button" class="btn sm" id="bkImpBtn">Importar respaldo</button>
-      <input type="file" id="bkImp" accept=".json,application/json" hidden>
+    <h2>Procedimientos realizados</h2>
+    <p class="muted">Agrega, ordena o quita procedimientos. «PIO» marcado pide la presión por ojo. Las atenciones guardadas conservan los suyos.</p>
+    <div class="list" id="ajList"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" style="flex:1;min-width:160px">
+      <label class="row muted" style="gap:4px"><input type="checkbox" id="ajPio"> PIO</label>
+      <button type="button" class="btn sm" id="ajAdd">Agregar</button>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Zona de cuidado</h2>
-    <div class="row">
-      <button type="button" class="btn d sm" id="anRegen">Generar nueva clave de seudonimización</button>
-      <button type="button" class="btn d sm" id="wipe">Borrar todas las atenciones de este equipo</button>
+  <div class="g2 cards">
+    <div class="card">
+      <h2>PDF y nota</h2>
+      <label class="check"><input type="checkbox" id="setFlatten"> PDF no editable (recomendado)</label>
+      <label class="check"><input type="checkbox" id="setFooter"> Pie con ID de atención y fecha</label>
+      <label class="l" for="setPie">Línea final de la nota</label>
+      <input id="setPie" placeholder="(vacío = sin línea)">
+    </div>
+    <div class="card">
+      <h2>Respaldo</h2>
+      <p class="muted">Copia de las atenciones de este equipo en un archivo. Al importar se suman sin duplicar.</p>
+      <div class="row">
+        <button type="button" class="btn sm" id="bkExp">Descargar respaldo</button>
+        <button type="button" class="btn sm" id="bkImpBtn">Importar</button>
+        <input type="file" id="bkImp" accept=".json,application/json" hidden>
+      </div>
     </div>
   </div>
+
+  <details class="card danger">
+    <summary>Zona de cuidado</summary>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="btn d sm" id="anRegen">Nueva clave de seudonimización</button>
+      <button type="button" class="btn d sm" id="wipe">Borrar las atenciones de este equipo</button>
+    </div>
+  </details>
 </section>
 </main>
 
 <!-- Filtro compartido entre Estadística y Exportar (se mueve entre pestañas). -->
-<div class="card noprint" id="filterCard">
-  <h2>Filtro <span class="badge" id="fCount">0</span></h2>
-  <div class="grid">
-    <div><label class="l" for="fOp">Operativo</label><select id="fOp"></select></div>
-    <div><label class="l" for="fFrom">Desde</label><input type="date" id="fFrom"></div>
-    <div><label class="l" for="fTo">Hasta</label><input type="date" id="fTo"></div>
-  </div>
+<div class="filterbar noprint" id="filterCard">
+  <select id="fOp" aria-label="Operativo"></select>
+  <input type="date" id="fFrom" aria-label="Desde" title="Desde">
+  <span class="sep">–</span>
+  <input type="date" id="fTo" aria-label="Hasta" title="Hasta">
+  <span class="badge" id="fCount">0</span>
 </div>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <h3 id="dlgTitle"></h3>
+  <div id="dlgBody"></div>
+  <small class="msg err" id="dlgErr"></small>
+  <div class="dlg-actions">
+    <button type="button" class="btn" id="dlgCancel">Cancelar</button>
+    <button type="button" class="btn p" id="dlgOk">Guardar</button>
+  </div>
+</dialog>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <!-- @SCRIPT -->

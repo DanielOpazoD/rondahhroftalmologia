@@ -7,11 +7,11 @@
  * importar respaldos. Las operaciones son idempotentes: repetir una
  * sincronización no cambia nada.
  */
-import { normalizeRecord, isValidId } from '../core/record.js';
+import { isValidId } from '../core/record.js';
 
 /**
  * Versión local de cada id (atención o lápida).
- * @param {object[]} records
+ * @param {{id: string, updated: number}[]} records elementos locales (atenciones, médicos, operativos)
  * @param {Record<string, number>} tombstones id -> fecha de eliminación (ms)
  * @returns {Map<string, {u: number, deleted: boolean}>}
  */
@@ -45,11 +45,14 @@ export function planSync(local, remote) {
 
 /**
  * Aplica versiones descargadas y descifradas sobre el estado local.
- * @param {{id: string, u: number, deleted?: boolean, record?: object}[]} pulled
- * @returns {{records: object[], tombstones: Record<string, number>, added: number, updated: number, deleted: number}}
+ * Los elementos son genéricos: {id, updated, kind, data}, donde `kind` es
+ * 'atencion' | 'medico' | 'operativo'. La aplicación los separa por tipo.
+ * @param {{id: string, updated: number, kind: string, data: object}[]} items
+ * @param {{id: string, u: number, deleted?: boolean, kind?: string, data?: object}[]} pulled
+ * @returns {{items: object[], tombstones: Record<string, number>, added: number, updated: number, deleted: number}}
  */
-export function applyPulled(records, tombstones, pulled) {
-  const byId = new Map(records.map((r) => [r.id, r]));
+export function applyPulled(items, tombstones, pulled) {
+  const byId = new Map(items.map((r) => [r.id, r]));
   const tomb = { ...tombstones };
   let added = 0;
   let updated = 0;
@@ -66,15 +69,14 @@ export function applyPulled(records, tombstones, pulled) {
       }
       tomb[item.id] = item.u;
     } else {
-      const rec = normalizeRecord({ ...item.record, id: item.id, updated: item.u });
-      if (!rec.id) continue;
+      if (!item.data || typeof item.data !== 'object') continue;
       if (cur) updated++;
       else added++;
-      byId.set(item.id, rec);
+      byId.set(item.id, { id: item.id, updated: item.u, kind: item.kind || 'atencion', data: item.data });
       delete tomb[item.id];
     }
   }
-  return { records: [...byId.values()], tombstones: tomb, added, updated, deleted };
+  return { items: [...byId.values()], tombstones: tomb, added, updated, deleted };
 }
 
 /** Divide un arreglo en lotes. */

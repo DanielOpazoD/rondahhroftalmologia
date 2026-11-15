@@ -3,7 +3,8 @@
  *
  * Forma de un registro (ver docs/MODELO_DATOS.md):
  * {
- *   v: 2,                         // versión de esquema
+ *   v: 3,                         // versión de esquema
+ *   especialidad: 'oftalmologia', // separa datos de distintas rondas
  *   id: 'a…' | null,              // null mientras no se guarda
  *   created, updated: number,     // epoch ms
  *   f: { [campo]: string },       // campos de texto (TEXT_FIELDS)
@@ -13,8 +14,8 @@
  *   procNames: { [procId]: string } // nombre del procedimiento al guardar
  * }
  */
-import { SCHEMA_VERSION, LIMITS, OJOS, SEXOS } from '../config/catalogs.js';
-import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber } from './format.js';
+import { SCHEMA_VERSION, LIMITS, OJOS, SEXOS, ESPECIALIDAD } from '../config/catalogs.js';
+import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt } from './format.js';
 
 /**
  * Registro vacío listo para completar.
@@ -23,6 +24,7 @@ import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber } f
 export function blankRecord(medico = {}, now = new Date()) {
   return {
     v: SCHEMA_VERSION,
+    especialidad: ESPECIALIDAD.id,
     id: null,
     checks: {},
     cat: '',
@@ -43,6 +45,7 @@ export function blankRecord(medico = {}, now = new Date()) {
 export function normalizeRecord(raw) {
   const r = raw && typeof raw === 'object' ? structuredCloneSafe(raw) : {};
   r.v = SCHEMA_VERSION;
+  r.especialidad = typeof r.especialidad === 'string' && r.especialidad ? r.especialidad : ESPECIALIDAD.id;
   // Los ids vienen también de respaldos importados: solo se aceptan caracteres seguros.
   r.id = isValidId(r.id) ? r.id : null;
   r.f = r.f && typeof r.f === 'object' ? r.f : {};
@@ -102,6 +105,11 @@ export function validateRecord(rec, now = new Date()) {
     warn('fecha_atencion', 'La fecha de atención es futura');
   }
 
+  if (f.paciente_fnac) {
+    if (!isIsoDate(f.paciente_fnac)) warn('paciente_fnac', 'Fecha de nacimiento no válida');
+    else if (isIsoDate(f.fecha_atencion) && f.paciente_fnac > f.fecha_atencion) warn('paciente_fnac', 'Nacimiento posterior a la fecha de atención');
+    else if (ageAt(f.paciente_fnac, f.fecha_atencion || todayIso(now)) > LIMITS.edadMax) warn('paciente_fnac', 'Fecha de nacimiento implausible');
+  }
   if (f.paciente_edad?.trim()) {
     const e = parseNumber(f.paciente_edad);
     if (e === null || e < 0 || e > LIMITS.edadMax || !Number.isInteger(e)) warn('paciente_edad', 'Edad no válida (años enteros 0–120)');
@@ -162,4 +170,18 @@ export function sortRecords(records) {
 
 function structuredCloneSafe(o) {
   return JSON.parse(JSON.stringify(o));
+}
+
+/**
+ * Si hay fecha de nacimiento válida, calcula la edad a la fecha de atención
+ * (o a hoy) y la deja en `f.paciente_edad`. Devuelve true si cambió la edad.
+ */
+export function applyBirthDate(rec, now = new Date()) {
+  const f = rec.f || {};
+  if (!isIsoDate(f.paciente_fnac)) return false;
+  const age = ageAt(f.paciente_fnac, isIsoDate(f.fecha_atencion) ? f.fecha_atencion : todayIso(now));
+  const next = age === null ? '' : String(age);
+  if ((f.paciente_edad || '') === next) return false;
+  f.paciente_edad = next;
+  return true;
 }

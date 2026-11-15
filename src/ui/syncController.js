@@ -6,6 +6,8 @@
  * guardar o eliminar, cada 2 minutos y al recuperar la conexión.
  */
 import { sortRecords } from '../core/record.js';
+import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
+import { ESPECIALIDAD } from '../config/catalogs.js';
 import { fmtDateTime } from '../core/format.js';
 import {
   cryptoAvailable, deriveTeamKeys, tokenHash, importEncKey, generatePassphrase, passphraseProblem, DecryptError,
@@ -43,10 +45,27 @@ export function createSyncController(ctx) {
     return st.key;
   }
 
+  /** Todo lo que se sincroniza: atenciones, perfiles de médico y operativos. */
+  function readLocal() {
+    const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated, kind, data: x });
+    return {
+      items: [
+        ...store.loadRecords().filter((r) => r.updated).map(wrap('atencion')),
+        ...store.loadMedicos().map(wrap('medico')),
+        ...store.loadOperativos().map(wrap('operativo')),
+      ],
+      tombstones: store.loadTombstones(),
+    };
+  }
+
   /** Aplica cambios que llegaron de otros equipos al estado de la app. */
-  function writeLocal(records, tombstones) {
-    store.saveRecords(sortRecords(records));
+  function writeLocal(items, tombstones) {
+    const of = (kind) => items.filter((i) => i.kind === kind).map((i) => ({ ...i.data, id: i.id, updated: i.updated }));
+    store.saveRecords(sortRecords(of('atencion')));
+    store.saveMedicos(byName(of('medico').map((m) => makeMedico(m)).filter(Boolean)));
+    store.saveOperativos(byName(of('operativo').map((o) => makeOperativo(o)).filter(Boolean)));
     store.saveTombstones(tombstones);
+    ctx.reloadCatalogs();
     ctx.records = store.loadRecords();
     if (ctx.rec.id && !ctx.dirty) {
       const fresh = ctx.records.find((r) => r.id === ctx.rec.id);
@@ -66,9 +85,9 @@ export function createSyncController(ctx) {
     setStatus('syncing');
     try {
       const res = await syncOnce({
-        api: createSyncApi({ token: st.config.token }),
+        api: createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id }),
         key: await getKey(),
-        readLocal: () => ({ records: store.loadRecords(), tombstones: store.loadTombstones() }),
+        readLocal,
         writeLocal,
       });
       st.config = { ...st.config, lastSync: Date.now() };
@@ -76,7 +95,7 @@ export function createSyncController(ctx) {
       setStatus('idle');
       const got = res.added + res.updated + res.deleted;
       if (!quiet || got) {
-        toast(got ? `Sincronizado: ${res.added} nuevas, ${res.updated} actualizadas, ${res.deleted} eliminadas desde otros equipos` : `Sincronizado (${res.pushed} enviadas)`, got ? 4000 : 2200);
+        toast(got ? `Sincronizado: ${got} ${got === 1 ? 'cambio recibido' : 'cambios recibidos'} de otros equipos` : 'Sincronizado', got ? 3500 : 1800);
       }
     } catch (e) {
       if (e instanceof SyncHttpError && e.status === 0) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
@@ -118,7 +137,7 @@ export function createSyncController(ctx) {
       const keys = await deriveTeamKeys(passphrase);
       const hash = tokenHash(keys.token);
       try {
-        await createSyncApi({ token: keys.token }).list();
+        await createSyncApi({ token: keys.token, esp: ESPECIALIDAD.id }).list();
       } catch (e) {
         if (e.status === 401) {
           setStatus('off');

@@ -16,6 +16,15 @@ test('el build produce un HTML autocontenido y sin recursos externos', async () 
   assert.ok(html.length > 1_000_000 && html.length < 6_000_000);
 });
 
+test('cada id que usa la interfaz existe en el HTML', () => {
+  const html = readFileSync(new URL('../src/index.html', import.meta.url), 'utf8');
+  const dir = new URL('../src/ui/', import.meta.url);
+  const sources = [...readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8')), readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')];
+  const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_]+)/g)].map((m) => m[1])));
+  const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
+  assert.deepEqual(missing, []);
+});
+
 test('buildSite escribe el sitio para Netlify con service worker versionado', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'oft-site-'));
   const { buildId } = await buildSite(dir);

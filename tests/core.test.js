@@ -62,7 +62,8 @@ describe('record', () => {
   test('normalizeRecord migra registros v1 incompletos sin perder datos', () => {
     const v1 = { id: 'a1', f: { paciente_nombre: 'X', paciente_edad: 70, nulo: null }, proc: { fo: { eye: 'AO' }, malo: { eye: 'XX' } }, cat: 'ZZ' };
     const r = normalizeRecord(v1);
-    assert.equal(r.v, 2);
+    assert.equal(r.v, 3);
+    assert.equal(r.especialidad, "oftalmologia", "datos antiguos quedan en oftalmología");
     assert.equal(r.f.paciente_edad, '70');
     assert.ok(!('nulo' in r.f));
     assert.deepEqual(Object.keys(r.proc), ['fo']);

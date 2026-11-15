@@ -3,8 +3,9 @@
  * con el registro en edición y lo refleja en pantalla (`sync`).
  */
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, SEXOS, OJOS } from '../config/catalogs.js';
-import { escapeHtml, formatRut } from '../core/format.js';
-import { validateRecord } from '../core/record.js';
+import { escapeHtml, formatRut, isIsoDate } from '../core/format.js';
+import { validateRecord, applyBirthDate } from '../core/record.js';
+import { renderCatalogSelects } from './catalogView.js';
 import { coversEye } from '../core/clinical.js';
 import { $, $$ } from './dom.js';
 
@@ -67,17 +68,15 @@ export function initAttentionView(ctx) {
     const k = e.target.id;
     if (TEXT_FIELDS.includes(k) && k !== 'paciente_sexo') {
       ctx.rec.f[k] = e.target.value;
-      ctx.changed({ silent: true });
+      // La edad se calcula sola desde la fecha de nacimiento.
+      const ageChanged = (k === 'paciente_fnac' || k === 'fecha_atencion') && applyBirthDate(ctx.rec);
+      if (k === 'paciente_fnac' && !isIsoDate(e.target.value)) $('#paciente_edad').readOnly = false;
+      ctx.changed({ silent: !ageChanged && k !== 'paciente_fnac' });
     }
   });
   $('#paciente_rut').addEventListener('blur', (e) => {
     if (!e.target.value.trim()) return;
     ctx.rec.f.paciente_rut = formatRut(e.target.value);
-    ctx.changed();
-  });
-  $('#medico_rut').addEventListener('blur', (e) => {
-    if (!e.target.value.trim()) return;
-    ctx.rec.f.medico_rut = formatRut(e.target.value);
     ctx.changed();
   });
 }
@@ -127,6 +126,10 @@ export function syncAttentionView(ctx) {
   // Procedimientos guardados que ya no están en la lista configurada.
   n += Object.keys(rec.proc).filter((id) => !ctx.procs.some((p) => p.id === id)).length;
   $('#procBadge').textContent = n;
+  const fromBirth = isIsoDate(rec.f.paciente_fnac);
+  $('#paciente_edad').readOnly = fromBirth;
+  $('#paciente_edad').title = fromBirth ? 'Calculada desde la fecha de nacimiento' : '';
+  renderCatalogSelects(ctx);
   renderToolbar(ctx);
   showValidation(ctx);
 }

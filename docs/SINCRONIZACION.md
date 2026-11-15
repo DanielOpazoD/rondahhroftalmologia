@@ -60,7 +60,7 @@ Por ejemplo, si se filtró:
 
 1. Genera una nueva contraseña en un PC que tenga todos los datos.
 2. Actualiza `SYNC_TOKEN_SHA256` y vuelve a publicar.
-3. En Netlify → *Blobs*, borra el almacén `oftalmo-sync`.
+3. En Netlify → *Blobs*, borra el almacén `hhr-rondas` (o solo las claves `oftalmologia/…`).
 4. Reactiva la sincronización en cada PC con la contraseña nueva. Cada PC vuelve a subir lo que tiene.
 
 ## Seguridad: lo que conviene saber
@@ -95,7 +95,17 @@ Abre `http://localhost:8787` y `http://127.0.0.1:8787`: son dos orígenes distin
 | Interfaz | `src/ui/syncController.js` |
 | Tests (4 PC convergen; el servidor no ve datos) | `tests/sync.test.js` |
 
-Almacenamiento: `r/<id>/<versión>` → `{iv, ct}`. Al escribir una versión nueva se borran las anteriores.
+Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<versión>` → `{iv, ct}`. Al escribir una versión nueva se borran las anteriores.
+
+**Qué se sincroniza:** todo viaja cifrado y el servidor no distingue un tipo de otro. Cada elemento lleva su tipo dentro del contenido cifrado:
+
+| Tipo | Contenido |
+|---|---|
+| `atencion` | la atención completa |
+| `medico` | perfil de médico: nombre y RUT |
+| `operativo` | nombre del operativo o ronda |
+
+**Separación por especialidad:** las solicitudes llevan `?esp=oftalmologia`, y cada especialidad tiene su propio espacio en el servidor. Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
 
 API (todas con `Authorization: Bearer <token>`):
 

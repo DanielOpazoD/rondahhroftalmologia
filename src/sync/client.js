@@ -17,13 +17,15 @@ export class SyncHttpError extends Error {
 }
 
 /**
- * @param {{baseUrl?: string, token: string, fetchFn?: typeof fetch}} opts
+ * @param {{baseUrl?: string, token: string, esp?: string, fetchFn?: typeof fetch}} opts
+ *   `esp`: especialidad (espacio de datos separado en el servidor)
  */
-export function createSyncApi({ baseUrl = '/api/sync', token, fetchFn = globalThis.fetch.bind(globalThis) }) {
+export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = globalThis.fetch.bind(globalThis) }) {
+  const qs = esp ? `?esp=${encodeURIComponent(esp)}` : '';
   const call = async (path, body) => {
     let res;
     try {
-      res = await fetchFn(`${baseUrl}/${path}`, {
+      res = await fetchFn(`${baseUrl}/${path}${qs}`, {
         method: body ? 'POST' : 'GET',
         headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined,
@@ -48,8 +50,8 @@ export function createSyncApi({ baseUrl = '/api/sync', token, fetchFn = globalTh
  * @param {{
  *   api: ReturnType<typeof createSyncApi>,
  *   key: CryptoKey,
- *   readLocal: () => {records: object[], tombstones: Record<string, number>},
- *   writeLocal: (records: object[], tombstones: Record<string, number>) => void,
+ *   readLocal: () => {items: {id: string, updated: number, kind: string, data: object}[], tombstones: Record<string, number>},
+ *   writeLocal: (items: object[], tombstones: Record<string, number>) => void,
  *   batchSize?: number,
  * }} deps
  * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number}>}
@@ -58,19 +60,19 @@ export async function syncOnce({ api, key, readLocal, writeLocal, batchSize = 10
   const { items } = await api.list();
   const remote = remoteVersions(items || []);
   const local0 = readLocal();
-  const plan = planSync(localVersions(local0.records, local0.tombstones), remote);
+  const plan = planSync(localVersions(local0.items, local0.tombstones), remote);
 
   // Subir
   let pushed = 0;
   let skipped = 0;
-  const byId = new Map(local0.records.map((r) => [r.id, r]));
+  const byId = new Map(local0.items.map((r) => [r.id, r]));
   for (const ids of chunks(plan.push, batchSize)) {
     const payload = await Promise.all(
       ids.map(async (id) => {
         const rec = byId.get(id);
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
-        const content = rec && u === rec.updated ? { record: rec } : { deleted: true };
+        const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
         return { id, u, ...(await encryptPayload(key, id, u, content)) };
       }),
     );
@@ -86,7 +88,8 @@ export async function syncOnce({ api, key, readLocal, writeLocal, batchSize = 10
     for (const it of res.items || []) {
       if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
       const content = await decryptPayload(key, it.id, it.u, it);
-      pulled.push({ id: it.id, u: it.u, deleted: !!content.deleted, record: content.record });
+      // `record` = formato de la v2.1 (solo atenciones)
+      pulled.push({ id: it.id, u: it.u, deleted: !!content.deleted, kind: content.kind || 'atencion', data: content.data ?? content.record });
     }
   }
 
@@ -94,8 +97,8 @@ export async function syncOnce({ api, key, readLocal, writeLocal, batchSize = 10
   let result = { added: 0, updated: 0, deleted: 0 };
   if (pulled.length) {
     const cur = readLocal();
-    const applied = applyPulled(cur.records, cur.tombstones, pulled);
-    writeLocal(applied.records, applied.tombstones);
+    const applied = applyPulled(cur.items, cur.tombstones, pulled);
+    writeLocal(applied.items, applied.tombstones);
     result = applied;
   }
   return { pushed, skipped, added: result.added, updated: result.updated, deleted: result.deleted };

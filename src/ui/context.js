@@ -8,8 +8,8 @@
 import { APP } from '../config/catalogs.js';
 import { blankRecord, normalizeRecord, newRecordId, validateRecord, findDuplicate } from '../core/record.js';
 import { buildNote } from '../core/note.js';
-import { filterRecords, operativosOf } from '../core/stats.js';
-import { fmtDate, escapeHtml } from '../core/format.js';
+import { filterRecords } from '../core/stats.js';
+import { fmtDate } from '../core/format.js';
 import { createSecret } from '../core/anonymize.js';
 import { buildAttentionPdf, pdfFileName } from '../pdf/attentionPdf.js';
 import { StorageError } from '../storage/store.js';
@@ -19,6 +19,8 @@ import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
 import { renderExportView } from './exportView.js';
 import { renderSettings } from './settingsView.js';
+import { renderCatalogSelects, renderCatalogSettings } from './catalogView.js';
+import { seedCatalogs, upsert, byName } from '../core/catalog.js';
 
 /**
  * @typedef {ReturnType<typeof createContext>} AppContext
@@ -39,6 +41,9 @@ export function createContext(store, templateB64) {
     dirty: false,
     records: store.loadRecords(),
     procs: store.loadProcs(),
+    /** Catálogos compartidos (perfiles de médico y operativos). */
+    medicos: store.loadMedicos(),
+    operativos: store.loadOperativos(),
     settings: store.loadSettings(),
     /** Filtro compartido de Estadística y Exportar. */
     filter: { operativo: '', desde: '', hasta: '' },
@@ -189,13 +194,61 @@ export function createContext(store, templateB64) {
 
     /** Re-dibuja listas que dependen de los registros guardados. */
     refreshLists() {
-      $('#opsList').innerHTML = operativosOf(ctx.records)
-        .map((o) => `<option value="${escapeHtml(o)}">`)
-        .join('');
       renderFilter(ctx);
       renderRegistry(ctx);
       if (ctx.currentTab === 't-est') renderStats(ctx);
       if (ctx.currentTab === 't-exp') renderExportView(ctx);
+    },
+
+    /** Completa los catálogos con médicos y operativos de atenciones antiguas (una vez por equipo). */
+    seedCatalogs() {
+      const r = seedCatalogs({ records: ctx.records, recordado: store.loadMedico(), medicos: ctx.medicos, operativos: ctx.operativos });
+      if (!r.added) return;
+      ctx.persist(() => {
+        store.saveMedicos(r.medicos);
+        store.saveOperativos(r.operativos);
+      });
+      ctx.medicos = r.medicos;
+      ctx.operativos = r.operativos;
+    },
+
+    reloadCatalogs() {
+      ctx.medicos = store.loadMedicos();
+      ctx.operativos = store.loadOperativos();
+      renderCatalogSelects(ctx);
+      renderCatalogSettings(ctx);
+    },
+
+    /** Crea o actualiza un médico u operativo y lo comparte. Devuelve el elemento guardado. */
+    saveCatalog(kind, item) {
+      const key = kind === 'medico' ? 'medicos' : 'operativos';
+      const list = byName(upsert(ctx[key], item));
+      const ok = ctx.persist(() => {
+        if (kind === 'medico') store.saveMedicos(list);
+        else store.saveOperativos(list);
+        const t = store.loadTombstones();
+        if (t[item.id]) {
+          delete t[item.id];
+          store.saveTombstones(t);
+        }
+      });
+      if (!ok) return undefined;
+      ctx.reloadCatalogs();
+      ctx.sync?.schedule();
+      return item;
+    },
+
+    deleteCatalog(kind, id) {
+      const key = kind === 'medico' ? 'medicos' : 'operativos';
+      const item = ctx[key].find((x) => x.id === id);
+      const list = ctx[key].filter((x) => x.id !== id);
+      ctx.persist(() => {
+        if (kind === 'medico') store.saveMedicos(list);
+        else store.saveOperativos(list);
+        store.addTombstone(id, Math.max(Date.now(), (item?.updated || 0) + 1));
+      });
+      ctx.reloadCatalogs();
+      ctx.sync?.schedule();
     },
 
     /** Recarga todo desde el almacenamiento (tras importar o borrar). */
@@ -203,6 +256,10 @@ export function createContext(store, templateB64) {
       ctx.records = store.loadRecords();
       ctx.procs = store.loadProcs();
       ctx.settings = store.loadSettings();
+      ctx.medicos = store.loadMedicos();
+      ctx.operativos = store.loadOperativos();
+      ctx.seedCatalogs();
+      renderCatalogSettings(ctx);
       renderProcList(ctx);
       renderSettings(ctx);
       syncAttentionView(ctx);

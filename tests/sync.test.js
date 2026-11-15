@@ -47,22 +47,24 @@ describe('crypto', () => {
 
 describe('protocolo', () => {
   test('planSync y applyPulled con last-write-wins y lápidas', () => {
-    const local = localVersions([minimalRecord('a', {}, { updated: 10 }), minimalRecord('b', {}, { updated: 10 })], { c: 30 });
+    const it = (id, updated, data = {}) => ({ id, updated, kind: 'atencion', data });
+    const local = localVersions([it('a', 10), it('b', 10)], { c: 30 });
     const remote = remoteVersions([{ id: 'a', u: 5 }, { id: 'b', u: 20 }, { id: 'c', u: 40 }, { id: 'd', u: 1 }, { id: 'd', u: 2 }]);
     const plan = planSync(local, remote);
     assert.deepEqual(plan.push, ['a']);
     assert.deepEqual(plan.pull, [{ id: 'b', u: 20 }, { id: 'c', u: 40 }, { id: 'd', u: 2 }]);
 
-    const r = applyPulled([minimalRecord('a', {}, { updated: 10 }), minimalRecord('b', {}, { updated: 10 })], {}, [
+    const r = applyPulled([it('a', 10), it('b', 10)], {}, [
       { id: 'b', u: 20, deleted: true },
-      { id: 'a', u: 5, record: { f: { paciente_nombre: 'viejo' } } }, // más antiguo: se ignora
-      { id: 'n', u: 7, record: { f: { paciente_nombre: 'nuevo' } } },
-      { id: 'bad id!', u: 7, record: {} },
+      { id: 'a', u: 5, kind: 'atencion', data: { f: { paciente_nombre: 'viejo' } } }, // más antiguo: se ignora
+      { id: 'n', u: 7, kind: 'medico', data: { nombre: 'Dra. Nueva' } },
+      { id: 'bad id!', u: 7, data: {} },
+      { id: 'sin', u: 9 }, // sin datos: se ignora
     ]);
-    assert.deepEqual(r.records.map((x) => x.id).sort(), ['a', 'n']);
+    assert.deepEqual(r.items.map((x) => x.id).sort(), ['a', 'n']);
     assert.deepEqual(r.tombstones, { b: 20 });
     assert.deepEqual([r.added, r.updated, r.deleted], [1, 0, 1]);
-    assert.equal(r.records.find((x) => x.id === 'n').updated, 7);
+    assert.deepEqual(r.items.find((x) => x.id === 'n'), { id: 'n', updated: 7, kind: 'medico', data: { nombre: 'Dra. Nueva' } });
   });
 });
 
@@ -74,6 +76,7 @@ async function setup() {
   let clock = Date.now();
   const handler = createSyncHandler({ store, tokenHash: tokenHash(keys.token), now: () => clock });
   const fetchFn = (url, init) => handler(new Request('https://x.test' + url, init));
+  const toItems = (records) => records.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: r }));
   const key = await importEncKey(keys.encKey);
   /** Un "PC": estado local en memoria. */
   const pc = () => {
@@ -82,10 +85,10 @@ async function setup() {
       state,
       sync: () =>
         syncOnce({
-          api: createSyncApi({ token: keys.token, fetchFn }),
+          api: createSyncApi({ token: keys.token, fetchFn, esp: 'oftalmologia' }),
           key,
-          readLocal: () => structuredClone(state),
-          writeLocal: (records, tombstones) => Object.assign(state, { records, tombstones }),
+          readLocal: () => ({ items: toItems(structuredClone(state.records)), tombstones: { ...state.tombstones } }),
+          writeLocal: (items, tombstones) => Object.assign(state, { records: items.map((i) => ({ ...i.data, id: i.id, updated: i.updated })), tombstones }),
           batchSize: 2,
         }),
     };
@@ -119,7 +122,7 @@ describe('servidor', () => {
     assert.deepEqual(await api.put([{ id: 'a', u: 10, iv, ct: 'AQ==' }]), { saved: ['a'], skipped: [] });
     assert.deepEqual(await api.put([{ id: 'a', u: 20, iv, ct: 'Ag==' }]), { saved: ['a'], skipped: [] });
     assert.deepEqual(await api.put([{ id: 'a', u: 15, iv, ct: 'Aw==' }]), { saved: [], skipped: ['a'] });
-    assert.deepEqual([...store._map.keys()], ['r/a/20']);
+    assert.deepEqual([...store._map.keys()], ['oftalmologia/r/a/20']);
     assert.deepEqual((await api.get([{ id: 'a', u: 10 }])).items, [{ id: 'a', u: 10, missing: true }]);
   });
 });
@@ -164,6 +167,7 @@ describe('convergencia de varios PC', () => {
     const serverText = [...store._map.entries()].join('\n');
     assert.ok(!/Paciente|Secreto|Editado|12\.345|345678/.test(serverText));
     assert.equal(store._map.size, 12, '11 atenciones + 1 eliminación, una versión cada una');
+    assert.ok([...store._map.keys()].every((k) => k.startsWith('oftalmologia/r/')), 'separado por especialidad');
 
     // Sincronizar de nuevo no cambia nada.
     const again = await pcs[1].sync();
@@ -174,8 +178,38 @@ describe('convergencia de varios PC', () => {
     const { fetchFn } = await setup();
     const wrong = await deriveTeamKeys('una contraseña distinta y larga', 1000);
     await assert.rejects(
-      syncOnce({ api: createSyncApi({ token: wrong.token, fetchFn }), key: await importEncKey(wrong.encKey), readLocal: () => ({ records: [], tombstones: {} }), writeLocal() {} }),
+      syncOnce({ api: createSyncApi({ token: wrong.token, fetchFn }), key: await importEncKey(wrong.encKey), readLocal: () => ({ items: [], tombstones: {} }), writeLocal() {} }),
       (e) => e.status === 401,
     );
+  });
+});
+
+describe('especialidades', () => {
+  test('cada especialidad tiene su espacio y puede tener su propia contraseña', async () => {
+    const ofta = await deriveTeamKeys(PASS, 1000);
+    const otra = await deriveTeamKeys('Q2W3E-R4T5Y-6Y7U8-P9Q0Z', 1000);
+    const store = memoryBlobStore();
+    const handler = createSyncHandler({ store, tokenHash: (esp) => (esp === 'otorrino' ? tokenHash(otra.token) : tokenHash(ofta.token)) });
+    const fetchFn = (url, init) => handler(new Request('https://x.test' + url, init));
+    const iv = 'AAAAAAAAAAAAAAAA';
+    await createSyncApi({ token: ofta.token, esp: 'oftalmologia', fetchFn }).put([{ id: 'a', u: 1, iv, ct: 'AQ==' }]);
+    await createSyncApi({ token: otra.token, esp: 'otorrino', fetchFn }).put([{ id: 'b', u: 1, iv, ct: 'AQ==' }]);
+    assert.deepEqual((await createSyncApi({ token: ofta.token, esp: 'oftalmologia', fetchFn }).list()).items, [{ id: 'a', u: 1 }]);
+    assert.deepEqual((await createSyncApi({ token: otra.token, esp: 'otorrino', fetchFn }).list()).items, [{ id: 'b', u: 1 }]);
+    await assert.rejects(createSyncApi({ token: ofta.token, esp: 'otorrino', fetchFn }).list(), (e) => e.status === 401);
+    const bad = await fetchFn('/api/sync/list?esp=../x', { headers: { authorization: 'Bearer ' + ofta.token } });
+    assert.equal(bad.status, 400);
+  });
+
+  test('lee el formato de la v2.1 ({record}) como atención', async () => {
+    const { keys, fetchFn } = await setup();
+    const key = await importEncKey(keys.encKey);
+    const api = createSyncApi({ token: keys.token, fetchFn });
+    const rec = minimalRecord('viejo1', { paciente_nombre: 'Formato antiguo' }, { updated: 5 });
+    await api.put([{ id: rec.id, u: 5, ...(await encryptPayload(key, rec.id, 5, { record: rec })) }]);
+    let got;
+    await syncOnce({ api, key, readLocal: () => ({ items: [], tombstones: {} }), writeLocal: (items) => (got = items) });
+    assert.equal(got[0].kind, 'atencion');
+    assert.equal(got[0].data.f.paciente_nombre, 'Formato antiguo');
   });
 });

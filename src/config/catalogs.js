@@ -11,22 +11,38 @@ export const APP = Object.freeze({
   id: 'oftalmo-operativos',
   nombre: 'Atención Oftalmológica · Rondas y Operativos',
   establecimiento: 'Hospital Hanga Roa',
-  version: '2.3.0',
+  version: '2.4.0',
 });
 
+/**
+ * Especialidad de esta aplicación.
+ *
+ * Los datos se separan por especialidad en todos los niveles:
+ *  - cada atención guarda `especialidad`;
+ *  - en el servidor, cada especialidad tiene su propio espacio (`<id>/r/...`)
+ *    y puede tener su propia contraseña (SYNC_TOKEN_SHA256_<ID>);
+ *  - en el navegador, las claves de almacenamiento llevan el prefijo de la especialidad.
+ * Una ronda de otra especialidad se agrega como otra configuración (id, nombre,
+ * prefijo, catálogos clínicos y plantilla), sin mezclar datos.
+ */
+export const ESPECIALIDAD = Object.freeze({ id: 'oftalmologia', nombre: 'Oftalmología', prefijo: 'oft_' });
+
 /** Versión del esquema de cada registro de atención (ver docs/MODELO_DATOS.md). */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Claves de localStorage. Se mantienen las de la v1 para no perder datos. */
+const P = ESPECIALIDAD.prefijo;
 export const STORAGE_KEYS = Object.freeze({
-  records: 'oft_atenciones_v1',
-  draft: 'oft_borrador_v1',
-  procs: 'oft_procs_v1',
-  medico: 'oft_medico_v1',
-  settings: 'oft_ajustes_v1',
-  anonSecret: 'oft_secreto_anon_v1',
-  tombstones: 'oft_eliminadas_v1',
-  sync: 'oft_sync_v1',
+  records: `${P}atenciones_v1`,
+  draft: `${P}borrador_v1`,
+  procs: `${P}procs_v1`,
+  medico: `${P}medico_v1`,
+  settings: `${P}ajustes_v1`,
+  anonSecret: `${P}secreto_anon_v1`,
+  tombstones: `${P}eliminadas_v1`,
+  sync: `${P}sync_v1`,
+  medicos: `${P}medicos_v1`,
+  operativos: `${P}operativos_v1`,
 });
 
 /** @typedef {{key: string, label: string}} CheckDef */
@@ -114,7 +130,7 @@ export const PIO_SUFFIX = { t_aplan: 'Apl', t_neum: 'Neu' };
  */
 export const TEXT_FIELDS = [
   'operativo', 'fecha_atencion',
-  'paciente_nombre', 'paciente_rut', 'paciente_edad', 'paciente_sexo', 'paciente_fono',
+  'paciente_nombre', 'paciente_rut', 'paciente_fnac', 'paciente_edad', 'paciente_sexo', 'paciente_fono',
   'antecedente_cirugia_detalle', 'antecedentes_otros',
   'motivo_consulta',
   'od_av', 'od_pio', 'od_otro_examen', 'od_otro_resultado', 'od_hallazgos',

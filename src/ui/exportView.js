@@ -38,7 +38,7 @@ export function initExportView(ctx) {
 
 export function renderExportView(ctx) {
   const n = ctx.filtered().length;
-  $('#expPdfZip').textContent = `Descargar ZIP con PDFs (${n})`;
+  $('#expPdfZip').textContent = n ? `Descargar (${n})` : 'Descargar';
   const s = ctx.store.loadSecret();
   $('#anFp').textContent = s ? secretFingerprint(s) : 'se crea en la primera exportación';
 }

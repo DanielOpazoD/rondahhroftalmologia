@@ -3,15 +3,20 @@
  * La lógica está en src/sync/server.js (probada en tests/sync.test.js).
  *
  * Configuración en Netlify (Site configuration → Environment variables):
- *   SYNC_TOKEN_SHA256 = valor que muestra la app en Ajustes → Sincronización.
+ *   SYNC_TOKEN_SHA256              huella de la contraseña del equipo (todas las especialidades)
+ *   SYNC_TOKEN_SHA256_<ESPECIALIDAD>  opcional: contraseña propia de una especialidad,
+ *                                    p. ej. SYNC_TOKEN_SHA256_OFTALMOLOGIA
  */
 import { getStore } from '@netlify/blobs';
 import { createSyncHandler } from '../../src/sync/server.js';
 
+const hashFor = (esp) =>
+  (process.env[`SYNC_TOKEN_SHA256_${esp.toUpperCase().replace(/-/g, '_')}`] || process.env.SYNC_TOKEN_SHA256 || '').trim().toLowerCase();
+
 export default async (req) => {
   const handler = createSyncHandler({
-    store: getStore({ name: 'oftalmo-sync', consistency: 'strong' }),
-    tokenHash: (process.env.SYNC_TOKEN_SHA256 || '').trim().toLowerCase(),
+    store: getStore({ name: 'hhr-rondas', consistency: 'strong' }),
+    tokenHash: hashFor,
   });
   return handler(req);
 };

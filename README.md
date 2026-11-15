@@ -5,13 +5,12 @@ Registro de atenciones de las **rondas y operativos de oftalmología**. Es un so
 ## Uso en terreno
 
 1. Abre la app desde su dirección en Netlify. Si vas a trabajar sin sincronización, también puedes abrir **`dist/Hoja_Atencion_Oftalmologica.html`** con doble clic (Chrome, Edge o Safari).
-2. **Atención**: completa la hoja. La barra superior muestra al paciente y si hay cambios sin guardar. Sus botones son:
+2. **Atención**: elige el operativo y el médico de la lista (o crea uno nuevo desde la misma lista) y completa la hoja. La edad se calcula sola si ingresas la fecha de nacimiento. La barra superior muestra al paciente y si hay cambios sin guardar. Sus botones son:
    - **＋** nueva atención;
    - **copiar** la nota para Eloísa;
    - **PDF** de la hoja oficial;
    - **✓ Guardar** (también Ctrl/⌘ + S).
 
-   El médico y el operativo quedan recordados para la siguiente atención.
 3. **Pacientes**: lista de los atendidos, agrupados por día. Toca una fila para abrirla.
 4. Al final de cada jornada: **Ajustes → Descargar respaldo** (no es necesario si la sincronización está activa).
 
@@ -21,7 +20,7 @@ Registro de atenciones de las **rondas y operativos de oftalmología**. Es un so
 | Pacientes | Atendidos por día, con diagnósticos y número de procedimientos. Busca por nombre (sin tildes) o RUT y filtra por operativo. En cada fila: copiar nota, PDF o eliminar. |
 | Estadística | Indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día. |
 | Exportar | ZIP con todos los PDF, Excel de estadística, datos seudonimizados para IA. |
-| Ajustes | Lista de procedimientos, opciones del PDF, respaldo e importación, zona de cuidado. |
+| Ajustes | Médicos y operativos (compartidos entre PC), sincronización, lista de procedimientos, opciones del PDF y respaldo. |
 
 ### Exportaciones
 

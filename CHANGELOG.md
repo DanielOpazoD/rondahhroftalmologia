@@ -1,5 +1,30 @@
 # Cambios
 
+## 2.4.0 — 2026-11-14
+
+### Nuevo
+- **Perfiles de médico y lista de operativos**, que se comparten entre los PC a través del servidor (cifrados):
+  - en la atención se eligen de un menú, y elegir un médico rellena su nombre y RUT;
+  - se crean desde el mismo menú («＋ Nuevo…») o en Ajustes;
+  - al actualizar, se crean solos a partir de las atenciones existentes.
+- **Fecha de nacimiento**: la edad se calcula sola a la fecha de atención (y queda de solo lectura).
+- **Separación por especialidad** en todos los niveles:
+  - cada atención guarda `especialidad`;
+  - en el servidor, cada especialidad tiene su espacio (`<especialidad>/r/...`) y puede tener su propia contraseña;
+  - en el navegador, las claves de almacenamiento llevan el prefijo de la especialidad.
+
+### Cambiado
+- **Estadística** más simple:
+  - filtro en una línea;
+  - indicadores con gestiones en una sola línea;
+  - tablas en dos columnas;
+  - se quitó el botón Imprimir (la impresión del navegador sigue funcionando).
+- **Exportar** más simple: tres filas (PDF, Estadística, Seudonimizados), con las opciones de seudonimización plegadas.
+- **Ajustes** reordenado: médicos y operativos primero, y la zona de cuidado plegada.
+- Se quitó el texto «Médico y operativo se recuerdan…».
+- La sincronización ahora lleva atenciones, médicos y operativos, y lee el formato de la versión anterior.
+- PDF, Excel y exportaciones no cambian.
+
 ## 2.3.0 — 2026-11-14
 
 ### Cambiado (solo interfaz; PDF, Excel y exportaciones no cambian)
