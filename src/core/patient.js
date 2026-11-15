@@ -23,6 +23,13 @@
  * aparezcan se detectan (`findDuplicatePairs`) y se unen (`mergePatients`):
  * la ficha absorbida queda marcada con `f.fusionado_en` y sus atenciones se
  * re-vinculan. La marca se sincroniza campo a campo como cualquier dato.
+ *
+ * Fichas creadas por error (sin atenciones): se ELIMINAN con la marca
+ * `f.eliminada_en` (`deletePatient`), que también viaja campo a campo; la
+ * ficha deja de aparecer en todos los equipos. Los datos no se borran: las
+ * fichas son comunes a todas las especialidades y otra podría tener
+ * atenciones de ese paciente. Si una atención vuelve a usarla, la marca se
+ * quita sola (`restorePatient`).
  */
 import { sha256 } from '../lib/sha256.js';
 import { rutKey, normalizeText } from './format.js';
@@ -39,6 +46,9 @@ export const PATIENT_SCHEMA = 1;
 
 /** Campo de sistema: id de la ficha en que se unió esta (no es dato del paciente). */
 export const MERGED_FIELD = 'fusionado_en';
+/** Campo de sistema: cuándo se eliminó la ficha (ISO-8601). */
+export const DELETED_FIELD = 'eliminada_en';
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
 /** @type {(id: unknown) => id is string} */
@@ -94,8 +104,11 @@ export function normalizePatient(raw) {
     proc: {},
   };
   delete p.f[MERGED_FIELD];
+  delete p.f[DELETED_FIELD];
   const into = raw.f?.[MERGED_FIELD];
   if (isValidId(into) && into.startsWith('p_') && into !== raw.id) p.f[MERGED_FIELD] = into;
+  const deletedAt = raw.f?.[DELETED_FIELD];
+  if (typeof deletedAt === 'string' && ISO_RE.test(deletedAt)) p.f[DELETED_FIELD] = deletedAt;
   if (raw.ft && typeof raw.ft === 'object') {
     p.ft = {};
     for (const [k, v] of Object.entries(raw.ft)) if (k.startsWith('f.') && Number.isFinite(v)) p.ft[k] = /** @type {number} */ (v);
@@ -113,7 +126,15 @@ function unknownTextFields(f) {
   const out = {};
   if (!f || typeof f !== 'object') return out;
   for (const [k, v] of Object.entries(f)) {
-    if (!PATIENT_FIELDS.includes(k) && k !== MERGED_FIELD && isSafeField(k) && typeof v === 'string' && v.trim() && v.length <= 2000) {
+    if (
+      !PATIENT_FIELDS.includes(k) &&
+      k !== MERGED_FIELD &&
+      k !== DELETED_FIELD &&
+      isSafeField(k) &&
+      typeof v === 'string' &&
+      v.trim() &&
+      v.length <= 2000
+    ) {
       out[k] = v;
     }
   }
@@ -225,6 +246,38 @@ export function canonicalPatientId(patients, id) {
   return [...cycle].sort()[0];
 }
 
+/** ¿Se eliminó esta ficha (creada por error)? @param {{f?: Record<string, unknown>} | null | undefined} p */
+export const isDeletedPatient = (p) => Boolean(p?.f?.[DELETED_FIELD]);
+
+/**
+ * Elimina una ficha creada por error: la marca (campo a campo, se sincroniza).
+ * @param {Paciente} p
+ * @param {number} at
+ */
+export function deletePatient(p, at) {
+  const d = structuredClone(p);
+  d.ft ||= {};
+  d.f[DELETED_FIELD] = new Date(at).toISOString();
+  d.ft['f.' + DELETED_FIELD] = at;
+  d.updated = Math.max(at, (p.updated || 0) + 1);
+  return /** @type {Paciente} */ (normalizePatient(d));
+}
+
+/**
+ * Quita la marca de eliminada (una atención volvió a usar la ficha). La
+ * fecha queda en `ft`: al fusionarse, la restauración gana a la eliminación.
+ * @param {Paciente} p
+ * @param {number} at
+ */
+export function restorePatient(p, at) {
+  if (!isDeletedPatient(p)) return p;
+  const r = structuredClone(p);
+  delete r.f[DELETED_FIELD];
+  r.ft = { ...r.ft, ['f.' + DELETED_FIELD]: at };
+  r.updated = Math.max(at, (p.updated || 0) + 1);
+  return /** @type {Paciente} */ (normalizePatient(r));
+}
+
 /** ¿Es una ficha vigente (no unida a otra)? */
 /** @type {(patients: Fichas, p: {id: string}) => boolean} */
 export const isCanonicalPatient = (patients, p) => canonicalPatientId(patients, p.id) === p.id;
@@ -266,7 +319,7 @@ export function resolvePatientId(f, patients, currentId) {
  */
 export function findDuplicatePairs(patients, dismissed = new Set()) {
   const map = asMap(patients);
-  const live = [...map.values()].filter((p) => isCanonicalPatient(map, p));
+  const live = [...map.values()].filter((p) => isCanonicalPatient(map, p) && !isDeletedPatient(p));
   /** @type {Map<string, ParDuplicado>} */
   const pairs = new Map();
   /** @type {(a: Paciente, b: Paciente, motivo: ParDuplicado['motivo']) => void} */

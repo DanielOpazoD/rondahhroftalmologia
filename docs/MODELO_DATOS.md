@@ -53,6 +53,12 @@ Así, quien fue ingresado primero sin RUT y después con RUT sigue siendo una so
 
 La marca se sincroniza como cualquier campo. Si un equipo que aún no sabía de la unión crea una atención para la ficha unida, se re-vincula sola al abrir o sincronizar (`ensurePatients`). Si dos equipos unen en sentidos opuestos (A → B y B → A), queda vigente la de id menor, igual en todos los equipos. «Son personas distintas» se recuerda en ese equipo (`oft_no_duplicados_v1`).
 
+**Eliminar una ficha creada por error** (`deletePatient`, desde la 2.15.0): en Pacientes, «Fichas sin atenciones» lista las fichas sin atenciones en esta especialidad; se pueden eliminar.
+
+- La ficha queda marcada con `f.eliminada_en: <ISO-8601>` y deja de mostrarse en todos los equipos (la marca se sincroniza campo a campo).
+- Sus datos **no se borran**: las fichas son comunes a todas las especialidades, y otra podría tener atenciones de ese paciente.
+- Si una atención vuelve a usar la ficha (al guardarla, o al llegar una de otro equipo), la marca se quita sola (`restorePatient`); la restauración gana a la eliminación.
+
 ## Atención (esquema v4)
 
 Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atenciones`, con un documento por atención (`src/storage/repo.js`). Si IndexedDB no está disponible, se usa localStorage como respaldo. Al abrir esta versión por primera vez, las atenciones que versiones anteriores guardaban en `localStorage["oft_atenciones_v1"]` se migran a IndexedDB y se libera ese espacio.

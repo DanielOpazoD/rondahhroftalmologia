@@ -114,3 +114,31 @@ test('la política de seguridad bloquea scripts inyectados', async ({ page }) =>
   expect(await page.evaluate(() => window.__inyectado)).toBeUndefined();
   expect(violations.length).toBeGreaterThan(0);
 });
+
+test('ficha creada por error: aparece en «sin atenciones» y se elimina; volver a usarla la restaura', async ({ page }) => {
+  await fillPatient(page, { nombre: 'Ficha Por Error' });
+  await save(page);
+  await showPatientRecord(page, 'Ficha Por Error');
+  await page.locator('#patAttentions .prow').first().locator('[data-a="del"]').click();
+  await page.locator('#msgDlg').getByRole('button', { name: 'Eliminar' }).click();
+  await page.locator('#patBack').click();
+  const box = page.locator('#orphBox');
+  await expect(box).toBeVisible();
+  await expect(page.locator('#orphTitle')).toHaveText('1 ficha sin atenciones');
+  await box.locator('summary').click();
+  await box.getByRole('button', { name: 'Eliminar ficha de Ficha Por Error' }).click();
+  await expect(page.locator('#msgTitle')).toHaveText('Eliminar ficha');
+  await page.locator('#msgDlg').getByRole('button', { name: 'Eliminar ficha' }).click();
+  await expect(page.locator('#toast')).toHaveText('Ficha eliminada');
+  await expect(box).toBeHidden();
+  // Persiste al recargar.
+  await page.reload();
+  await tab(page, 'Pacientes');
+  await expect(page.locator('#orphBox')).toBeHidden();
+  // Una atención nueva del mismo paciente la vuelve a usar: reaparece.
+  await tab(page, 'Atención');
+  await fillPatient(page, { nombre: 'Ficha Por Error' });
+  await save(page);
+  await showPatientRecord(page, 'Ficha Por Error');
+  await expect(page.locator('#patAttentions .prow')).toHaveCount(1);
+});

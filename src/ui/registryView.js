@@ -4,7 +4,7 @@
  */
 import { SEXOS } from '../config/catalogs.js';
 import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut } from '../core/format.js';
-import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs } from '../core/patient.js';
+import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs, isDeletedPatient } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 import { html, setHtml, join } from './html.js';
@@ -27,6 +27,10 @@ export function initRegistryView(ctx) {
     if (b.dataset.a === 'merge') ctx.mergePatients(b.dataset.keep, b.dataset.drop);
     if (b.dataset.a === 'distinct') ctx.notDuplicates(b.dataset.keep, b.dataset.drop);
     if (b.dataset.a === 'view') showPatient(ctx, b.dataset.p);
+  });
+  $('#orphList').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (b?.dataset.a === 'delp') void ctx.deletePatient(b.dataset.p);
   });
   $('#patNew').addEventListener('click', () => ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId));
   $('#patAttentions').addEventListener('click', (e) => {
@@ -91,11 +95,12 @@ export function renderRegistry(ctx) {
 
   const all = ctx.store.loadPatients();
   renderDuplicates(ctx, all, groups);
+  renderOrphans(ctx, all, groups);
   const q = $('#regSearch').value.trim();
   const op = sel.value;
   const patients = all
     // Las fichas unidas a otra no se muestran (sus atenciones ya están en la vigente).
-    .filter((p) => isCanonicalPatient(all, p))
+    .filter((p) => isCanonicalPatient(all, p) && !isDeletedPatient(p))
     .map((p) => ({ p, recs: groups.get(p.id) || [] }))
     .filter(({ p, recs }) => recs.length && matchesQuery(p, q) && (!op || recs.some((r) => r.f.operativo === op)))
     .sort(
@@ -175,6 +180,33 @@ function renderPatient(ctx, recs) {
     recs.length
       ? html`<section class="pgroup"><h3><span>Atenciones de ${ctx.especialidadNombre}</span><span>${recs.length}</span></h3>${rows}</section>`
       : html`<div class="empty">Este paciente aún no tiene atenciones en esta especialidad.</div>`,
+  );
+}
+
+/**
+ * Fichas sin atenciones en esta especialidad (p. ej. creadas por error, o
+ * cuya única atención se eliminó): se pueden eliminar.
+ */
+function renderOrphans(ctx, all, groups) {
+  const list = all
+    .filter((p) => isCanonicalPatient(all, p) && !isDeletedPatient(p) && !(groups.get(p.id) || []).length)
+    .sort((a, b) => patientLabel(a).localeCompare(patientLabel(b), 'es'));
+  $('#orphBox').hidden = !list.length;
+  if (!list.length) return;
+  $('#orphTitle').textContent = `${list.length} ${list.length === 1 ? 'ficha sin atenciones' : 'fichas sin atenciones'}`;
+  setHtml(
+    $('#orphList'),
+    html`${list.map(
+      (p) => html`<div class="prow">
+        <div class="pmain static">
+          <span class="pname">${patientLabel(p)}</span>
+          <span class="pmeta">${join([p.f.paciente_rut || 'sin RUT', p.f.paciente_fnac && fmtDate(p.f.paciente_fnac)].filter(Boolean), ' · ')}</span>
+        </div>
+        <div class="pact">
+          <button type="button" class="ib sm danger" data-a="delp" data-p="${p.id}" title="Eliminar ficha" aria-label="Eliminar ficha de ${patientLabel(p)}">${ICON('trash')}</button>
+        </div>
+      </div>`,
+    )}`,
   );
 }
 

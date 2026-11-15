@@ -3,7 +3,17 @@
  * completar datos desde su ficha y mantener las fichas al día.
  */
 import { blankRecord, applyBirthDate } from '../../core/record.js';
-import { patientFields, missingPatients, resolvePatientId, canonicalPatientId, mergePatients, patientLabel } from '../../core/patient.js';
+import {
+  patientFields,
+  missingPatients,
+  resolvePatientId,
+  canonicalPatientId,
+  mergePatients,
+  patientLabel,
+  deletePatient,
+  restorePatient,
+  isDeletedPatient,
+} from '../../core/patient.js';
 import { clock } from '../../core/clock.js';
 import { makeAuditEntry } from '../../core/audit.js';
 import { toast } from '../dom.js';
@@ -129,7 +139,16 @@ export function patientActions(ctx, store) {
         for (const r of relinked) ctx.records = store.upsertRecord(r);
         ctx.sync?.schedule();
       }
-      return missing.length + relinked.length;
+      // Fichas eliminadas que tienen atenciones (p. ej. llegó una de otro equipo): se restauran.
+      const used = new Set(ctx.records.map((r) => r.pacienteId).filter(Boolean));
+      const restored = [...existing.values()]
+        .filter((p) => isDeletedPatient(p) && used.has(p.id))
+        .map((p) => restorePatient(p, clock.tick()));
+      if (restored.length) {
+        store.savePatients(restored);
+        ctx.sync?.schedule();
+      }
+      return missing.length + relinked.length + restored.length;
     },
 
     /**
@@ -171,6 +190,33 @@ export function patientActions(ctx, store) {
       ctx.emit('datos');
       ctx.sync?.schedule();
       toast('Fichas unidas');
+      return true;
+    },
+
+    /**
+     * Elimina una ficha creada por error. Solo si no tiene atenciones en este
+     * equipo; se sincroniza (deja de aparecer en todos los equipos).
+     */
+    async deletePatient(id) {
+      const p = store.getPatient(id);
+      if (!p || isDeletedPatient(p)) return false;
+      if (ctx.records.some((r) => r.pacienteId === id)) {
+        toast('Esta ficha tiene atenciones: no se puede eliminar.', 4000);
+        return false;
+      }
+      const ok = await uiConfirm({
+        title: 'Eliminar ficha',
+        message: `Se eliminará la ficha de ${patientLabel(p)}${p.f.paciente_rut ? ` (${p.f.paciente_rut})` : ''}, que no tiene atenciones. Dejará de aparecer en este y en los demás equipos. Si más adelante una atención la usa (mismo RUT), vuelve a aparecer.`,
+        tone: 'danger',
+        okLabel: 'Eliminar ficha',
+      });
+      if (!ok) return false;
+      await ctx.ensureUser();
+      if (!ctx.persist(() => store.savePatients([deletePatient(p, clock.tick())]))) return false;
+      if (ctx.openPatientId === id) ctx.openPatientId = null;
+      ctx.emit('datos');
+      ctx.sync?.schedule();
+      toast('Ficha eliminada');
       return true;
     },
 
