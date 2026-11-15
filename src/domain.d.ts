@@ -53,7 +53,7 @@ export interface Perfil {
 }
 
 /** Tipos de elemento que se sincronizan. */
-export type TipoSync = 'atencion' | 'paciente' | 'medico' | 'operativo' | 'bitacora';
+export type TipoSync = 'atencion' | 'paciente' | 'medico' | 'operativo' | 'bitacora' | 'adjunto';
 
 /** Elemento local que se sincroniza (antes de cifrar). */
 export interface ElementoSync {

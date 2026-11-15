@@ -53,6 +53,12 @@ export const STORAGE_KEYS = Object.freeze({
   lockSignal: `${P}bloqueo_aviso_v1`,
   /** Última actividad en cualquier pestaña (para la inactividad compartida). */
   lockActivity: `${P}bloqueo_actividad_v1`,
+  /** Metadatos de adjuntos (solo si no hay IndexedDB; ahí no se guardan archivos). */
+  attachments: `${P}adjuntos_v1`,
+  /** Adjuntos cuyo contenido ya está en el servidor. */
+  attachmentsUploaded: `${P}adjuntos_subidos_v1`,
+  /** Adjuntos eliminados cuyo contenido falta borrar del servidor. */
+  attachmentPurges: `${P}adjuntos_por_borrar_v1`,
   /** Registro local de errores (últimos 50). */
   errors: `${P}errores_v1`,
 });

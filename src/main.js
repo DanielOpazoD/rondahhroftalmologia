@@ -58,7 +58,13 @@ async function openRepo(storage, practice) {
   } catch (e) {
     console.warn('IndexedDB no disponible; se usa localStorage:', e);
     const repo = createRepo(
-      localStorageBackend(storage, { atenciones: K.records, eliminadas: K.tombstones, bitacora: K.audit, pacientes: K.patients }),
+      localStorageBackend(storage, {
+        atenciones: K.records,
+        eliminadas: K.tombstones,
+        bitacora: K.audit,
+        pacientes: K.patients,
+        adjuntos: K.attachments,
+      }),
       {
         onError,
       },

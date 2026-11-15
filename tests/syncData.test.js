@@ -53,3 +53,26 @@ test('pacientes: ida y vuelta en su espacio; perfiles con id opaco', async () =>
   assert.equal(opaqueInSpecialty('a1'), false);
   assert.equal(opaqueInSpecialty('o_x'), false);
 });
+
+test('adjuntos: sus metadatos viajan con la especialidad y una lápida los quita', async () => {
+  const s = await newStore();
+  const meta = {
+    id: 'j1',
+    atencionId: 'a1',
+    nombre: 'f.pdf',
+    tipo: 'application/pdf',
+    tamano: 10,
+    sha256: 'a'.repeat(64),
+    created: 5,
+    updated: 5,
+  };
+  writeSpecialtyItems(s, [{ id: 'j1', updated: 5, kind: 'adjunto', data: meta }], {});
+  assert.deepEqual(
+    readSpecialtyItems(s)
+      .items.filter((i) => i.kind === 'adjunto')
+      .map((i) => i.id),
+    ['j1'],
+  );
+  writeSpecialtyItems(s, [], { j1: 9 });
+  assert.equal(s.loadAttachments().length, 0, 'eliminado en otro equipo');
+});

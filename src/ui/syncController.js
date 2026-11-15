@@ -21,6 +21,7 @@ import {
 import { createSyncApi, syncOnce, SyncHttpError, createSyncCache } from '../sync/client.js';
 import { PROTOCOL_VERSION } from '../sync/protocol.js';
 import { logError } from './errorLog.js';
+import { attachmentsPending, syncAttachmentContent } from '../sync/attachments.js';
 import { readPatientItems, writePatientItems, readSpecialtyItems, writeSpecialtyItems, opaqueInSpecialty } from '../app/syncData.js';
 import { $, toast, copyText } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
@@ -112,6 +113,37 @@ export function createSyncController(ctx) {
     ctx.emit('datos');
   }
 
+  /**
+   * Contenido de los adjuntos (espacio `<especialidad>-adjuntos`): solo si hay
+   * algo que subir, bajar o borrar. Ver sync/attachments.js.
+   */
+  async function syncAttachments(key) {
+    if (!store.supportsAttachments()) return;
+    const metas = store.loadAttachments();
+    const purges = store.loadAttachmentPurges();
+    const uploaded = store.loadAttachmentsUploaded();
+    if (!attachmentsPending(metas, await store.attachmentDataIds(), (id) => uploaded.has(id), purges)) return;
+    const r = await syncAttachmentContent({
+      api: createSyncApi({ token: st.config.token, esp: `${ESPECIALIDAD.id}-adjuntos` }),
+      key,
+      metas,
+      purges,
+      local: {
+        ids: () => store.attachmentDataIds(),
+        load: (id) => store.loadAttachmentData(id),
+        save: (id, bytes) => store.saveAttachmentData(id, bytes),
+        isUploaded: (id) => uploaded.has(id),
+        markUploaded: (id) => uploaded.add(id),
+      },
+    });
+    ctx.persist(() => {
+      store.saveAttachmentsUploaded(uploaded);
+      store.saveAttachmentPurges(store.loadAttachmentPurges().filter((id) => !r.borrados.includes(id)));
+    });
+    for (const id of r.fallidos) logError('adjuntos', new Error(`Contenido del adjunto ${id} no coincide con su huella`));
+    if (r.bajados) ctx.emit('adjuntos');
+  }
+
   async function syncNow({ quiet = true } = {}) {
     if (!st.config || !available()) return;
     if (st.running) {
@@ -146,6 +178,7 @@ export function createSyncController(ctx) {
       });
       const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
       ctx.ensurePatients();
+      await syncAttachments(key);
       checkClock(api.serverDate);
       // El servidor habla una versión de protocolo más nueva: hay una app más nueva publicada.
       if (api.serverProtocol > PROTOCOL_VERSION && !st.newerWarned) {

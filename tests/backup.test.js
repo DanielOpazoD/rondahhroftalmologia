@@ -11,6 +11,7 @@ async function filled() {
   await s.setJSON('oftalmologia/r/a1/100.0123456789abcdef', { iv: 'IV', ct: 'CIFRADO1' });
   await s.setJSON('pacientes/r/h_x/50', { iv: 'IV', ct: 'CIFRADO2' });
   await s.setJSON('oftalmologia/c/20261116/1.a1.100.0123456789abcdef', 1); // índice: no se respalda
+  await s.setJSON('oftalmologia-adjuntos/r/jx-0/5', { iv: 'IV', ct: 'ARCHIVO' }); // contenido de adjuntos: no se respalda
   return s;
 }
 
