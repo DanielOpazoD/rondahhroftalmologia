@@ -52,7 +52,10 @@ export function initAttentionView(ctx) {
       ctx.changed();
     },
   );
-  $$('#sexSeg button').forEach((b, i) => (b.title = SEXOS[i].label));
+  $$('#sexSeg button').forEach((b, i) => {
+    b.title = SEXOS[i].label;
+    b.setAttribute('aria-label', SEXOS[i].label);
+  });
 
   renderProcList(ctx);
   const list = $('#procList');

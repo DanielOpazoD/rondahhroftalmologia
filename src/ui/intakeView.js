@@ -13,14 +13,15 @@ import { $, $$ } from './dom.js';
 import { updateRutMark } from './rut.js';
 import { html, setHtml } from './html.js';
 
-const ICON = (n) => html`<svg><use href="#i-${n}"/></svg>`;
+const ICON = (n) => html`<svg aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const FIELDS = { ing_rut: 'paciente_rut', ing_nombre: 'paciente_nombre', ing_fnac: 'paciente_fnac', ing_fono: 'paciente_fono' };
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initIntakeView(ctx) {
   ctx.intakeSexo = '';
   const sexButtons = SEXOS.map(
-    (s) => html`<button type="button" data-v="${s.key}" title="${s.label}" aria-pressed="false">${s.key === 'O' ? 'Otro' : s.key}</button>`,
+    (s) =>
+      html`<button type="button" data-v="${s.key}" title="${s.label}" aria-label="${s.label}" aria-pressed="false">${s.key === 'O' ? 'Otro' : s.key}</button>`,
   );
   setHtml($('#ingSexo'), html`${sexButtons}`);
   $('#ingSexo').addEventListener('click', (e) => {

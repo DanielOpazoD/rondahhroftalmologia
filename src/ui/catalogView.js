@@ -15,7 +15,7 @@ import { uiConfirm } from './modal.js';
 
 const NEW = '__nuevo';
 const CUR = '__actual';
-const ICON = (n) => html`<svg><use href="#i-${n}"/></svg>`;
+const ICON = (n) => html`<svg aria-hidden="true"><use href="#i-${n}"/></svg>`;
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initCatalogView(ctx) {

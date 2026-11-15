@@ -179,8 +179,8 @@ export function renderSettings(ctx) {
   const procRows = ctx.procs.map(
     (p, i) => html`<div class="it"><div class="t"><b>${p.n}</b></div>
         <button type="button" class="chip mini${p.pio ? ' on' : ''}" data-a="pio" data-i="${i}" aria-pressed="${String(!!p.pio)}" title="Pide PIO por ojo">PIO</button>
-        <button type="button" class="ib sm" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : html` disabled`}><svg><use href="#i-up"/></svg></button>
-        <button type="button" class="ib sm danger" data-a="rm" data-i="${i}" title="Quitar" aria-label="Quitar"><svg><use href="#i-trash"/></svg></button></div>`,
+        <button type="button" class="ib sm" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : html` disabled`}><svg aria-hidden="true"><use href="#i-up"/></svg></button>
+        <button type="button" class="ib sm danger" data-a="rm" data-i="${i}" title="Quitar" aria-label="Quitar"><svg aria-hidden="true"><use href="#i-trash"/></svg></button></div>`,
   );
   setHtml(
     $('#ajList'),
