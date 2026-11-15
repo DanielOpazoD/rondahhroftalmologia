@@ -1,5 +1,7 @@
 # Arquitectura
 
+Las decisiones de fondo, con su porqué, están en el [registro de decisiones (ADR)](adr/README.md).
+
 ## Restricciones que guían el diseño
 
 1. **Sin conexión y sin instalación.** Se usa en terreno (Rapa Nui), a veces sin internet, abriendo un archivo con doble clic (`file://`). Por eso el producto final es **un único HTML** con todo incrustado: código, estilos, pdf-lib y la plantilla PDF.
