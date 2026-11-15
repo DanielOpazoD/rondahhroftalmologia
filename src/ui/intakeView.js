@@ -6,22 +6,23 @@
  * de la lista y registran lo clínico. Todo se fusiona campo a campo.
  */
 import { SEXOS } from '../config/catalogs.js';
-import { escapeHtml, formatRut, isIsoDate, todayIso, ageAt, fmtDate } from '../core/format.js';
-import { patientIdFor, isAttended, attentionsOf } from '../core/patient.js';
+import { formatRut, isIsoDate, todayIso, ageAt, fmtDate } from '../core/format.js';
+import { resolvePatientId, isAttended, attentionsOf } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
 import { $, $$ } from './dom.js';
 import { updateRutMark } from './rut.js';
+import { html, setHtml } from './html.js';
 
-const ICON = (n) => `<svg><use href="#i-${n}"/></svg>`;
+const ICON = (n) => html`<svg><use href="#i-${n}"/></svg>`;
 const FIELDS = { ing_rut: 'paciente_rut', ing_nombre: 'paciente_nombre', ing_fnac: 'paciente_fnac', ing_fono: 'paciente_fono' };
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initIntakeView(ctx) {
   ctx.intakeSexo = '';
-  $('#ingSexo').innerHTML = SEXOS.map(
-    (s) =>
-      `<button type="button" data-v="${s.key}" title="${escapeHtml(s.label)}" aria-pressed="false">${s.key === 'O' ? 'Otro' : s.key}</button>`,
-  ).join('');
+  const sexButtons = SEXOS.map(
+    (s) => html`<button type="button" data-v="${s.key}" title="${s.label}" aria-pressed="false">${s.key === 'O' ? 'Otro' : s.key}</button>`,
+  );
+  setHtml($('#ingSexo'), html`${sexButtons}`);
   $('#ingSexo').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -75,7 +76,7 @@ function updateAge() {
 
 /** Completa los campos vacíos con la ficha existente del paciente (si la hay). */
 function fillFromRegistry(ctx) {
-  const id = patientIdFor({ paciente_rut: $('#ing_rut').value, paciente_nombre: $('#ing_nombre').value });
+  const id = resolvePatientId({ paciente_rut: $('#ing_rut').value, paciente_nombre: $('#ing_nombre').value }, ctx.store.loadPatients());
   const p = id && ctx.store.getPatient(id);
   if (!p) {
     $('#ingHint').textContent = id && $('#ing_rut').value.trim() ? 'Paciente nuevo.' : '';
@@ -106,7 +107,7 @@ function clearForm(ctx) {
   $('#ing_rut').focus();
 }
 
-function admit(ctx) {
+async function admit(ctx) {
   const data = {
     paciente_rut: $('#ing_rut').value.trim() ? formatRut($('#ing_rut').value) : '',
     paciente_nombre: $('#ing_nombre').value.trim(),
@@ -115,7 +116,7 @@ function admit(ctx) {
     paciente_sexo: ctx.intakeSexo,
     paciente_fono: $('#ing_fono').value.trim(),
   };
-  const result = ctx.admitPatient(data, { fecha: $('#ingFecha').value || todayIso(), operativo: $('#ingOp').value });
+  const result = await ctx.admitPatient(data, { fecha: $('#ingFecha').value || todayIso(), operativo: $('#ingOp').value });
   if (result.ok) clearForm(ctx);
 }
 
@@ -133,8 +134,7 @@ export function renderIntake(ctx) {
   const cur = sel.dataset.init ? sel.value : ctx.store.loadMedico().op || '';
   sel.dataset.init = '1';
   const ops = ctx.operativos.map((o) => o.nombre);
-  sel.innerHTML =
-    '<option value="">Sin operativo</option>' + ops.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  setHtml(sel, html`<option value="">Sin operativo</option>${ops.map((n) => html`<option value="${n}">${n}</option>`)}`);
   sel.value = ops.includes(cur) ? cur : '';
 
   const date = $('#ingFecha').value;
@@ -147,31 +147,30 @@ export function renderIntake(ctx) {
   $('#ingPend').textContent = pending;
 
   if (!list.length) {
-    $('#ingList').innerHTML =
-      `<div class="empty">No hay pacientes en la lista de ${escapeHtml(dayTitle(date))}${op ? ' para este operativo' : ''}.</div>`;
+    setHtml(
+      $('#ingList'),
+      html`<div class="empty">No hay pacientes en la lista de ${dayTitle(date)}${op ? ' para este operativo' : ''}.</div>`,
+    );
     return;
   }
-  $('#ingList').innerHTML =
-    `<section class="pgroup"><h3><span>${escapeHtml(dayTitle(date))}</span><span>${list.length} ${list.length === 1 ? 'paciente' : 'pacientes'}</span></h3>${list
-      .map((r, i) => {
-        const f = r.f;
-        const done = isAttended(r);
-        const meta = [f.paciente_rut, f.paciente_edad && `${f.paciente_edad} a`, f.paciente_sexo, f.medico_nombre]
-          .filter(Boolean)
-          .map(escapeHtml)
-          .join(' · ');
-        const dx = diagnosesList(r, { withOthers: false }).slice(0, 2);
-        const id = escapeHtml(r.id);
-        return `<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
-        <button type="button" class="pmain" data-a="open" data-id="${id}" title="Abrir atención">
-          <span class="pname">${i + 1}. ${escapeHtml(f.paciente_nombre || '(sin nombre)')}</span>
+  const rows = list.map((r, i) => {
+    const f = r.f;
+    const done = isAttended(r);
+    const meta = [f.paciente_rut, f.paciente_edad && `${f.paciente_edad} a`, f.paciente_sexo, f.medico_nombre].filter(Boolean).join(' · ');
+    const dx = diagnosesList(r, { withOthers: false }).slice(0, 2);
+    return html`<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
+        <button type="button" class="pmain" data-a="open" data-id="${r.id}" title="Abrir atención">
+          <span class="pname">${i + 1}. ${f.paciente_nombre || '(sin nombre)'}</span>
           <span class="pmeta">${meta}</span>
-          <span class="ptags">${dx.map((d) => `<span class="tag">${escapeHtml(d)}</span>`).join('')}<span class="state ${done ? 'done' : 'pend'}">${done ? 'Atendido' : 'Por atender'}</span></span>
+          <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}<span class="state ${done ? 'done' : 'pend'}">${done ? 'Atendido' : 'Por atender'}</span></span>
         </button>
         <div class="pact">
-          ${done ? '' : `<button type="button" class="ib sm danger" data-a="del" data-id="${id}" title="Quitar de la lista" aria-label="Quitar de la lista">${ICON('trash')}</button>`}
+          ${done ? '' : html`<button type="button" class="ib sm danger" data-a="del" data-id="${r.id}" title="Quitar de la lista" aria-label="Quitar de la lista">${ICON('trash')}</button>`}
         </div>
       </div>`;
-      })
-      .join('')}</section>`;
+  });
+  setHtml(
+    $('#ingList'),
+    html`<section class="pgroup"><h3><span>${dayTitle(date)}</span><span>${list.length} ${list.length === 1 ? 'paciente' : 'pacientes'}</span></h3>${rows}</section>`,
+  );
 }

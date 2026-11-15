@@ -57,10 +57,11 @@ export function auditChanges(before, after) {
 /**
  * Crea una entrada de bitácora.
  * @param {{tipo: 'ingresada'|'creada'|'editada'|'eliminada', before?: object, after?: object, at: number,
- *   equipo: string, equipoId: string, rand?: () => number}} o
+ *   equipo: string, equipoId: string, autor?: string, autorId?: string, rand?: () => number}} o
+ *   `autor`: nombre del perfil que registró (quién), además del equipo (desde dónde).
  * @returns {object|null} null si una edición no cambió nada
  */
-export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, rand = Math.random }) {
+export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, autor, autorId, rand = Math.random }) {
   const cambios = tipo === 'eliminada' ? [] : auditChanges(before, after);
   if (tipo === 'editada' && !cambios.length) return null;
   return {
@@ -69,6 +70,7 @@ export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, rand
     tipo,
     equipo: equipo || 'Equipo sin nombre',
     equipoId,
+    ...(autor ? { autor: String(autor), autorId } : {}),
     cambios,
   };
 }

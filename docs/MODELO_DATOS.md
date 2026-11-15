@@ -29,6 +29,30 @@ Colección `pacientes` de IndexedDB (`src/core/patient.js`). Solo datos demográ
 - Las fichas no se eliminan: eliminar una atención no borra al paciente.
 - **Preingreso:** la pestaña Ingreso crea la ficha y una atención **por atender** (solo datos del paciente, operativo y fecha). Pasa a **atendida** cuando alguien registra cualquier dato clínico (`isAttended`).
 
+### Identidad a lo largo de los años
+
+El id es solo una llave estable; al paciente se lo **encuentra por su RUT** entre las fichas existentes (`resolvePatientId`):
+
+1. si hay RUT y alguna ficha tiene ese RUT, esa ficha (aunque haya nacido solo con nombre);
+2. si la atención ya estaba vinculada a una ficha, esa (y la ficha recibe el RUT nuevo);
+3. si no, el id derivado de los datos.
+
+Así, quien fue ingresado primero sin RUT y después con RUT sigue siendo una sola ficha.
+
+**Posibles duplicados** (`findDuplicatePairs`), mostrados en Pacientes:
+
+- **mismo RUT**: seguro que es la misma persona;
+- **mismo nombre** (sin tildes ni mayúsculas), siempre que no tengan RUT distintos ni fechas de nacimiento distintas. Los homónimos con datos distintos no se sugieren.
+
+**Unir fichas** (`mergePatients`):
+
+- la ficha que se conserva completa sus datos vacíos con los de la otra;
+- la otra queda marcada con `f.fusionado_en: <id>` y deja de mostrarse;
+- sus atenciones pasan a la ficha vigente (cambio de `pacienteId`, fechado y registrado en la bitácora);
+- nunca se unen fichas con RUT distintos.
+
+La marca se sincroniza como cualquier campo. Si un equipo que aún no sabía de la unión crea una atención para la ficha unida, se re-vincula sola al abrir o sincronizar (`ensurePatients`). Si dos equipos unen en sentidos opuestos (A → B y B → A), queda vigente la de id menor, igual en todos los equipos. «Son personas distintas» se recuerda en ese equipo (`oft_no_duplicados_v1`).
+
 ## Atención (esquema v4)
 
 Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atenciones`, con un documento por atención (`src/storage/repo.js`). Si IndexedDB no está disponible, se usa localStorage como respaldo. Al abrir esta versión por primera vez, las atenciones que versiones anteriores guardaban en `localStorage["oft_atenciones_v1"]` se migran a IndexedDB y se libera ese espacio.
@@ -105,13 +129,15 @@ Colección `bitacora`, con un documento `b_<idAtención>` por atención:
   "entries": [
     { "id": "e…", "at": 1763150000000, "tipo": "editada",       // creada | editada | eliminada
       "equipo": "Box 1", "equipoId": "pc3k9…",
+      "autor": "Dra. Pérez", "autorId": "m_…",                   // quién (perfil), si se eligió
       "cambios": [ { "c": "f.od_pio", "a": "14", "d": "19" } ] } // campo, antes, después
   ] }
 ```
 
 - **Cuándo se agrega:** cada guardado que cambia algo y cada eliminación agregan una entrada inmutable.
 - **Sincronización:** los documentos se sincronizan cifrados. Si dos PC agregan entradas a la vez, se unen sin perder ninguna.
-- **Dónde se ve:** en el **Historial de cambios** de cada atención, con el nombre de cada equipo (Ajustes → «Nombre de este equipo»).
+- **Quién y desde dónde:** cada entrada guarda el **perfil** que registró (ver «Perfiles» más abajo) y el **equipo** (Ajustes → «Nombre de este equipo»).
+- **Dónde se ve:** en el **Historial de cambios** de cada atención: «Dra. Pérez (Box 1)».
 - **Respaldos:** incluyen la bitácora.
 
 ### Almacenamiento y crecimiento a varios años
@@ -137,11 +163,18 @@ Cada atención guarda `especialidad`. Las claves de `localStorage` llevan el pre
 
 Para agregar la ronda de otra especialidad se crea su módulo en `src/specialties/<id>/` (ver [ESPECIALIDADES.md](ESPECIALIDADES.md)). Sus atenciones nunca se mezclan con las de oftalmología; las fichas de pacientes sí son comunes.
 
-### Médicos y operativos
+### Perfiles y operativos
 
-Son catálogos compartidos que se ofrecen como menú en el formulario. Elegir un médico copia su nombre y RUT a la atención, y elegir un operativo copia su nombre. Por eso, editar o eliminar un perfil después no cambia las atenciones ya guardadas (ni sus PDF o Excel).
+Son catálogos compartidos y sincronizados.
 
-Los ids son deterministas: `m_` + huella del RUT (o del nombre) y `o_` + huella del nombre. Así, si dos PC crean el mismo médico u operativo por separado, no se duplica.
+- **Perfiles profesionales** `{id, nombre, rut, rol}`, con `rol` = `medico` | `enfermeria` | `tens` | `tecnologo` | `admision` | `otro`. Los perfiles de versiones anteriores (sin rol) son médicos. En el código y en la sincronización se siguen llamando «médicos» (`medicos`, tipo `medico`) por compatibilidad.
+  - Solo los de rol médico aparecen en el menú **Médico** de la atención: elegirlo copia su nombre y RUT a la atención.
+  - Todos sirven para indicar **quién registra**. La primera vez que se guarda en una sesión se pregunta, proponiendo el último perfil de ese equipo (`oft_usuario_v1`); el chip del encabezado permite cambiarlo. Si quien registra es médico, las atenciones nuevas lo traen como médico. Sin perfiles creados, no se pregunta nada.
+- **Operativos:** elegir uno copia su nombre a la atención.
+
+Editar o eliminar un perfil u operativo después no cambia las atenciones ya guardadas (ni sus PDF o Excel).
+
+Los ids son deterministas: `m_` + huella del RUT (o del nombre) y `o_` + huella del nombre. Así, si dos PC crean el mismo perfil u operativo por separado, no se duplica. En el servidor, el id de un perfil viaja opaco (ver SINCRONIZACION.md).
 
 Al abrir la app por primera vez con esta versión, los catálogos se completan con los médicos y operativos de las atenciones existentes.
 

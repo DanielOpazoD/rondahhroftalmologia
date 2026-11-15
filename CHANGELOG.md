@@ -1,5 +1,39 @@
 # Cambios
 
+## 2.10.0 — 2026-11-15
+
+### Nuevo
+- **Quién registra.**
+  - Los perfiles ahora tienen rol: médico, enfermería, TENS, tecnólogo, admisión u otro.
+  - La primera vez que se guarda en una sesión, la app pregunta quién registra, proponiendo el último perfil del equipo. El chip del encabezado lo muestra y permite cambiarlo.
+  - El historial de cambios guarda quién y desde qué equipo.
+  - Si quien registra es médico, las atenciones nuevas lo traen como médico. En el menú Médico solo aparecen perfiles médicos.
+- **Identidad del paciente a lo largo de los años.**
+  - Al paciente se lo encuentra por su RUT entre las fichas existentes. Si fue ingresado primero sin RUT y después con RUT, sigue siendo una sola ficha.
+  - Pacientes avisa de **posibles duplicados**: mismo RUT, o mismo nombre sin datos que los distingan.
+  - Se pueden **unir** (las atenciones pasan a una ficha y nada se borra) o marcar como personas distintas. Las uniones se sincronizan; si dos equipos unen al mismo tiempo, el resultado es el mismo en todos.
+
+### Rendimiento
+- **Sincronización incremental:** después de la primera sincronización al abrir la app, solo se pide al servidor lo cambiado, y no se recalculan huellas ya verificadas. Con 20.000 atenciones, una sincronización sin cambios pasa de 2,1 s a 0,14 s, y la respuesta del servidor de 1,1 MB a 45 bytes. Cada 30 minutos se pide la lista completa como autocorrección.
+
+### Mantenibilidad y seguridad
+- **HTML seguro en toda la interfaz:** la plantilla `html\`…\`` escapa sola cada dato, y ESLint prohíbe escribir `innerHTML` directamente. Desaparecen los 26 escapes manuales.
+- `ui/context.js` se dividió en acciones por área (`ui/actions/`): de 541 a 158 líneas.
+
+### Al actualizar
+- **Recarga la app en todos los PC** antes de usar perfiles con rol o de unir fichas. Un PC con una versión anterior no conoce esos campos, y si edita esa ficha o perfil podría borrarlos.
+
+### Revisión independiente
+- Un revisor sin contexto encontró y se corrigió:
+  - una bitácora importada desde un respaldo podía quedar sin sincronizar con la caché nueva: ahora el respaldo sube su versión y las huellas se re-verifican en cada lista completa;
+  - el cambio de ficha de una atención al agregarle el RUT no quedaba fechado, y la fusión entre equipos podía elegir la ficha anterior;
+  - «＋ Nuevo perfil…» desde la pregunta «¿Quién registra?» no abría el formulario;
+  - la marca del índice de cambios ahora se escribe antes que la versión, así un reintento nunca la pierde.
+- Cada corrección tiene su prueba, y se verificó que la prueba falla sin la corrección.
+
+### Sin cambios
+- PDF, Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
+
 ## 2.9.2 — 2026-11-15
 
 ### Seguridad

@@ -20,9 +20,10 @@ import {
   passphraseProblem,
   DecryptError,
 } from '../sync/crypto.js';
-import { createSyncApi, syncOnce, SyncHttpError } from '../sync/client.js';
+import { createSyncApi, syncOnce, SyncHttpError, createSyncCache } from '../sync/client.js';
 import { $, toast, copyText } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
+import { html } from './html.js';
 
 const INTERVAL_MS = 2 * 60 * 1000;
 /** Espacio del servidor con las fichas de pacientes, compartido por todas las especialidades. */
@@ -42,6 +43,11 @@ export function createSyncController(ctx) {
     message: '',
     timer: null,
     interval: null,
+    /** Estado entre sincronizaciones por espacio (solo cambios, huellas verificadas). */
+    caches: { pacientes: createSyncCache(), especialidad: createSyncCache() },
+  };
+  const resetCaches = () => {
+    st.caches = { pacientes: createSyncCache(), especialidad: createSyncCache() };
   };
 
   const available = () => cryptoAvailable() && /^https?:$/.test(location.protocol);
@@ -156,13 +162,21 @@ export function createSyncController(ctx) {
         api: createSyncApi({ token: st.config.token, esp: PATIENTS_SPACE }),
         // El id de una ficha es la huella del RUT: el servidor ve solo un id opaco.
         opaqueIds: true,
+        cache: st.caches.pacientes,
         readLocal: readPatients,
         writeLocal: writePatients,
       });
       // 2) Atenciones, catálogos y bitácora: espacio de la especialidad.
       const api = createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id });
       // El id de un perfil de médico es la huella de su RUT: el servidor ve un id opaco.
-      const resE = await syncOnce({ ...common, api, readLocal, writeLocal, opaqueIds: (id) => id.startsWith('m_') });
+      const resE = await syncOnce({
+        ...common,
+        api,
+        readLocal,
+        writeLocal,
+        opaqueIds: (id) => id.startsWith('m_'),
+        cache: st.caches.especialidad,
+      });
       const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
       ctx.ensurePatients();
       checkClock(api.serverDate);
@@ -231,9 +245,7 @@ export function createSyncController(ctx) {
           return uiAlert({
             title: 'Contraseña incorrecta',
             tone: 'danger',
-            html:
-              'Esta no es la contraseña del equipo. El servidor ya tiene una configurada: escribe <b>la misma que usan los otros PC</b>; no generes una nueva.' +
-              '<br><br>Si nadie la tiene, hay que reemplazarla en el servidor (ver «Cambiar la contraseña» en la documentación).',
+            html: html`Esta no es la contraseña del equipo. El servidor ya tiene una configurada: escribe <b>la misma que usan los otros PC</b>; no generes una nueva.<br><br>Si nadie la tiene, hay que reemplazarla en el servidor (ver «Cambiar la contraseña» en la documentación).`,
           });
         }
         if (e.status !== 503 && e.status !== 0 && e.status !== 404) throw e;
@@ -242,6 +254,7 @@ export function createSyncController(ctx) {
       }
       st.config = { encKey: keys.encKey, token: keys.token, hash, activatedAt: Date.now(), lastSync: null };
       st.key = null;
+      resetCaches();
       store.saveSyncConfig(st.config);
       $('#syncPass').value = '';
       start();
@@ -250,9 +263,7 @@ export function createSyncController(ctx) {
         uiAlert({
           title: 'Falta configurar el servidor',
           tone: 'warn',
-          html:
-            'La sincronización quedó activa en este PC, pero el servidor aún no tiene contraseña. ' +
-            'Copia el valor de <b>Configuración del servidor</b> y créalo en Netlify como <code>SYNC_TOKEN_SHA256</code>; luego vuelve a publicar el sitio.',
+          html: html`La sincronización quedó activa en este PC, pero el servidor aún no tiene contraseña. Copia el valor de <b>Configuración del servidor</b> y créalo en Netlify como <code>SYNC_TOKEN_SHA256</code>; luego vuelve a publicar el sitio.`,
         });
       } else {
         toast('Sincronización activada en este PC');
@@ -273,6 +284,7 @@ export function createSyncController(ctx) {
     clearInterval(st.interval);
     st.config = null;
     st.key = null;
+    resetCaches();
     store.saveSyncConfig(null);
     setStatus('off');
   }

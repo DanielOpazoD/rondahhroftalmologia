@@ -10,11 +10,18 @@
  *
  * API (todas requieren `Authorization: Bearer <token>` y `?esp=<especialidad>`,
  * por omisión `oftalmologia`):
- *   GET  /api/sync/list   -> { items: [{id, u, h}] }
+ *   GET  /api/sync/list   -> { items: [{id, u, h}], now, full: true }   versión vigente de cada id
+ *   GET  /api/sync/list?since=<ms>  -> { items, now, full: false }      solo lo cambiado desde `since`
+ *        (hora del servidor; si `since` es muy antiguo o no hay, responde la lista completa)
  *   POST /api/sync/get    { items: [{id, u, h}] }            -> { items: [{id, u, h, iv, ct} | {id, u, missing}] }
  *   POST /api/sync/put    { items: [{id, u, h, iv, ct}] }    -> { saved: [id], skipped: [id] }
  *   POST /api/sync/purge  { ids: [id] }                      -> { purged: [id] }   (solo ids antiguos en claro, ver LEGACY_ID_RE)
  * `h` = huella de 16 hex del contenido (opcional por compatibilidad).
+ *
+ * Índice de cambios: cada versión escrita deja además una marca vacía
+ *     <especialidad>/c/<AAAAMMDD>/<hora>.<id>.<versión>.<huella>
+ * Con ella, `list?since=` lee solo los días recientes en lugar de todas las
+ * claves. Las marcas de más de CHANGE_LOG_DAYS días se borran al listar completo.
  *
  * Se escribe contra una interfaz mínima de "store" (list/get/setJSON/delete)
  * para poder probarla en Node con un almacenamiento en memoria.
@@ -43,6 +50,13 @@ const H_RE = /^[0-9a-f]{16}$/;
  */
 const keyOf = (esp, id, u, h) => `${esp}/r/${id}/${u}${h ? '.' + h : ''}`;
 const keyRe = (esp) => new RegExp(`^${esp}/r/([A-Za-z0-9_-]{1,64})/(\\d{1,16})(?:\\.([0-9a-f]{16}))?$`);
+
+/** Días que se conserva el índice de cambios (un equipo más atrasado recibe la lista completa). */
+export const CHANGE_LOG_DAYS = 30;
+const DAY_MS = 24 * 3600 * 1000;
+const dayOf = (t) => new Date(t).toISOString().slice(0, 10).replace(/-/g, '');
+const changeKey = (esp, t, id, u, h) => `${esp}/c/${dayOf(t)}/${t}.${id}.${u}.${h || ''}`;
+const changeRe = (esp) => new RegExp(`^${esp}/c/(\\d{8})/(\\d{1,16})\\.([A-Za-z0-9_-]{1,64})\\.(\\d{1,16})\\.([0-9a-f]{16})?$`);
 
 /** Orden de versiones: número y, a igual número, huella (desempate determinista). */
 const newer = (a, b) => a.u > b.u || (a.u === b.u && (a.h || '') > (b.h || ''));
@@ -130,15 +144,36 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     const re = keyRe(esp);
     try {
       if (req.method === 'GET' && action === 'list') {
-        const { blobs } = await store.list({ prefix: `${esp}/r/` });
+        const t0 = now();
         const latest = new Map();
+        const keep = (id, v) => {
+          if (!latest.has(id) || newer(v, latest.get(id))) latest.set(id, v);
+        };
+        const items = () => [...latest].map(([id, { u, h }]) => (h ? { id, u, h } : { id, u }));
+        const since = Number(url.searchParams.get('since'));
+        if (Number.isSafeInteger(since) && since > 0 && since <= t0 && t0 - since < CHANGE_LOG_DAYS * DAY_MS) {
+          // Solo los días desde `since`: pocas claves aunque haya años de datos.
+          const cre = changeRe(esp);
+          for (let d = since - (since % DAY_MS); d <= t0; d += DAY_MS) {
+            const { blobs } = await store.list({ prefix: `${esp}/c/${dayOf(d)}/` });
+            for (const b of blobs) {
+              const m = cre.exec(b.key);
+              if (m && Number(m[2]) >= since) keep(m[3], { u: Number(m[4]), h: m[5] });
+            }
+          }
+          return json(200, { items: items(), now: t0, full: false });
+        }
+        const { blobs } = await store.list({ prefix: `${esp}/r/` });
         for (const b of blobs) {
           const m = re.exec(b.key);
-          if (!m) continue;
-          const v = { u: Number(m[2]), h: m[3] };
-          if (!latest.has(m[1]) || newer(v, latest.get(m[1]))) latest.set(m[1], v);
+          if (m) keep(m[1], { u: Number(m[2]), h: m[3] });
         }
-        return json(200, { items: [...latest].map(([id, { u, h }]) => (h ? { id, u, h } : { id, u })) });
+        // Limpieza del índice de cambios antiguo (pocas claves: solo la actividad reciente).
+        const cutoff = dayOf(t0 - (CHANGE_LOG_DAYS + 2) * DAY_MS);
+        const { blobs: marks } = await store.list({ prefix: `${esp}/c/` });
+        const old = marks.filter((b) => b.key.slice(esp.length + 3, esp.length + 11) < cutoff);
+        await mapLimit(old, 8, (b) => store.delete(b.key));
+        return json(200, { items: items(), now: t0, full: true });
       }
 
       if (req.method === 'POST' && (action === 'get' || action === 'put')) {
@@ -174,6 +209,9 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
             skipped.push(id);
             return;
           }
+          // Primero la marca del índice: si falla lo siguiente, el reintento la
+          // reescribe; al revés, una versión podría quedar sin marca.
+          await store.setJSON(changeKey(esp, t, id, u, h), 1);
           await store.setJSON(keyOf(esp, id, u, h), { iv, ct });
           await Promise.all(existing.map((old) => store.delete(old.key)));
           saved.push(id);

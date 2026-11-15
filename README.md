@@ -22,9 +22,13 @@ Registro de atenciones de las **rondas y operativos de oftalmología**. Es un so
 | Pacientes | Registro de pacientes: busca por nombre (sin tildes) o RUT y filtra por operativo. Cada ficha muestra sus datos y su historial; en cada atención: copiar nota, PDF o eliminar. |
 
 Los campos de RUT muestran **✓ verde** si el dígito verificador es correcto y **✗ roja** si no lo es.
+
+**Quién registra:** en Ajustes → Perfiles se crean los perfiles de médicos y otros profesionales (enfermería, TENS, tecnólogo, admisión). La primera vez que se guarda en una sesión, la app pregunta quién registra; el chip del encabezado lo muestra y permite cambiarlo. El historial de cambios guarda quién y desde qué equipo. Si quien registra es médico, las atenciones nuevas lo traen como médico.
+
+**Posibles duplicados:** si un paciente quedó registrado dos veces (por ejemplo, primero sin RUT), Pacientes lo avisa y permite unir las fichas sin perder atenciones, o marcarlas como personas distintas.
 | Estadística | Indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día. |
 | Exportar | ZIP con todos los PDF, Excel de estadística, datos seudonimizados para IA. |
-| Ajustes | Médicos y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
+| Ajustes | Perfiles y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
 
 Cada atención guardada muestra al final su **Historial de cambios**: quién (qué equipo), cuándo, y qué campo cambió de qué valor a cuál.
 

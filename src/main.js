@@ -19,6 +19,7 @@ import { createClock, setClock } from './core/clock.js';
 import { initCatalogView, renderCatalogSettings } from './ui/catalogView.js';
 import { initIntakeView } from './ui/intakeView.js';
 import { initRutMarks } from './ui/rut.js';
+import { initUserView } from './ui/userView.js';
 
 function getStorage() {
   try {
@@ -63,6 +64,7 @@ async function main() {
   setClock(createClock({ load: () => store.loadClock(), save: (t) => ctx.persist(() => store.saveClock(t)) }));
   const ctx = createContext(store, TEMPLATE_PDF_B64);
   $('#appVersion').textContent = 'v' + ctx.version;
+  $('#appVersionAj').textContent = ctx.version;
 
   initAttentionView(ctx);
   initRegistryView(ctx);
@@ -71,6 +73,7 @@ async function main() {
   initSettingsView(ctx);
   initCatalogView(ctx);
   initIntakeView(ctx);
+  initUserView(ctx);
   initRutMarks();
   ctx.seedCatalogs();
 
@@ -120,8 +123,9 @@ function registerServiceWorker() {
 
 main().catch((e) => {
   console.error(e);
-  document.body.insertAdjacentHTML(
-    'afterbegin',
-    '<div class="banner warn" style="margin:16px">No se pudo iniciar la aplicación. Recarga la página; si persiste, avisa al equipo de soporte.</div>',
-  );
+  const banner = document.createElement('div');
+  banner.className = 'banner warn';
+  banner.style.margin = '16px';
+  banner.textContent = 'No se pudo iniciar la aplicación. Recarga la página; si persiste, avisa al equipo de soporte.';
+  document.body.prepend(banner);
 });

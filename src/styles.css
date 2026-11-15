@@ -127,11 +127,20 @@ header.top {
   font-size: 14px;
   line-height: 1.15;
 }
+.brand > div {
+  min-width: 0;
+}
 .brand small {
   display: block;
   font-size: 11.5px;
   color: var(--mut);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Con el chip de quién registra, el encabezado se compacta. */
+.topin:has(.userChip:not([hidden])) .ver {
+  display: none;
 }
 .logo {
   width: 28px;
@@ -1745,4 +1754,105 @@ ol.hist ul li {
   display: inline-grid;
   vertical-align: -4px;
   margin-left: 2px;
+}
+
+/* ------------------------------------------------ quién registra (encabezado) */
+.userChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 150px;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: 99px;
+  padding: 4px 10px 4px 7px;
+  font: 500 11.5px/1 var(--font);
+}
+.userChip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.userChip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.userChip.unset {
+  color: var(--warn);
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+@media (max-width: 760px) {
+  .userChip {
+    max-width: 120px;
+  }
+}
+
+/* ------------------------------------------------ posibles duplicados */
+.dups {
+  margin: 0 0 12px;
+  border: 1px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.dups summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--warn);
+  list-style: none;
+}
+.dups summary::-webkit-details-marker {
+  display: none;
+}
+.dups summary svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.duprow {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.duppair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.duppair .pmain {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.dupact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.dupact .tag {
+  margin-right: auto;
+}
+@media (max-width: 560px) {
+  .duppair {
+    grid-template-columns: 1fr;
+  }
+}
+
+.verfoot {
+  text-align: center;
+  margin: 18px 0 4px;
 }

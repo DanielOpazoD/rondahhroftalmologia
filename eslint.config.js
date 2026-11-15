@@ -60,6 +60,23 @@ export default [
   },
   // La interfaz usa los diálogos propios (ui/modal.js), no los del navegador
   { files: ['src/ui/**/*.js'], rules: { 'no-restricted-globals': ['error', 'alert', 'confirm', 'prompt'] } },
+  // HTML solo con plantillas que escapan solas (ui/html.js: html`…` + setHtml)
+  {
+    files: ['src/**/*.js'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'AssignmentExpression[left.property.name=/^(innerHTML|outerHTML)$/]',
+          message: 'Usa setHtml(el, html`…`) de src/ui/html.js: escapa los datos solo.',
+        },
+        {
+          selector: "CallExpression[callee.property.name='insertAdjacentHTML']",
+          message: 'Usa setHtml(el, html`…`) de src/ui/html.js.',
+        },
+      ],
+    },
+  },
   // Node: scripts, función de Netlify y pruebas
   {
     files: ['scripts/**/*.mjs', 'netlify/**/*.mjs', 'tests/**/*.js', 'e2e/**/*.js', '*.config.js'],

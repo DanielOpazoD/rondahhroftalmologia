@@ -19,13 +19,22 @@ Permite que varios PC (por ejemplo, 4 en un operativo) trabajen al mismo tiempo 
 - **Cifrado:** cada atención se cifra entera (nombre, RUT, examen, etc.) con un IV aleatorio. Va «atada» a su id y versión, así que el servidor no puede cambiarla de lugar ni de fecha sin que se note. Las eliminaciones también viajan cifradas.
 - **Qué ve Netlify:** un id aleatorio por atención, la fecha de su última modificación y el texto cifrado. También ve la IP y la hora de cada sincronización.
 
-### Cuándo se sincroniza
+### Cuándo se sincroniza (y qué se pide)
 
 - al abrir la app;
 - 4 segundos después de guardar, eliminar o importar;
 - cada 2 minutos;
 - al volver la conexión o al volver a la pestaña;
 - con el botón «Sincronizar ahora».
+
+**Solo lo cambiado.** La primera sincronización al abrir la app pide la lista completa de versiones. Las siguientes piden solo lo cambiado desde la anterior (`list?since=`), y no recalculan huellas que ya se verificaron. Cada 30 minutos se vuelve a pedir la lista completa, como autocorrección.
+
+Medido con 20.000 atenciones, una sincronización sin cambios:
+
+| | Antes | Ahora |
+|---|---|---|
+| Tiempo | 2,1 s | 0,14 s |
+| Respuesta del servidor | 1,1 MB | 45 bytes |
 
 ### Varios PC editando al mismo paciente (fusión campo a campo)
 
@@ -137,6 +146,8 @@ Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<v
 3. cuando la versión opaca ya está en el servidor, borra la antigua con `POST /api/sync/purge`.
 
 `purge` solo acepta ids con la forma de los antiguos (`m_` + 8, `p_` + 10 caracteres): no puede borrar atenciones ni ids opacos. Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
+
+**Índice de cambios:** cada versión escrita deja además una marca vacía `<especialidad>/c/<AAAAMMDD>/<hora>.<id>.<versión>.<huella>` (hora del servidor). `list?since=<ms>` lee solo los días desde `since` y devuelve `{items, now, full: false}`. El cliente guarda `now` como cursor y pide desde `now − 10 min`, para cubrir escrituras en curso. Si `since` tiene más de 30 días o falta, la respuesta es la lista completa (`full: true`), y en ese caso se borran las marcas de más de 30 días. El cliente mantiene en memoria su copia de las versiones del servidor (`createSyncCache` en `src/sync/client.js`).
 
 API (todas con `Authorization: Bearer <token>`):
 

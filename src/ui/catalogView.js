@@ -1,18 +1,21 @@
 /**
- * Perfiles de médico y operativos: selectores del formulario y gestión en Ajustes.
- * Elegir un médico rellena su nombre y RUT en la atención; elegir un operativo
- * rellena su nombre. Ambos catálogos se sincronizan entre equipos.
+ * Perfiles profesionales y operativos: selectores del formulario y gestión en Ajustes.
+ * Elegir un médico rellena su nombre y RUT en la atención (solo los perfiles
+ * con rol médico); elegir un operativo rellena su nombre. Los perfiles también
+ * dicen quién registra (ver userView.js). Ambos catálogos se sincronizan.
  */
-import { escapeHtml, isValidRut } from '../core/format.js';
-import { makeMedico, makeOperativo, findMedico } from '../core/catalog.js';
+import { isValidRut } from '../core/format.js';
+import { makeMedico, makeOperativo, findMedico, onlyDoctors, rolLabel } from '../core/catalog.js';
+import { ROLES } from '../config/catalogs.js';
 import { $ } from './dom.js';
+import { html, setHtml } from './html.js';
 import { openDialog } from './dialog.js';
 import { clock } from '../core/clock.js';
 import { uiConfirm } from './modal.js';
 
 const NEW = '__nuevo';
 const CUR = '__actual';
-const ICON = (n) => `<svg><use href="#i-${n}"/></svg>`;
+const ICON = (n) => html`<svg><use href="#i-${n}"/></svg>`;
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initCatalogView(ctx) {
@@ -23,11 +26,11 @@ export function initCatalogView(ctx) {
   });
   $('#medicoSel').addEventListener('change', (e) => {
     const v = e.target.value;
-    if (v === NEW) return editMedico(ctx, null, (m) => setMedico(ctx, m));
+    if (v === NEW) return editProfile(ctx, { rol: 'medico' }, (m) => setMedico(ctx, m));
     if (v !== CUR) setMedico(ctx, ctx.medicos.find((m) => m.id === v) || null);
   });
 
-  $('#medAdd').addEventListener('click', () => editMedico(ctx));
+  $('#medAdd').addEventListener('click', () => editProfile(ctx));
   $('#opAdd').addEventListener('click', () => editOperativo(ctx));
   const listClick = (kind) => async (e) => {
     const b = e.target.closest('button[data-a]');
@@ -35,10 +38,10 @@ export function initCatalogView(ctx) {
     const list = kind === 'medico' ? ctx.medicos : ctx.operativos;
     const item = list.find((x) => x.id === b.dataset.id);
     if (!item) return;
-    if (b.dataset.a === 'edit') return kind === 'medico' ? editMedico(ctx, item) : editOperativo(ctx, item);
+    if (b.dataset.a === 'edit') return kind === 'medico' ? editProfile(ctx, item) : editOperativo(ctx, item);
     if (b.dataset.a !== 'del') return;
     const ok = await uiConfirm({
-      title: kind === 'medico' ? 'Eliminar médico' : 'Eliminar operativo',
+      title: kind === 'medico' ? 'Eliminar perfil' : 'Eliminar operativo',
       message: `«${item.nombre}» se quitará de la lista en todos los equipos. Las atenciones ya guardadas no cambian.`,
       tone: 'danger',
       okLabel: 'Eliminar',
@@ -63,19 +66,25 @@ function setMedico(ctx, m) {
   ctx.changed();
 }
 
-/** Diálogo de médico. `done(m)` recibe el perfil guardado, o undefined si se canceló. */
-function editMedico(ctx, m = null, done) {
+/**
+ * Diálogo de perfil profesional. `m` es el perfil a editar, o valores
+ * iniciales de uno nuevo (p. ej. `{rol: 'medico'}`). `done(m)` recibe el
+ * perfil guardado, o undefined si se canceló.
+ */
+export function editProfile(ctx, m = null, done) {
   let result;
+  const editing = Boolean(m?.id);
   openDialog({
-    title: m ? 'Editar médico' : 'Nuevo médico',
+    title: editing ? 'Editar perfil' : 'Nuevo perfil',
     fields: [
       { id: 'nombre', label: 'Nombre', value: m?.nombre, placeholder: 'Ej: Dra. Ana Pérez Soto' },
+      { id: 'rol', label: 'Rol', value: m?.rol || 'medico', options: ROLES.map((r) => ({ value: r.key, label: r.label })) },
       { id: 'rut', label: 'RUT', value: m?.rut, placeholder: '12.345.678-9' },
     ],
-    onSave: ({ nombre, rut }) => {
+    onSave: ({ nombre, rut, rol }) => {
       if (!nombre) return 'Escribe el nombre';
       if (rut && !isValidRut(rut)) return 'RUT con dígito verificador inválido';
-      const item = makeMedico({ ...m, nombre, rut, updated: clock.tick() });
+      const item = makeMedico({ ...m, nombre, rut, rol, updated: clock.tick() });
       result = ctx.saveCatalog('medico', item);
       return null;
     },
@@ -104,37 +113,41 @@ export function renderCatalogSelects(ctx) {
   const f = ctx.rec.f;
   const op = f.operativo || '';
   const opNames = ctx.operativos.map((o) => o.nombre);
-  $('#operativoSel').innerHTML =
-    '<option value="">Sin operativo</option>' +
-    (op && !opNames.includes(op) ? `<option value="${CUR}">${escapeHtml(op)}</option>` : '') +
-    opNames.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('') +
-    `<option value="${NEW}">＋ Nuevo operativo…</option>`;
+  const curOp = op && !opNames.includes(op) ? html`<option value="${CUR}">${op}</option>` : '';
+  const opOptions = opNames.map((n) => html`<option value="${n}">${n}</option>`);
+  setHtml(
+    $('#operativoSel'),
+    html`<option value="">Sin operativo</option>${curOp}${opOptions}<option value="${NEW}">＋ Nuevo operativo…</option>`,
+  );
   $('#operativoSel').value = op ? (opNames.includes(op) ? op : CUR) : '';
 
-  const m = findMedico(ctx.medicos, f.medico_nombre, f.medico_rut);
+  const doctors = onlyDoctors(ctx.medicos);
+  const m = findMedico(doctors, f.medico_nombre, f.medico_rut);
   const hasOther = !m && f.medico_nombre;
-  $('#medicoSel').innerHTML =
-    '<option value="">Sin médico</option>' +
-    (hasOther ? `<option value="${CUR}">${escapeHtml(f.medico_nombre)}</option>` : '') +
-    ctx.medicos
-      .map((x) => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.nombre)}${x.rut ? ' · ' + escapeHtml(x.rut) : ''}</option>`)
-      .join('') +
-    `<option value="${NEW}">＋ Nuevo médico…</option>`;
+  const curMed = hasOther ? html`<option value="${CUR}">${f.medico_nombre}</option>` : '';
+  const medOptions = doctors.map((x) => html`<option value="${x.id}">${x.nombre}${x.rut ? ' · ' + x.rut : ''}</option>`);
+  setHtml(
+    $('#medicoSel'),
+    html`<option value="">Sin médico</option>${curMed}${medOptions}<option value="${NEW}">＋ Nuevo médico…</option>`,
+  );
   $('#medicoSel').value = m ? m.id : hasOther ? CUR : '';
 }
 
-/** Listas de médicos y operativos en Ajustes. */
+/** Listas de perfiles y operativos en Ajustes. */
 export function renderCatalogSettings(ctx) {
-  const row = (
-    x,
-    sub,
-  ) => `<div class="it"><div class="t"><b>${escapeHtml(x.nombre)}</b>${sub ? `<span class="muted">${escapeHtml(sub)}</span>` : ''}</div>
-    <button type="button" class="ib sm" data-a="edit" data-id="${escapeHtml(x.id)}" title="Editar" aria-label="Editar">${ICON('edit')}</button>
-    <button type="button" class="ib sm danger" data-a="del" data-id="${escapeHtml(x.id)}" title="Eliminar" aria-label="Eliminar">${ICON('trash')}</button></div>`;
-  $('#medList').innerHTML = ctx.medicos.length ? ctx.medicos.map((m) => row(m, m.rut)).join('') : '<p class="hint">Aún no hay médicos.</p>';
-  $('#opList').innerHTML = ctx.operativos.length
-    ? ctx.operativos.map((o) => row(o)).join('')
-    : '<p class="hint">Aún no hay operativos.</p>';
+  const row = (x, sub) => html`<div class="it"><div class="t"><b>${x.nombre}</b>${sub ? html`<span class="muted">${sub}</span>` : ''}</div>
+    <button type="button" class="ib sm" data-a="edit" data-id="${x.id}" title="Editar" aria-label="Editar">${ICON('edit')}</button>
+    <button type="button" class="ib sm danger" data-a="del" data-id="${x.id}" title="Eliminar" aria-label="Eliminar">${ICON('trash')}</button></div>`;
+  setHtml(
+    $('#medList'),
+    ctx.medicos.length
+      ? html`${ctx.medicos.map((m) => row(m, [rolLabel(m.rol), m.rut].filter(Boolean).join(' · ')))}`
+      : html`<p class="hint">Aún no hay perfiles.</p>`,
+  );
+  setHtml(
+    $('#opList'),
+    ctx.operativos.length ? html`${ctx.operativos.map((o) => row(o))}` : html`<p class="hint">Aún no hay operativos.</p>`,
+  );
   $('#medCount').textContent = ctx.medicos.length;
   $('#opCount').textContent = ctx.operativos.length;
 }

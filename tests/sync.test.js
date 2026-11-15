@@ -13,13 +13,16 @@ import {
 } from '../src/sync/crypto.js';
 import { localVersions, remoteVersions, planSync, applyPulled } from '../src/sync/protocol.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
-import { createSyncApi, syncOnce, SyncHttpError, serverId } from '../src/sync/client.js';
+import { createSyncApi, syncOnce, SyncHttpError, serverId, createSyncCache, CURSOR_MARGIN_MS } from '../src/sync/client.js';
+import { CHANGE_LOG_DAYS } from '../src/sync/server.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
 import { patientFromRecord, normalizePatient } from '../src/core/patient.js';
 import { makeMedico } from '../src/core/catalog.js';
 import { syncMerge, syncFingerprint, stampChanges } from '../src/core/merge.js';
 
 const PASS = 'K7QM3-XRT9P-ZAWD4-N8F2C';
+/** Claves de versiones guardadas (sin el índice de cambios `/c/`). */
+const versionKeys = (store) => [...store._map.keys()].filter((k) => k.split('/')[1] === 'r');
 
 describe('crypto', () => {
   test('contraseña generada y normalización', () => {
@@ -128,7 +131,7 @@ describe('servidor', () => {
     const noConfig = createSyncHandler({ store: memoryBlobStore(), tokenHash: '' });
     assert.equal((await noConfig(new Request('https://x/api/sync/list'))).status, 503);
     await assert.rejects(createSyncApi({ token: 'malo', fetchFn }).list(), (e) => e instanceof SyncHttpError && e.status === 401);
-    assert.deepEqual(await createSyncApi({ token: keys.token, fetchFn }).list(), { items: [] });
+    assert.deepEqual((await createSyncApi({ token: keys.token, fetchFn }).list()).items, []);
   });
 
   test('valida entradas', async () => {
@@ -148,7 +151,7 @@ describe('servidor', () => {
     assert.deepEqual(await api.put([{ id: 'a', u: 10, iv, ct: 'AQ==' }]), { saved: ['a'], skipped: [] });
     assert.deepEqual(await api.put([{ id: 'a', u: 20, iv, ct: 'Ag==' }]), { saved: ['a'], skipped: [] });
     assert.deepEqual(await api.put([{ id: 'a', u: 15, iv, ct: 'Aw==' }]), { saved: [], skipped: ['a'] });
-    assert.deepEqual([...store._map.keys()], ['oftalmologia/r/a/20']);
+    assert.deepEqual(versionKeys(store), ['oftalmologia/r/a/20']);
     assert.deepEqual((await api.get([{ id: 'a', u: 10 }])).items, [{ id: 'a', u: 10, missing: true }]);
   });
 });
@@ -200,9 +203,9 @@ describe('convergencia de varios PC', () => {
     // Lo que guarda el servidor no contiene nombres ni RUT.
     const serverText = [...store._map.entries()].join('\n');
     assert.ok(!/Paciente|Secreto|Editado|12\.345|345678/.test(serverText));
-    assert.equal(store._map.size, 12, '11 atenciones + 1 eliminación, una versión cada una');
+    assert.equal(versionKeys(store).length, 12, '11 atenciones + 1 eliminación, una versión cada una');
     assert.ok(
-      [...store._map.keys()].every((k) => k.startsWith('oftalmologia/r/')),
+      versionKeys(store).every((k) => k.startsWith('oftalmologia/r/')),
       'separado por especialidad',
     );
 
@@ -391,7 +394,7 @@ describe('fichas de pacientes (espacio común)', () => {
       assert.equal(p.state.patients[0].f.paciente_fnac, '1950-03-01');
     }
     assert.deepEqual(admision.state.patients, box.state.patients);
-    const keysOnServer = [...store._map.keys()];
+    const keysOnServer = versionKeys(store);
     assert.equal(keysOnServer.length, 1);
     assert.match(keysOnServer[0], /^pacientes\/r\/h_[0-9a-f]{32}\//, 'solo en el espacio común, con id opaco');
     // El id local (huella del RUT, adivinable probando RUTs) nunca llega al servidor.
@@ -453,7 +456,10 @@ describe('fichas de pacientes (espacio común)', () => {
         writeLocal: (items, tombstones) => Object.assign(state, { items, tombstones }),
       });
     await sync();
-    const ids = () => [...store._map.keys()].map((k) => k.split('/')[2]).sort();
+    const ids = () =>
+      versionKeys(store)
+        .map((k) => k.split('/')[2])
+        .sort();
     assert.deepEqual(
       ids(),
       [atencion.id, serverId(keys.encKey, med.id), serverId(keys.encKey, nuevo.id)].sort(),
@@ -498,7 +504,119 @@ describe('purge', () => {
       await assert.rejects(api.purge(ids), (e) => e instanceof SyncHttpError && e.status === 400);
     }
     assert.deepEqual(await api.purge(['m_abcdefgh', 'p_0123456789']), { purged: ['m_abcdefgh'] });
-    assert.deepEqual([...store._map.keys()], ['oftalmologia/r/aten1/10']);
+    assert.deepEqual(versionKeys(store), ['oftalmologia/r/aten1/10']);
     await assert.rejects(createSyncApi({ token: 'malo', fetchFn }).purge(['m_abcdefgh']), (e) => e.status === 401);
+  });
+});
+
+describe('sincronización incremental (años de datos)', () => {
+  /** Servidor con reloj controlable y registro de lo que responde `list`. */
+  async function incWorld() {
+    const keys = await deriveTeamKeys(PASS, 1000);
+    const key = await importEncKey(keys.encKey);
+    const store = memoryBlobStore();
+    const clock = { t: Date.now() };
+    const lists = [];
+    const handler = createSyncHandler({ store, tokenHash: tokenHash(keys.token), now: () => clock.t });
+    const fetchFn = async (url, init) => {
+      const res = await handler(new Request('https://x.test' + url, init));
+      if (url.includes('/list')) lists.push({ url, body: await res.clone().json() });
+      return res;
+    };
+    const pc = (records = []) => {
+      const state = { items: records.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: r })), tombstones: {} };
+      const calls = { fingerprint: 0 };
+      const cache = createSyncCache();
+      return {
+        state,
+        calls,
+        cache,
+        sync: () =>
+          syncOnce({
+            api: createSyncApi({ token: keys.token, fetchFn }),
+            key,
+            encKey: keys.encKey,
+            mergeFn: syncMerge,
+            fingerprint: (k, d) => (calls.fingerprint++, syncFingerprint(k, d)),
+            cache,
+            readLocal: () => structuredClone(state),
+            writeLocal: (items, tombstones) => Object.assign(state, { items, tombstones }),
+          }),
+      };
+    };
+    return { store, clock, lists, pc };
+  }
+
+  test('tras la primera, solo se piden los cambios y no se recalculan huellas', async () => {
+    const { clock, lists, pc } = await incWorld();
+    const t0 = clock.t;
+    const recs = Array.from({ length: 300 }, (_, i) => minimalRecord('r' + i, { paciente_nombre: 'P' + i }, { updated: t0 - 1000 + i }));
+    const A = pc(recs);
+    const B = pc();
+    await A.sync();
+    clock.t += 3600_000;
+    await B.sync();
+    assert.equal(B.state.items.length, 300);
+    assert.equal(lists.at(-1).body.full, true, 'la primera es completa');
+    clock.t += 3600_000;
+    await A.sync(); // sincronización periódica: el cursor avanza
+    // Una hora después, sin cambios: lista vacía y ninguna huella recalculada.
+    clock.t += 3600_000;
+    A.calls.fingerprint = 0;
+    await A.sync();
+    assert.match(lists.at(-1).url, /since=/);
+    assert.equal(lists.at(-1).body.full, false);
+    assert.deepEqual(lists.at(-1).body.items, []);
+    assert.equal(A.calls.fingerprint, 0);
+    // B edita una atención: A recibe SOLO ese cambio.
+    const e = B.state.items.find((i) => i.id === 'r7');
+    e.updated = e.data.updated = clock.t;
+    e.data.f.od_pio = '22';
+    e.data.ft = { ...e.data.ft, 'f.od_pio': clock.t };
+    await B.sync();
+    clock.t += 60_000;
+    await A.sync();
+    assert.deepEqual(
+      lists.at(-1).body.items.map((i) => i.id),
+      ['r7'],
+    );
+    assert.equal(A.state.items.find((i) => i.id === 'r7').data.f.od_pio, '22');
+  });
+
+  test('cursor demasiado antiguo: lista completa; el índice viejo se limpia', async () => {
+    const { store, clock, lists, pc } = await incWorld();
+    const A = pc([minimalRecord('a', {}, { updated: clock.t - 1 })]);
+    await A.sync();
+    const marks = () => [...store._map.keys()].filter((k) => k.includes('/c/'));
+    assert.equal(marks().length, 1, 'cada versión deja una marca en el índice de cambios');
+    clock.t += (CHANGE_LOG_DAYS + 5) * 24 * 3600_000;
+    A.cache.fullAt = clock.t; // fuerza el intento incremental con un cursor viejo
+    await A.sync();
+    assert.equal(lists.at(-1).body.full, true);
+    assert.deepEqual(marks(), [], 'marcas de más de 30 días borradas');
+    assert.ok(CURSOR_MARGIN_MS >= 5 * 60_000);
+  });
+
+  test('un cambio local sin versión nueva se corrige en la siguiente lista completa (huellas re-verificadas)', async () => {
+    const { clock, pc } = await incWorld();
+    const doc = { id: 'b_x', atencionId: 'x', updated: clock.t - 5, entries: [{ id: 'e1', at: 10, tipo: 'creada', cambios: [] }] };
+    const A = pc();
+    const B = pc();
+    A.state.items = [{ id: 'b_x', updated: doc.updated, kind: 'bitacora', data: structuredClone(doc) }];
+    for (const p of [A, B, A, B]) {
+      clock.t += 60_000;
+      await p.sync();
+    }
+    // A recibe una entrada por fuera de la sincronización, sin subir la versión.
+    A.state.items[0].data.entries.unshift({ id: 'e2', at: 7, tipo: 'editada', cambios: [] });
+    clock.t += 60_000;
+    await A.sync();
+    // Pasados 30 minutos, la lista completa vuelve a comprobar las huellas.
+    A.cache.fullAt = 0;
+    for (const p of [A, B]) {
+      clock.t += 60_000;
+      await p.sync();
+    }
+    assert.deepEqual(B.state.items[0].data.entries.map((e) => e.id).sort(), ['e1', 'e2']);
   });
 });

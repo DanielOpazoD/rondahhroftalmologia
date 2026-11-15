@@ -84,6 +84,10 @@ test('crear un médico desde el menú rellena la atención', async ({ page }) =>
   await expect(page.locator('#medicoSel option:checked')).toHaveText('Dra. Prueba E2E · 12.345.678-5');
   await fillPatient(page, { nombre: 'Con Medico' });
   await save(page);
+  // Hay perfiles: la primera vez se pregunta quién registra.
+  await expect(dlg.locator('#dlgTitle')).toHaveText('¿Quién registra?');
+  await dlg.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.locator('#toast')).toContainText('Atención guardada');
   await openPatient(page, 'Con Medico');
   await expect(page.locator('#medicoSel option:checked')).toHaveText('Dra. Prueba E2E · 12.345.678-5');
 });

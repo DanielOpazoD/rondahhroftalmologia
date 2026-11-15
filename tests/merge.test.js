@@ -145,3 +145,30 @@ test('claves maliciosas (__proto__, constructor) no contaminan prototipos', () =
   const n = normalizeRecord(evil);
   assert.ok(!Object.hasOwn(n.proc, '__proto__') && !Object.hasOwn(n.checks, 'constructor'));
 });
+
+test('vínculo con el paciente: el cambio fechado gana sin importar el orden de los ids', () => {
+  for (const [viejo, nuevo] of [
+    ['p_aaaaaaaaaa', 'p_bbbbbbbbbb'],
+    ['p_bbbbbbbbbb', 'p_aaaaaaaaaa'],
+  ]) {
+    const orig = {
+      id: 'x',
+      updated: 10,
+      pacienteId: viejo,
+      f: { paciente_nombre: 'Rosa' },
+      checks: {},
+      proc: {},
+      ft: { 'f.paciente_nombre': 10, pacienteId: 10 },
+    };
+    // Un equipo agrega el RUT y la atención pasa a otra ficha (como hace «guardar»).
+    const cambiado = { ...structuredClone(orig), pacienteId: nuevo, updated: 20, f: { paciente_nombre: 'Rosa', paciente_rut: '1-9' } };
+    cambiado.ft = { ...cambiado.ft, 'f.paciente_rut': 20, pacienteId: 20 };
+    // Otro equipo edita otro campo al mismo tiempo.
+    const otro = { ...structuredClone(orig), updated: 15, f: { paciente_nombre: 'Rosa', od_pio: '18' } };
+    otro.ft = { ...otro.ft, 'f.od_pio': 15 };
+    for (const m of [mergeRecords(cambiado, otro), mergeRecords(otro, cambiado)]) {
+      assert.equal(m.pacienteId, nuevo);
+      assert.equal(m.f.od_pio, '18');
+    }
+  }
+});

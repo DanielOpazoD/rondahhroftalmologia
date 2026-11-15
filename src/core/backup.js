@@ -122,7 +122,18 @@ export function mergeBackup(local, incoming, opts = {}) {
     if (!future.has(r.id) || (r.updated || 0) > (future.get(r.id).updated || 0)) future.set(r.id, r);
   }
   const audit = new Map((local.auditDocs || []).map((d) => [d.id, d]));
-  for (const d of incoming.auditDocs || []) audit.set(d.id, audit.has(d.id) ? mergeAuditDocs(audit.get(d.id), d) : d);
+  for (const d of incoming.auditDocs || []) {
+    const cur = audit.get(d.id);
+    if (!cur) {
+      audit.set(d.id, d);
+      continue;
+    }
+    const m = mergeAuditDocs(cur, d);
+    // Si el respaldo trae entradas que este equipo no tenía, es una versión
+    // nueva (si no, la sincronización no sabría que cambió).
+    if (m.entries.length > (cur.entries?.length || 0)) m.updated = Math.max(cur.updated || 0, d.updated || 0) + 1;
+    audit.set(d.id, m);
+  }
 
   const patients = new Map((local.patients || []).map((p) => [p.id, p]));
   for (const p of incoming.patients || []) {

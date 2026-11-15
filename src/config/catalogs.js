@@ -35,7 +35,24 @@ export const STORAGE_KEYS = Object.freeze({
   audit: `${P}bitacora_v1`,
   device: `${P}equipo_v1`,
   patients: `${P}pacientes_v1`,
+  /** Perfil que está registrando en este equipo: {id}. */
+  user: `${P}usuario_v1`,
+  /** Pares de fichas marcadas como personas distintas ("idA|idB"). */
+  notDuplicates: `${P}no_duplicados_v1`,
 });
+
+/**
+ * Roles de los perfiles profesionales. Solo los de rol `medico` aparecen como
+ * médico responsable de la atención (y en su PDF); todos pueden registrar.
+ */
+export const ROLES = [
+  { key: 'medico', label: 'Médico/a' },
+  { key: 'enfermeria', label: 'Enfermería' },
+  { key: 'tens', label: 'TENS' },
+  { key: 'tecnologo', label: 'Tecnólogo/a médico/a' },
+  { key: 'admision', label: 'Admisión' },
+  { key: 'otro', label: 'Otro' },
+];
 
 /** Opciones de sexo registral (para estadística tipo REM). */
 export const SEXOS = [

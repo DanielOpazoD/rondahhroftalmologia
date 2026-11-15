@@ -2,11 +2,12 @@
  * Pestaña Ajustes: lista de procedimientos, opciones de PDF/nota, respaldo y zona de cuidado.
  */
 import { DEFAULT_PROCS } from '../specialties/activa/config.js';
-import { escapeHtml, todayIso } from '../core/format.js';
+import { todayIso } from '../core/format.js';
 import { buildBackup, parseBackup, mergeBackup } from '../core/backup.js';
 import { createSecret } from '../core/pseudonym.js';
 import { $, download, toast } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
+import { html, setHtml } from './html.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initSettingsView(ctx) {
@@ -165,16 +166,16 @@ export function initSettingsView(ctx) {
 }
 
 export function renderSettings(ctx) {
-  $('#ajList').innerHTML =
-    ctx.procs
-      .map(
-        (p, i) => `<div class="it"><div class="t"><b>${escapeHtml(p.n)}</b></div>
-        <button type="button" class="chip mini${p.pio ? ' on' : ''}" data-a="pio" data-i="${i}" aria-pressed="${!!p.pio}" title="Pide PIO por ojo">PIO</button>
-        <button type="button" class="ib sm" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : ' disabled'}><svg><use href="#i-up"/></svg></button>
+  const procRows = ctx.procs.map(
+    (p, i) => html`<div class="it"><div class="t"><b>${p.n}</b></div>
+        <button type="button" class="chip mini${p.pio ? ' on' : ''}" data-a="pio" data-i="${i}" aria-pressed="${String(!!p.pio)}" title="Pide PIO por ojo">PIO</button>
+        <button type="button" class="ib sm" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : html` disabled`}><svg><use href="#i-up"/></svg></button>
         <button type="button" class="ib sm danger" data-a="rm" data-i="${i}" title="Quitar" aria-label="Quitar"><svg><use href="#i-trash"/></svg></button></div>`,
-      )
-      .join('') +
-    '<div class="it"><div class="t"></div><button type="button" class="btn sm" id="ajReset">Restaurar lista original</button></div>';
+  );
+  setHtml(
+    $('#ajList'),
+    html`${procRows}<div class="it"><div class="t"></div><button type="button" class="btn sm" id="ajReset">Restaurar lista original</button></div>`,
+  );
   $('#setFlatten').checked = !!ctx.settings.pdfFlatten;
   $('#setFooter').checked = !!ctx.settings.pdfFooter;
   $('#setPie').value = ctx.settings.notaPie || '';

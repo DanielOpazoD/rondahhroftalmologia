@@ -15,6 +15,7 @@ import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createZip } from '../lib/zip.js';
 import { $, download, toast, withBusy, nextFrame } from './dom.js';
 import { uiConfirm } from './modal.js';
+import { html, setHtml } from './html.js';
 
 /** Sufijo de archivo según el filtro: _OperativoNov_2026-11-14. */
 function suffix(ctx) {
@@ -25,7 +26,7 @@ function suffix(ctx) {
 /** @param {import('./context.js').AppContext} ctx */
 export function initExportView(ctx) {
   const fill = (sel, opts, value) => {
-    $(sel).innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    setHtml($(sel), html`${opts.map(([v, l]) => html`<option value="${v}">${l}</option>`)}`);
     $(sel).value = value;
   };
   fill('#anFechas', ANON_OPTIONS.fechas, ANON_DEFAULTS.fechas);

@@ -2,22 +2,29 @@
  * Avisos y confirmaciones con la interfaz de la app (reemplazan alert/confirm/prompt).
  * Todas devuelven promesas: `if (await uiConfirm({...})) { ... }`.
  */
-import { escapeHtml } from '../core/format.js';
 import { $ } from './dom.js';
+import { html, setHtml, SafeHtml } from './html.js';
 
 const ICONS = {
-  info: '<svg><use href="#i-info"/></svg>',
-  ok: '<svg><use href="#i-check"/></svg>',
-  warn: '<svg><use href="#i-alert"/></svg>',
-  danger: '<svg><use href="#i-alert"/></svg>',
+  info: html`<svg><use href="#i-info"/></svg>`,
+  ok: html`<svg><use href="#i-check"/></svg>`,
+  warn: html`<svg><use href="#i-alert"/></svg>`,
+  danger: html`<svg><use href="#i-alert"/></svg>`,
 };
+
+/** Texto plano con saltos de línea como <br> (el texto se escapa). */
+const textWithBreaks = (s) =>
+  html`${String(s || '')
+    .split('\n')
+    .map((line, i) => html`${i ? html`<br>` : ''}${line}`)}`;
 
 let pending = null;
 
 /**
  * Muestra el diálogo de mensajes.
- * `html` solo con texto de la propia app (nunca datos ingresados sin escapar).
- * @param {{title: string, message?: string, html?: string, tone?: 'info'|'ok'|'warn'|'danger', altLabel?: string,
+ * `html`: plantilla html`…` (los datos interpolados se escapan solos). Si no
+ * es una plantilla segura, se muestra como texto.
+ * @param {{title: string, message?: string, html?: SafeHtml, tone?: 'info'|'ok'|'warn'|'danger', altLabel?: string,
  *   okLabel?: string, cancelLabel?: string|null, copyText?: string}} o
  * @returns {Promise<any>} true/false (o 'ok'|'alt'|false si hay `altLabel`)
  */
@@ -26,9 +33,9 @@ function show(o) {
   if (pending) pending(false); // cierra un mensaje anterior que siguiera abierto
   const tone = o.tone || 'info';
   dlg.className = 'msgdlg ' + tone;
-  $('#msgIcon').innerHTML = ICONS[tone];
+  setHtml($('#msgIcon'), ICONS[tone] || ICONS.info);
   $('#msgTitle').textContent = o.title;
-  $('#msgText').innerHTML = o.html ?? escapeHtml(o.message || '').replace(/\n/g, '<br>');
+  setHtml($('#msgText'), o.html instanceof SafeHtml ? o.html : textWithBreaks(o.html ?? o.message));
   const area = $('#msgCopy');
   area.hidden = o.copyText === undefined;
   area.value = o.copyText ?? '';

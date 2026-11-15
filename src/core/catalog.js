@@ -12,6 +12,7 @@
 import { hmacSha256 } from '../lib/sha256.js';
 import { normalizeText, rutKey, formatRut } from './format.js';
 import { isValidId } from './record.js';
+import { ROLES } from '../config/catalogs.js';
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
 const shortHash = (s) => Array.from(hmacSha256('catalogo', s).slice(0, 8), (b) => B32[b & 31]).join('');
@@ -27,22 +28,34 @@ export function operativoId(nombre) {
   return 'o_' + shortHash(normalizeText(nombre));
 }
 
-/** @typedef {{id: string, nombre: string, rut: string, created: number, updated: number}} Medico */
+/**
+ * Perfil profesional (por compatibilidad se llama «médico» en el código y en
+ * la sincronización; `rol` dice qué es: médico, enfermería, TENS…).
+ * @typedef {{id: string, nombre: string, rut: string, rol: string, created: number, updated: number}} Medico
+ */
 /** @typedef {{id: string, nombre: string, created: number, updated: number}} Operativo */
 
 /**
  * Crea o normaliza un perfil de médico; null si no es válido.
- * @param {{nombre?: string, rut?: string, id?: string, created?: number, updated?: number}} [m]
+ * Los perfiles de versiones anteriores (sin `rol`) son médicos.
+ * @param {{nombre?: string, rut?: string, rol?: string, id?: string, created?: number, updated?: number}} [m]
  * @param {number} [now]
  * @returns {Medico|null}
  */
-export function makeMedico({ nombre, rut = '', id, created, updated } = {}, now = Date.now()) {
+export function makeMedico({ nombre, rut = '', rol, id, created, updated } = {}, now = Date.now()) {
   const n = String(nombre ?? '').trim();
   if (!n) return null;
   const r = String(rut ?? '').trim() ? formatRut(rut) : '';
   const mid = isValidId(id) ? id : medicoId(n, r);
-  return { id: mid, nombre: n, rut: r, created: created || now, updated: updated || now };
+  const role = ROLES.some((x) => x.key === rol) ? rol : 'medico';
+  return { id: mid, nombre: n, rut: r, rol: role, created: created || now, updated: updated || now };
 }
+
+/** Etiqueta del rol de un perfil. */
+export const rolLabel = (rol) => ROLES.find((x) => x.key === rol)?.label || 'Médico/a';
+
+/** Solo los perfiles que pueden ser médico responsable de una atención. */
+export const onlyDoctors = (list) => list.filter((m) => (m.rol || 'medico') === 'medico');
 
 /**
  * Crea o normaliza un operativo; null si no es válido.

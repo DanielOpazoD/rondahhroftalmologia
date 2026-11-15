@@ -3,12 +3,13 @@
  * historial de atenciones de esta especialidad a lo largo del tiempo.
  */
 import { SEXOS } from '../config/catalogs.js';
-import { escapeHtml, fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut } from '../core/format.js';
-import { isAttended, patientLabel } from '../core/patient.js';
+import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut } from '../core/format.js';
+import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
+import { html, setHtml, join } from './html.js';
 
-const ICON = (name) => `<svg><use href="#i-${name}"/></svg>`;
+const ICON = (name) => html`<svg><use href="#i-${name}"/></svg>`;
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initRegistryView(ctx) {
@@ -20,6 +21,13 @@ export function initRegistryView(ctx) {
     if (b) showPatient(ctx, b.dataset.p);
   });
   $('#patBack').addEventListener('click', () => showPatient(ctx, null));
+  $('#dupList').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    if (b.dataset.a === 'merge') ctx.mergePatients(b.dataset.keep, b.dataset.drop);
+    if (b.dataset.a === 'distinct') ctx.notDuplicates(b.dataset.keep, b.dataset.drop);
+    if (b.dataset.a === 'view') showPatient(ctx, b.dataset.p);
+  });
   $('#patNew').addEventListener('click', () => ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId));
   $('#patAttentions').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
@@ -78,15 +86,16 @@ export function renderRegistry(ctx) {
   const sel = $('#regOp');
   const ops = ctx.operativos.map((o) => o.nombre);
   const cur = sel.value;
-  sel.innerHTML =
-    '<option value="">Todos los operativos</option>' +
-    ops.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+  setHtml(sel, html`<option value="">Todos los operativos</option>${ops.map((o) => html`<option value="${o}">${o}</option>`)}`);
   sel.value = ops.includes(cur) ? cur : '';
 
+  const all = ctx.store.loadPatients();
+  renderDuplicates(ctx, all, groups);
   const q = $('#regSearch').value.trim();
   const op = sel.value;
-  const patients = ctx.store
-    .loadPatients()
+  const patients = all
+    // Las fichas unidas a otra no se muestran (sus atenciones ya están en la vigente).
+    .filter((p) => isCanonicalPatient(all, p))
     .map((p) => ({ p, recs: groups.get(p.id) || [] }))
     .filter(({ p, recs }) => recs.length && matchesQuery(p, q) && (!op || recs.some((r) => r.f.operativo === op)))
     .sort(
@@ -96,39 +105,34 @@ export function renderRegistry(ctx) {
     );
   $('#regCount').textContent = patients.length;
   if (!patients.length) {
-    $('#regList').innerHTML = `<div class="empty">${
-      ctx.records.length
-        ? 'Sin resultados para esta búsqueda.'
-        : 'Aún no hay pacientes.<br>Ingrésalos en la pestaña Ingreso o desde una atención.'
-    }</div>`;
+    const empty = ctx.records.length
+      ? 'Sin resultados para esta búsqueda.'
+      : html`Aún no hay pacientes.<br>Ingrésalos en la pestaña Ingreso o desde una atención.`;
+    setHtml($('#regList'), html`<div class="empty">${empty}</div>`);
     return;
   }
-  $('#regList').innerHTML = `<section class="pgroup">${patients
-    .slice(0, 500)
-    .map(({ p, recs }) => {
-      const last = recs[0];
-      const age = ageNow(p, last.f.paciente_edad);
-      const meta = [
-        p.f.paciente_rut,
-        age !== '' && age != null ? `${age} a` : '',
-        p.f.paciente_sexo,
-        `última: ${fmtDate(last.f.fecha_atencion)}`,
-      ]
-        .filter(Boolean)
-        .map(escapeHtml)
-        .join(' · ');
-      const dx = diagnosesList(last, { withOthers: false }).slice(0, 2);
-      return `<div class="prow"><button type="button" class="pmain" data-p="${escapeHtml(p.id)}" title="Ver paciente">
-        <span class="pname">${escapeHtml(patientLabel(p))}</span>
+  const rows = patients.slice(0, 500).map(({ p, recs }) => {
+    const last = recs[0];
+    const age = ageNow(p, last.f.paciente_edad);
+    const meta = [
+      p.f.paciente_rut,
+      age !== '' && age != null ? `${age} a` : '',
+      p.f.paciente_sexo,
+      `última: ${fmtDate(last.f.fecha_atencion)}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const dx = diagnosesList(last, { withOthers: false }).slice(0, 2);
+    const count = `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'}`;
+    return html`<div class="prow"><button type="button" class="pmain" data-p="${p.id}" title="Ver paciente">
+        <span class="pname">${patientLabel(p)}</span>
         <span class="pmeta">${meta}</span>
-        <span class="ptags">${dx.map((d) => `<span class="tag">${escapeHtml(d)}</span>`).join('')}<span class="tag soft">${recs.length} ${
-          recs.length === 1 ? 'atención' : 'atenciones'
-        }</span></span>
+        <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}<span class="tag soft">${count}</span></span>
       </button></div>`;
-    })
-    .join(
-      '',
-    )}</section>${patients.length > 500 ? '<p class="hint">Se muestran los 500 más recientes: usa la búsqueda para encontrar otros.</p>' : ''}`;
+  });
+  const more =
+    patients.length > 500 ? html`<p class="hint">Se muestran los 500 más recientes: usa la búsqueda para encontrar otros.</p>` : '';
+  setHtml($('#regList'), html`<section class="pgroup">${rows}</section>${more}`);
 }
 
 function renderPatient(ctx, recs) {
@@ -138,37 +142,70 @@ function renderPatient(ctx, recs) {
   const age = ageNow(p, recs[0]?.f.paciente_edad);
   const rutMark = f.paciente_rut
     ? isValidRut(f.paciente_rut)
-      ? ' <span class="rutmark inline ok" title="RUT válido">✓</span>'
-      : ' <span class="rutmark inline bad" title="RUT inválido">✗</span>'
+      ? html` <span class="rutmark inline ok" title="RUT válido">✓</span>`
+      : html` <span class="rutmark inline bad" title="RUT inválido">✗</span>`
     : '';
   const meta = [
-    f.paciente_rut && `RUT ${escapeHtml(f.paciente_rut)}${rutMark}`,
-    f.paciente_fnac && `Nac. ${escapeHtml(fmtDate(f.paciente_fnac))}`,
-    age !== '' && age != null && `${escapeHtml(String(age))} años`,
-    sexLabel(f.paciente_sexo) && escapeHtml(sexLabel(f.paciente_sexo)),
-    f.paciente_fono && `Fono ${escapeHtml(f.paciente_fono)}`,
+    f.paciente_rut && html`RUT ${f.paciente_rut}${rutMark}`,
+    f.paciente_fnac && html`Nac. ${fmtDate(f.paciente_fnac)}`,
+    age !== '' && age != null && html`${String(age)} años`,
+    sexLabel(f.paciente_sexo) && html`${sexLabel(f.paciente_sexo)}`,
+    f.paciente_fono && html`Fono ${f.paciente_fono}`,
   ].filter(Boolean);
-  $('#patCard').innerHTML = `<h2>${escapeHtml(patientLabel(p))}</h2><div class="patmeta">${meta.join(' · ')}</div>`;
-  $('#patAttentions').innerHTML = recs.length
-    ? `<section class="pgroup"><h3><span>Atenciones de ${escapeHtml(ctx.especialidadNombre)}</span><span>${recs.length}</span></h3>${recs
-        .map((r) => {
-          const id = escapeHtml(r.id);
-          const done = isAttended(r);
-          const dx = diagnosesList(r, { withOthers: false }).slice(0, 3);
-          const rmeta = [r.f.operativo, r.f.medico_nombre].filter(Boolean).map(escapeHtml).join(' · ');
-          return `<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
-            <button type="button" class="pmain" data-a="open" data-id="${id}" title="Abrir atención">
-              <span class="pname">${escapeHtml(fmtDate(r.f.fecha_atencion) || 'Sin fecha')}</span>
+  setHtml($('#patCard'), html`<h2>${patientLabel(p)}</h2><div class="patmeta">${join(meta, ' · ')}</div>`);
+  const rows = recs.map((r) => {
+    const done = isAttended(r);
+    const dx = diagnosesList(r, { withOthers: false }).slice(0, 3);
+    const rmeta = [r.f.operativo, r.f.medico_nombre].filter(Boolean).join(' · ');
+    return html`<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
+            <button type="button" class="pmain" data-a="open" data-id="${r.id}" title="Abrir atención">
+              <span class="pname">${fmtDate(r.f.fecha_atencion) || 'Sin fecha'}</span>
               <span class="pmeta">${rmeta}</span>
-              <span class="ptags">${dx.map((d) => `<span class="tag">${escapeHtml(d)}</span>`).join('')}${done ? '' : '<span class="state pend">Por atender</span>'}</span>
+              <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}${done ? '' : html`<span class="state pend">Por atender</span>`}</span>
             </button>
             <div class="pact">
-              <button type="button" class="ib sm" data-a="copy" data-id="${id}" title="Copiar nota" aria-label="Copiar nota">${ICON('copy')}</button>
-              <button type="button" class="ib sm" data-a="pdf" data-id="${id}" title="Descargar PDF" aria-label="Descargar PDF">${ICON('pdf')}</button>
-              <button type="button" class="ib sm danger" data-a="del" data-id="${id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
+              <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${ICON('copy')}</button>
+              <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF">${ICON('pdf')}</button>
+              <button type="button" class="ib sm danger" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
             </div>
           </div>`;
-        })
-        .join('')}</section>`
-    : '<div class="empty">Este paciente aún no tiene atenciones en esta especialidad.</div>';
+  });
+  setHtml(
+    $('#patAttentions'),
+    recs.length
+      ? html`<section class="pgroup"><h3><span>Atenciones de ${ctx.especialidadNombre}</span><span>${recs.length}</span></h3>${rows}</section>`
+      : html`<div class="empty">Este paciente aún no tiene atenciones en esta especialidad.</div>`,
+  );
+}
+
+/**
+ * Posibles duplicados: pares de fichas que parecen la misma persona. Se
+ * propone conservar la que tiene RUT; si ninguna o ambas, la de más atenciones.
+ */
+function renderDuplicates(ctx, all, groups) {
+  const pairs = findDuplicatePairs(all, ctx.store.loadNotDuplicates());
+  $('#dupBox').hidden = !pairs.length;
+  if (!pairs.length) return;
+  $('#dupTitle').textContent = `${pairs.length} ${pairs.length === 1 ? 'posible duplicado' : 'posibles duplicados'}`;
+  const count = (p) => (groups.get(p.id) || []).length;
+  const card = (p) =>
+    html`<button type="button" class="pmain" data-a="view" data-p="${p.id}" title="Ver ficha">
+      <span class="pname">${patientLabel(p)}</span>
+      <span class="pmeta">${join([p.f.paciente_rut || 'sin RUT', p.f.paciente_fnac && fmtDate(p.f.paciente_fnac), `${count(p)} ${count(p) === 1 ? 'atención' : 'atenciones'}`].filter(Boolean), ' · ')}</span>
+    </button>`;
+  setHtml(
+    $('#dupList'),
+    html`${pairs.map(({ a, b, motivo }) => {
+      const score = (p) => (p.f.paciente_rut ? 1e6 : 0) + count(p) * 10 - (p.created || 0) / 1e13;
+      const [keep, drop] = score(a) >= score(b) ? [a, b] : [b, a];
+      return html`<div class="duprow">
+        <div class="duppair">${card(keep)}${card(drop)}</div>
+        <div class="dupact">
+          <span class="tag soft">${motivo === 'rut' ? 'Mismo RUT' : 'Mismo nombre'}</span>
+          <button type="button" class="btn sm" data-a="distinct" data-keep="${keep.id}" data-drop="${drop.id}">Son personas distintas</button>
+          <button type="button" class="btn sm p" data-a="merge" data-keep="${keep.id}" data-drop="${drop.id}">Unir en ${patientLabel(keep)}</button>
+        </div>
+      </div>`;
+    })}`,
+  );
 }

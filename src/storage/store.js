@@ -155,6 +155,22 @@ export function createStore(storage, repo) {
     saveMedicos(l) {
       write(K.medicos, l);
     },
+    /** Perfil que registra en este equipo (el último elegido): id o null. */
+    loadUser() {
+      const u = read(K.user, null);
+      return typeof u?.id === 'string' ? u.id : null;
+    },
+    saveUser(id) {
+      write(K.user, id ? { id } : null);
+    },
+    /** Pares de fichas marcadas como personas distintas ("idA|idB"). */
+    loadNotDuplicates() {
+      const l = read(K.notDuplicates, []);
+      return new Set(Array.isArray(l) ? l.filter((x) => typeof x === 'string') : []);
+    },
+    saveNotDuplicates(set) {
+      write(K.notDuplicates, [...set]);
+    },
     /** Operativos / rondas (catálogo compartido). */
     loadOperativos() {
       const l = read(K.operativos, []);

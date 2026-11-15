@@ -23,25 +23,29 @@ test('el build produce un HTML autocontenido y sin recursos externos', async () 
   assert.ok(html.length > 1_000_000 && html.length < 6_000_000);
 });
 
+/** Archivos .js de la interfaz (incluye subcarpetas como ui/actions/). */
+const uiFiles = () => {
+  const dir = new URL('../src/ui/', import.meta.url);
+  return readdirSync(dir, { recursive: true })
+    .map(String)
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => ({ name: f, text: readFileSync(new URL(f, dir), 'utf8') }));
+};
+
 test('cada id que usa la interfaz existe en el HTML', () => {
   const html =
     readFileSync(new URL('../src/index.html', import.meta.url), 'utf8') +
     readFileSync(new URL('../src/specialties/oftalmologia/formulario.html', import.meta.url), 'utf8');
-  const dir = new URL('../src/ui/', import.meta.url);
-  const sources = [
-    ...readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8')),
-    readFileSync(new URL('../src/main.js', import.meta.url), 'utf8'),
-  ];
+  const sources = [...uiFiles().map((f) => f.text), readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')];
   const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_]+)/g)].map((m) => m[1])));
   const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
   assert.deepEqual(missing, []);
 });
 
 test('la interfaz no usa alert/confirm/prompt del navegador (usa ui/modal.js)', () => {
-  const dir = new URL('../src/ui/', import.meta.url);
-  const offenders = readdirSync(dir).filter((f) =>
-    /(^|[^\w.])(window\.)?(alert|confirm|prompt)\(/.test(readFileSync(new URL(f, dir), 'utf8')),
-  );
+  const offenders = uiFiles()
+    .filter((f) => /(^|[^\w.])(window\.)?(alert|confirm|prompt)\(/.test(f.text))
+    .map((f) => f.name);
   assert.deepEqual(offenders, []);
 });
 

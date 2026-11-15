@@ -1,13 +1,14 @@
 /**
  * Diálogo modal simple con campos de texto (usa <dialog> nativo).
  */
-import { escapeHtml } from '../core/format.js';
 import { $ } from './dom.js';
+import { html, setHtml } from './html.js';
 
 /**
  * @param {{
  *   title: string,
- *   fields: {id: string, label: string, value?: string, placeholder?: string, type?: string}[],
+ *   fields: {id: string, label: string, value?: string, placeholder?: string, type?: string,
+ *     options?: {value: string, label: string}[]}[],   // con `options`: lista desplegable
  *   okLabel?: string,
  *   onSave: (values: Record<string, string>) => string | null | void,  // devuelve un mensaje de error para no cerrar
  *   onClose?: (saved: boolean) => void,
@@ -19,12 +20,16 @@ export function openDialog({ title, fields, okLabel = 'Guardar', onSave, onClose
   $('#dlgTitle').textContent = title;
   $('#dlgErr').textContent = '';
   $('#dlgOk').textContent = okLabel;
-  $('#dlgBody').innerHTML = fields
-    .map(
-      (f) => `<label class="l" for="dlg_${f.id}">${escapeHtml(f.label)}</label>
-      <input id="dlg_${f.id}" type="${f.type || 'text'}" autocomplete="off" value="${escapeHtml(f.value || '')}" placeholder="${escapeHtml(f.placeholder || '')}">`,
-    )
-    .join('');
+  setHtml(
+    $('#dlgBody'),
+    html`${fields.map((f) =>
+      f.options
+        ? html`<label class="l" for="dlg_${f.id}">${f.label}</label>
+      <select id="dlg_${f.id}">${f.options.map((o) => html`<option value="${o.value}"${o.value === (f.value || '') ? html` selected` : ''}>${o.label}</option>`)}</select>`
+        : html`<label class="l" for="dlg_${f.id}">${f.label}</label>
+      <input id="dlg_${f.id}" type="${f.type || 'text'}" autocomplete="off" value="${f.value || ''}" placeholder="${f.placeholder || ''}">`,
+    )}`,
+  );
 
   const values = () => Object.fromEntries(fields.map((f) => [f.id, $(`#dlg_${f.id}`).value.trim()]));
   // Se notifica el cierre de inmediato (el evento "close" del navegador llega
@@ -54,7 +59,12 @@ export function openDialog({ title, fields, okLabel = 'Guardar', onSave, onClose
     }
   };
   dlg.oncancel = finish; // tecla Escape
-  dlg.onclose = finish;
+  // El evento "close" llega después del cierre (asíncrono). Si onClose ya abrió
+  // otro diálogo en el mismo <dialog>, ese evento atrasado no debe cerrarlo:
+  // un cierre real siempre llega con el diálogo ya cerrado.
+  dlg.onclose = () => {
+    if (!dlg.open) finish();
+  };
   dlg.showModal();
   $(`#dlg_${fields[0].id}`)?.focus();
 }

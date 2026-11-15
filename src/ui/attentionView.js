@@ -4,20 +4,22 @@
  */
 import { SEXOS } from '../config/catalogs.js';
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, OJOS, coversEye, diagnosesList } from '../specialties/activa/index.js';
-import { escapeHtml, formatRut, isIsoDate, fmtDateTime, fmtDate } from '../core/format.js';
+import { formatRut, isIsoDate, fmtDateTime, fmtDate } from '../core/format.js';
 import { auditLabel, shortValue } from '../core/audit.js';
 import { patientIdFor, attentionsOf } from '../core/patient.js';
 import { refreshRutMarks } from './rut.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
 import { $, $$, toast } from './dom.js';
+import { html, setHtml } from './html.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initAttentionView(ctx) {
   const chips = (el, defs) => {
-    el.innerHTML = defs
-      .map((d) => `<button type="button" class="chip" data-k="${d.key}" aria-pressed="false">${escapeHtml(d.label)}</button>`)
-      .join('');
+    setHtml(
+      el,
+      html`${defs.map((d) => html`<button type="button" class="chip" data-k="${d.key}" aria-pressed="false">${d.label}</button>`)}`,
+    );
     el.addEventListener('click', (e) => {
       const b = e.target.closest('.chip');
       if (!b) return;
@@ -31,9 +33,7 @@ export function initAttentionView(ctx) {
   chips($('#dxChips'), DIAGNOSTICOS);
 
   const seg = (el, values, labels, onPick) => {
-    el.innerHTML = values
-      .map((v, i) => `<button type="button" data-v="${v}" aria-pressed="false">${escapeHtml(labels[i])}</button>`)
-      .join('');
+    setHtml(el, html`${values.map((v, i) => html`<button type="button" data-v="${v}" aria-pressed="false">${labels[i]}</button>`)}`);
     el.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (b) onPick(b.dataset.v);
@@ -103,13 +103,14 @@ export function initAttentionView(ctx) {
 
 /** Dibuja la lista de procedimientos según la configuración actual. */
 export function renderProcList(ctx) {
-  $('#procList').innerHTML = ctx.procs
-    .map(
-      (p) => `<div class="proc" data-id="${escapeHtml(p.id)}"><div class="nm">${escapeHtml(p.n)}</div>
-      <div class="seg" role="group" aria-label="Ojo para ${escapeHtml(p.n)}">${OJOS.map((v) => `<button type="button" data-v="${v}" aria-pressed="false">${v}</button>`).join('')}</div>
-      ${p.pio ? `<div class="pio">${['od', 'oi'].map((e) => `<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${escapeHtml(p.n)}" placeholder="mmHg" inputmode="decimal"></label>`).join('')}</div>` : ''}</div>`,
-    )
-    .join('');
+  setHtml(
+    $('#procList'),
+    html`${ctx.procs.map(
+      (p) => html`<div class="proc" data-id="${p.id}"><div class="nm">${p.n}</div>
+      <div class="seg" role="group" aria-label="Ojo para ${p.n}">${OJOS.map((v) => html`<button type="button" data-v="${v}" aria-pressed="false">${v}</button>`)}</div>
+      ${p.pio ? html`<div class="pio">${['od', 'oi'].map((e) => html`<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${p.n}" placeholder="mmHg" inputmode="decimal"></label>`)}</div>` : ''}</div>`,
+    )}`,
+  );
 }
 
 const setPressed = (b, on) => {
@@ -204,19 +205,19 @@ export function renderHistory(ctx) {
   const entries = id ? ctx.store.auditFor(id) : [];
   $('#histCard').hidden = !entries.length;
   $('#histCount').textContent = entries.length;
-  $('#histList').innerHTML = entries
-    .map((e) => {
+  setHtml(
+    $('#histList'),
+    html`${entries.map((e) => {
       const cambios = (e.cambios || [])
         .slice(0, 30)
         .map(
           (c) =>
-            `<li>${escapeHtml(auditLabel(c.c, ctx.procs))}: <span class="hval">${escapeHtml(shortValue(c.a))}</span> → <span class="hval">${escapeHtml(shortValue(c.d))}</span></li>`,
-        )
-        .join('');
-      const more = (e.cambios || []).length > 30 ? `<li>… y ${e.cambios.length - 30} cambios más</li>` : '';
-      return `<li><div class="hmeta"><b>${TIPO[e.tipo] || escapeHtml(e.tipo)}</b> · ${escapeHtml(fmtDateTime(new Date(e.at)))} · ${escapeHtml(e.equipo)}</div>${cambios || more ? `<ul>${cambios}${more}</ul>` : ''}</li>`;
-    })
-    .join('');
+            html`<li>${auditLabel(c.c, ctx.procs)}: <span class="hval">${shortValue(c.a)}</span> → <span class="hval">${shortValue(c.d)}</span></li>`,
+        );
+      const more = (e.cambios || []).length > 30 ? html`<li>… y ${e.cambios.length - 30} cambios más</li>` : '';
+      return html`<li><div class="hmeta"><b>${TIPO[e.tipo] || e.tipo}</b> · ${fmtDateTime(new Date(e.at))} · ${e.autor ? html`${e.autor} <span class="muted">(${e.equipo})</span>` : e.equipo}</div>${cambios.length || more ? html`<ul>${cambios}${more}</ul>` : ''}</li>`;
+    })}`,
+  );
 }
 
 /** Otras atenciones del mismo paciente (historial clínico a lo largo del tiempo). */
@@ -224,15 +225,10 @@ export function renderPrevious(ctx) {
   const id = ctx.rec.pacienteId || patientIdFor(ctx.rec.f);
   const others = id ? attentionsOf(ctx.records, id).filter((r) => r.id !== ctx.rec.id) : [];
   $('#patPrev').hidden = !others.length;
-  $('#patPrev').innerHTML = others.length
-    ? `<b>Otras atenciones (${others.length}):</b>` +
-      others
-        .slice(0, 6)
-        .map((r) => {
-          const dx = diagnosesList(r, { withOthers: false }).slice(0, 2).join(', ');
-          return `<button type="button" data-id="${escapeHtml(r.id)}" title="Abrir">${escapeHtml(fmtDate(r.f.fecha_atencion))}${dx ? ' · ' + escapeHtml(dx) : ''}</button>`;
-        })
-        .join('') +
-      (others.length > 6 ? `<span class="muted">y ${others.length - 6} más (ver en Pacientes)</span>` : '')
-    : '';
+  const prevButtons = others.slice(0, 6).map((r) => {
+    const dx = diagnosesList(r, { withOthers: false }).slice(0, 2).join(', ');
+    return html`<button type="button" data-id="${r.id}" title="Abrir">${fmtDate(r.f.fecha_atencion)}${dx ? ' · ' + dx : ''}</button>`;
+  });
+  const prevMore = others.length > 6 ? html`<span class="muted">y ${others.length - 6} más (ver en Pacientes)</span>` : '';
+  setHtml($('#patPrev'), others.length ? html`<b>Otras atenciones (${others.length}):</b>${prevButtons}${prevMore}` : html``);
 }

@@ -30,8 +30,9 @@
 - **Almacenamiento:**
   - `storage/repo.js` maneja los datos clínicos (atenciones, fichas de pacientes, eliminaciones, bitácora). Los mantiene en memoria y persiste en **IndexedDB** solo lo que cambió (`storage/backends.js`, con localStorage como respaldo).
   - `storage/store.js` guarda lo pequeño: ajustes, catálogos, borrador y sincronización. Recibe el `storage` por parámetro, y en las pruebas se usa uno en memoria (IndexedDB simulado con `fake-indexeddb`).
-  - **Rendimiento medido:** guardar una atención toma unos 25 ms; una sincronización sin cambios con 3.000 atenciones, menos de 200 ms; la descarga inicial de 3.000 atenciones, unos 0,3 s.
-- **`ui/context.js`** guarda el estado (atención en edición, registros, filtro, ajustes) y expone acciones (`save`, `openRecord`, `downloadPdf`…). Las vistas llaman a esas acciones; nunca escriben en el almacenamiento directamente.
+  - **Rendimiento medido:** guardar una atención toma unos 25 ms; una sincronización sin cambios con 20.000 atenciones, unos 140 ms (solo pide lo cambiado); la descarga inicial de 3.000 atenciones, unos 0,3 s.
+- **`ui/context.js`** guarda el estado (atención en edición, registros, filtro, ajustes) y lo transversal (persistir, re-dibujar, pestañas). Las acciones están en **`ui/actions/`**: `attention.js` (guardar, abrir, eliminar), `patients.js` (preingreso, fichas, unir duplicados), `catalogs.js` y `outputs.js` (PDF, nota). Las vistas llaman a esas acciones; nunca escriben en el almacenamiento directamente.
+- **HTML seguro** (`ui/html.js`): toda la interfaz arma su HTML con la plantilla `html\`…\``, que escapa sola cada dato interpolado, y lo escribe con `setHtml`. ESLint prohíbe asignar `innerHTML` directamente, así que un nombre de paciente con `<` o `&` nunca se interpreta como HTML.
 
 - **Paciente como unidad** (`core/patient.js`): cada atención es un episodio vinculado a la ficha de su paciente (`pacienteId`). Ver [MODELO_DATOS.md](MODELO_DATOS.md).
 

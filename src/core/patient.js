@@ -15,6 +15,14 @@
  * El id se deriva del RUT (o del nombre si no hay RUT): dos equipos que
  * registran al mismo paciente por separado obtienen el mismo id y sus datos
  * se fusionan en lugar de duplicarse.
+ *
+ * Identidad a lo largo de los años (`resolvePatientId`): el id es solo una
+ * llave estable; al paciente se lo encuentra por su RUT entre las fichas
+ * existentes. Así, si alguien fue ingresado solo con nombre y después se
+ * agrega su RUT, sigue siendo la misma ficha. Los duplicados que aun así
+ * aparezcan se detectan (`findDuplicatePairs`) y se unen (`mergePatients`):
+ * la ficha absorbida queda marcada con `f.fusionado_en` y sus atenciones se
+ * re-vinculan. La marca se sincroniza campo a campo como cualquier dato.
  */
 import { sha256 } from '../lib/sha256.js';
 import { rutKey, normalizeText } from './format.js';
@@ -23,6 +31,9 @@ import { rutKey, normalizeText } from './format.js';
 export const PATIENT_FIELDS = ['paciente_rut', 'paciente_nombre', 'paciente_fnac', 'paciente_sexo', 'paciente_fono'];
 
 export const PATIENT_SCHEMA = 1;
+
+/** Campo de sistema: id de la ficha en que se unió esta (no es dato del paciente). */
+export const MERGED_FIELD = 'fusionado_en';
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
 const isValidId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
@@ -64,6 +75,8 @@ export function normalizePatient(raw) {
     checks: {},
     proc: {},
   };
+  const into = raw.f?.[MERGED_FIELD];
+  if (isValidId(into) && into.startsWith('p_') && into !== raw.id) p.f[MERGED_FIELD] = into;
   if (raw.ft && typeof raw.ft === 'object') {
     p.ft = {};
     for (const [k, v] of Object.entries(raw.ft)) if (k.startsWith('f.') && Number.isFinite(v)) p.ft[k] = v;
@@ -131,4 +144,127 @@ export function isAttended(rec) {
   if (Object.values(rec.checks || {}).some(Boolean)) return true;
   if (Object.keys(rec.proc || {}).length || rec.cat) return true;
   return Object.entries(rec.f || {}).some(([k, v]) => !NON_CLINICAL.has(k) && String(v ?? '').trim() !== '');
+}
+
+/* ------------------------------------------------- identidad y duplicados */
+
+/** Fichas por id (acepta lista o Map). */
+const asMap = (patients) => (patients instanceof Map ? patients : new Map((patients || []).map((p) => [p.id, p])));
+
+/**
+ * Ficha vigente de un id, siguiendo las uniones (A → B → C). Si dos equipos
+ * unieron en sentidos opuestos (A → B y B → A), gana el id menor: el
+ * resultado es el mismo en todos los equipos y ninguna ficha se pierde.
+ */
+export function canonicalPatientId(patients, id) {
+  const map = asMap(patients);
+  const seen = [];
+  let cur = id;
+  while (cur && !seen.includes(cur)) {
+    seen.push(cur);
+    const next = map.get(cur)?.f?.[MERGED_FIELD];
+    if (!next) return cur;
+    cur = next;
+  }
+  // Ciclo: el id menor del ciclo es la ficha vigente.
+  const cycle = seen.slice(seen.indexOf(cur));
+  return [...cycle].sort()[0];
+}
+
+/** ¿Es una ficha vigente (no unida a otra)? */
+export const isCanonicalPatient = (patients, p) => canonicalPatientId(patients, p.id) === p.id;
+
+/**
+ * Id del paciente al que corresponden estos datos:
+ * 1. si hay RUT y alguna ficha tiene ese RUT, esa ficha;
+ * 2. si la atención ya estaba vinculada a una ficha, esa (aunque ahora se le agregue el RUT);
+ * 3. si no, el id derivado de los datos (ficha nueva o ya existente).
+ * Siempre devuelve la ficha vigente (siguiendo uniones).
+ * @param {Record<string, any>} f
+ * @param {object[] | Map<string, object>} patients
+ * @param {string} [currentId]
+ */
+export function resolvePatientId(f, patients, currentId) {
+  const map = asMap(patients);
+  const k = rutKey(f?.paciente_rut);
+  if (k) {
+    const derived = 'p_' + hashId('rut:' + k);
+    if (map.has(derived)) return canonicalPatientId(map, derived);
+    for (const p of map.values()) if (rutKey(p.f?.paciente_rut) === k) return canonicalPatientId(map, p.id);
+  }
+  if (currentId) return canonicalPatientId(map, currentId);
+  const id = patientIdFor(f);
+  return id && map.has(id) ? canonicalPatientId(map, id) : id;
+}
+
+/**
+ * Pares de fichas que probablemente son la misma persona (solo fichas vigentes):
+ * - `rut`: mismo RUT (seguro);
+ * - `nombre`: mismo nombre (sin tildes ni mayúsculas) y nada que las distinga
+ *   (no tienen RUT distintos ni fechas de nacimiento distintas).
+ * @param {object[] | Map<string, object>} patients
+ * @param {Set<string>} [dismissed] pares "idA|idB" marcados como personas distintas
+ * @returns {{a: object, b: object, motivo: 'rut' | 'nombre'}[]}
+ */
+export function findDuplicatePairs(patients, dismissed = new Set()) {
+  const map = asMap(patients);
+  const live = [...map.values()].filter((p) => isCanonicalPatient(map, p));
+  const pairs = new Map();
+  const add = (a, b, motivo) => {
+    const [x, y] = a.id < b.id ? [a, b] : [b, a];
+    const key = x.id + '|' + y.id;
+    if (dismissed.has(key) || pairs.has(key)) return;
+    pairs.set(key, { a: x, b: y, motivo });
+  };
+  const group = (keyOf) => {
+    const g = new Map();
+    for (const p of live) {
+      const k = keyOf(p);
+      if (!k) continue;
+      if (!g.has(k)) g.set(k, []);
+      g.get(k).push(p);
+    }
+    return [...g.values()].filter((list) => list.length > 1);
+  };
+  for (const list of group((p) => rutKey(p.f.paciente_rut))) {
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) add(list[i], list[j], 'rut');
+  }
+  const differ = (a, b, k) => a.f[k] && b.f[k] && (k === 'paciente_rut' ? rutKey(a.f[k]) !== rutKey(b.f[k]) : a.f[k] !== b.f[k]);
+  for (const list of group((p) => normalizeText(p.f.paciente_nombre))) {
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const [a, b] = [list[i], list[j]];
+        if (!differ(a, b, 'paciente_rut') && !differ(a, b, 'paciente_fnac')) add(a, b, 'nombre');
+      }
+    }
+  }
+  return [...pairs.values()];
+}
+
+/**
+ * Une la ficha `drop` en `keep`: `keep` completa sus datos vacíos con los de
+ * `drop`, y `drop` queda marcada como unida. No une personas con RUT distintos.
+ * Las atenciones se re-vinculan aparte (ver la acción de la interfaz).
+ * @returns {{keep: object, drop: object}}
+ */
+export function mergePatients(keep, drop, at) {
+  if (keep.id === drop.id) throw new Error('Es la misma ficha');
+  const rk = rutKey(keep.f.paciente_rut);
+  const rd = rutKey(drop.f.paciente_rut);
+  if (rk && rd && rk !== rd) throw new Error('Tienen RUT distintos: no son la misma persona');
+  const k = structuredClone(keep);
+  k.ft ||= {};
+  for (const f of PATIENT_FIELDS) {
+    if (!k.f[f] && drop.f[f]) {
+      k.f[f] = drop.f[f];
+      k.ft['f.' + f] = at;
+    }
+  }
+  k.updated = Math.max(at, (keep.updated || 0) + 1);
+  const d = structuredClone(drop);
+  d.ft ||= {};
+  d.f[MERGED_FIELD] = keep.id;
+  d.ft['f.' + MERGED_FIELD] = at;
+  d.updated = Math.max(at, (drop.updated || 0) + 1);
+  return { keep: normalizePatient(k), drop: normalizePatient(d) };
 }

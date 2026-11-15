@@ -132,3 +132,32 @@ describe('respaldo manipulado', () => {
     assert.equal(forced.futureRecords[0].f.paciente_nombre, 'Falsa');
   });
 });
+
+test('bitácora: registra quién (perfil) además del equipo', () => {
+  const r = minimalRecord('a', { paciente_nombre: 'Ana' }, { updated: 100 });
+  const e = makeAuditEntry({ tipo: 'creada', after: r, at: 100, equipo: 'Box 1', equipoId: 'pc1', autor: 'Dra. Pérez', autorId: 'm_x' });
+  assert.equal(e.autor, 'Dra. Pérez');
+  assert.equal(e.autorId, 'm_x');
+  assert.equal('autor' in makeAuditEntry({ tipo: 'creada', after: r, at: 100, equipo: 'Box 1', equipoId: 'pc1' }), false);
+});
+
+test('respaldo: la bitácora que recibe entradas nuevas sube de versión (para sincronizarse)', () => {
+  const local = { id: 'b_a', atencionId: 'a', updated: 10, entries: [{ id: 'e1', at: 10 }] };
+  const otro = {
+    id: 'b_a',
+    atencionId: 'a',
+    updated: 10,
+    entries: [
+      { id: 'e0', at: 7 },
+      { id: 'e1', at: 10 },
+    ],
+  };
+  const m = mergeBackup({ records: [], procs: [], auditDocs: [local] }, { records: [], procs: [], auditDocs: [otro] });
+  assert.deepEqual(
+    m.auditDocs[0].entries.map((e) => e.id),
+    ['e0', 'e1'],
+  );
+  assert.ok(m.auditDocs[0].updated > 10);
+  const igual = mergeBackup({ records: [], procs: [], auditDocs: [otro] }, { records: [], procs: [], auditDocs: [local] });
+  assert.equal(igual.auditDocs[0].updated, 10, 'sin entradas nuevas no cambia');
+});

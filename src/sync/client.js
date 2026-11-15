@@ -23,10 +23,10 @@ export class SyncHttpError extends Error {
  */
 export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = globalThis.fetch.bind(globalThis) }) {
   const qs = esp ? `?esp=${encodeURIComponent(esp)}` : '';
-  const call = async (path, body) => {
+  const call = async (path, body, extra = '') => {
     let res;
     try {
-      res = await fetchFn(`${baseUrl}/${path}${qs}`, {
+      res = await fetchFn(`${baseUrl}/${path}${qs}${extra ? (qs ? '&' : '?') + extra : ''}`, {
         method: body ? 'POST' : 'GET',
         headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined,
@@ -43,7 +43,8 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
   const api = {
     /** Cabecera Date de la última respuesta (para detectar relojes desajustados). */
     serverDate: null,
-    list: () => call('list'),
+    /** Versión vigente de cada id; con `since` (hora del servidor), solo lo cambiado desde entonces. */
+    list: (since) => call('list', undefined, since ? `since=${Math.floor(since)}` : ''),
     get: (items) => call('get', { items }),
     put: (items) => call('put', { items }),
     /** Borra del servidor ids en claro de versiones anteriores (ya migrados a id opaco). */
@@ -70,6 +71,7 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
  *   fingerprint?: (kind: string, data: object) => string,
  *   batchSize?: number,
  *   opaqueIds?: boolean | ((localId: string) => boolean),
+ *   cache?: SyncCache,
  * }} deps
  *   `encKey`: clave del equipo (base64), para la huella de contenido de cada versión;
  *   `fingerprint`: representación canónica del contenido (ver core/merge.js);
@@ -77,7 +79,10 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
  *   (todos, o los que indique la función). Necesario cuando el id local se
  *   deriva de datos personales: fichas de pacientes y perfiles de médico usan
  *   una huella del RUT, que se podría adivinar probando RUTs. Los ids en claro
- *   que subieron versiones anteriores se migran solos (ver `syncPass`).
+ *   que subieron versiones anteriores se migran solos (ver `syncPass`);
+ *   `cache`: estado entre sincronizaciones de un mismo espacio (ver `createSyncCache`).
+ *   Con él, después de la primera sincronización solo se pide al servidor lo
+ *   cambiado y no se recalculan huellas ya verificadas.
  * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
  */
 export async function syncOnce(deps) {
@@ -92,6 +97,48 @@ export async function syncOnce(deps) {
     if (!r.needsPush) break;
   }
   return total;
+}
+
+/**
+ * @typedef {{snapshot: Map<string, {u: number, h?: string}> | null, cursor: number | null,
+ *   fullAt: number, verified: Map<string, string>}} SyncCache
+ */
+
+/** Margen al pedir cambios (cubre escrituras en curso al momento de listar). */
+export const CURSOR_MARGIN_MS = 10 * 60 * 1000;
+/** Cada cuánto se vuelve a pedir la lista completa (autocorrección). */
+export const FULL_LIST_EVERY_MS = 30 * 60 * 1000;
+
+/**
+ * Estado entre sincronizaciones de un espacio: copia de las versiones del
+ * servidor, cursor de cambios y huellas locales ya verificadas. Vive en
+ * memoria: al abrir la app la primera sincronización es completa.
+ * @returns {SyncCache}
+ */
+export function createSyncCache() {
+  return { snapshot: null, cursor: null, fullAt: 0, verified: new Map() };
+}
+
+const vNewer = (a, b) => a.u > b.u || (a.u === b.u && (a.h || '') > (b.h || ''));
+
+/** Pide la lista al servidor (completa o solo cambios) y devuelve las versiones remotas. */
+async function listRemote(api, cache, nowMs = Date.now()) {
+  const incremental = cache?.snapshot && cache.cursor && nowMs - cache.fullAt < FULL_LIST_EVERY_MS;
+  const res = await api.list(incremental ? cache.cursor - CURSOR_MARGIN_MS : undefined);
+  const got = remoteVersions(res.items || []);
+  if (!cache) return got;
+  if (incremental && res.full === false) {
+    for (const [id, v] of got) if (!cache.snapshot.has(id) || vNewer(v, cache.snapshot.get(id))) cache.snapshot.set(id, v);
+  } else {
+    // Lista completa (o servidor antiguo sin cursor). Las huellas verificadas
+    // se vuelven a comprobar: acota cualquier cambio local que no haya subido
+    // la versión (autocorrección cada FULL_LIST_EVERY_MS).
+    cache.snapshot = res.now ? new Map(got) : null;
+    cache.verified = new Map();
+    cache.fullAt = nowMs;
+  }
+  cache.cursor = Number.isFinite(res.now) ? res.now : null;
+  return cache.snapshot ? new Map(cache.snapshot) : got;
 }
 
 const subkeys = new Map();
@@ -171,11 +218,11 @@ function withOpaqueIds(deps) {
  *   lids: Map<string, string> | null,
  *   wire: ((lid: string) => string) | null,
  *   isLegacy?: (id: string) => boolean,
+ *   cache?: SyncCache,
  * }} deps
  */
-async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100, lids, wire, isLegacy }) {
-  const { items } = await api.list();
-  const remote = remoteVersions(items || []);
+async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100, lids, wire, isLegacy, cache }) {
+  const remote = await listRemote(api, cache);
 
   // Ids en claro de versiones anteriores: no entran al plan. Si su versión
   // opaca ya está en el servidor, se borran; si no, se bajan y se aplican con
@@ -193,7 +240,10 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
   // fusiona y después se borra.
   const isMigrated = (l) => remote.has(wire(l.id)) && remote.get(wire(l.id)).u >= l.u;
   const migrated = legacy.filter(isMigrated);
-  if (migrated.length) await api.purge(migrated.map((l) => l.id));
+  if (migrated.length) {
+    await api.purge(migrated.map((l) => l.id));
+    for (const l of migrated) cache?.snapshot?.delete(l.id);
+  }
   const toMigrate = legacy.filter((l) => !isMigrated(l));
   const local0 = readLocal();
   const byId = new Map(local0.items.map((r) => [r.id, r]));
@@ -207,9 +257,17 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
   const hashOf = (id) => {
     const v = local.get(id);
     const rec = byId.get(id);
-    return v.deleted || !rec
-      ? contentHash(encKey, id, v.u, 'eliminado', '')
-      : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
+    // Ya verificado en una sincronización anterior: misma versión local y misma huella remota.
+    // (Lo local solo cambia de contenido con una versión nueva, o adoptando la del servidor.)
+    const r = remote.get(id);
+    const mark = `${v.u}|${v.deleted || !rec ? 'd' : 'r'}|${r?.h}`;
+    if (cache && r?.h && cache.verified.get(id) === mark) return r.h;
+    const h =
+      v.deleted || !rec
+        ? contentHash(encKey, id, v.u, 'eliminado', '')
+        : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
+    if (cache && h === r?.h) cache.verified.set(id, mark);
+    return h;
   };
   const plan = planSync(local, remote, encKey && fingerprint ? hashOf : undefined);
   const pulled = [];
@@ -326,6 +384,11 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
       }),
     );
     const res = await api.put(payload);
+    // Lo subido ya está en el servidor: se anota para no volver a compararlo.
+    if (cache?.snapshot) {
+      const saved = new Set(res.saved || []);
+      for (const p of payload) if (saved.has(p.id)) cache.snapshot.set(p.id, p.h ? { u: p.u, h: p.h } : { u: p.u });
+    }
     pushed += res.saved?.length || 0;
     skipped += res.skipped?.length || 0;
   }

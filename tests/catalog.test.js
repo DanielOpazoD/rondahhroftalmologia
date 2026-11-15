@@ -2,7 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ageAt } from '../src/core/format.js';
 import { applyBirthDate, validateRecord, blankRecord } from '../src/core/record.js';
-import { medicoId, operativoId, makeMedico, makeOperativo, seedCatalogs, findMedico, upsert, byName } from '../src/core/catalog.js';
+import {
+  medicoId,
+  operativoId,
+  makeMedico,
+  makeOperativo,
+  seedCatalogs,
+  findMedico,
+  upsert,
+  byName,
+  onlyDoctors,
+  rolLabel,
+} from '../src/core/catalog.js';
 import { createStore, memoryStorage } from '../src/storage/store.js';
 import { ESPECIALIDAD, STORAGE_KEYS } from '../src/config/catalogs.js';
 import { minimalRecord } from './fixtures.js';
@@ -55,10 +66,20 @@ test('makeMedico / makeOperativo normalizan y validan', () => {
     id: medicoId('Dra. Ana Pérez', '22.222.222-2'),
     nombre: 'Dra. Ana Pérez',
     rut: '22.222.222-2',
+    rol: 'medico',
     created: 10,
     updated: 10,
   });
   assert.equal(makeMedico({ nombre: ' ' }), null);
+  // Rol del perfil: los anteriores (sin rol) y los inválidos son médicos.
+  assert.equal(makeMedico({ nombre: 'Enf. Tuki', rol: 'enfermeria' }).rol, 'enfermeria');
+  assert.equal(makeMedico({ nombre: 'X', rol: 'hacker' }).rol, 'medico');
+  const lista = [makeMedico({ nombre: 'Dr. A' }), makeMedico({ nombre: 'TENS B', rol: 'tens' })];
+  assert.deepEqual(
+    onlyDoctors(lista).map((x) => x.nombre),
+    ['Dr. A'],
+  );
+  assert.equal(rolLabel('tens'), 'TENS');
   const o = makeOperativo({ nombre: ' Ronda   Dic ' }, 5);
   assert.equal(o.nombre, 'Ronda Dic');
   assert.equal(makeOperativo({ nombre: 'x', id: 'bad id!' }).id, operativoId('x'), 'id inválido se recalcula');

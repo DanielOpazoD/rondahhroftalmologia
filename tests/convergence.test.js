@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveTeamKeys, tokenHash, importEncKey } from '../src/sync/crypto.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
-import { createSyncApi, syncOnce } from '../src/sync/client.js';
+import { createSyncApi, syncOnce, createSyncCache } from '../src/sync/client.js';
 import { syncMerge, stampChanges, flatten } from '../src/core/merge.js';
 import { syncFingerprint } from '../src/core/merge.js';
 
@@ -22,7 +22,10 @@ async function world(seed = 1) {
   const timing = rng(seed * 7919);
   const keys = await deriveTeamKeys('K7QM3-XRT9P-ZAWD4-N8F2C', 1000);
   const store = memoryBlobStore();
-  const handler = createSyncHandler({ store, tokenHash: tokenHash(keys.token) });
+  // Reloj del servidor que avanza 1 minuto por solicitud: así el cursor de
+  // cambios (con su margen de 10 minutos) de verdad deja fuera lo antiguo.
+  let serverNow = Date.now();
+  const handler = createSyncHandler({ store, tokenHash: tokenHash(keys.token), now: () => (serverNow += 60_000) });
   // Respuesta con un retardo aleatorio pequeño: permite que las sincronizaciones se entrelacen.
   const delay = () => new Promise((r) => setTimeout(r, Math.floor(timing() * 3)));
   const fetchFn = async (url, init) => {
@@ -34,6 +37,8 @@ async function world(seed = 1) {
   const key = await importEncKey(keys.encKey);
   const pc = (name) => {
     const st = { recs: [], tomb: {} };
+    // A y C sincronizan en modo incremental (solo cambios); B y D, completo.
+    const cache = name === 'A' || name === 'C' ? createSyncCache() : undefined;
     return {
       name,
       st,
@@ -44,6 +49,7 @@ async function world(seed = 1) {
           encKey: keys.encKey,
           mergeFn: syncMerge,
           fingerprint: syncFingerprint,
+          cache,
           readLocal: () => ({
             items: st.recs.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: structuredClone(r) })),
             tombstones: { ...st.tomb },
