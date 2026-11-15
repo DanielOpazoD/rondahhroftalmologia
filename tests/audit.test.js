@@ -213,3 +213,16 @@ test('bitácora: al sincronizar una entrada que se fue juntando, gana su versió
     assert.deepEqual(m.entries, [v2]);
   }
 });
+
+test('changesSummary: resumen breve de lo que cambió otro equipo', async () => {
+  const { changesSummary } = await import('../src/core/audit.js');
+  const cambios = [
+    { c: 'f.plan', d: 'Lentes' },
+    { c: 'f.od_pio', a: '15', d: '18' },
+    { c: 'checks.x', d: true },
+    { c: 'f.indicaciones', a: 'a' },
+  ];
+  const s = changesSummary(cambios);
+  assert.match(s, /^Plan: vacío → Lentes · .*: 15 → 18 · .*: vacío → sí y 1 más$/);
+  assert.equal(changesSummary(cambios.slice(0, 1)), 'Plan: vacío → Lentes');
+});

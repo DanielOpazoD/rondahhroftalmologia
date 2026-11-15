@@ -8,9 +8,9 @@ import { mergeRecords } from '../../core/merge.js';
 import { isAttended } from '../../core/patient.js';
 import { prepareSave } from '../../app/attentions.js';
 import { clock } from '../../core/clock.js';
-import { makeAuditEntry } from '../../core/audit.js';
+import { makeAuditEntry, auditChanges, changesSummary } from '../../core/audit.js';
 import { toast } from '../dom.js';
-import { syncAttentionView, showValidation, renderToolbar, renderHistory } from '../attentionView.js';
+import { syncAttentionView, showValidation, renderToolbar, renderHistory, flashFields, showRemoteNotice } from '../attentionView.js';
 import { uiConfirm, uiChoose } from '../modal.js';
 
 /** Pregunta antes de descartar cambios sin guardar. */
@@ -143,14 +143,25 @@ export function attentionActions(ctx, store) {
     /**
      * Llegaron cambios de otro equipo para la atención abierta: se incorporan
      * sin perder lo que se está escribiendo (lo local editado después gana).
+     * Se avisa QUÉ cambió (y quién) y se resaltan esos campos un momento.
      */
     absorbRemote(fresh) {
-      if (!ctx.dirty) return ctx.loadIntoForm(fresh);
-      ctx.rec = normalizeRecord(mergeRecords(fresh, ctx.rec));
-      ctx.snap = structuredClone(ctx.rec);
-      ctx.persist(() => store.saveDraft(ctx.rec));
-      syncAttentionView(ctx);
-      toast('Se agregaron datos registrados en otro equipo', 3000);
+      const before = ctx.rec;
+      if (!ctx.dirty) ctx.loadIntoForm(fresh);
+      else {
+        ctx.rec = normalizeRecord(mergeRecords(fresh, ctx.rec));
+        ctx.snap = structuredClone(ctx.rec);
+        ctx.persist(() => store.saveDraft(ctx.rec));
+        syncAttentionView(ctx);
+      }
+      const cambios = auditChanges(before, ctx.rec);
+      if (!cambios.length) return;
+      // Quién: la última entrada de la bitácora hecha en otro equipo.
+      const me = store.loadDeviceId();
+      const last = store.auditFor(ctx.rec.id).find((e) => e.equipoId !== me);
+      const who = last ? last.autor || last.equipo : 'otro equipo';
+      showRemoteNotice(ctx.rec.id, `Cambios de ${who}: ${changesSummary(cambios, ctx.procs)}`);
+      flashFields(cambios.map((c) => c.c));
     },
 
     /** Carga una atención guardada en el formulario (sin cambios pendientes). */

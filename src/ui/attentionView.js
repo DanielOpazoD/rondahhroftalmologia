@@ -16,6 +16,7 @@ import { html, setHtml } from './html.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initAttentionView(ctx) {
+  $('#remoteClose').addEventListener('click', () => ($('#remoteBanner').hidden = true));
   const chips = (el, defs) => {
     setHtml(
       el,
@@ -125,6 +126,9 @@ const setPressed = (b, on) => {
 /** Refleja el registro en edición en el formulario. */
 export function syncAttentionView(ctx) {
   const rec = ctx.rec;
+  // El aviso de cambios de otro equipo es de una atención: se oculta al cambiar de atención.
+  const notice = $('#remoteBanner');
+  if (!notice.hidden && notice.dataset.id !== rec.id) notice.hidden = true;
   for (const k of TEXT_FIELDS) {
     const el = /** @type {HTMLInputElement | null} */ (document.getElementById(k));
     if (el && el.value !== (rec.f[k] || '')) el.value = rec.f[k] || '';
@@ -211,6 +215,50 @@ export function showValidation(ctx, { showErrors = false } = {}) {
 }
 
 const TIPO = { ingresada: 'Ingresada a la lista', creada: 'Creada', editada: 'Editada', eliminada: 'Eliminada' };
+
+/** Temporizador del aviso de cambios de otro equipo. @type {ReturnType<typeof setTimeout> | undefined} */
+let remoteTimer;
+
+/**
+ * Aviso (en la atención, no un mensaje pasajero) de lo que cambió otro
+ * equipo en la atención abierta. Se cierra solo, con «Entendido» o al abrir
+ * otra atención.
+ * @param {string} id atención a la que se refiere
+ * @param {string} text
+ */
+export function showRemoteNotice(id, text) {
+  const b = $('#remoteBanner');
+  b.dataset.id = id;
+  $('#remoteText').textContent = text;
+  b.hidden = false;
+  clearTimeout(remoteTimer);
+  remoteTimer = setTimeout(() => (b.hidden = true), 30_000);
+}
+
+/**
+ * Resalta un momento los campos que cambiaron (rutas f.*, checks.*, cat,
+ * proc.<id>.*), p. ej. al llegar cambios de otro equipo.
+ * @param {string[]} paths
+ */
+export function flashFields(paths) {
+  /** @type {Set<Element>} */
+  const els = new Set();
+  for (const p of paths) {
+    /** @type {Element | null | undefined} */
+    let el = null;
+    if (p.startsWith('f.')) el = document.getElementById(p.slice(2));
+    else if (p.startsWith('checks.')) el = document.querySelector(`.chip[data-k="${CSS.escape(p.slice(7))}"]`);
+    else if (p === 'cat') el = document.getElementById('catSeg');
+    else if (p.startsWith('proc.')) el = document.querySelector(`#procList .proc[data-id="${CSS.escape(p.slice(5, p.lastIndexOf('.')))}"]`);
+    if (el) els.add(el);
+  }
+  for (const el of els) {
+    el.classList.remove('remote');
+    void (/** @type {HTMLElement} */ (el).offsetWidth); // reinicia la animación
+    el.classList.add('remote');
+    setTimeout(() => el.classList.remove('remote'), 3000);
+  }
+}
 
 /** Historial de cambios (bitácora) de la atención abierta. */
 export function renderHistory(ctx) {

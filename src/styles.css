@@ -2280,3 +2280,25 @@ html.hdr-icons .userChip {
   outline-offset: -4px;
   background: var(--acc-soft);
 }
+
+/* Campo que acaba de cambiar en otro equipo: se resalta un momento. */
+.remote {
+  animation: remote-flash 3s ease-out;
+  border-radius: 6px;
+}
+@keyframes remote-flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 55%, transparent);
+    background-color: color-mix(in srgb, var(--acc-soft) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--acc);
+  }
+}

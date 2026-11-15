@@ -73,3 +73,38 @@ test('el historial incluye lo que grabó otro equipo', async ({ browser }) => {
   await pcA.close();
   await pcB.close();
 });
+
+test('la atención abierta avisa qué cambió otro equipo (y quién) y resalta el campo', async ({ browser }) => {
+  const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
+  const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
+  for (const [P, name] of [
+    [A, 'Box A'],
+    [B, 'Box B'],
+  ]) {
+    await openApp(P);
+    await tab(P, 'Ajustes');
+    await P.locator('#setDevice').fill(name);
+    await P.locator('#setDevice').blur();
+    await activateSync(P);
+  }
+  await tab(A, 'Atención');
+  await fillPatient(A, { nombre: 'Abierta En Dos' });
+  await save(A);
+  await syncNow(A);
+  await syncNow(B);
+  await openPatient(B, 'Abierta En Dos');
+  // A la deja abierta; B anota el plan.
+  await B.locator('#plan').fill('Control en 3 meses');
+  await save(B);
+  await syncNow(B);
+  await syncNow(A);
+  await tab(A, 'Atención');
+  await expect(A.locator('#plan')).toHaveValue('Control en 3 meses');
+  const notice = A.locator('#remoteBanner');
+  await expect(notice).toContainText('Cambios de Box B');
+  await expect(notice).toContainText('Plan: vacío → Control en 3 meses');
+  await expect(A.locator('#plan.remote')).toHaveCount(1);
+  await notice.getByRole('button', { name: 'Entendido' }).click();
+  await expect(notice).toBeHidden();
+  await Promise.all([ca.close(), cb.close()]);
+});
