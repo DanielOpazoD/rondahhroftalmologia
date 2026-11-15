@@ -11,6 +11,7 @@ import { refreshRutMarks } from './rut.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
 import { $, $$, toast } from './dom.js';
+import { renderAttachments } from './attachmentsView.js';
 import { html, setHtml } from './html.js';
 
 /** @param {import('./context.js').AppContext} ctx */
@@ -159,6 +160,7 @@ export function syncAttentionView(ctx) {
   renderHistory(ctx);
   renderToolbar(ctx);
   showValidation(ctx);
+  void renderAttachments(ctx);
 }
 
 /** Título y estado de la barra superior: a quién se atiende y si hay cambios sin guardar. */

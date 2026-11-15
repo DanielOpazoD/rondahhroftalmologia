@@ -180,6 +180,8 @@ export function attentionActions(ctx, store) {
         store.addTombstone(id, Math.max(clock.tick(), (r.updated || 0) + 1));
       });
       if (!done) return;
+      // Sus adjuntos se eliminan con ella (en todos los equipos).
+      ctx.removeAttachmentsOf(store.loadAttachments(id));
       ctx.sync?.schedule();
       if (ctx.rec.id === id) {
         ctx.rec.id = null;

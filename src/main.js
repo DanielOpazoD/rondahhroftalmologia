@@ -27,6 +27,7 @@ import { createLock } from './ui/lock.js';
 import { startUpdateWatcher } from './ui/updateNotice.js';
 import { initErrorLog, logError } from './ui/errorLog.js';
 import { initHeaderFit } from './ui/headerFit.js';
+import { initAttachmentsView } from './ui/attachmentsView.js';
 
 function getStorage() {
   try {
@@ -142,6 +143,7 @@ async function main() {
   initCheckView(ctx);
   initRutMarks();
   initHeaderFit();
+  initAttachmentsView(ctx);
   ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
