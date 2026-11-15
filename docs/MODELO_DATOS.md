@@ -155,6 +155,7 @@ Colección `bitacora`, con un documento `b_<idAtención>` por atención:
 Cada atención puede tener archivos adjuntos (imágenes, PDF, Word…), con estos límites: 20 MB por archivo, y 60 MB y 30 archivos por atención (`core/attachments.js`).
 
 - **Metadatos** (colección `adjuntos`): `{id: 'j…', atencionId, nombre, tipo, tamano, sha256, partes, created, updated}`. Se sincronizan como el tipo `adjunto` en el espacio de la especialidad. Eliminar uno deja una lápida.
+- **Miniatura** (imágenes, desde la 2.15.0): `miniatura`, un JPEG de 96 px como data URL (≤ 16 000 caracteres), guardado con los metadatos. Así se ve en todos los equipos antes de que llegue el contenido. Se valida al leer (`isThumbnail`): solo `data:image/jpeg;base64,…`. A las imágenes adjuntadas antes se les crea al abrirlas en un equipo que tenga su contenido.
 - **Contenido** (colección `adjuntos_datos`, IndexedDB): los bytes, que se leen de a uno. Viaja **cifrado** en partes de 192 KiB al espacio `<especialidad>-adjuntos`. Al bajarlo se verifica su SHA-256. Al eliminarlo, se reemplaza en el servidor por una lápida pequeña.
 - **Fotos grandes** se reducen al adjuntar: lado mayor de 2400 px, en JPEG, solo si así pesan menos.
 - **PDF con anexos** (`core/pdfAnexos.js`): la hoja, un índice, las imágenes como páginas y los PDF con sus páginas. Lo que no puede ser página (Word, Excel) va **incrustado** en el PDF, y se abre desde el panel de adjuntos del visor.

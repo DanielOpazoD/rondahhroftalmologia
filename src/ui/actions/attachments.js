@@ -11,12 +11,13 @@ import {
   sha256Hex,
   isInlineType,
   cleanType,
+  THUMB_MAX_CHARS,
 } from '../../core/attachments.js';
 import { attachmentAuditEntry } from '../../core/audit.js';
 import { clock } from '../../core/clock.js';
 import { toast } from '../dom.js';
 import { uiConfirm, uiAlert } from '../modal.js';
-import { prepareImage } from '../images.js';
+import { prepareImage, makeThumbnail } from '../images.js';
 
 /**
  * @param {any} ctx contexto de la aplicación (ver ui/context.js)
@@ -59,8 +60,12 @@ export function attachmentActions(ctx, store) {
           uiAlert({ title: `No se adjuntó «${safeFileName(file.name)}»`, message: problem, tone: 'warn' });
           continue;
         }
+        const miniatura = kindOf(prepared.tipo, prepared.nombre).startsWith('imagen')
+          ? await makeThumbnail(prepared.bytes, cleanType(prepared.tipo), THUMB_MAX_CHARS)
+          : null;
         const now = clock.tick();
         const meta = normalizeAttachment({
+          ...(miniatura ? { miniatura } : {}),
           id: newAttachmentId(now),
           atencionId,
           nombre: prepared.nombre,
@@ -84,6 +89,27 @@ export function attachmentActions(ctx, store) {
         ctx.sync?.schedule();
         toast(added === 1 ? 'Archivo adjuntado' : `${added} archivos adjuntados`);
       }
+    },
+
+    /**
+     * Adjuntos de antes de la 2.15.0: si su contenido está en este equipo, se
+     * les crea la miniatura (una vez) y se sincroniza.
+     * @param {any[]} metas
+     */
+    async addMissingThumbnails(metas) {
+      const have = new Set(await store.attachmentDataIds());
+      /** @type {any[]} */
+      const done = [];
+      for (const a of metas) {
+        if (a.miniatura || !have.has(a.id) || !kindOf(a.tipo, a.nombre).startsWith('imagen')) continue;
+        const data = await store.loadAttachmentData(a.id);
+        const miniatura = data && (await makeThumbnail(data.bytes, cleanType(a.tipo), THUMB_MAX_CHARS));
+        if (miniatura) done.push({ ...a, miniatura, updated: Math.max(clock.tick(), (a.updated || 0) + 1) });
+      }
+      if (!done.length) return 0;
+      if (!ctx.persist(() => store.saveAttachments(done))) return 0;
+      ctx.sync?.schedule();
+      return done.length;
     },
 
     /** Abre (o descarga) un adjunto. */

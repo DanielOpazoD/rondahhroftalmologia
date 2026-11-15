@@ -64,3 +64,33 @@ export async function toPng(bytes, tipo) {
   if (!img) return null;
   return render(img, img.width, img.height, 'image/png', undefined);
 }
+
+/** Lado mayor de una miniatura (px): el doble de lo que se ve, para pantallas nítidas. */
+const THUMB_SIDE = 96;
+
+/**
+ * Miniatura de una imagen (JPEG pequeño como data URL) para guardar con sus
+ * metadatos; null si el navegador no puede leerla.
+ * @param {Uint8Array} bytes
+ * @param {string} tipo
+ * @param {number} [maxChars] tamaño máximo del texto
+ * @returns {Promise<string | null>}
+ */
+export async function makeThumbnail(bytes, tipo, maxChars = 16_000) {
+  const img = await decode(new Blob([/** @type {BlobPart} */ (bytes)], { type: tipo }));
+  if (!img) return null;
+  const s = Math.min(1, THUMB_SIDE / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.width * s));
+  canvas.height = Math.max(1, Math.round(img.height * s));
+  const g = canvas.getContext('2d');
+  if (!g) return null;
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.drawImage(img, 0, 0, canvas.width, canvas.height);
+  for (const q of [0.72, 0.5]) {
+    const url = canvas.toDataURL('image/jpeg', q);
+    if (url.length <= maxChars) return url;
+  }
+  return null;
+}

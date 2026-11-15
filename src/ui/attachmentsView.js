@@ -57,10 +57,15 @@ export async function renderAttachments(ctx) {
   thumbs = [];
   const have = new Set(list.length ? await store.attachmentDataIds() : []);
   const items = [];
+  let missingThumbs = false;
   for (const a of list) {
     const kind = kindOf(a.tipo, a.nombre);
     let preview = html`<span class="attico">${ICON(kind === 'pdf' ? 'pdf' : 'file')}</span>`;
-    if (kind.startsWith('imagen') && isInlineType(a.tipo) && have.has(a.id)) {
+    if (a.miniatura) {
+      // Miniatura guardada con los metadatos (validada en normalizeAttachment).
+      preview = html`<img class="attthumb" src="${a.miniatura}" alt="">`;
+    } else if (kind.startsWith('imagen') && isInlineType(a.tipo) && have.has(a.id)) {
+      missingThumbs = true;
       const data = await store.loadAttachmentData(a.id);
       if (data) {
         const url = URL.createObjectURL(new Blob([data.bytes], { type: cleanType(a.tipo) }));
@@ -80,4 +85,6 @@ export async function renderAttachments(ctx) {
   if (ctx.rec.id !== id) return;
   setHtml($('#attList'), html`${items}`);
   $('#attAdd').disabled = !id || !store.supportsAttachments();
+  // Adjuntos anteriores sin miniatura: se crea una vez (y se re-dibuja).
+  if (missingThumbs && (await ctx.addMissingThumbnails(list))) ctx.emit('adjuntos');
 }
