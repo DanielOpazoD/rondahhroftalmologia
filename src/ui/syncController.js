@@ -22,6 +22,7 @@ import {
 } from '../sync/crypto.js';
 import { createSyncApi, syncOnce, SyncHttpError, createSyncCache } from '../sync/client.js';
 import { PROTOCOL_VERSION } from '../sync/protocol.js';
+import { logError } from './errorLog.js';
 import { $, toast, copyText } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { html } from './html.js';
@@ -207,6 +208,7 @@ export function createSyncController(ctx) {
           'Hay datos en el servidor que no se pueden descifrar con esta contraseña. Revisa que sea la misma en todos los PC.',
         );
       } else setStatus('error', e.message || String(e));
+      if (!(e instanceof SyncHttpError && e.status === 0)) logError('sincronización', e);
       if (!quiet) toast(st.message, 4000);
     } finally {
       st.running = false;

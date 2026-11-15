@@ -1,3 +1,5 @@
+import { logError } from './errorLog.js';
+
 /**
  * Utilidades de interfaz: selección de elementos, avisos, descargas y portapapeles.
  */
@@ -78,6 +80,7 @@ export async function withBusy(button, fn) {
     return await fn();
   } catch (e) {
     console.error(e);
+    logError('acción', e);
     // Import dinámico para no crear una dependencia circular dom ↔ modal.
     import('./modal.js').then(({ uiAlert }) =>
       uiAlert({ title: 'No se pudo completar la acción', message: String(e?.message || e), tone: 'danger' }),

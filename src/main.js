@@ -25,6 +25,7 @@ import { uiConfirm } from './ui/modal.js';
 import { initCheckView, autoCheck } from './ui/checkView.js';
 import { createLock } from './ui/lock.js';
 import { startUpdateWatcher } from './ui/updateNotice.js';
+import { initErrorLog, logError } from './ui/errorLog.js';
 
 function getStorage() {
   try {
@@ -42,7 +43,10 @@ function getStorage() {
  * está disponible, localStorage. La primera vez migra los datos antiguos.
  */
 async function openRepo(storage, practice) {
-  const onError = (e) => toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
+  const onError = (e) => {
+    toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
+    logError('almacenamiento', e);
+  };
   try {
     const repo = createRepo(await idbBackend(dbName(practice)), { onError });
     repo.kind = 'indexeddb';
@@ -94,6 +98,7 @@ async function main() {
   const ctx = createContext(store, TEMPLATE_PDF_B64);
   ctx.practice = practice;
   ctx.storageKind = repo.kind;
+  initErrorLog(ctx);
   // Bloqueo con PIN: antes de mostrar datos.
   ctx.lock = createLock(ctx);
   ctx.lock.lock({ broadcast: false }); // abrir una pestaña nueva no bloquea las otras
@@ -173,6 +178,7 @@ function registerServiceWorker() {
 
 main().catch((e) => {
   console.error(e);
+  logError('inicio', e);
   const banner = document.createElement('div');
   banner.className = 'banner warn';
   banner.style.margin = '16px';

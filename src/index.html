@@ -312,6 +312,16 @@
     </div>
   </div>
 
+  <details class="card" id="errCard">
+    <summary><b>Registro de errores</b> <span class="badge" id="errCount">0</span></summary>
+    <p class="hint">Errores de este equipo, para enviarlos a soporte si algo falla. No salen del equipo por sí solos. Pueden incluir algún dato: compártelo solo con soporte.</p>
+    <p class="hint" id="errEmpty">Sin errores registrados.</p>
+    <pre class="note" id="errText" tabindex="0" hidden></pre>
+    <div class="row" style="gap:8px">
+      <button type="button" class="btn sm" id="errCopy">Copiar</button>
+      <button type="button" class="btn sm" id="errClear">Vaciar</button>
+    </div>
+  </details>
   <details class="card danger">
     <summary>Zona de cuidado</summary>
     <div class="row" style="margin-top:10px">

@@ -53,6 +53,8 @@ export const STORAGE_KEYS = Object.freeze({
   lockSignal: `${P}bloqueo_aviso_v1`,
   /** Última actividad en cualquier pestaña (para la inactividad compartida). */
   lockActivity: `${P}bloqueo_actividad_v1`,
+  /** Registro local de errores (últimos 50). */
+  errors: `${P}errores_v1`,
 });
 
 /**

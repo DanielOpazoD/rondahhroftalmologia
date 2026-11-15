@@ -14,6 +14,7 @@ import { StorageError } from '../storage/store.js';
 import { stampChanges } from '../core/merge.js';
 import { clock } from '../core/clock.js';
 import { $$, toast, base64ToBytes } from './dom.js';
+import { logError } from './errorLog.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
 import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
@@ -94,8 +95,9 @@ export function createContext(store, templateB64) {
         fn();
         return true;
       } catch (e) {
-        if (e instanceof StorageError) toast(e.message, 4000);
-        else throw e;
+        if (!(e instanceof StorageError)) throw e;
+        toast(e.message, 4000);
+        logError('almacenamiento', e);
         return false;
       }
     },
