@@ -73,7 +73,11 @@ test('makeMedico / makeOperativo normalizan y validan', () => {
   assert.equal(makeMedico({ nombre: ' ' }), null);
   // Rol del perfil: los anteriores (sin rol) y los inválidos son médicos.
   assert.equal(makeMedico({ nombre: 'Enf. Tuki', rol: 'enfermeria' }).rol, 'enfermeria');
-  assert.equal(makeMedico({ nombre: 'X', rol: 'hacker' }).rol, 'medico');
+  // Un rol de una versión más nueva se conserva y NO cuenta como médico; uno malformado queda como «otro».
+  assert.equal(makeMedico({ nombre: 'X', rol: 'kinesiologo' }).rol, 'kinesiologo');
+  assert.deepEqual(onlyDoctors([makeMedico({ nombre: 'X', rol: 'kinesiologo' })]), []);
+  assert.equal(rolLabel('kinesiologo'), 'Otro');
+  assert.equal(makeMedico({ nombre: 'X', rol: 'Rol <raro>' }).rol, 'otro');
   const lista = [makeMedico({ nombre: 'Dr. A' }), makeMedico({ nombre: 'TENS B', rol: 'tens' })];
   assert.deepEqual(
     onlyDoctors(lista).map((x) => x.nombre),

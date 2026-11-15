@@ -106,6 +106,10 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
 
 Con `ft`, dos versiones de una misma atención se fusionan campo a campo (`src/core/merge.js`): en cada campo gana la edición más reciente. Las atenciones antiguas sin `ft` usan su `updated` para todos sus campos.
 
+### Compatibilidad entre versiones (lector tolerante)
+
+Mientras los PC no se actualicen todos a la vez, conviven versiones distintas. Al normalizar atenciones, fichas, perfiles y operativos **se conservan los campos que esta versión no conoce**, con claves seguras y valores de datos (`core/compat.js`, ADR 0012). Así un PC con una versión anterior no borra lo que agregó una más nueva. Un rol de perfil desconocido se conserva y no cuenta como médico.
+
 ### Migraciones de esquema
 
 `src/core/migrations.js` define un paso por versión (`STEPS[n]` lleva de vN a vN+1). Para cambiar el formato:
