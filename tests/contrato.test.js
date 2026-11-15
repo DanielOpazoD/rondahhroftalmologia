@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import * as oftalmologia from '../src/specialties/oftalmologia/index.js';
 import { validateSpecialty } from '../src/specialties/contrato.js';
 
@@ -8,6 +8,20 @@ const formHtml = readFileSync(new URL('../src/specialties/oftalmologia/formulari
 
 test('oftalmología cumple el contrato de especialidad', () => {
   assert.deepEqual(validateSpecialty(oftalmologia, { formHtml }), []);
+});
+
+test('cada especialidad de src/specialties/ cumple el contrato', async () => {
+  const dir = new URL('../src/specialties/', import.meta.url);
+  const ids = readdirSync(dir, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name !== 'activa')
+    .map((d) => d.name);
+  assert.ok(ids.includes('oftalmologia') && ids.includes('orl'));
+  for (const id of ids) {
+    const mod = await import(new URL(`${id}/index.js`, dir).href);
+    const html = readFileSync(new URL(`${id}/formulario.html`, dir), 'utf8');
+    assert.deepEqual(validateSpecialty(mod, { formHtml: html }), [], id);
+    assert.equal(mod.ESPECIALIDAD.id, id, 'la carpeta se llama como ESPECIALIDAD.id');
+  }
 });
 
 test('el contrato detecta especialidades mal configuradas', () => {

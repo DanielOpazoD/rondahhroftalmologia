@@ -6,7 +6,8 @@
  *   validacion.js    validarClinico(rec, warn, note)
  *   index.js         reexporta los módulos clínicos y sus salidas (ver REQUIRED_FUNCTIONS)
  *   formulario.html  parte clínica del formulario
- *   plantilla.pdf    plantilla del PDF oficial
+ *   plantilla.pdf    plantilla del PDF oficial (opcional: sin ella, la especialidad dibuja
+ *                    su PDF desde cero y buildAttentionPdf recibe una plantilla vacía)
  *
  * validateSpecialty() revisa el módulo antes de construir (scripts/build.mjs)
  * y en las pruebas: una especialidad mal configurada no llega a producción.

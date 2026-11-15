@@ -1,4 +1,6 @@
 node_modules/
+# Builds de otras especialidades (ESPECIALIDAD=<id> npm run build): no se publican desde aquí
+dist-*/
 .DS_Store
 *.log
 
