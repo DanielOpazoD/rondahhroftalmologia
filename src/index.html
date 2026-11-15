@@ -324,6 +324,18 @@
       </div>
     </div>
   </div>
+  <div class="card" id="usersCard" hidden>
+    <h2>Usuarios <span class="badge" id="usersCount">0</span></h2>
+    <p class="hint">Cada persona entra con su RUT. La clave inicial es su RUT sin dígito verificador (vence en 7 días); al entrar debe crear la suya.</p>
+    <div class="row u-gap8 u-wrap u-aic">
+      <input id="usersSearch" type="search" placeholder="Buscar por nombre o RUT" aria-label="Buscar usuario" class="u-grow u-minw160">
+      <button type="button" class="btn p sm" id="usersAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg>Nuevo usuario</button>
+      <button type="button" class="btn sm" id="usersFromProfiles" hidden>Crear desde perfiles</button>
+      <button type="button" class="btn sm" id="usersReload">Actualizar</button>
+    </div>
+    <p class="msg err" id="usersErr" role="alert"></p>
+    <div id="usersList" class="plist"></div>
+  </div>
 
   <div class="card">
     <h2>Procedimientos realizados</h2>

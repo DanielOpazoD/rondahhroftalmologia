@@ -29,6 +29,7 @@ import { initErrorLog, logError } from './ui/errorLog.js';
 import { initHeaderFit } from './ui/headerFit.js';
 import { initAttachmentsView } from './ui/attachmentsView.js';
 import { createAccountsController } from './ui/accounts.js';
+import { initUsersView } from './ui/usersView.js';
 
 function getStorage() {
   try {
@@ -148,6 +149,7 @@ async function main() {
   initRutMarks();
   initHeaderFit();
   initAttachmentsView(ctx);
+  initUsersView(ctx);
   ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));

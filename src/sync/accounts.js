@@ -24,7 +24,7 @@
  *   POST clave    🔒 {sal, iter, acceso, envuelta, accesoActual?} → {token, exp}
  *   POST salir    🔒 {motivo?}
  *   POST eventos  🔒 {eventos: [{ev, obj?, at?, n?, off?}]}
- *   POST preparar 🔒admin (o contraseña del equipo antes de activar) {id} → {complemento}
+ *   POST preparar 🔒admin (o contraseña del equipo antes de activar) {id, existente?} → {complemento}
  *   POST activar     (contraseña del equipo) {usuario} — crea el primer administrador
  *   GET  usuarios 🔒admin → {usuarios}
  *   POST crear    🔒admin {id, rut, rol, admin, perfil, sal, iter, acceso, envuelta}
@@ -245,11 +245,13 @@ export function createAccounts({
     const expired = fail(401, 'sesion_invalida', 'La sesión terminó. Vuelve a entrar con tu RUT y clave.');
     if (!p || p.e < t) return { ok: false, response: expired };
     const ses = /** @type {Sesion | null} */ (await store.get(K.session(p.s), { type: 'json' }));
-    if (!ses || ses.fin || ses.uid !== p.u) return { ok: false, response: expired };
+    if (!ses || ses.uid !== p.u) return { ok: false, response: expired };
+    // Primero la cuenta: si se desactivó, la persona debe saberlo (no solo que su sesión terminó).
     const user = await getUser(p.u);
     if (!user || user.estado !== 'activo') {
       return { ok: false, response: fail(403, 'cuenta_desactivada', 'Tu cuenta está desactivada. Habla con un administrador.') };
     }
+    if (ses.fin) return { ok: false, response: expired };
     if (t - ses.ultimo > 60_000) await store.setJSON(K.session(p.s), { ...ses, ultimo: t });
     return { ok: true, user, sid: p.s, mustChange: Boolean(user.debeCambiar) };
   }
@@ -546,7 +548,9 @@ export function createAccounts({
     if (!me.admin) return fail(403, 'sin_permiso', 'Solo un administrador puede hacer esto.');
 
     if (action === 'preparar') {
-      if (!USER_ID_RE.test(b.id) || (await getUser(b.id))) return fail(400, 'id_invalido', 'Id de cuenta inválido');
+      // Para restablecer la clave de una cuenta existente (`existente: true`) o para una cuenta nueva.
+      const exists = USER_ID_RE.test(b.id) && Boolean(await getUser(b.id));
+      if (!USER_ID_RE.test(b.id) || exists !== (b.existente === true)) return fail(400, 'id_invalido', 'Id de cuenta inválido');
       return json(200, { complemento: complementOf(b.id) });
     }
 

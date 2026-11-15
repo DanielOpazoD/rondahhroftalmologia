@@ -1716,6 +1716,13 @@ ol.hist ul li {
   background: var(--warn-soft);
   color: var(--warn);
 }
+.state.bad {
+  background: color-mix(in srgb, var(--bad) 12%, transparent);
+  color: var(--bad);
+}
+.prow.off .pname {
+  color: var(--mut);
+}
 .state.done {
   background: color-mix(in srgb, var(--ok) 13%, transparent);
   color: var(--ok);

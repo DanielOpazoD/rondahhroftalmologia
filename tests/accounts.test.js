@@ -244,7 +244,8 @@ describe('servidor de cuentas', () => {
     // Desactivar: su sesión deja de servir de inmediato y no puede volver a entrar.
     assert.equal((await env.call('cuentas/editar', { token: env.adminToken, body: { id: uid, estado: 'desactivado' } })).status, 200);
     const cut = await env.call('sync/list', { method: 'GET', token: tok });
-    assert.equal(cut.status, 401);
+    assert.equal(cut.status, 403);
+    assert.equal(cut.body.code, 'cuenta_desactivada', 'la persona sabe por qué');
     assert.equal((await env.login('11.111.111-1', 'Admis1')).body.code, 'cuenta_desactivada');
     const list = (await env.call('cuentas/usuarios', { method: 'GET', token: env.adminToken })).body.usuarios;
     assert.deepEqual(list.map((u) => [u.id === env.adminId, u.estado]).sort(), [
@@ -267,11 +268,16 @@ describe('servidor de cuentas', () => {
     assert.equal(late.body.code, 'clave_inicial_vencida');
     // El administrador la restablece (su sesión dura 12 h: entra de nuevo).
     const adminTok = (await env.login(ADMIN_RUT, 'Ojo2026')).body.token;
+    // El complemento de una cuenta existente se pide con `existente` (y solo para cuentas que existen).
+    assert.equal((await env.call('cuentas/preparar', { token: adminTok, body: { id: uid } })).status, 400);
+    assert.equal((await env.call('cuentas/preparar', { token: adminTok, body: { id: newUserId(), existente: true } })).status, 400);
+    const again = await env.call('cuentas/preparar', { token: adminTok, body: { id: uid, existente: true } });
+    assert.equal(again.body.complemento, prep.complemento);
     const c = await credentialsFor({
       password: '11111111',
       teamKeyB64: env.keys.encKey,
       uid,
-      complemento: prep.complemento,
+      complemento: again.body.complemento,
       iterations: ITER,
     });
     assert.equal((await env.call('cuentas/restablecer', { token: adminTok, body: { id: uid, ...c } })).status, 200);
