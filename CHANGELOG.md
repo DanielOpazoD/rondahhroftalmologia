@@ -1,5 +1,26 @@
 # Cambios
 
+## 2.14.0 — 2026-11-16
+
+### Nuevo
+- **Archivos adjuntos en cada atención** (#33, #34): imágenes, PDF, Word…
+  - Tarjeta «Adjuntos»: adjuntar con el botón o arrastrando, con miniaturas; abrir y eliminar.
+  - Las fotos grandes se reducen solas (lado mayor 2400 px, JPEG).
+  - Viajan **cifrados** a los otros PC, en partes, y al bajarlos se verifica su huella SHA-256.
+  - Límites: 20 MB por archivo, y 60 MB y 30 archivos por atención.
+  - Quedan en el historial de cambios. Eliminar la atención elimina sus adjuntos.
+- **PDF con anexos** (#35): el botón PDF de una atención con adjuntos ofrece «Con anexos» o «Solo la hoja».
+  - Con anexos: la hoja, un índice, las imágenes como páginas y los PDF adjuntos con sus páginas, en un solo documento.
+  - Word y Excel van **dentro del PDF** (panel de adjuntos del visor).
+  - «Solo la hoja» es el PDF de siempre.
+
+### A tener en cuenta
+- El respaldo diario del servidor no incluye el contenido de los adjuntos (puede pesar gigabytes). Está en cada PC que sincroniza y en los respaldos de cada PC.
+- Sin IndexedDB (navegadores muy antiguos o modo privado estricto) no se pueden adjuntar archivos.
+
+### Sin cambios
+- El PDF «Solo la hoja», Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
+
 ## 2.13.0 — 2026-11-16
 
 ### Nuevo
