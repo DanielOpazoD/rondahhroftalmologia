@@ -39,7 +39,9 @@ npm run test:e2e
 npm run test:stress
 ```
 
-`test:e2e` corre las pruebas en un navegador real. `test:stress` corre 200 escenarios de varios PC sincronizando a la vez.
+`test:e2e` corre las pruebas en un navegador real. Cada prueba empieza con el servidor de sincronización local vacío (`e2e/fixtures.js`): importa `test` desde ahí, no desde `@playwright/test`. La CI exige además una **cobertura mínima** de la lógica (`npm run test:coverage`: líneas 95 %, ramas 85 %, funciones 87 %) y que las dependencias de producción no tengan vulnerabilidades altas (`npm audit`).
+
+ `test:stress` corre 200 escenarios de varios PC sincronizando a la vez.
 
 `e2e/accesibilidad.spec.js` revisa con axe-core que cada pestaña, diálogo, la pantalla de bloqueo y el modo práctica no tengan infracciones WCAG 2.1 A/AA, en tema claro, oscuro y en celular. También prueba el teclado: saltar al contenido, flechas entre pestañas y errores asociados a su campo. Si agregas pantallas o colores, agrégalos ahí.
 

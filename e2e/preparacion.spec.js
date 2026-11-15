@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { openApp, tab } from './helpers.js';
 
 test('chequeo del equipo: indica qué falta y lleva a resolverlo; aparece solo tras días sin uso', async ({ page }) => {

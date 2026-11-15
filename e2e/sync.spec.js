@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { openApp, fillPatient, save, activateSync, syncNow, openPatient, showPatientRecord } from './helpers.js';
 
 /**

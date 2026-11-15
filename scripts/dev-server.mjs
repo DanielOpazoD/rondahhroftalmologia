@@ -17,7 +17,10 @@ import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 const port = Number(process.env.PORT || 8787);
-const handler = createSyncHandler({ store: memoryBlobStore(), tokenHash: (process.env.SYNC_TOKEN_SHA256 || '').toLowerCase() });
+const makeHandler = () => createSyncHandler({ store: memoryBlobStore(), tokenHash: (process.env.SYNC_TOKEN_SHA256 || '').toLowerCase() });
+let handler = makeHandler();
+/** Solo para las pruebas en navegador: cada prueba empieza con el servidor vacío. */
+const TEST_RESET = process.env.E2E_RESET === '1';
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
@@ -28,6 +31,11 @@ const TYPES = {
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (TEST_RESET && req.method === 'POST' && url.pathname === '/__test__/reset') {
+      handler = makeHandler();
+      res.writeHead(204);
+      return res.end();
+    }
     if (url.pathname.startsWith('/api/sync/')) {
       const chunks = [];
       for await (const c of req) chunks.push(c);
