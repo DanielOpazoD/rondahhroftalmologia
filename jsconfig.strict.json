@@ -2,7 +2,7 @@
   "extends": "./jsconfig.json",
   "compilerOptions": {
     "strict": true,
-    "noImplicitAny": false
+    "noImplicitAny": true
   },
   "include": ["src/core/**/*.js", "src/sync/**/*.js", "src/lib/**/*.js", "src/app/**/*.js", "src/types.d.ts", "src/domain.d.ts"]
 }

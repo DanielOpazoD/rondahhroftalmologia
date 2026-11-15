@@ -4,7 +4,7 @@
  * operativo (ver core/demo.js).
  */
 
-/** @returns {{f: Record<string, string>, checks: Record<string, boolean>, proc: Record<string, object>, cat?: string}[]} */
+/** @returns {import('../../domain').CasoEjemplo[]} */
 export function casosDeEjemplo() {
   return [
     {

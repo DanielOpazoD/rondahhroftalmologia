@@ -14,8 +14,15 @@ import { mergeAuditDocs } from './audit.js';
 import { normalizePatient } from './patient.js';
 
 /**
+ * Datos que se respaldan o se unen (los locales y los leídos de un respaldo).
+ * `futureRecords`: atenciones de versiones más nuevas de la app, intactas.
+ * @typedef {{records: import('../domain').Atencion[], futureRecords?: import('../domain').RegistroFusionable[],
+ *   procs: import('../domain').Procedimiento[], auditDocs?: import('../domain').AuditDoc[], patients?: import('../domain').Paciente[]}} DatosRespaldo
+ */
+
+/**
  * Crea el objeto de respaldo.
- * @param {{records: object[], futureRecords?: object[], procs: object[], anonSecret?: string|null, auditDocs?: object[], patients?: object[], practica?: boolean}} data
+ * @param {DatosRespaldo & {anonSecret?: string|null, practica?: boolean}} data
  *   `practica`: respaldo del modo práctica (datos de ejemplo; no se importa a los datos reales).
  */
 export function buildBackup(
@@ -40,19 +47,23 @@ export function buildBackup(
   };
 }
 
+/** @param {any} d documento de bitácora leído del respaldo (sin validar) */
 const validAuditDoc = (d) =>
   d &&
   typeof d === 'object' &&
   isValidId(d.id) &&
   d.id.startsWith('b_') &&
   Array.isArray(d.entries) &&
-  d.entries.every((e) => e && typeof e.id === 'string' && Number.isFinite(e.at));
+  d.entries.every((/** @type {any} */ e) => e && typeof e.id === 'string' && Number.isFinite(e.at));
 
 /**
  * Lee y valida un respaldo (v1, v2 o v3).
+ * @param {string} text
+ * @returns {DatosRespaldo & {practica: boolean, anonSecret: string|null}}
  * @throws {Error} si el contenido no es un respaldo válido
  */
 export function parseBackup(text) {
+  /** @type {any} JSON del archivo, sin validar */
   let data;
   try {
     data = JSON.parse(text);
@@ -61,7 +72,8 @@ export function parseBackup(text) {
   }
   if (!data || !Array.isArray(data.atenciones)) throw new Error('El archivo no es un respaldo de esta aplicación');
   if (data.app && data.app !== APP.id) throw new Error(`El respaldo es de otra aplicación (${data.app})`);
-  const objects = data.atenciones.filter((r) => r && typeof r === 'object');
+  /** @type {Record<string, unknown>[]} */
+  const objects = data.atenciones.filter((/** @type {unknown} */ r) => r && typeof r === 'object');
   return {
     // normalizeRecord anula ids inválidos; esos registros se descartan.
     records: objects
@@ -72,8 +84,8 @@ export function parseBackup(text) {
     futureRecords: objects.filter((r) => isFutureVersion(r) && versionOf(r) <= SCHEMA_VERSION + MAX_FUTURE_STEPS && isValidId(r.id)),
     procs: Array.isArray(data.procs)
       ? data.procs
-          .filter((p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())
-          .map((p) => ({ id: p.id, n: p.n.trim(), pio: p.pio ? 1 : 0 }))
+          .filter((/** @type {any} */ p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())
+          .map((/** @type {any} */ p) => ({ id: p.id, n: p.n.trim(), pio: p.pio ? 1 : 0 }))
       : [],
     auditDocs: Array.isArray(data.bitacora) ? data.bitacora.filter(validAuditDoc) : [],
     patients: Array.isArray(data.pacientes) ? data.pacientes.map(normalizePatient).filter(Boolean) : [],
@@ -89,9 +101,11 @@ export function parseBackup(text) {
  * Una atención de versión FUTURA que reemplazaría a una atención actual con el
  * mismo id NO se aplica salvo `allowFutureOverride` (la interfaz lo pregunta):
  * un respaldo manipulado no puede ocultar atenciones existentes en silencio.
- * @param {{allowFutureOverride?: boolean}} [opts]
  * Las fichas de pacientes también se fusionan campo a campo.
- * @returns {{records: object[], futureRecords: object[], procs: object[], auditDocs: object[], patients: object[], added: number, updated: number, unchanged: number, futureConflicts: string[]}}
+ * @param {DatosRespaldo} local
+ * @param {DatosRespaldo} incoming
+ * @param {{allowFutureOverride?: boolean}} [opts]
+ * @returns {Required<DatosRespaldo> & {added: number, updated: number, unchanged: number, futureConflicts: string[]}}
  */
 export function mergeBackup(local, incoming, opts = {}) {
   const { allowFutureOverride = false } = opts;
@@ -117,6 +131,7 @@ export function mergeBackup(local, incoming, opts = {}) {
   }
   // Versiones futuras: se conservan intactas; entre dos, la más nueva.
   const future = new Map((local.futureRecords || []).map((r) => [r.id, r]));
+  /** @type {string[]} */
   const futureConflicts = [];
   for (const r of incoming.futureRecords || []) {
     if (map.has(r.id)) {

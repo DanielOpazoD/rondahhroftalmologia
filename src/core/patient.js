@@ -28,6 +28,10 @@ import { sha256 } from '../lib/sha256.js';
 import { rutKey, normalizeText } from './format.js';
 import { unknownFields, isSafeField } from './compat.js';
 
+/** @typedef {import('../domain').Paciente} Paciente */
+/** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
+/** Fichas: lista o Map por id. @typedef {Paciente[] | Map<string, Paciente>} Fichas */
+
 /** Campos de la ficha del paciente (mismos nombres que en la atención). */
 export const PATIENT_FIELDS = ['paciente_rut', 'paciente_nombre', 'paciente_fnac', 'paciente_sexo', 'paciente_fono'];
 
@@ -37,13 +41,16 @@ export const PATIENT_SCHEMA = 1;
 export const MERGED_FIELD = 'fusionado_en';
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
+/** @type {(id: unknown) => id is string} */
 const isValidId = (id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+/** @param {string} s */
 const hashId = (s) => Array.from(sha256(s).slice(0, 10), (b) => B32[b & 31]).join('');
 
 /**
  * Id del paciente a partir de sus datos: por RUT si lo hay; si no, por nombre.
  * Devuelve null si no hay con qué identificarlo.
- * @param {Record<string, any>} f datos con paciente_rut / paciente_nombre
+ * @param {Record<string, unknown>} f datos con paciente_rut / paciente_nombre
+ * @returns {string|null}
  */
 export function patientIdFor(f = {}) {
   const k = rutKey(f.paciente_rut);
@@ -53,8 +60,13 @@ export function patientIdFor(f = {}) {
   return null;
 }
 
-/** Datos del paciente tomados de una atención (o de cualquier objeto con `f`). */
+/**
+ * Datos del paciente tomados de una atención (o de cualquier objeto con `f`).
+ * @param {Record<string, unknown>} [f]
+ * @returns {Record<string, string>}
+ */
 export function patientFields(f = {}) {
+  /** @type {Record<string, string>} */
   const out = {};
   for (const k of PATIENT_FIELDS) if (f[k] !== undefined && f[k] !== null && String(f[k]).trim() !== '') out[k] = String(f[k]).trim();
   return out;
@@ -62,11 +74,13 @@ export function patientFields(f = {}) {
 
 /**
  * Normaliza una ficha de paciente; null si no es válida.
- * @param {object} raw
+ * @param {{id?: unknown, v?: unknown, created?: unknown, updated?: unknown, f?: Record<string, unknown>, ft?: Record<string, unknown>, [campo: string]: unknown} | null | undefined} raw
+ *   ficha guardada, recibida de otro equipo o de un respaldo (sin validar)
+ * @returns {Paciente|null}
  */
 export function normalizePatient(raw) {
   if (!raw || typeof raw !== 'object' || !isValidId(raw.id) || !raw.id.startsWith('p_')) return null;
-  /** @type {Record<string, any>} */
+  /** @type {Paciente} */
   const p = {
     // Campos que agregue una versión más nueva se conservan (ver core/compat.js).
     ...unknownFields(raw, ['id', 'tipo', 'v', 'created', 'updated', 'f', 'ft', 'checks', 'proc']),
@@ -84,13 +98,18 @@ export function normalizePatient(raw) {
   if (isValidId(into) && into.startsWith('p_') && into !== raw.id) p.f[MERGED_FIELD] = into;
   if (raw.ft && typeof raw.ft === 'object') {
     p.ft = {};
-    for (const [k, v] of Object.entries(raw.ft)) if (k.startsWith('f.') && Number.isFinite(v)) p.ft[k] = v;
+    for (const [k, v] of Object.entries(raw.ft)) if (k.startsWith('f.') && Number.isFinite(v)) p.ft[k] = /** @type {number} */ (v);
   }
   return p;
 }
 
-/** Textos de la ficha que esta versión no conoce (de una versión más nueva): se conservan. */
+/**
+ * Textos de la ficha que esta versión no conoce (de una versión más nueva): se conservan.
+ * @param {unknown} f
+ * @returns {Record<string, string>}
+ */
 function unknownTextFields(f) {
+  /** @type {Record<string, string>} */
   const out = {};
   if (!f || typeof f !== 'object') return out;
   for (const [k, v] of Object.entries(f)) {
@@ -104,6 +123,8 @@ function unknownTextFields(f) {
 /**
  * Ficha nueva a partir de los datos de una atención. Sus campos quedan
  * fechados con `at` (fecha de la edición que los aportó).
+ * @param {RegistroFusionable} rec
+ * @param {number} at
  */
 export function patientFromRecord(rec, at) {
   const id = rec.pacienteId || patientIdFor(rec.f);
@@ -112,7 +133,10 @@ export function patientFromRecord(rec, at) {
   return normalizePatient({ id, created: at, updated: at, f, ft: Object.fromEntries(Object.keys(f).map((k) => ['f.' + k, at])) });
 }
 
-/** Edad de referencia y texto breve del paciente para listas. */
+/**
+ * Edad de referencia y texto breve del paciente para listas.
+ * @param {RegistroFusionable | null | undefined} p
+ */
 export function patientLabel(p) {
   const f = p?.f || {};
   return f.paciente_nombre || f.paciente_rut || '(sin nombre)';
@@ -122,12 +146,14 @@ export function patientLabel(p) {
  * Fichas que faltan para atenciones que apuntan a un paciente inexistente
  * (migración desde versiones sin pacientes, o atenciones recibidas de otro
  * equipo antes que su ficha). Idempotente: ids deterministas.
- * @param {object[]} records atenciones
+ * @param {RegistroFusionable[]} records atenciones
  * @param {Map<string, object>|Record<string, object>} patients fichas existentes por id
- * @returns {object[]} fichas nuevas (la más reciente de cada paciente aporta los datos)
+ * @returns {Paciente[]} fichas nuevas (la más reciente de cada paciente aporta los datos)
  */
 export function missingPatients(records, patients) {
+  /** @param {string} id */
   const has = (id) => (patients instanceof Map ? patients.has(id) : Boolean(patients[id]));
+  /** @type {Map<string, Paciente>} */
   const out = new Map();
   for (const r of records) {
     const id = r.pacienteId || patientIdFor(r.f);
@@ -139,7 +165,13 @@ export function missingPatients(records, patients) {
   return [...out.values()].filter(Boolean);
 }
 
-/** Atenciones de un paciente, de la más reciente a la más antigua. */
+/**
+ * Atenciones de un paciente, de la más reciente a la más antigua.
+ * @template {RegistroFusionable} T
+ * @param {T[]} records
+ * @param {string} pacienteId
+ * @returns {T[]}
+ */
 export function attentionsOf(records, pacienteId) {
   return records
     .filter((r) => r.pacienteId === pacienteId)
@@ -157,6 +189,7 @@ export function attentionsOf(records, pacienteId) {
  * organización (operativo, fecha, médico).
  */
 const NON_CLINICAL = new Set([...PATIENT_FIELDS, 'paciente_edad', 'operativo', 'fecha_atencion', 'medico_nombre', 'medico_rut']);
+/** @param {RegistroFusionable} rec */
 export function isAttended(rec) {
   if (Object.values(rec.checks || {}).some(Boolean)) return true;
   if (Object.keys(rec.proc || {}).length || rec.cat) return true;
@@ -165,16 +198,20 @@ export function isAttended(rec) {
 
 /* ------------------------------------------------- identidad y duplicados */
 
-/** Fichas por id (acepta lista o Map). */
+/** Fichas por id (acepta lista o Map). @type {(patients: Fichas | null | undefined) => Map<string, Paciente>} */
 const asMap = (patients) => (patients instanceof Map ? patients : new Map((patients || []).map((p) => [p.id, p])));
 
 /**
  * Ficha vigente de un id, siguiendo las uniones (A → B → C). Si dos equipos
  * unieron en sentidos opuestos (A → B y B → A), gana el id menor: el
  * resultado es el mismo en todos los equipos y ninguna ficha se pierde.
+ * @param {Fichas} patients
+ * @param {string} id
+ * @returns {string}
  */
 export function canonicalPatientId(patients, id) {
   const map = asMap(patients);
+  /** @type {string[]} */
   const seen = [];
   let cur = id;
   while (cur && !seen.includes(cur)) {
@@ -189,6 +226,7 @@ export function canonicalPatientId(patients, id) {
 }
 
 /** ¿Es una ficha vigente (no unida a otra)? */
+/** @type {(patients: Fichas, p: {id: string}) => boolean} */
 export const isCanonicalPatient = (patients, p) => canonicalPatientId(patients, p.id) === p.id;
 
 /**
@@ -197,9 +235,10 @@ export const isCanonicalPatient = (patients, p) => canonicalPatientId(patients, 
  * 2. si la atención ya estaba vinculada a una ficha, esa (aunque ahora se le agregue el RUT);
  * 3. si no, el id derivado de los datos (ficha nueva o ya existente).
  * Siempre devuelve la ficha vigente (siguiendo uniones).
- * @param {Record<string, any>} f
- * @param {object[] | Map<string, object>} patients
+ * @param {Record<string, unknown>} f
+ * @param {Fichas} patients
  * @param {string} [currentId]
+ * @returns {string|null}
  */
 export function resolvePatientId(f, patients, currentId) {
   const map = asMap(patients);
@@ -214,26 +253,32 @@ export function resolvePatientId(f, patients, currentId) {
   return id && map.has(id) ? canonicalPatientId(map, id) : id;
 }
 
+/** @typedef {{a: Paciente, b: Paciente, motivo: 'rut' | 'nombre'}} ParDuplicado */
+
 /**
  * Pares de fichas que probablemente son la misma persona (solo fichas vigentes):
  * - `rut`: mismo RUT (seguro);
  * - `nombre`: mismo nombre (sin tildes ni mayúsculas) y nada que las distinga
  *   (no tienen RUT distintos ni fechas de nacimiento distintas).
- * @param {object[] | Map<string, object>} patients
+ * @param {Fichas} patients
  * @param {Set<string>} [dismissed] pares "idA|idB" marcados como personas distintas
- * @returns {{a: object, b: object, motivo: 'rut' | 'nombre'}[]}
+ * @returns {ParDuplicado[]}
  */
 export function findDuplicatePairs(patients, dismissed = new Set()) {
   const map = asMap(patients);
   const live = [...map.values()].filter((p) => isCanonicalPatient(map, p));
+  /** @type {Map<string, ParDuplicado>} */
   const pairs = new Map();
+  /** @type {(a: Paciente, b: Paciente, motivo: ParDuplicado['motivo']) => void} */
   const add = (a, b, motivo) => {
     const [x, y] = a.id < b.id ? [a, b] : [b, a];
     const key = x.id + '|' + y.id;
     if (dismissed.has(key) || pairs.has(key)) return;
     pairs.set(key, { a: x, b: y, motivo });
   };
+  /** @param {(p: Paciente) => string} keyOf */
   const group = (keyOf) => {
+    /** @type {Map<string, Paciente[]>} */
     const g = new Map();
     for (const p of live) {
       const k = keyOf(p);
@@ -246,6 +291,7 @@ export function findDuplicatePairs(patients, dismissed = new Set()) {
   for (const list of group((p) => rutKey(p.f.paciente_rut))) {
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) add(list[i], list[j], 'rut');
   }
+  /** @type {(a: Paciente, b: Paciente, k: string) => boolean} */
   const differ = (a, b, k) => a.f[k] && b.f[k] && (k === 'paciente_rut' ? rutKey(a.f[k]) !== rutKey(b.f[k]) : a.f[k] !== b.f[k]);
   for (const list of group((p) => normalizeText(p.f.paciente_nombre))) {
     for (let i = 0; i < list.length; i++) {
@@ -262,7 +308,10 @@ export function findDuplicatePairs(patients, dismissed = new Set()) {
  * Une la ficha `drop` en `keep`: `keep` completa sus datos vacíos con los de
  * `drop`, y `drop` queda marcada como unida. No une personas con RUT distintos.
  * Las atenciones se re-vinculan aparte (ver la acción de la interfaz).
- * @returns {{keep: object, drop: object}}
+ * @param {Paciente} keep
+ * @param {Paciente} drop
+ * @param {number} at
+ * @returns {{keep: Paciente, drop: Paciente}}
  */
 export function mergePatients(keep, drop, at) {
   if (keep.id === drop.id) throw new Error('Es la misma ficha');

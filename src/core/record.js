@@ -22,8 +22,18 @@ import { migrate } from './migrations.js';
 import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt } from './format.js';
 
 /**
+ * Atención recién creada en el formulario. Es una Atencion (normalizeRecord
+ * devuelve una que se le puede asignar), salvo `proc`, que el formulario
+ * completa por partes (ver ProcRealizado en domain.d.ts).
+ * @typedef {{v: number, especialidad: string, id: string|null, checks: Record<string, boolean>, cat: string,
+ *   proc: {}, ft?: import('../domain').FechasPorCampo, f: Record<string, string>,
+ *   created?: number, updated?: number, pacienteId?: string, procNames?: Record<string, string>}} AtencionEnBlanco
+ */
+
+/**
  * Registro vacío listo para completar.
  * @param {{n?: string, r?: string, op?: string}} [medico] datos recordados del médico
+ * @returns {AtencionEnBlanco}
  */
 export function blankRecord(medico = {}, now = new Date()) {
   return {
@@ -46,11 +56,14 @@ export function blankRecord(medico = {}, now = new Date()) {
 /**
  * Lleva cualquier registro (versión anterior, posiblemente incompleto) a la
  * forma actual sin perder información. No modifica el objeto recibido.
+ * @param {unknown} raw
+ * @returns {import('../domain').Atencion}
  * @throws {import('./migrations.js').FutureVersionError} si es de una versión más nueva
  */
 export function normalizeRecord(raw) {
   // Migra paso a paso (lanza FutureVersionError si es de una versión más nueva: no se degrada).
-  const r = migrate(raw && typeof raw === 'object' ? structuredCloneSafe(raw) : {});
+  // Desde aquí se completa y valida cada parte: al final tiene la forma de una atención.
+  const r = /** @type {import('../domain').Atencion} */ (migrate(raw && typeof raw === 'object' ? structuredCloneSafe(raw) : {}));
   r.especialidad = typeof r.especialidad === 'string' && r.especialidad ? r.especialidad : ESPECIALIDAD.id;
   // Los ids vienen también de respaldos importados: solo se aceptan caracteres seguros.
   r.id = isValidId(r.id) ? r.id : null;
@@ -73,7 +86,11 @@ export function normalizeRecord(raw) {
   return r;
 }
 
-/** Id seguro para atenciones y procedimientos: letras, números, "_" o "-" (1–64). */
+/**
+ * Id seguro para atenciones y procedimientos: letras, números, "_" o "-" (1–64).
+ * @param {unknown} id
+ * @returns {id is string}
+ */
 export function isValidId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 }
@@ -91,19 +108,24 @@ export function newRecordId(now = Date.now(), rand = Math.random) {
  * Valida un registro antes de guardarlo.
  * - errors: impiden guardar.
  * - warnings: se informan pero permiten guardar (datos de terreno pueden ser incompletos).
+ * @param {import('../domain').Atencion} rec
  * @returns {{errors: string[], warnings: string[], fields: Record<string, {msg: string, level: 'error'|'warn'}>}}
  *   `fields` asocia id de campo -> mensaje y nivel, para marcarlo en la interfaz.
  */
 export function validateRecord(rec, now = new Date()) {
   const f = rec.f || {};
+  /** @type {string[]} */
   const errors = [];
+  /** @type {string[]} */
   const warnings = [];
   /** @type {Record<string, {msg: string, level: 'error'|'warn'}>} */
   const fields = {};
+  /** @type {(field: string, msg: string) => void} */
   const warn = (field, msg) => {
     warnings.push(msg);
     fields[field] = { msg, level: 'warn' };
   };
+  /** @type {(field: string, msg: string, fieldMsg?: string) => void} */
   const error = (field, msg, fieldMsg = msg) => {
     errors.push(msg);
     fields[field] = { msg: fieldMsg, level: 'error' };
@@ -145,6 +167,7 @@ export function validateRecord(rec, now = new Date()) {
  * Clave que identifica a un paciente para contar "pacientes distintos" y
  * generar su código seudónimo: RUT canónico si existe; si no, el nombre
  * normalizado.
+ * @param {import('../domain').RegistroFusionable} rec
  * @returns {{key: string, basis: 'rut'|'nombre'|'id'}}
  */
 export function patientKey(rec) {
@@ -157,20 +180,32 @@ export function patientKey(rec) {
 
 /**
  * Busca otra atención del mismo paciente en la misma fecha (posible duplicado).
- * @returns {object|undefined}
+ * @template {import('../domain').RegistroFusionable} T
+ * @param {import('../domain').RegistroFusionable} rec
+ * @param {T[]} records
+ * @returns {T|undefined}
  */
 export function findDuplicate(rec, records) {
   const key = patientKey(rec).key;
   return records.find((r) => r.id !== rec.id && r.f?.fecha_atencion === rec.f?.fecha_atencion && patientKey(r).key === key);
 }
 
-/** Ordena atenciones: fecha más reciente primero; a igual fecha, la última creada primero. */
+/**
+ * Ordena atenciones: fecha más reciente primero; a igual fecha, la última creada primero.
+ * @template {import('../domain').RegistroFusionable} T
+ * @param {T[]} records
+ * @returns {T[]}
+ */
 export function sortRecords(records) {
   return [...records].sort(
     (a, b) => (b.f?.fecha_atencion || '').localeCompare(a.f?.fecha_atencion || '') || (b.created || 0) - (a.created || 0),
   );
 }
 
+/**
+ * @param {object} o
+ * @returns {object}
+ */
 function structuredCloneSafe(o) {
   return JSON.parse(JSON.stringify(o));
 }
@@ -178,6 +213,7 @@ function structuredCloneSafe(o) {
 /**
  * Si hay fecha de nacimiento válida, calcula la edad a la fecha de atención
  * (o a hoy) y la deja en `f.paciente_edad`. Devuelve true si cambió la edad.
+ * @param {import('../domain').RegistroFusionable} rec
  */
 export function applyBirthDate(rec, now = new Date()) {
   const f = rec.f || {};

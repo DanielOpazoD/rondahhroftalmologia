@@ -11,24 +11,49 @@
 import { sortRecords } from '../core/record.js';
 import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
 
-/** Ids que viajan opacos en el espacio de la especialidad: perfiles (huella del RUT). Ver ADR 0005. */
-export const opaqueInSpecialty = (id) => id.startsWith('m_');
+/** Documento local que se sincroniza (atención, ficha, perfil, operativo o bitácora). @typedef {{id: string, updated?: number}} Documento */
+/** @typedef {import('../domain').ElementoSync} ElementoSync */
+/**
+ * Lo que esta capa usa del almacenamiento (ver storage/store.js).
+ * @typedef {{
+ *   loadPatients: () => Documento[], savePatients: (list: Documento[]) => void,
+ *   loadRecords: () => Documento[], saveRecords: (list: Documento[]) => void, loadFutureRecords: () => Documento[],
+ *   loadMedicos: () => Documento[], saveMedicos: (list: Documento[]) => void,
+ *   loadOperativos: () => Documento[], saveOperativos: (list: Documento[]) => void,
+ *   loadAuditDocs: () => Documento[], saveAuditDocs: (list: Documento[]) => void,
+ *   loadTombstones: () => Record<string, number>, saveTombstones: (t: Record<string, number>) => void,
+ * }} SyncStore
+ */
 
+/** Ids que viajan opacos en el espacio de la especialidad: perfiles (huella del RUT). Ver ADR 0005. */
+export const opaqueInSpecialty = (/** @type {string} */ id) => id.startsWith('m_');
+
+/** @type {(kind: import('../domain').TipoSync) => (x: Documento) => ElementoSync} */
 const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated, kind, data: x });
-/** Elemento sincronizado -> documento local (con id y versión del elemento). */
+/** Elemento sincronizado -> documento local (con id y versión del elemento). @param {ElementoSync} i */
 const unwrap = (i) => ({ ...i.data, id: i.id, updated: i.updated });
 
-/** Fichas de pacientes para sincronizar. */
+/**
+ * Fichas de pacientes para sincronizar.
+ * @param {SyncStore} store
+ */
 export function readPatientItems(store) {
   return { items: store.loadPatients().map(wrap('paciente')), tombstones: {} };
 }
 
-/** Guarda las fichas recibidas o fusionadas. */
+/**
+ * Guarda las fichas recibidas o fusionadas.
+ * @param {SyncStore} store
+ * @param {ElementoSync[]} items
+ */
 export function writePatientItems(store, items) {
   store.savePatients(items.filter((i) => i.kind === 'paciente').map(unwrap));
 }
 
-/** Todo lo de la especialidad que se sincroniza. */
+/**
+ * Todo lo de la especialidad que se sincroniza.
+ * @param {SyncStore} store
+ */
 export function readSpecialtyItems(store) {
   return {
     items: [
@@ -46,8 +71,14 @@ export function readSpecialtyItems(store) {
   };
 }
 
-/** Guarda lo recibido o fusionado de la especialidad (atenciones, bitácora, catálogos y lápidas). */
+/**
+ * Guarda lo recibido o fusionado de la especialidad (atenciones, bitácora, catálogos y lápidas).
+ * @param {SyncStore} store
+ * @param {ElementoSync[]} items
+ * @param {Record<string, number>} tombstones
+ */
 export function writeSpecialtyItems(store, items, tombstones) {
+  /** @param {import('../domain').TipoSync} kind */
   const of = (kind) => items.filter((i) => i.kind === kind).map(unwrap);
   store.saveRecords(sortRecords(of('atencion')));
   store.saveAuditDocs(of('bitacora'));

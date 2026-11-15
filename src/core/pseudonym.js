@@ -38,7 +38,10 @@ export const ANON_OPTIONS = {
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-/** Bytes -> base32 Crockford (sin letras ambiguas I, L, O, U). */
+/**
+ * Bytes -> base32 Crockford (sin letras ambiguas I, L, O, U).
+ * @param {Iterable<number>} bytes
+ */
 export function base32(bytes) {
   let bits = 0;
   let value = 0;
@@ -56,12 +59,18 @@ export function base32(bytes) {
   return out;
 }
 
-/** Nueva clave secreta aleatoria (256 bits, en hexadecimal). */
+/**
+ * Nueva clave secreta aleatoria (256 bits, en hexadecimal).
+ * @param {(n: number) => Uint8Array} [rng]
+ */
 export function createSecret(rng = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))) {
   return Array.from(rng(32), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Huella corta de la clave, para comparar equipos sin mostrar la clave. */
+/**
+ * Huella corta de la clave, para comparar equipos sin mostrar la clave.
+ * @param {string} secret
+ */
 export function secretFingerprint(secret) {
   return base32(hmacSha256(secret, 'huella')).slice(0, 6);
 }
@@ -69,6 +78,8 @@ export function secretFingerprint(secret) {
 /**
  * Código seudónimo estable: `${prefix}-${8 caracteres}`.
  * 8 caracteres base32 = 40 bits: colisión prácticamente imposible para miles de pacientes.
+ * @param {string} secret
+ * @param {string} key
  */
 export function pseudonym(secret, key, prefix = 'P', length = 8) {
   if (!secret) throw new Error('Falta la clave de seudonimización');
@@ -77,14 +88,21 @@ export function pseudonym(secret, key, prefix = 'P', length = 8) {
 
 /* ------------------------------------------------------- limpieza de texto */
 
-/** Expresión que encuentra una palabra sin importar tildes ni mayúsculas. */
+/**
+ * Expresión que encuentra una palabra sin importar tildes ni mayúsculas.
+ * @param {string} word
+ */
 function wordRegex(word) {
+  /** @type {Record<string, string>} */
   const variants = { a: '[aáàä]', e: '[eéèë]', i: '[iíìï]', o: '[oóòö]', u: '[uúùü]', n: '[nñ]' };
   const body = [...normalizeText(word)].map((c) => variants[c] || c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('');
   return new RegExp(`(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])`, 'giu');
 }
 
-/** Palabras de un nombre que vale la pena buscar (3+ letras). */
+/**
+ * Palabras de un nombre que vale la pena buscar (3+ letras).
+ * @param {unknown} name
+ */
 export function nameTokens(name) {
   return [
     ...new Set(
@@ -115,7 +133,11 @@ export function scrubText(text, ctx = {}) {
 
 /* ------------------------------------------------------ generalizaciones */
 
-/** Edad generalizada según la opción. */
+/**
+ * Edad generalizada según la opción.
+ * @param {number | null | undefined} age
+ * @param {string} mode
+ */
 export function generalizeAge(age, mode) {
   if (age === null || age === undefined) return '';
   if (age >= 90) return '90+';
@@ -124,7 +146,12 @@ export function generalizeAge(age, mode) {
   return `${lo}-${lo + 4}`;
 }
 
-/** Fecha generalizada según la opción. */
+/**
+ * Fecha generalizada según la opción.
+ * @param {string} iso
+ * @param {string} mode
+ * @param {string | null} [firstDate]
+ */
 export function generalizeDate(iso, mode, firstDate) {
   if (!iso || mode === 'omitir') return '';
   if (mode === 'exacta') return iso;
@@ -135,12 +162,16 @@ export function generalizeDate(iso, mode, firstDate) {
 /**
  * Busca en la salida (texto serializado) identificadores de los pacientes
  * originales: palabras del nombre (4+ letras), cuerpo del RUT y teléfono.
+ * @param {string} outputText
+ * @param {import('../domain').RegistroFusionable[]} records
  * @returns {{tipo: string, muestra: string}[]} hallazgos (con el valor enmascarado)
  */
 export function findLeaks(outputText, records) {
   const text = normalizeText(outputText);
   const digits = String(outputText).replace(/\D+/g, ' ');
+  /** @type {Map<string, {tipo: string, muestra: string}>} */
   const found = new Map();
+  /** @param {string} s */
   const mask = (s) => s.slice(0, 2) + '•'.repeat(Math.max(1, s.length - 2));
   for (const r of records) {
     const f = r.f || {};
@@ -159,7 +190,15 @@ export function findLeaks(outputText, records) {
 
 /* ------------------------------------------------------------ salidas */
 
-/** Hoja de la tabla de correspondencia (CONFIDENCIAL). */
+/**
+ * Fila de la tabla de correspondencia: código seudónimo -> identidad del paciente.
+ * @typedef {{codigo_paciente: string, nombre: string, rut: string, base_codigo: string, atenciones: number}} FilaCorrespondencia
+ */
+
+/**
+ * Hoja de la tabla de correspondencia (CONFIDENCIAL).
+ * @param {{correspondencia: FilaCorrespondencia[]}} result
+ */
 export function correspondenciaSheets(result, now = new Date()) {
   return [
     {

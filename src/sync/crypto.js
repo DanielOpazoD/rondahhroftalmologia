@@ -28,12 +28,14 @@ export function cryptoAvailable() {
 
 /* ------------------------------------------------------------ base64 */
 
+/** @param {Uint8Array} bytes */
 export function bytesToB64(bytes) {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
 
+/** @param {string} b64 */
 export function b64ToBytes(b64) {
   const bin = atob(b64);
   const out = new Uint8Array(bin.length);
@@ -46,21 +48,23 @@ export function b64ToBytes(b64) {
 /**
  * Contraseña aleatoria fácil de dictar: "K7QM3-XRT9P-ZAWD4-N8F2C" (100 bits).
  * Sin letras ambiguas (I, L, O, U).
+ * @param {(n: number) => Uint8Array} [rng]
  */
 export function generatePassphrase(rng = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))) {
   const bytes = rng(20);
   const chars = Array.from(bytes, (b) => CROCKFORD[b & 31]).join('');
-  return chars.match(/.{5}/g).join('-');
+  return /** @type {RegExpMatchArray} */ (chars.match(/.{5}/g)).join('-');
 }
 
 /**
  * Normaliza la contraseña: si tiene el formato generado, sin importar
  * mayúsculas ni espacios; si no, solo quita espacios en los extremos.
+ * @param {unknown} p
  */
 export function normalizePassphrase(p) {
   const s = String(p ?? '').trim();
   const compact = s.toUpperCase().replace(/[\s-]/g, '');
-  if (/^[0-9A-HJKMNP-TV-Z]{20}$/.test(compact)) return compact.match(/.{5}/g).join('-');
+  if (/^[0-9A-HJKMNP-TV-Z]{20}$/.test(compact)) return /** @type {RegExpMatchArray} */ (compact.match(/.{5}/g)).join('-');
   return s;
 }
 
@@ -68,6 +72,7 @@ export function normalizePassphrase(p) {
  * Solo se aceptan contraseñas GENERADAS por la app (100 bits aleatorios).
  * Una contraseña elegida a mano podría adivinarse probando diccionarios
  * contra los datos cifrados; una generada no, aunque la sal sea fija.
+ * @param {unknown} p
  */
 export function passphraseProblem(p) {
   return /^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/.test(normalizePassphrase(p))
@@ -83,6 +88,7 @@ export function passphraseProblem(p) {
  *   clave de cifrado = HKDF(maestra, "cifrado")   — nunca sale del PC
  *   token del servidor = HKDF(maestra, "acceso")  — el servidor guarda su SHA-256
  * Las dos salidas son independientes: conocer el token no revela la clave de cifrado.
+ * @param {string} passphrase
  * @returns {Promise<{encKey: string, token: string}>} encKey en base64, token en hex
  */
 export async function deriveTeamKeys(passphrase, iterations = PBKDF2_ITERATIONS) {
@@ -90,6 +96,7 @@ export async function deriveTeamKeys(passphrase, iterations = PBKDF2_ITERATIONS)
   const base = await subtle.importKey('raw', utf8(normalizePassphrase(passphrase)), 'PBKDF2', false, ['deriveBits']);
   const master = await subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: utf8(SALT), iterations }, base, 256);
   const hkdfKey = await subtle.importKey('raw', master, 'HKDF', false, ['deriveBits']);
+  /** @param {string} label */
   const expand = async (label) =>
     new Uint8Array(
       await subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: utf8(`${SALT}:${label}`) }, hkdfKey, 256),
@@ -97,20 +104,34 @@ export async function deriveTeamKeys(passphrase, iterations = PBKDF2_ITERATIONS)
   return { encKey: bytesToB64(await expand('cifrado')), token: toHex(await expand('acceso')) };
 }
 
-/** Valor que se configura en Netlify (variable SYNC_TOKEN_SHA256). */
+/**
+ * Valor que se configura en Netlify (variable SYNC_TOKEN_SHA256).
+ * @param {string} token
+ */
 export function tokenHash(token) {
   return toHex(sha256(token));
 }
 
-/** Importa la clave AES guardada (base64). */
+/**
+ * Importa la clave AES guardada (base64).
+ * @param {string} encKeyB64
+ */
 export function importEncKey(encKeyB64) {
   return globalThis.crypto.subtle.importKey('raw', b64ToBytes(encKeyB64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
+/**
+ * @param {string} id
+ * @param {number} u
+ */
 const aad = (id, u) => utf8(`${id}|${u}`);
 
 /**
  * Cifra un objeto ligado a (id, versión).
+ * @param {CryptoKey} key
+ * @param {string} id
+ * @param {number} u
+ * @param {unknown} obj
  * @returns {Promise<{iv: string, ct: string}>} base64
  */
 export async function encryptPayload(key, id, u, obj) {
@@ -122,6 +143,11 @@ export async function encryptPayload(key, id, u, obj) {
 /**
  * Descifra y verifica. Lanza DecryptError si la clave no corresponde o el
  * contenido fue alterado.
+ * @param {CryptoKey} key
+ * @param {string} id
+ * @param {number} u
+ * @param {{iv: string, ct: string}} payload
+ * @returns {Promise<any>} JSON descifrado (forma no verificada: la valida quien lo usa)
  */
 export async function decryptPayload(key, id, u, { iv, ct }) {
   try {

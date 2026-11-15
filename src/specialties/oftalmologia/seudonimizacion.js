@@ -34,7 +34,7 @@ const DATE_FIELD = { mes: 'mes', relativa: 'dia_relativo', exacta: 'fecha', omit
  * @param {object[]} records
  * @param {import('./config.js').ProcDef[]} procs
  * @param {{secret: string, fechas?: string, edad?: string, texto?: string}} options
- * @returns {{registros: object[], correspondencia: object[], opciones: object, primeraFecha: string|null}}
+ * @returns {{registros: object[], correspondencia: import('../../core/pseudonym.js').FilaCorrespondencia[], opciones: object, primeraFecha: string|null}}
  */
 export function anonymizeRecords(records, procs, options) {
   const opt = { ...ANON_DEFAULTS, ...options };

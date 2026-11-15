@@ -16,15 +16,23 @@ import { ROLES } from '../config/catalogs.js';
 import { unknownFields } from './compat.js';
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
+/** @param {string} s */
 const shortHash = (s) => Array.from(hmacSha256('catalogo', s).slice(0, 8), (b) => B32[b & 31]).join('');
 
-/** Id estable de un perfil de médico: por RUT si existe, si no por nombre. */
+/**
+ * Id estable de un perfil de médico: por RUT si existe, si no por nombre.
+ * @param {unknown} nombre
+ * @param {unknown} rut
+ */
 export function medicoId(nombre, rut) {
   const k = rutKey(rut);
   return 'm_' + shortHash(k ? 'rut:' + k : 'nombre:' + normalizeText(nombre));
 }
 
-/** Id estable de un operativo, por nombre. */
+/**
+ * Id estable de un operativo, por nombre.
+ * @param {unknown} nombre
+ */
 export function operativoId(nombre) {
   return 'o_' + shortHash(normalizeText(nombre));
 }
@@ -32,9 +40,9 @@ export function operativoId(nombre) {
 /**
  * Perfil profesional (por compatibilidad se llama «médico» en el código y en
  * la sincronización; `rol` dice qué es: médico, enfermería, TENS…).
- * @typedef {{id: string, nombre: string, rut: string, rol: string, created: number, updated: number}} Medico
+ * @typedef {import('../domain').Perfil} Medico
  */
-/** @typedef {{id: string, nombre: string, created: number, updated: number}} Operativo */
+/** @typedef {import('../domain').Operativo} Operativo */
 
 /**
  * Crea o normaliza un perfil de médico; null si no es válido.
@@ -65,12 +73,15 @@ export function makeMedico(m = {}, now = Date.now()) {
 }
 const MEDICO_FIELDS = ['id', 'nombre', 'rut', 'rol', 'created', 'updated'];
 /** Clave de rol con forma válida (conocida o de una versión más nueva). */
+/** @type {(r: unknown) => r is string} */
 const isRoleKey = (r) => typeof r === 'string' && /^[a-z][a-z0-9_-]{0,31}$/.test(r);
 
 /** Etiqueta del rol de un perfil. */
+/** @param {string | null | undefined} rol */
 export const rolLabel = (rol) => (!rol ? 'Médico/a' : ROLES.find((x) => x.key === rol)?.label || 'Otro');
 
 /** Solo los perfiles que pueden ser médico responsable de una atención. */
+/** @type {(list: Medico[]) => Medico[]} */
 export const onlyDoctors = (list) => list.filter((m) => (m.rol || 'medico') === 'medico');
 
 /**
@@ -94,12 +105,23 @@ export function makeOperativo(o = {}, now = Date.now()) {
   };
 }
 
-/** Ordena por nombre (es-CL, sin importar tildes). */
+/**
+ * Ordena por nombre (es-CL, sin importar tildes).
+ * @template {{nombre: string}} T
+ * @param {T[]} list
+ * @returns {T[]}
+ */
 export function byName(list) {
   return [...list].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 }
 
-/** Agrega o reemplaza por id. */
+/**
+ * Agrega o reemplaza por id.
+ * @template {{id: string, created?: number}} T
+ * @param {T[]} list
+ * @param {T} item
+ * @returns {T[]}
+ */
 export function upsert(list, item) {
   const i = list.findIndex((x) => x.id === item.id);
   const out = [...list];
@@ -112,7 +134,7 @@ export function upsert(list, item) {
  * Siembra los catálogos a partir de atenciones ya guardadas y del último
  * médico/operativo recordado (migración desde versiones sin catálogos).
  * Solo agrega lo que falta; no modifica entradas existentes.
- * @param {{records?: object[], recordado?: {n?: string, r?: string, op?: string}, medicos?: Medico[], operativos?: Operativo[]}} input
+ * @param {{records?: import('../domain').RegistroFusionable[], recordado?: {n?: string, r?: string, op?: string}, medicos?: Medico[], operativos?: Operativo[]}} input
  * @param {number} [now]
  * @returns {{medicos: Medico[], operativos: Operativo[], added: number}}
  */
@@ -120,6 +142,7 @@ export function seedCatalogs({ records = [], recordado = {}, medicos = [], opera
   const meds = [...medicos];
   const ops = [...operativos];
   let added = 0;
+  /** @type {(nombre: string, rut?: string) => void} */
   const addMed = (nombre, rut) => {
     const m = makeMedico({ nombre, rut }, now);
     if (m && !meds.some((x) => x.id === m.id)) {
@@ -127,6 +150,7 @@ export function seedCatalogs({ records = [], recordado = {}, medicos = [], opera
       added++;
     }
   };
+  /** @param {string} nombre */
   const addOp = (nombre) => {
     const o = makeOperativo({ nombre }, now);
     if (o && !ops.some((x) => x.id === o.id)) {
@@ -143,7 +167,13 @@ export function seedCatalogs({ records = [], recordado = {}, medicos = [], opera
   return { medicos: byName(meds), operativos: byName(ops), added };
 }
 
-/** Perfil que corresponde a los datos de médico de una atención (por RUT o nombre). */
+/**
+ * Perfil que corresponde a los datos de médico de una atención (por RUT o nombre).
+ * @param {Medico[]} medicos
+ * @param {unknown} nombre
+ * @param {unknown} rut
+ * @returns {Medico|undefined}
+ */
 export function findMedico(medicos, nombre, rut) {
   const k = rutKey(rut);
   if (k) {
