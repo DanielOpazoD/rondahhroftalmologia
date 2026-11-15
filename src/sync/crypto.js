@@ -2,9 +2,10 @@
  * Cifrado de extremo a extremo para la sincronización entre equipos.
  *
  * - Todos los equipos comparten una CONTRASEÑA DEL EQUIPO que nunca sale del PC.
- * - De ella se derivan (PBKDF2-SHA256) 512 bits:
- *     · 256 bits -> clave AES-256-GCM con que se cifra cada atención;
- *     · 256 bits -> token de acceso al servidor (el servidor solo conoce su SHA-256).
+ * - La contraseña la genera la app (100 bits aleatorios); no se aceptan contraseñas elegidas a mano.
+ * - De ella se derivan (PBKDF2-SHA256 + HKDF), por separado:
+ *     · la clave AES-256-GCM con que se cifra cada atención;
+ *     · el token de acceso al servidor (el servidor solo conoce su SHA-256).
  * - Cada atención se cifra con un IV aleatorio y con "datos asociados"
  *   `id|versión`, para que el servidor no pueda intercambiar contenidos entre
  *   registros ni cambiar su versión sin que se detecte.
@@ -14,7 +15,7 @@
  */
 import { sha256, toHex, utf8 } from '../lib/sha256.js';
 
-const SALT = 'hhr-oftalmo-sync-v1';
+const SALT = 'hhr-oftalmo-sync-v2';
 export const PBKDF2_ITERATIONS = 310_000;
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
@@ -63,26 +64,35 @@ export function normalizePassphrase(p) {
   return s;
 }
 
-/** Reglas mínimas para una contraseña elegida a mano. */
+/**
+ * Solo se aceptan contraseñas GENERADAS por la app (100 bits aleatorios).
+ * Una contraseña elegida a mano podría adivinarse probando diccionarios
+ * contra los datos cifrados; una generada no, aunque la sal sea fija.
+ */
 export function passphraseProblem(p) {
-  const s = normalizePassphrase(p);
-  if (s.length < 16) return 'La contraseña del equipo debe tener al menos 16 caracteres (usa «Generar»).';
-  return null;
+  return /^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/.test(normalizePassphrase(p))
+    ? null
+    : 'Usa una contraseña generada con «Generar» (formato XXXXX-XXXXX-XXXXX-XXXXX), la misma en todos los PC.';
 }
 
 /* ---------------------------------------------------------- claves */
 
 /**
- * Deriva la clave de cifrado y el token del servidor a partir de la contraseña.
+ * Deriva la clave de cifrado y el token del servidor a partir de la contraseña:
+ *   maestra = PBKDF2-SHA256(contraseña, sal, 310 000)
+ *   clave de cifrado = HKDF(maestra, "cifrado")   — nunca sale del PC
+ *   token del servidor = HKDF(maestra, "acceso")  — el servidor guarda su SHA-256
+ * Las dos salidas son independientes: conocer el token no revela la clave de cifrado.
  * @returns {Promise<{encKey: string, token: string}>} encKey en base64, token en hex
  */
 export async function deriveTeamKeys(passphrase, iterations = PBKDF2_ITERATIONS) {
   const subtle = globalThis.crypto.subtle;
   const base = await subtle.importKey('raw', utf8(normalizePassphrase(passphrase)), 'PBKDF2', false, ['deriveBits']);
-  const bits = new Uint8Array(
-    await subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: utf8(SALT), iterations }, base, 512),
-  );
-  return { encKey: bytesToB64(bits.slice(0, 32)), token: toHex(bits.slice(32)) };
+  const master = await subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: utf8(SALT), iterations }, base, 256);
+  const hkdfKey = await subtle.importKey('raw', master, 'HKDF', false, ['deriveBits']);
+  const expand = async (label) =>
+    new Uint8Array(await subtle.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: utf8(`${SALT}:${label}`) }, hkdfKey, 256));
+  return { encKey: bytesToB64(await expand('cifrado')), token: toHex(await expand('acceso')) };
 }
 
 /** Valor que se configura en Netlify (variable SYNC_TOKEN_SHA256). */

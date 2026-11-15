@@ -233,7 +233,7 @@
         <button type="button" class="btn sm" id="syncGen">Generar</button>
         <button type="button" class="btn sm" id="syncShow">Mostrar</button>
       </div>
-      <p class="muted">Genérala en el primer PC y escríbela igual en los demás. Guárdala en un lugar seguro: si se pierde, los datos del servidor no se pueden descifrar (los de cada PC no se pierden).</p>
+      <p class="muted">Genérala con «Generar» en el primer PC (solo se aceptan contraseñas generadas) y escríbela igual en los demás. Guárdala en un lugar seguro: si se pierde, los datos del servidor no se pueden descifrar (los de cada PC no se pierden).</p>
       <button type="button" class="btn p sm" id="syncOn">Activar en este PC</button>
     </div>
     <div id="syncActive" hidden>
@@ -244,7 +244,7 @@
       </div>
       <details class="setup">
         <summary>Configuración del servidor (una sola vez)</summary>
-        <p class="muted">En Netlify → <i>Site configuration → Environment variables</i>, crea la variable <code>SYNC_TOKEN_SHA256</code> con este valor y vuelve a publicar el sitio. Este valor no permite leer los datos.</p>
+        <p class="muted">En Netlify → <i>Site configuration → Environment variables</i>, crea la variable <code>SYNC_TOKEN_SHA256</code> con este valor y vuelve a publicar el sitio. Es una huella del permiso de acceso: no contiene la clave de cifrado y, con una contraseña generada, no permite deducirla.</p>
         <pre class="note" id="syncHash"></pre>
         <button type="button" class="btn sm" id="syncCopyHash">Copiar valor</button>
       </details>

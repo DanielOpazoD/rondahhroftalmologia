@@ -12,10 +12,10 @@ Permite que varios PC (por ejemplo, 4 en un operativo) trabajen al mismo tiempo 
        │   (solo: id, versión, cifrado)    │
 ```
 
-- **Contraseña del equipo:** es la misma en todos los PC. Se escribe una vez en cada uno y **nunca se envía**.
-- **Derivación de claves:** de la contraseña se derivan (PBKDF2-SHA256, 310 000 iteraciones) dos cosas:
+- **Contraseña del equipo:** es la misma en todos los PC. Se escribe una vez en cada uno y **nunca se envía**. La genera la app (100 bits aleatorios, formato `XXXXX-XXXXX-XXXXX-XXXXX`). No se aceptan contraseñas elegidas a mano, porque se podrían adivinar probando diccionarios contra los datos cifrados.
+- **Derivación de claves:** de la contraseña se deriva una clave maestra (PBKDF2-SHA256, 310 000 iteraciones). De ella salen, por separado (HKDF):
   - una **clave de cifrado** AES-256, que nunca sale del PC;
-  - un **token de acceso** al servidor. El servidor solo guarda su huella SHA-256 (variable `SYNC_TOKEN_SHA256`).
+  - un **token de acceso** al servidor. El servidor solo guarda su huella SHA-256 (variable `SYNC_TOKEN_SHA256`). Conocer el token no revela la clave de cifrado.
 - **Cifrado:** cada atención se cifra entera (nombre, RUT, examen, etc.) con un IV aleatorio. Va «atada» a su id y versión, así que el servidor no puede cambiarla de lugar ni de fecha sin que se note. Las eliminaciones también viajan cifradas.
 - **Qué ve Netlify:** un id aleatorio por atención, la fecha de su última modificación y el texto cifrado. También ve la IP y la hora de cada sincronización.
 

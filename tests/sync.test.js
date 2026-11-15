@@ -18,7 +18,9 @@ describe('crypto', () => {
     assert.equal(normalizePassphrase(' k7qm3 xrt9p-zawd4 n8f2c '), PASS);
     assert.equal(normalizePassphrase('  mi frase secreta larga  '), 'mi frase secreta larga');
     assert.ok(passphraseProblem('corta'));
+    assert.ok(passphraseProblem('una frase elegida a mano bastante larga'), 'solo contraseñas generadas');
     assert.equal(passphraseProblem(PASS), null);
+    assert.equal(passphraseProblem(' k7qm3 xrt9p zawd4 n8f2c '), null);
   });
 
   test('derivación determinista: misma contraseña => misma clave y token', async () => {
