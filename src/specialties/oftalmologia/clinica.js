@@ -33,12 +33,14 @@ function procHasPio(id, rec, procs) {
 
 /**
  * Procedimientos realizados como datos estructurados, en el orden de la lista
- * configurada (los que ya no están en la lista van al final).
+ * configurada (los que ya no están en ella no se incluyen).
  * @returns {{id: string, nombre: string, ojo: string, ojos: number, pioOd: string, pioOi: string}[]}
  */
 export function proceduresDone(rec, procs) {
-  const ids = Object.keys(rec.proc || {});
-  const ordered = [...procs.filter((p) => rec.proc[p.id]).map((p) => p.id), ...ids.filter((id) => !procs.some((p) => p.id === id))];
+  // Solo los procedimientos de la lista configurada: uno que se quitó de la
+  // lista no se muestra ni se cuenta (el dato queda en la atención; si se
+  // restaura la lista, vuelve a aparecer).
+  const ordered = procs.filter((p) => rec.proc?.[p.id]).map((p) => p.id);
   return ordered.map((id) => {
     const v = rec.proc[id];
     const pio = procHasPio(id, rec, procs);

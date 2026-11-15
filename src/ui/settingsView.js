@@ -33,7 +33,7 @@ export function initSettingsView(ctx) {
       if (
         !(await uiConfirm({
           title: 'Quitar procedimiento',
-          message: `«${procs[i].n}» se quitará de la lista. Las atenciones ya guardadas lo conservan.`,
+          message: `«${procs[i].n}» se quitará de la lista: deja de mostrarse y de contarse en las atenciones y la estadística de este equipo. Los datos no se borran: si lo restauras, vuelve.`,
           tone: 'danger',
           okLabel: 'Quitar',
         }))
@@ -212,7 +212,8 @@ export function initSettingsView(ctx) {
 export function renderSettings(ctx) {
   const procRows = ctx.procs.map(
     (p, i) => html`<div class="it"><div class="t"><b>${p.n}</b></div>
-        <button type="button" class="chip mini${p.pio ? ' on' : ''}" data-a="pio" data-i="${i}" aria-pressed="${String(!!p.pio)}" title="Pide PIO por ojo">PIO</button>
+        <button type="button" class="chip mini piotg${p.pio ? ' on' : ''}" data-a="pio" data-i="${i}" aria-pressed="${String(!!p.pio)}"
+          aria-label="Pide PIO por ojo en ${p.n}" title="${p.pio ? 'Pide PIO por ojo (clic para quitar)' : 'Pedir PIO por ojo'}">${p.pio ? 'PIO' : '+ PIO'}</button>
         <button type="button" class="ib sm" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : html` disabled`}><svg aria-hidden="true"><use href="#i-up"/></svg></button>
         <button type="button" class="ib sm danger" data-a="rm" data-i="${i}" title="Quitar" aria-label="Quitar"><svg aria-hidden="true"><use href="#i-trash"/></svg></button></div>`,
   );

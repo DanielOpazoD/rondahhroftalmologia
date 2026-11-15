@@ -19,7 +19,21 @@
   - Se ve en los otros PC antes de que llegue la foto.
   - A las imágenes anteriores se les crea al abrirlas.
 
+### Mejoras
+- **Procedimientos según la lista configurada** (#44): uno que se quita de la lista en Ajustes deja de mostrarse y de contarse.
+  - Afecta: el contador de la tarjeta, la estadística, los reportes, el PDF y la nota.
+  - El dato queda en la atención: si se restaura el procedimiento, vuelve con su valor.
+- **«PIO» solo donde corresponde** (#44): en Ajustes, la etiqueta aparece solo en los procedimientos que piden la presión intraocular.
+  - Corrige un error por el que todos se veían apagados.
+- **Sincronización silenciosa** (#44): ya no aparece «Sincronizado: N cambios recibidos»; solo hay mensaje al pulsar «Sincronizar ahora».
+- **Menú al descargar el PDF** (#44): «PDF» o «PDF + adjuntos», desde la atención y desde Pacientes.
+- **Pacientes** (#44):
+  - la lista marca «Por atender»;
+  - la ficha muestra un resumen y el botón «Nueva atención»;
+  - cada atención muestra sus procedimientos y sus adjuntos.
+
 ### A tener en cuenta
+- La lista de procedimientos se configura **en cada PC** (no se sincroniza).
 - El respaldo ZIP de «Descargar respaldo» **no está cifrado**, igual que el JSON: guárdalo como cualquier documento clínico.
 - El primer respaldo de adjuntos en el servidor puede tardar algunas horas si hay muchos: cada hora copia lo que alcanza.
 

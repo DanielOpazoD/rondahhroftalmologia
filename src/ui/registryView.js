@@ -5,7 +5,7 @@
 import { SEXOS } from '../config/catalogs.js';
 import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut } from '../core/format.js';
 import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs, isDeletedPatient } from '../core/patient.js';
-import { diagnosesList } from '../specialties/activa/index.js';
+import { diagnosesList, proceduresDone } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 import { html, setHtml, join } from './html.js';
 
@@ -129,10 +129,11 @@ export function renderRegistry(ctx) {
       .join(' · ');
     const dx = diagnosesList(last, { withOthers: false }).slice(0, 2);
     const count = `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'}`;
+    const pending = recs.some((r) => !isAttended(r));
     return html`<div class="prow"><button type="button" class="pmain" data-p="${p.id}" title="Ver paciente">
         <span class="pname">${patientLabel(p)}</span>
         <span class="pmeta">${meta}</span>
-        <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}<span class="tag soft">${count}</span></span>
+        <span class="ptags">${pending ? html`<span class="state pend">Por atender</span>` : ''}${dx.map((d) => html`<span class="tag">${d}</span>`)}<span class="tag soft">${count}</span></span>
       </button></div>`;
   });
   const more =
@@ -157,11 +158,27 @@ function renderPatient(ctx, recs) {
     sexLabel(f.paciente_sexo) && html`${sexLabel(f.paciente_sexo)}`,
     f.paciente_fono && html`Fono ${f.paciente_fono}`,
   ].filter(Boolean);
-  setHtml($('#patCard'), html`<h2>${patientLabel(p)}</h2><div class="patmeta">${join(meta, ' · ')}</div>`);
+  const first = recs.length ? recs[recs.length - 1].f.fecha_atencion : '';
+  const summary = recs.length
+    ? `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'} de ${ctx.especialidadNombre}${first ? ` · desde ${fmtDate(first)}` : ''}`
+    : '';
+  setHtml(
+    $('#patCardInfo'),
+    html`<h2>${patientLabel(p)}</h2><div class="patmeta">${join(meta, ' · ')}</div>${summary ? html`<div class="patsum">${summary}</div>` : ''}`,
+  );
   const rows = recs.map((r) => {
     const done = isAttended(r);
     const dx = diagnosesList(r, { withOthers: false }).slice(0, 3);
-    const rmeta = [r.f.operativo, r.f.medico_nombre].filter(Boolean).join(' · ');
+    const procs = proceduresDone(r, ctx.procs).map((x) => x.nombre);
+    const nAtt = ctx.store.supportsAttachments() ? ctx.store.loadAttachments(r.id).length : 0;
+    const rmeta = [
+      r.f.operativo,
+      r.f.medico_nombre,
+      procs.length && (procs.length <= 2 ? procs.join(', ') : `${procs.length} procedimientos`),
+      nAtt && `${nAtt} ${nAtt === 1 ? 'adjunto' : 'adjuntos'}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
     return html`<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
             <button type="button" class="pmain" data-a="open" data-id="${r.id}" title="Abrir atención">
               <span class="pname">${fmtDate(r.f.fecha_atencion) || 'Sin fecha'}</span>
@@ -170,7 +187,7 @@ function renderPatient(ctx, recs) {
             </button>
             <div class="pact">
               <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${ICON('copy')}</button>
-              <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF">${ICON('pdf')}</button>
+              <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu">${ICON('pdf')}</button>
               <button type="button" class="ib sm danger" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
             </div>
           </div>`;
