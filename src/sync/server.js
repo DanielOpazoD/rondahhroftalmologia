@@ -26,7 +26,7 @@
  * Se escribe contra una interfaz mínima de "store" (list/get/setJSON/delete)
  * para poder probarla en Node con un almacenamiento en memoria.
  */
-import { sha256, toHex } from '../lib/sha256.js';
+import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
 
 /** @typedef {import('../domain').SyncVersion} SyncVersion */
@@ -49,6 +49,19 @@ export const LIMITS = Object.freeze({
   /** Tamaño máximo del cuerpo de una solicitud (Netlify Functions acepta hasta ~6 MB). */
   bodyMaxBytes: 5_500_000,
 });
+
+/**
+ * Límite de intentos fallidos de contraseña por red de origen: tras
+ * `maxFails` en `windowMs`, esa red recibe 429 durante `blockMs`. Una
+ * solicitud con la contraseña CORRECTA nunca se bloquea (en el hospital varios
+ * PC comparten la misma IP pública). La IP no se guarda: solo un HMAC con un
+ * secreto del servidor.
+ */
+export const AUTH_LIMIT = Object.freeze({ maxFails: 20, windowMs: 15 * 60_000, blockMs: 15 * 60_000 });
+
+/** IP de origen según los encabezados de Netlify / proxy. @param {Request} req */
+const clientIp = (req) =>
+  req.headers.get('x-nf-client-connection-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'desconocida';
 
 /** Método HTTP de cada acción. @type {Readonly<Record<string, 'GET' | 'POST'>>} */
 const ROUTES = Object.freeze({ list: 'GET', get: 'POST', put: 'POST', purge: 'POST' });
@@ -222,11 +235,12 @@ function validItem(it, now, withPayload) {
  *   tokenHash?: string | ((esp: string) => string | undefined),
  *   now?: () => number,
  *   log?: (entry: {reqId: string, action: string, esp: string, status: number, ms: number, code?: string}) => void,
+ *   authLimit?: {maxFails: number, windowMs: number, blockMs: number} | false,
  * }} deps  `tokenHash` puede depender de la especialidad (contraseña distinta por ronda).
  *   `log`: registro estructurado de cada solicitud (sin token ni datos; la función de Netlify lo escribe en sus logs).
  * @returns {(req: Request) => Promise<Response>}
  */
-export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now, log = () => {} }) {
+export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now, log = () => {}, authLimit = AUTH_LIMIT }) {
   /**
    * Toda respuesta declara la versión de protocolo del servidor. Un cliente
    * que declara una versión menor a la mínima recibe 426 con el aviso de
@@ -272,6 +286,25 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
   };
 
   /**
+   * Anota un intento fallido de la red de origen. Devuelve los ms que falta
+   * esperar si esa red quedó bloqueada (0 si no).
+   * @param {Request} req
+   * @param {string} secret secreto del servidor para no guardar la IP en claro
+   */
+  async function registerFailure(req, secret) {
+    if (!authLimit) return 0;
+    const key = '_limites/' + toHex(hmacSha256(secret, 'ip:' + clientIp(req))).slice(0, 32);
+    const t = now();
+    const cur = /** @type {{first?: number, fails?: number, until?: number} | null} */ (await store.get(key, { type: 'json' }));
+    if (cur?.until && cur.until > t) return cur.until - t;
+    const fresh = !cur?.first || t - cur.first > authLimit.windowMs || (cur.until && cur.until <= t);
+    const next = { first: fresh ? t : /** @type {number} */ (cur?.first), fails: (fresh ? 0 : cur?.fails || 0) + 1, until: 0 };
+    if (next.fails >= authLimit.maxFails) next.until = t + authLimit.blockMs;
+    await store.setJSON(key, next);
+    return next.until ? next.until - t : 0;
+  }
+
+  /**
    * @param {Request} req
    * @param {string} reqId
    * @returns {Promise<Response>}
@@ -287,6 +320,14 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     const auth = req.headers.get('authorization') || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
     if (!token || !safeEqual(toHex(sha256(token)), tokenHash)) {
+      if (authLimit) {
+        const blocked = await registerFailure(req, tokenHash);
+        if (blocked) {
+          const r = fail(429, 'demasiados_intentos', 'Demasiados intentos con una contraseña incorrecta. Espera unos minutos.');
+          r.headers.set('retry-after', String(Math.ceil(blocked / 1000)));
+          return r;
+        }
+      }
       return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta para este servidor.');
     }
 

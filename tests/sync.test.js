@@ -22,7 +22,7 @@ import {
 } from '../src/sync/protocol.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createSyncApi, syncOnce, SyncHttpError, serverId, createSyncCache, CURSOR_MARGIN_MS } from '../src/sync/client.js';
-import { CHANGE_LOG_DAYS } from '../src/sync/server.js';
+import { CHANGE_LOG_DAYS, AUTH_LIMIT } from '../src/sync/server.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
 import { patientFromRecord, normalizePatient } from '../src/core/patient.js';
 import { makeMedico } from '../src/core/catalog.js';
@@ -759,5 +759,43 @@ describe('servidor robusto', () => {
     assert.deepEqual(Object.keys(logs.at(-1)).sort(), ['action', 'esp', 'ms', 'reqId', 'status']);
     assert.equal(logs.find((l) => l.status === 413).code, 'demasiado_grande');
     assert.ok(!JSON.stringify(logs).includes(keys.token), 'el registro no contiene el token');
+  });
+});
+
+describe('límite de intentos fallidos', () => {
+  test('tras 20 fallos desde una red: 429 por 15 min; la contraseña correcta nunca se bloquea', async () => {
+    const keys = await deriveTeamKeys(PASS, 1000);
+    const store = memoryBlobStore();
+    const clock = { t: Date.now() };
+    const handler = createSyncHandler({ store, tokenHash: tokenHash(keys.token), now: () => clock.t });
+    const req = (token, ip = '200.1.2.3') =>
+      handler(
+        new Request('https://x.test/api/sync/list', { headers: { authorization: 'Bearer ' + token, 'x-nf-client-connection-ip': ip } }),
+      );
+    for (let i = 0; i < AUTH_LIMIT.maxFails - 1; i++) assert.equal((await req('malo')).status, 401);
+    const blocked = await req('malo');
+    assert.equal(blocked.status, 429);
+    assert.equal((await blocked.json()).code, 'demasiados_intentos');
+    assert.ok(Number(blocked.headers.get('retry-after')) > 0);
+    assert.equal((await req('malo')).status, 429, 'sigue bloqueada');
+    assert.equal((await req(keys.token)).status, 200, 'la contraseña correcta pasa desde la misma red');
+    assert.equal((await req('malo', '201.9.9.9')).status, 401, 'otra red no está bloqueada');
+    // La IP no se guarda en claro.
+    assert.ok(![...store._map.keys()].some((k) => k.includes('200.1.2.3')));
+    assert.ok(!JSON.stringify([...store._map.values()]).includes('200.1.2.3'));
+    // Pasado el bloqueo, vuelve a 401 (y cuenta de nuevo).
+    clock.t += AUTH_LIMIT.blockMs + 1;
+    assert.equal((await req('malo')).status, 401);
+  });
+
+  test('los fallos espaciados (fuera de la ventana) no bloquean', async () => {
+    const keys = await deriveTeamKeys(PASS, 1000);
+    const clock = { t: Date.now() };
+    const handler = createSyncHandler({ store: memoryBlobStore(), tokenHash: tokenHash(keys.token), now: () => clock.t });
+    for (let i = 0; i < AUTH_LIMIT.maxFails * 2; i++) {
+      clock.t += AUTH_LIMIT.windowMs / 10;
+      const r = await handler(new Request('https://x.test/api/sync/list', { headers: { authorization: 'Bearer malo' } }));
+      assert.equal(r.status, 401);
+    }
   });
 });
