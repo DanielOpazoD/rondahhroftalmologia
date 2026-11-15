@@ -31,6 +31,26 @@ export const CHUNK_BYTES = 192 * 1024;
 /** Tipos que se aceptan al adjuntar (atributo `accept` del selector de archivos). */
 export const ACCEPT = 'image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.odt,.txt,.rtf';
 
+/**
+ * Tipos que se pueden ABRIR en el navegador (en otra pestaña o como
+ * miniatura): solo contenido pasivo. Cualquier otro tipo (en particular
+ * image/svg+xml o text/html, que pueden llevar scripts) se DESCARGA como
+ * binario genérico, nunca se abre: un adjunto no debe poder ejecutar código
+ * en el origen de la app.
+ */
+export const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
+
+/** Tipo MIME normalizado (minúsculas, sin parámetros). @param {unknown} tipo */
+export const cleanType = (tipo) =>
+  String(tipo ?? '')
+    .toLowerCase()
+    .split(';')[0]
+    .trim()
+    .slice(0, 100);
+
+/** ¿Se puede abrir en el navegador? @param {unknown} tipo */
+export const isInlineType = (tipo) => INLINE_TYPES.has(cleanType(tipo));
+
 /** Clase de archivo, para decidir cómo mostrarlo y cómo incluirlo en el PDF con anexos. */
 export function kindOf(tipo = '', nombre = '') {
   const t = String(tipo).toLowerCase();
@@ -80,7 +100,7 @@ export function normalizeAttachment(raw) {
     id: raw.id,
     atencionId: raw.atencionId,
     nombre: safeFileName(raw.nombre),
-    tipo: typeof raw.tipo === 'string' ? raw.tipo.slice(0, 100) : '',
+    tipo: cleanType(raw.tipo),
     tamano,
     sha256: raw.sha256,
     partes: chunkCount(tamano),

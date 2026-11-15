@@ -2,7 +2,16 @@
  * Acciones sobre los adjuntos de la atención abierta: agregar (con
  * compresión de fotos), abrir y eliminar. Ver core/attachments.js.
  */
-import { addProblem, kindOf, newAttachmentId, normalizeAttachment, safeFileName, sha256Hex } from '../../core/attachments.js';
+import {
+  addProblem,
+  kindOf,
+  newAttachmentId,
+  normalizeAttachment,
+  safeFileName,
+  sha256Hex,
+  isInlineType,
+  cleanType,
+} from '../../core/attachments.js';
 import { attachmentAuditEntry } from '../../core/audit.js';
 import { clock } from '../../core/clock.js';
 import { toast } from '../dom.js';
@@ -85,11 +94,15 @@ export function attachmentActions(ctx, store) {
         toast('Este archivo aún no llega a este equipo: se descargará al sincronizar.', 4000);
         return;
       }
-      const url = URL.createObjectURL(new Blob([/** @type {BlobPart} */ (data.bytes)], { type: meta.tipo || 'application/octet-stream' }));
+      // Solo contenido pasivo (JPEG, PNG, GIF, WebP, PDF) se abre en otra pestaña.
+      // Todo lo demás se descarga como binario genérico: nunca se interpreta en
+      // el origen de la app (p. ej. un SVG o HTML con scripts).
+      const inline = isInlineType(meta.tipo);
+      const type = inline ? cleanType(meta.tipo) : 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([/** @type {BlobPart} */ (data.bytes)], { type }));
       const a = document.createElement('a');
       a.href = url;
-      // Imágenes y PDF se abren en otra pestaña; el resto se descarga con su nombre.
-      if (/^image\/|pdf/.test(meta.tipo)) a.target = '_blank';
+      if (inline) a.target = '_blank';
       else a.download = meta.nombre;
       a.rel = 'noopener';
       document.body.appendChild(a);

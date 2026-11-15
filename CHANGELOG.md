@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.14.1 — 2026-11-16
+
+### Seguridad
+- **Adjuntos: solo se abren en el navegador tipos pasivos** (JPEG, PNG, GIF, WebP y PDF), y sin miniatura para el resto. Cualquier otro tipo, en particular SVG o HTML, que pueden llevar scripts, se **descarga** como binario genérico: un adjunto nunca se interpreta dentro de la app. El tipo de los metadatos se normaliza. Lo detectó una revisión de seguridad automática; se agregó una prueba unitaria y una en navegador (un SVG con script se descarga y no se abre).
+
 ## 2.14.0 — 2026-11-16
 
 ### Nuevo

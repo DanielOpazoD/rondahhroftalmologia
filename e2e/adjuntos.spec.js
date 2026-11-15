@@ -134,3 +134,18 @@ test('PDF con anexos: desde el botón PDF, la hoja y sus adjuntos en un solo doc
   expect(doc.getPageCount()).toBe(plainPages + 3);
   await expect(page.locator('#toast')).toContainText('1 dentro del PDF');
 });
+
+test('seguridad: un SVG o HTML adjunto se descarga, nunca se abre (no ejecuta scripts en la app)', async ({ page, context }) => {
+  await openApp(page);
+  await page.locator('#paciente_nombre').fill('Paciente SVG');
+  await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>window.parent.__pwned=1</script></svg>');
+  await attach(page, [{ name: 'dibujo.svg', mimeType: 'image/svg+xml', buffer: svg }]);
+  await expect(page.locator('#attCount')).toHaveText('1');
+  await expect(page.locator('#attList .attthumb')).toHaveCount(0); // sin miniatura
+  let opened = 0;
+  context.on('page', () => opened++);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('#attList .attmain').click()]);
+  expect(dl.suggestedFilename()).toBe('dibujo.svg');
+  expect(opened).toBe(0);
+});

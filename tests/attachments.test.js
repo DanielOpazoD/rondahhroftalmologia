@@ -165,3 +165,24 @@ test('sincronización del contenido: cifrado en partes, íntegro, y se libera al
   const after = [...store._map.values()].join('').length;
   assert.ok(after < before / 10, 'se liberó el espacio');
 });
+
+test('seguridad: solo se abren en el navegador tipos pasivos; SVG y HTML se descargan', async () => {
+  const { isInlineType, cleanType } = await import('../src/core/attachments.js');
+  for (const t of ['image/jpeg', 'image/png', 'IMAGE/PNG', 'application/pdf; charset=binary', 'image/webp', 'image/gif']) {
+    assert.ok(isInlineType(t), t);
+  }
+  for (const t of ['image/svg+xml', 'text/html', 'application/xhtml+xml', 'text/xml', 'application/javascript', '', undefined]) {
+    assert.ok(!isInlineType(t), String(t));
+  }
+  assert.equal(cleanType(' Image/SVG+XML ; x=1'), 'image/svg+xml');
+  const meta = normalizeAttachment({
+    id: 'j9',
+    atencionId: 'a1',
+    nombre: 'x.svg',
+    tipo: 'Image/SVG+XML; a=b',
+    tamano: 1,
+    sha256: 'b'.repeat(64),
+    created: 1,
+  });
+  assert.equal(meta.tipo, 'image/svg+xml');
+});
