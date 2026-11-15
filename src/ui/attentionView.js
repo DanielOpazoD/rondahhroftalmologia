@@ -3,12 +3,14 @@
  * con el registro en edición y lo refleja en pantalla (`sync`).
  */
 import { SEXOS } from '../config/catalogs.js';
-import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, OJOS, coversEye } from '../specialties/activa/index.js';
-import { escapeHtml, formatRut, isIsoDate, fmtDateTime } from '../core/format.js';
+import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, OJOS, coversEye, diagnosesList } from '../specialties/activa/index.js';
+import { escapeHtml, formatRut, isIsoDate, fmtDateTime, fmtDate } from '../core/format.js';
 import { auditLabel, shortValue } from '../core/audit.js';
+import { patientIdFor, attentionsOf } from '../core/patient.js';
+import { refreshRutMarks } from './rut.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
-import { $, $$ } from './dom.js';
+import { $, $$, toast } from './dom.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initAttentionView(ctx) {
@@ -90,6 +92,12 @@ export function initAttentionView(ctx) {
     if (!e.target.value.trim()) return;
     ctx.rec.f.paciente_rut = formatRut(e.target.value);
     ctx.changed();
+    // Paciente ya registrado: se completan sus datos desde la ficha.
+    if (ctx.fillFromPatient()) toast('Paciente registrado: se completaron sus datos');
+  });
+  $('#patPrev').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-id]');
+    if (b) ctx.openRecord(b.dataset.id);
   });
 }
 
@@ -142,6 +150,8 @@ export function syncAttentionView(ctx) {
   $('#paciente_edad').readOnly = fromBirth;
   $('#paciente_edad').title = fromBirth ? 'Calculada desde la fecha de nacimiento' : '';
   renderCatalogSelects(ctx);
+  renderPrevious(ctx);
+  refreshRutMarks();
   renderHistory(ctx);
   renderToolbar(ctx);
   showValidation(ctx);
@@ -186,7 +196,7 @@ export function showValidation(ctx, { showErrors = false } = {}) {
   });
 }
 
-const TIPO = { creada: 'Creada', editada: 'Editada', eliminada: 'Eliminada' };
+const TIPO = { ingresada: 'Ingresada a la lista', creada: 'Creada', editada: 'Editada', eliminada: 'Eliminada' };
 
 /** Historial de cambios (bitácora) de la atención abierta. */
 export function renderHistory(ctx) {
@@ -207,4 +217,22 @@ export function renderHistory(ctx) {
       return `<li><div class="hmeta"><b>${TIPO[e.tipo] || escapeHtml(e.tipo)}</b> · ${escapeHtml(fmtDateTime(new Date(e.at)))} · ${escapeHtml(e.equipo)}</div>${cambios || more ? `<ul>${cambios}${more}</ul>` : ''}</li>`;
     })
     .join('');
+}
+
+/** Otras atenciones del mismo paciente (historial clínico a lo largo del tiempo). */
+export function renderPrevious(ctx) {
+  const id = ctx.rec.pacienteId || patientIdFor(ctx.rec.f);
+  const others = id ? attentionsOf(ctx.records, id).filter((r) => r.id !== ctx.rec.id) : [];
+  $('#patPrev').hidden = !others.length;
+  $('#patPrev').innerHTML = others.length
+    ? `<b>Otras atenciones (${others.length}):</b>` +
+      others
+        .slice(0, 6)
+        .map((r) => {
+          const dx = diagnosesList(r, { withOthers: false }).slice(0, 2).join(', ');
+          return `<button type="button" data-id="${escapeHtml(r.id)}" title="Abrir">${escapeHtml(fmtDate(r.f.fecha_atencion))}${dx ? ' · ' + escapeHtml(dx) : ''}</button>`;
+        })
+        .join('') +
+      (others.length > 6 ? `<span class="muted">y ${others.length - 6} más (ver en Pacientes)</span>` : '')
+    : '';
 }

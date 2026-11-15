@@ -39,9 +39,17 @@ export async function syncNow(page) {
   await expect(page.locator('#syncBadge')).toHaveText('Sincronizado', { timeout: 20_000 });
 }
 
-/** Abre la atención de un paciente desde la lista. */
-export async function openPatient(page, nombre) {
+/** Abre la ficha de un paciente en la pestaña Pacientes. */
+export async function showPatientRecord(page, nombre) {
   await tab(page, 'Pacientes');
-  await page.locator('.pmain', { hasText: nombre }).click();
+  if (await page.locator('#patDetailView').isVisible()) await page.locator('#patBack').click();
+  await page.locator('#regList .pmain', { hasText: nombre }).click();
+  await expect(page.locator('#patCard h2')).toHaveText(nombre);
+}
+
+/** Abre la atención más reciente de un paciente (Pacientes → paciente → atención). */
+export async function openPatient(page, nombre) {
+  await showPatientRecord(page, nombre);
+  await page.locator('#patAttentions .pmain').first().click();
   await expect(page.locator('#tbName')).toHaveText(nombre);
 }

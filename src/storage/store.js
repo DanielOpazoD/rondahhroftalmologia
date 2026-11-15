@@ -93,6 +93,10 @@ export function createStore(storage, repo) {
     addAuditEntry: (id, e) => repo.addAuditEntry(id, e),
     loadAuditDocs: () => repo.loadAuditDocs(),
     saveAuditDocs: (docs) => repo.saveAuditDocs(docs),
+    loadPatients: () => repo.loadPatients(),
+    getPatient: (id) => repo.getPatient(id),
+    upsertPatient: (p) => repo.upsertPatient(p),
+    savePatients: (list) => repo.savePatients(list),
 
     /** Identificador estable de este equipo (para la bitácora). */
     loadDeviceId() {

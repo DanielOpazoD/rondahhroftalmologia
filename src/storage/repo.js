@@ -13,6 +13,7 @@
  */
 import { normalizeRecord, sortRecords, isValidId } from '../core/record.js';
 import { isFutureVersion } from '../core/migrations.js';
+import { normalizePatient, patientLabel } from '../core/patient.js';
 
 /**
  * @typedef {{getAll: Function, put: Function, putMany: Function, delete: Function, clear: Function, name: string}} Backend
@@ -32,6 +33,8 @@ export function createRepo(backend, { onError = (e) => console.error(e) } = {}) 
   const tombs = new Map();
   /** @type {Map<string, AuditDoc>} */
   const audit = new Map();
+  /** Fichas de pacientes (comunes a todas las especialidades). */
+  const patients = new Map();
   /** Última versión persistida de cada documento (para escribir solo lo que cambió). */
   const persisted = new Map();
   const pending = new Set();
@@ -88,11 +91,18 @@ export function createRepo(backend, { onError = (e) => console.error(e) } = {}) 
      * @param {{legacy?: {records: object[], tombstones: Record<string, number>}, clearLegacy?: () => void}} [migration]
      */
     async init({ legacy, clearLegacy } = {}) {
-      const [recs, dels, docs] = await Promise.all([
+      const [recs, dels, docs, pats] = await Promise.all([
         backend.getAll('atenciones'),
         backend.getAll('eliminadas'),
         backend.getAll('bitacora'),
+        backend.getAll('pacientes'),
       ]);
+      for (const raw of pats) {
+        const p = normalizePatient(raw);
+        if (!p) continue;
+        patients.set(p.id, p);
+        persisted.set(keyOf('pacientes', p.id), JSON.stringify(p));
+      }
       for (const r of recs) {
         const saved = setRecord(r);
         if (saved) persisted.set(keyOf('atenciones', r.id), JSON.stringify(r));
@@ -194,6 +204,26 @@ export function createRepo(backend, { onError = (e) => console.error(e) } = {}) 
     addTombstone(id, t) {
       tombs.set(id, t);
       putIfChanged('eliminadas', { id, t });
+    },
+
+    /* ----------------------------------------------------------- pacientes */
+
+    /** Fichas de pacientes, ordenadas por nombre. */
+    loadPatients: () =>
+      [...patients.values()].sort((a, b) => patientLabel(a).localeCompare(patientLabel(b), 'es', { sensitivity: 'base' })),
+    getPatient: (id) => patients.get(id),
+    upsertPatient(raw) {
+      const p = normalizePatient(raw);
+      if (!p) return null;
+      patients.set(p.id, p);
+      putIfChanged('pacientes', p);
+      return p;
+    },
+    /** Reemplaza/agrega fichas (sincronización, migración) en una sola escritura. */
+    savePatients(list) {
+      const valid = list.map(normalizePatient).filter(Boolean);
+      for (const p of valid) patients.set(p.id, p);
+      putManyIfChanged('pacientes', valid);
     },
 
     /* ----------------------------------------------------------- bitácora */

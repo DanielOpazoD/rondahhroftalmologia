@@ -1,12 +1,42 @@
 # Modelo de datos
 
-## Atención (esquema v3)
+El **paciente** es la unidad. Cada **atención** es un episodio de una especialidad en una fecha, vinculado a su paciente con `pacienteId`. Así, un mismo paciente acumula atenciones en días distintos (y, a futuro, de distintas especialidades) sin duplicar sus datos.
+
+```
+Paciente p_xxxxxxxxxx  (espacio común, todas las especialidades)
+ ├─ Atención oftalmología 2026-11-14   (pacienteId = p_xxxxxxxxxx)
+ ├─ Atención oftalmología 2027-05-02
+ └─ Atención <otra especialidad> …
+```
+
+## Paciente (ficha)
+
+Colección `pacientes` de IndexedDB (`src/core/patient.js`). Solo datos demográficos; nada clínico.
+
+```jsonc
+{
+  "id": "p_k3j9x0a2mq",   // determinista: huella del RUT; sin RUT, del nombre normalizado
+  "tipo": "paciente", "v": 1,
+  "created": 1763150000000, "updated": 1763150000000,
+  "f": { "paciente_rut": "12.345.678-5", "paciente_nombre": "…", "paciente_fnac": "1950-03-01",
+         "paciente_sexo": "F", "paciente_fono": "…" },
+  "ft": { "f.paciente_fono": 1763150000000 }   // fechas por campo: dos equipos se fusionan campo a campo
+}
+```
+
+- El id **no depende del formato** del RUT (`12.345.678-5` = `123456785`). Dos equipos que ingresan al mismo paciente por separado crean la misma ficha, no dos.
+- Al guardar una atención se actualiza la ficha con sus datos demográficos. Al abrir la app, toda atención sin ficha la genera (`missingPatients`): las bases antiguas quedan ordenadas por paciente sin hacer nada.
+- Las fichas no se eliminan: eliminar una atención no borra al paciente.
+- **Preingreso:** la pestaña Ingreso crea la ficha y una atención **por atender** (solo datos del paciente, operativo y fecha). Pasa a **atendida** cuando alguien registra cualquier dato clínico (`isAttended`).
+
+## Atención (esquema v4)
 
 Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atenciones`, con un documento por atención (`src/storage/repo.js`). Si IndexedDB no está disponible, se usa localStorage como respaldo. Al abrir esta versión por primera vez, las atenciones que versiones anteriores guardaban en `localStorage["oft_atenciones_v1"]` se migran a IndexedDB y se libera ese espacio.
 
 ```jsonc
 {
-  "v": 3,                          // versión de esquema
+  "v": 4,                          // versión de esquema
+  "pacienteId": "p_k3j9x0a2mq",    // paciente al que pertenece (v4)
   "especialidad": "oftalmologia",  // separa datos de distintas rondas
   "id": "amhz3k2a9x1",             // único; se genera al guardar
   "created": 1763150000000,        // epoch ms
@@ -39,7 +69,7 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
 
 - `proc[id].od / .oi` son la PIO en mmHg y solo existen en procedimientos con `pio: 1`.
 - `procNames` guarda el nombre del procedimiento al momento de guardar. Así, si después se quita de la lista en Ajustes, la estadística sigue mostrando su nombre.
-- `normalizeRecord()` acepta registros v1, v2 o incompletos y los lleva a v3 sin perder datos (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
+- `normalizeRecord()` acepta registros v1 a v3 o incompletos y los lleva a v4 sin perder datos (la v4 agrega `pacienteId`) (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
 
 ### Fechas por campo (`ft`)
 
@@ -84,6 +114,19 @@ Colección `bitacora`, con un documento `b_<idAtención>` por atención:
 - **Dónde se ve:** en el **Historial de cambios** de cada atención, con el nombre de cada equipo (Ajustes → «Nombre de este equipo»).
 - **Respaldos:** incluyen la bitácora.
 
+### Almacenamiento y crecimiento a varios años
+
+Base IndexedDB `hhr-rondas-oftalmologia` (versión 2), un documento por elemento:
+
+| Colección | Contenido |
+|---|---|
+| `atenciones` | una por episodio de atención |
+| `pacientes` | una ficha por paciente |
+| `bitacora` | historial de cambios, uno por atención (`b_<id>`) |
+| `eliminadas` | marcas de eliminación `{id, t}` |
+
+Cada guardado escribe solo los documentos que cambiaron, así que el costo no crece con los años de datos.
+
 ### Eliminaciones
 
 La colección `eliminadas` guarda `{id, t}`. Ocupa unos pocos bytes por eliminación y no se poda: si un PC estuvo desconectado mucho tiempo, la eliminación igual le llega.
@@ -92,7 +135,7 @@ La colección `eliminadas` guarda `{id, t}`. Ocupa unos pocos bytes por eliminac
 
 Cada atención guarda `especialidad`. Las claves de `localStorage` llevan el prefijo de la especialidad (`oft_`), y en el servidor cada especialidad tiene su propio espacio (`<especialidad>/r/...`).
 
-Para agregar la ronda de otra especialidad hay que crear su propia configuración en `src/config/catalogs.js`: `ESPECIALIDAD` (id, nombre, prefijo), catálogos clínicos y plantilla PDF. Sus datos nunca se mezclan con los de oftalmología.
+Para agregar la ronda de otra especialidad se crea su módulo en `src/specialties/<id>/` (ver [ESPECIALIDADES.md](ESPECIALIDADES.md)). Sus atenciones nunca se mezclan con las de oftalmología; las fichas de pacientes sí son comunes.
 
 ### Médicos y operativos
 
@@ -122,10 +165,10 @@ Al abrir la app por primera vez con esta versión, los catálogos se completan c
 
 ```json
 { "app": "oftalmo-operativos", "v": 3, "version_app": "2.7.0", "exportado": "ISO-8601",
-  "procs": [ ... ], "atenciones": [ ... ], "bitacora": [ ... ], "anonSecret": "…" }
+  "procs": [ ... ], "atenciones": [ ... ], "bitacora": [ ... ], "pacientes": [ ... ], "anonSecret": "…" }
 ```
 
-Al importar, las atenciones que ya existen se **fusionan campo a campo**, igual que en la sincronización, y la bitácora se une. Se aceptan respaldos v1, v2 y v3.
+Al importar, las atenciones y las fichas de pacientes que ya existen se **fusionan campo a campo**, igual que en la sincronización, y la bitácora se une. Se aceptan respaldos v1, v2 y v3. Los respaldos anteriores a la 2.9.0 no traen `pacientes`: las fichas se reconstruyen desde las atenciones.
 
 Se aceptan respaldos v1 (sin `anonSecret`). Al importar, si el equipo no tiene clave de seudonimización, adopta la del respaldo. Así los códigos coinciden entre equipos.
 

@@ -11,12 +11,13 @@ import { SCHEMA_VERSION } from '../config/catalogs.js';
 export const MAX_FUTURE_STEPS = 3;
 import { mergeRecords, sameContent } from './merge.js';
 import { mergeAuditDocs } from './audit.js';
+import { normalizePatient } from './patient.js';
 
 /**
  * Crea el objeto de respaldo.
- * @param {{records: object[], futureRecords?: object[], procs: object[], anonSecret?: string|null, auditDocs?: object[]}} data
+ * @param {{records: object[], futureRecords?: object[], procs: object[], anonSecret?: string|null, auditDocs?: object[], patients?: object[]}} data
  */
-export function buildBackup({ records, futureRecords = [], procs, anonSecret, auditDocs = [] }, now = new Date()) {
+export function buildBackup({ records, futureRecords = [], procs, anonSecret, auditDocs = [], patients = [] }, now = new Date()) {
   return {
     app: APP.id,
     v: 3,
@@ -26,6 +27,9 @@ export function buildBackup({ records, futureRecords = [], procs, anonSecret, au
     // Incluye intactas las atenciones de versiones más nuevas de la app.
     atenciones: [...records, ...futureRecords],
     bitacora: auditDocs,
+    // Fichas de pacientes (desde la 2.9.0; los respaldos anteriores no las traen
+    // y se reconstruyen a partir de las atenciones).
+    pacientes: patients,
     // La clave permite que los códigos seudónimos coincidan entre equipos.
     ...(anonSecret ? { anonSecret } : {}),
   };
@@ -67,6 +71,7 @@ export function parseBackup(text) {
           .map((p) => ({ id: p.id, n: p.n.trim(), pio: p.pio ? 1 : 0 }))
       : [],
     auditDocs: Array.isArray(data.bitacora) ? data.bitacora.filter(validAuditDoc) : [],
+    patients: Array.isArray(data.pacientes) ? data.pacientes.map(normalizePatient).filter(Boolean) : [],
     anonSecret: typeof data.anonSecret === 'string' && /^[0-9a-f]{64}$/.test(data.anonSecret) ? data.anonSecret : null,
   };
 }
@@ -79,7 +84,8 @@ export function parseBackup(text) {
  * mismo id NO se aplica salvo `allowFutureOverride` (la interfaz lo pregunta):
  * un respaldo manipulado no puede ocultar atenciones existentes en silencio.
  * @param {{allowFutureOverride?: boolean}} [opts]
- * @returns {{records: object[], futureRecords: object[], procs: object[], auditDocs: object[], added: number, updated: number, unchanged: number, futureConflicts: string[]}}
+ * Las fichas de pacientes también se fusionan campo a campo.
+ * @returns {{records: object[], futureRecords: object[], procs: object[], auditDocs: object[], patients: object[], added: number, updated: number, unchanged: number, futureConflicts: string[]}}
  */
 export function mergeBackup(local, incoming, opts = {}) {
   const { allowFutureOverride = false } = opts;
@@ -118,6 +124,16 @@ export function mergeBackup(local, incoming, opts = {}) {
   const audit = new Map((local.auditDocs || []).map((d) => [d.id, d]));
   for (const d of incoming.auditDocs || []) audit.set(d.id, audit.has(d.id) ? mergeAuditDocs(audit.get(d.id), d) : d);
 
+  const patients = new Map((local.patients || []).map((p) => [p.id, p]));
+  for (const p of incoming.patients || []) {
+    const cur = patients.get(p.id);
+    if (!cur) patients.set(p.id, p);
+    else {
+      const m = normalizePatient(mergeRecords(cur, p));
+      if (m && !sameContent(m, cur)) patients.set(p.id, { ...m, updated: Math.max(cur.updated || 0, p.updated || 0) + 1 });
+    }
+  }
+
   const procs = [...local.procs];
   for (const p of incoming.procs) if (!procs.some((x) => x.id === p.id)) procs.push(p);
   return {
@@ -125,6 +141,7 @@ export function mergeBackup(local, incoming, opts = {}) {
     futureRecords: [...future.values()],
     procs,
     auditDocs: [...audit.values()],
+    patients: [...patients.values()],
     added,
     updated,
     unchanged,

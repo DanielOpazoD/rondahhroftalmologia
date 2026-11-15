@@ -11,15 +11,15 @@
 
 ```
             ┌──────────────────────────────────────────────┐
-  ui/       │ vistas: attention, registry, stats, export,  │  DOM, eventos
-            │ settings · context.js (controlador)          │
+  ui/       │ vistas: intake, attention, registry, stats,  │  DOM, eventos
+            │ export, settings · context.js (controlador)  │
             └───────────────┬──────────────────────────────┘
                             │ llama a
      ┌──────────────────────┼─────────────────────────┐
      ▼                      ▼                         ▼
-  storage/store.js     core/* (lógica pura)       pdf/attentionPdf.js
-  localStorage         record, clinical, note,    pdf-lib + plantilla
-                       stats, reports, anonymize,
+  storage/repo.js      core/* (lógica pura)       specialties/activa/*
+  storage/store.js     record, patient, merge,    (catálogos, clínica,
+  IndexedDB            migrations, audit, clock,   nota, PDF, Excel)
                        backup, format
                             │
                             ▼
@@ -28,10 +28,12 @@
 
 - **`core/` y `lib/` no tocan el DOM ni `localStorage`.** Reciben datos y devuelven datos, así que se prueban directamente en Node (`tests/`).
 - **Almacenamiento:**
-  - `storage/repo.js` maneja los datos clínicos (atenciones, eliminaciones, bitácora). Los mantiene en memoria y persiste en **IndexedDB** solo lo que cambió (`storage/backends.js`, con localStorage como respaldo).
+  - `storage/repo.js` maneja los datos clínicos (atenciones, fichas de pacientes, eliminaciones, bitácora). Los mantiene en memoria y persiste en **IndexedDB** solo lo que cambió (`storage/backends.js`, con localStorage como respaldo).
   - `storage/store.js` guarda lo pequeño: ajustes, catálogos, borrador y sincronización. Recibe el `storage` por parámetro, y en las pruebas se usa uno en memoria (IndexedDB simulado con `fake-indexeddb`).
   - **Rendimiento medido:** guardar una atención toma unos 25 ms; una sincronización sin cambios con 3.000 atenciones, menos de 200 ms; la descarga inicial de 3.000 atenciones, unos 0,3 s.
 - **`ui/context.js`** guarda el estado (atención en edición, registros, filtro, ajustes) y expone acciones (`save`, `openRecord`, `downloadPdf`…). Las vistas llaman a esas acciones; nunca escriben en el almacenamiento directamente.
+
+- **Paciente como unidad** (`core/patient.js`): cada atención es un episodio vinculado a la ficha de su paciente (`pacienteId`). Ver [MODELO_DATOS.md](MODELO_DATOS.md).
 
 Flujo típico: `evento → acción del contexto → store → render de las vistas afectadas`.
 

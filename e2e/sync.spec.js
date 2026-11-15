@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, fillPatient, save, activateSync, syncNow, openPatient } from './helpers.js';
+import { openApp, fillPatient, save, activateSync, syncNow, openPatient, showPatientRecord } from './helpers.js';
 
 /**
  * Dos "PC" (contextos de navegador independientes) contra el mismo servidor:
@@ -74,8 +74,8 @@ test('atención nueva del mismo paciente el mismo día: ofrece continuar en la e
   await expect(B.locator('#od_av')).toHaveValue('20/40');
   await expect(B.locator('#oi_av')).toHaveValue('20/25');
   // …y no se creó una segunda atención para el mismo paciente.
-  await B.getByRole('tab', { name: 'Pacientes' }).click();
-  await expect(B.locator('.prow', { hasText: 'Duplicado Evitado' })).toHaveCount(1);
+  await showPatientRecord(B, 'Duplicado Evitado');
+  await expect(B.locator('#patAttentions .prow')).toHaveCount(1);
   await pcA.close();
   await pcB.close();
 });

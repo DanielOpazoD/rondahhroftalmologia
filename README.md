@@ -5,19 +5,23 @@ Registro de atenciones de las **rondas y operativos de oftalmología**. Es un so
 ## Uso en terreno
 
 1. Abre la app desde su dirección en Netlify. Si vas a trabajar sin sincronización, también puedes abrir **`dist/Hoja_Atencion_Oftalmologica.html`** con doble clic (Chrome, Edge o Safari).
-2. **Atención**: elige el operativo y el médico de la lista (o crea uno nuevo desde la misma lista) y completa la hoja. La edad se calcula sola si ingresas la fecha de nacimiento. La barra superior muestra al paciente y si hay cambios sin guardar. Sus botones son:
+2. **Ingreso** (opcional, para trabajar en paralelo): una persona preingresa a los pacientes del día con sus datos (RUT, nombre, fecha de nacimiento, sexo, fono). Quedan en la lista como **Por atender**. Los médicos y otros profesionales abren a cada paciente desde esa lista y registran solo lo clínico; al guardar algún dato clínico pasa a **Atendido**. Si el RUT ya está registrado, se completan sus datos y se avisa cuántas atenciones previas tiene.
+3. **Atención**: elige el operativo y el médico de la lista (o crea uno nuevo desde la misma lista) y completa la hoja. La edad se calcula sola si ingresas la fecha de nacimiento. La barra superior muestra al paciente y si hay cambios sin guardar. Sus botones son:
    - **＋** nueva atención;
    - **copiar** la nota para Eloísa;
    - **PDF** de la hoja oficial;
    - **✓ Guardar** (también Ctrl/⌘ + S).
 
-3. **Pacientes**: lista de los atendidos, agrupados por día. Toca una fila para abrirla.
-4. Al final de cada jornada: **Ajustes → Descargar respaldo** (no es necesario si la sincronización está activa).
+4. **Pacientes**: registro de pacientes. Cada paciente es una ficha con su historial de atenciones (una por día). Desde la ficha se abre cualquier atención o se crea una nueva para ese paciente.
+5. Al final de cada jornada: **Ajustes → Descargar respaldo** (no es necesario si la sincronización está activa).
 
 | Pestaña | Para qué sirve |
 |---|---|
-| Atención | Formulario. Valida el RUT (dígito verificador), la edad y la PIO, y avisa si el paciente ya tiene una atención ese día. |
-| Pacientes | Atendidos por día, con diagnósticos y número de procedimientos. Busca por nombre (sin tildes) o RUT y filtra por operativo. En cada fila: copiar nota, PDF o eliminar. |
+| Ingreso | Preingreso de pacientes y lista del día (Por atender / Atendido), para trabajar varios a la vez. |
+| Atención | Formulario. Muestra las atenciones previas del paciente. Valida la edad y la PIO, y avisa si el paciente ya tiene una atención ese día. |
+| Pacientes | Registro de pacientes: busca por nombre (sin tildes) o RUT y filtra por operativo. Cada ficha muestra sus datos y su historial; en cada atención: copiar nota, PDF o eliminar. |
+
+Los campos de RUT muestran **✓ verde** si el dígito verificador es correcto y **✗ roja** si no lo es.
 | Estadística | Indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día. |
 | Exportar | ZIP con todos los PDF, Excel de estadística, datos seudonimizados para IA. |
 | Ajustes | Médicos y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
@@ -37,6 +41,8 @@ Cada atención guardada muestra al final su **Historial de cambios**: quién (qu
 ### Varios PC trabajando a la vez
 
 Hay dos formas de trabajar con varios PC:
+
+Varias personas pueden trabajar al mismo tiempo sobre el mismo paciente: por ejemplo, admisión ingresa, enfermería anota la PIO y el médico el diagnóstico. Cada campo se guarda por separado y se conservan todos.
 
 - **Sincronización cifrada (recomendada).** Requiere tener la app publicada en Netlify. Los PC se mantienen iguales en forma automática. Cada atención se cifra en el PC con la contraseña del equipo antes de enviarse, así que Netlify no puede leer nombres, RUT ni datos clínicos. Sin internet se sigue trabajando y se sincroniza al volver la conexión. La puesta en marcha está en [docs/SINCRONIZACION.md](docs/SINCRONIZACION.md).
 - **Respaldos.** También sirve con el archivo abierto con doble clic. Cada PC descarga su respaldo (`respaldo_oftalmo_AAAA-MM-DD.json`) y en un solo PC se usa **Ajustes → Importar respaldo** con cada archivo. Las atenciones se suman sin duplicar. Si una atención existe en ambos, queda la versión editada más recientemente.

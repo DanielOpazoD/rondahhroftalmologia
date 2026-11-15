@@ -78,6 +78,7 @@ export function initSettingsView(ctx) {
       procs: ctx.procs,
       anonSecret: ctx.store.loadSecret(),
       auditDocs: ctx.store.loadAuditDocs(),
+      patients: ctx.store.loadPatients(),
     });
     download(JSON.stringify(data), `respaldo_oftalmo_${todayIso()}.json`, 'application/json');
     toast('Respaldo descargado');
@@ -94,6 +95,7 @@ export function initSettingsView(ctx) {
         futureRecords: ctx.store.loadFutureRecords(),
         procs: ctx.procs,
         auditDocs: ctx.store.loadAuditDocs(),
+        patients: ctx.store.loadPatients(),
       };
       let merged = mergeBackup(localData, incoming);
       if (merged.futureConflicts.length) {
@@ -108,6 +110,7 @@ export function initSettingsView(ctx) {
       }
       ctx.store.saveRecords([...merged.records, ...merged.futureRecords]);
       ctx.store.saveAuditDocs(merged.auditDocs);
+      ctx.store.savePatients(merged.patients);
       ctx.store.saveProcs(merged.procs);
       let keyMsg = '';
       const local = ctx.store.loadSecret();

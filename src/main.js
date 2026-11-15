@@ -17,6 +17,8 @@ import { initSettingsView, renderSettings } from './ui/settingsView.js';
 import { createSyncController } from './ui/syncController.js';
 import { createClock, setClock } from './core/clock.js';
 import { initCatalogView, renderCatalogSettings } from './ui/catalogView.js';
+import { initIntakeView } from './ui/intakeView.js';
+import { initRutMarks } from './ui/rut.js';
 
 function getStorage() {
   try {
@@ -42,9 +44,12 @@ async function openRepo(storage) {
     return repo;
   } catch (e) {
     console.warn('IndexedDB no disponible; se usa localStorage:', e);
-    const repo = createRepo(localStorageBackend(storage, { atenciones: K.records, eliminadas: K.tombstones, bitacora: K.audit }), {
-      onError,
-    });
+    const repo = createRepo(
+      localStorageBackend(storage, { atenciones: K.records, eliminadas: K.tombstones, bitacora: K.audit, pacientes: K.patients }),
+      {
+        onError,
+      },
+    );
     await repo.init();
     return repo;
   }
@@ -65,6 +70,8 @@ async function main() {
   initExportView(ctx);
   initSettingsView(ctx);
   initCatalogView(ctx);
+  initIntakeView(ctx);
+  initRutMarks();
   ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
@@ -91,6 +98,7 @@ async function main() {
   ctx.sync = createSyncController(ctx);
   ctx.sync.init();
 
+  ctx.ensurePatients();
   ctx.restoreDraft();
   renderSettings(ctx);
   renderCatalogSettings(ctx);

@@ -15,6 +15,7 @@ import { localVersions, remoteVersions, planSync, applyPulled } from '../src/syn
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createSyncApi, syncOnce, SyncHttpError } from '../src/sync/client.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
+import { patientFromRecord, normalizePatient } from '../src/core/patient.js';
 import { syncMerge, stampChanges } from '../src/core/merge.js';
 
 const PASS = 'K7QM3-XRT9P-ZAWD4-N8F2C';
@@ -340,5 +341,55 @@ describe('huella de contenido', () => {
     );
     const other = (await deriveTeamKeys('Q2W3E-R4T5Y-6Y7U8-P9Q0Z', 1000)).encKey;
     assert.notEqual(contentHash(other, 'a', 10, 'atencion', same), h, 'depende de la clave del equipo');
+  });
+});
+
+describe('fichas de pacientes (espacio común)', () => {
+  test('dos equipos editan distintos datos de la misma ficha: se conservan ambos y no se mezclan con atenciones', async () => {
+    const { keys, fetchFn, store } = await setup();
+    const key = await importEncKey(keys.encKey);
+    const base = patientFromRecord(minimalRecord('a', { paciente_rut: '12.345.678-5', paciente_nombre: 'Rosa Secreta' }), 1000);
+    /** Un equipo que sincroniza solo fichas en el espacio 'pacientes'. */
+    const pc = () => {
+      const state = { patients: [structuredClone(base)] };
+      return {
+        state,
+        edit(k, v, t) {
+          const prev = state.patients[0];
+          const next = structuredClone(prev);
+          next.f[k] = v;
+          next.updated = t;
+          state.patients = [stampChanges(next, prev, t)];
+        },
+        sync: () =>
+          syncOnce({
+            api: createSyncApi({ token: keys.token, fetchFn, esp: 'pacientes' }),
+            key,
+            readLocal: () => ({
+              items: state.patients.map((p) => ({ id: p.id, updated: p.updated, kind: 'paciente', data: structuredClone(p) })),
+              tombstones: {},
+            }),
+            mergeFn: syncMerge,
+            writeLocal: (items) => {
+              state.patients = items.map((i) => normalizePatient({ ...i.data, id: i.id, updated: i.updated }));
+            },
+          }),
+      };
+    };
+    const [admision, box] = [pc(), pc()];
+    await admision.sync();
+    admision.edit('paciente_fono', '555 1234', 2000);
+    box.edit('paciente_fnac', '1950-03-01', 2500);
+    for (const p of [admision, box, admision, box]) await p.sync();
+    for (const p of [admision, box]) {
+      assert.equal(p.state.patients.length, 1);
+      assert.equal(p.state.patients[0].f.paciente_fono, '555 1234');
+      assert.equal(p.state.patients[0].f.paciente_fnac, '1950-03-01');
+    }
+    assert.deepEqual(admision.state.patients, box.state.patients);
+    const keysOnServer = [...store._map.keys()];
+    assert.ok(keysOnServer.length && keysOnServer.every((k) => k.startsWith('pacientes/r/p_')), 'solo en el espacio común');
+    const raw = JSON.stringify([...store._map.values()]);
+    assert.ok(!raw.includes('Rosa') && !raw.includes('12.345.678'), 'el servidor no ve nombre ni RUT');
   });
 });

@@ -32,6 +32,7 @@
     <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></symbol>
+    <symbol id="i-userplus" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M18 8v6M15 11h6"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
   </defs>
 </svg>
@@ -42,6 +43,7 @@
       <div><b>Oftalmología</b><small>Rondas · Hospital Hanga Roa</small></div>
     </div>
     <nav role="tablist" aria-label="Secciones">
+      <button type="button" role="tab" data-tab="t-ing"><svg><use href="#i-userplus"/></svg><span>Ingreso</span></button>
       <button type="button" role="tab" data-tab="t-at" class="on"><svg><use href="#i-form"/></svg><span>Atención</span></button>
       <button type="button" role="tab" data-tab="t-reg"><svg><use href="#i-users"/></svg><span>Pacientes</span></button>
       <button type="button" role="tab" data-tab="t-est"><svg><use href="#i-chart"/></svg><span>Estadística</span></button>
@@ -56,6 +58,32 @@
 </header>
 
 <main>
+<!-- ================= INGRESO ================= -->
+<section id="t-ing" class="tab" role="tabpanel" aria-label="Ingreso de pacientes">
+  <div class="card">
+    <h2>Ingresar paciente a la lista</h2>
+    <div class="g4">
+      <div><label class="l" for="ing_rut">RUT</label><div class="rutwrap"><input id="ing_rut" autocomplete="off" placeholder="12.345.678-9"><span class="rutmark" data-rut-for="ing_rut" aria-live="polite"></span></div></div>
+      <div class="span2"><label class="l" for="ing_nombre">Nombre y apellidos</label><input id="ing_nombre" autocomplete="off"></div>
+      <div><label class="l" for="ing_fono">Fono</label><input id="ing_fono" inputmode="tel"></div>
+      <div><label class="l" for="ing_fnac">Fecha de nacimiento</label><input id="ing_fnac" type="date"></div>
+      <div><label class="l" for="ing_edad">Edad</label><input id="ing_edad" inputmode="numeric" placeholder="años"></div>
+      <div class="span2"><span class="l">Sexo</span><div class="seg" id="ingSexo" role="group" aria-label="Sexo"></div></div>
+    </div>
+    <div class="ingfoot">
+      <p class="hint" id="ingHint"></p>
+      <button type="button" class="btn p" id="ingAdd"><svg><use href="#i-plus"/></svg><span>Agregar a la lista</span></button>
+    </div>
+  </div>
+
+  <div class="listhead">
+    <input id="ingFecha" type="date" aria-label="Fecha de la lista">
+    <select id="ingOp" aria-label="Operativo"></select>
+  </div>
+  <p class="listcount"><b id="ingCount">0</b> pacientes · <span id="ingPend">0</span> por atender</p>
+  <div id="ingList" class="plist"></div>
+</section>
+
 <!-- ================= ATENCIÓN ================= -->
 <section id="t-at" class="tab on" role="tabpanel" aria-label="Atención">
   <div class="toolbar">
@@ -84,13 +112,14 @@
   <div class="card">
     <h2>Paciente</h2>
     <div class="g4">
+      <div><label class="l" for="paciente_rut">RUT</label><div class="rutwrap"><input id="paciente_rut" autocomplete="off" placeholder="12.345.678-9"><span class="rutmark" data-rut-for="paciente_rut" aria-live="polite"></span></div><small class="msg" data-msg="paciente_rut"></small></div>
       <div class="span2"><label class="l" for="paciente_nombre">Nombre y apellidos</label><input id="paciente_nombre" autocomplete="off"><small class="msg" data-msg="paciente_nombre"></small></div>
-      <div><label class="l" for="paciente_rut">RUT</label><input id="paciente_rut" autocomplete="off" placeholder="12.345.678-9"><small class="msg" data-msg="paciente_rut"></small></div>
       <div><label class="l" for="paciente_fono">Fono</label><input id="paciente_fono" inputmode="tel"></div>
       <div><label class="l" for="paciente_fnac">Fecha de nacimiento</label><input id="paciente_fnac" type="date"><small class="msg" data-msg="paciente_fnac"></small></div>
       <div><label class="l" for="paciente_edad">Edad</label><input id="paciente_edad" inputmode="numeric" placeholder="años"><small class="msg" data-msg="paciente_edad"></small></div>
       <div class="span2"><span class="l">Sexo</span><div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div></div>
     </div>
+    <div class="prevlist" id="patPrev" hidden></div>
   </div>
 
   <!-- @FORMULARIO -->
@@ -102,14 +131,22 @@
 </section>
 
 <!-- ================= PACIENTES ================= -->
-<section id="t-reg" class="tab" role="tabpanel" aria-label="Pacientes atendidos">
+<section id="t-reg" class="tab" role="tabpanel" aria-label="Pacientes">
   <div class="banner warn" id="futureBanner" hidden></div>
-  <div class="listhead">
-    <label class="search"><svg><use href="#i-search"/></svg><input id="regSearch" type="search" aria-label="Buscar paciente" placeholder="Buscar por nombre o RUT"></label>
-    <select id="regOp" aria-label="Operativo"></select>
+  <div id="patListView">
+    <div class="listhead">
+      <label class="search"><svg><use href="#i-search"/></svg><input id="regSearch" type="search" aria-label="Buscar paciente" placeholder="Buscar por nombre o RUT"></label>
+      <select id="regOp" aria-label="Operativo"></select>
+    </div>
+    <p class="listcount"><b id="regCount">0</b> pacientes</p>
+    <div id="regList" class="plist"></div>
   </div>
-  <p class="listcount"><b id="regCount">0</b> atenciones</p>
-  <div id="regList" class="plist"></div>
+  <div id="patDetailView" hidden>
+    <button type="button" class="btn sm" id="patBack">← Pacientes</button>
+    <div class="card patcard" id="patCard"></div>
+    <div class="row" style="margin:0 0 10px"><button type="button" class="btn p sm" id="patNew"><svg><use href="#i-plus"/></svg>Nueva atención para este paciente</button></div>
+    <div id="patAttentions" class="plist"></div>
+  </div>
 </section>
 
 <!-- ================= ESTADÍSTICA ================= -->

@@ -16,7 +16,7 @@ export const APP = Object.freeze({
 });
 
 /** Versión del esquema de cada registro de atención (ver docs/MODELO_DATOS.md y core/migrations.js). */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** Claves de localStorage, con el prefijo de la especialidad (no se mezclan datos entre rondas). */
 const P = ESPECIALIDAD.prefijo;
@@ -34,6 +34,7 @@ export const STORAGE_KEYS = Object.freeze({
   clock: `${P}reloj_v1`,
   audit: `${P}bitacora_v1`,
   device: `${P}equipo_v1`,
+  patients: `${P}pacientes_v1`,
 });
 
 /** Opciones de sexo registral (para estadística tipo REM). */

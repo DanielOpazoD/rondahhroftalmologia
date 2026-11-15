@@ -1,4 +1,5 @@
 import { test, describe } from 'node:test';
+import { SCHEMA_VERSION } from '../src/config/catalogs.js';
 import assert from 'node:assert/strict';
 import {
   fmtDate,
@@ -88,7 +89,7 @@ describe('record', () => {
       cat: 'ZZ',
     };
     const r = normalizeRecord(v1);
-    assert.equal(r.v, 3);
+    assert.equal(r.v, SCHEMA_VERSION);
     assert.equal(r.especialidad, 'oftalmologia', 'datos antiguos quedan en oftalmología');
     assert.equal(r.f.paciente_edad, '70');
     assert.ok(!('nulo' in r.f));

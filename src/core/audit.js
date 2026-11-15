@@ -27,6 +27,7 @@ export function auditLabel(path, procs = []) {
   if (path.startsWith('f.')) return ETIQUETAS[path.slice(2)] || path.slice(2);
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';
+  if (path === 'pacienteId') return 'Paciente (vínculo)';
   if (path.startsWith('proc.')) {
     const rest = path.slice(5);
     const dot = rest.lastIndexOf('.');
@@ -55,7 +56,7 @@ export function auditChanges(before, after) {
 
 /**
  * Crea una entrada de bitácora.
- * @param {{tipo: 'creada'|'editada'|'eliminada', before?: object, after?: object, at: number,
+ * @param {{tipo: 'ingresada'|'creada'|'editada'|'eliminada', before?: object, after?: object, at: number,
  *   equipo: string, equipoId: string, rand?: () => number}} o
  * @returns {object|null} null si una edición no cambió nada
  */

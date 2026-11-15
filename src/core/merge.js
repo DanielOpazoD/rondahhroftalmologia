@@ -40,6 +40,7 @@ export function flatten(rec) {
   }
   for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
   if (rec?.cat) m.set('cat', String(rec.cat));
+  if (rec?.pacienteId) m.set('pacienteId', String(rec.pacienteId));
   for (const [id, p] of Object.entries(rec?.proc || {})) {
     if (!isSafeKey(id) || !p || typeof p !== 'object') continue;
     for (const k of PROC_KEYS) if (p[k] !== undefined && p[k] !== null && p[k] !== '') m.set(`proc.${id}.${k}`, String(p[k]));
@@ -58,6 +59,7 @@ export function unflatten(m) {
       const k = path.slice(7);
       if (isSafeKey(k)) out.checks[k] = true;
     } else if (path === 'cat') out.cat = v;
+    else if (path === 'pacienteId') out.pacienteId = v;
     else if (path.startsWith('proc.')) {
       const rest = path.slice(5);
       const dot = rest.lastIndexOf('.');
@@ -160,6 +162,10 @@ export function syncMerge(kind, local, remote) {
     const data = mergeAuditDocs(local, remote);
     return { data, sameAsRemote: data.entries.length === (remote.entries || []).length };
   }
+  if (kind === 'paciente') {
+    const data = mergeRecords(local, remote);
+    return { data, sameAsRemote: sameContent(data, remote) };
+  }
   if (kind !== 'atencion') return null;
   // Una versión más nueva de la app no se fusiona con lógica antigua: gana entera la más nueva.
   if (isFutureVersion(local) || isFutureVersion(remote)) return null;
@@ -174,7 +180,9 @@ export function syncMerge(kind, local, remote) {
  * distinto contenido (dos equipos que fusionaron a la vez).
  */
 export function syncFingerprint(kind, data) {
-  if (kind === 'atencion') return JSON.stringify([...flatten(data)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
+  if (kind === 'atencion' || kind === 'paciente') {
+    return JSON.stringify([...flatten(data)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
+  }
   if (kind === 'medico') return JSON.stringify([data?.nombre || '', data?.rut || '']);
   if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
   if (kind === 'bitacora') return JSON.stringify((data?.entries || []).map((e) => e.id).sort());

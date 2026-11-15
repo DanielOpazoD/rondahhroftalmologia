@@ -9,6 +9,7 @@
  *    fusiona, y la app pide actualizarse (recargar).
  */
 import { SCHEMA_VERSION } from '../config/catalogs.js';
+import { patientIdFor } from './patient.js';
 
 export class FutureVersionError extends Error {
   constructor(v) {
@@ -31,6 +32,11 @@ export const STEPS = {
   1: (r) => ({ ...r, v: 2 }),
   // v2 -> v3: separación por especialidad y fechas de edición por campo (`ft`, opcional).
   2: (r) => ({ ...r, v: 3, especialidad: r.especialidad || 'oftalmologia' }),
+  // v3 -> v4: el paciente pasa a ser una unidad; cada atención apunta a su ficha.
+  3: (r) => {
+    const pacienteId = r.pacienteId || patientIdFor(r.f || {});
+    return pacienteId ? { ...r, v: 4, pacienteId } : { ...r, v: 4 };
+  },
 };
 
 /**

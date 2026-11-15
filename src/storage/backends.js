@@ -10,7 +10,10 @@
  */
 
 /** Colecciones persistentes. */
-export const COLLECTIONS = ['atenciones', 'eliminadas', 'bitacora'];
+export const COLLECTIONS = ['atenciones', 'eliminadas', 'bitacora', 'pacientes'];
+
+/** Versión de la base IndexedDB: subirla al agregar colecciones (se crean en onupgradeneeded). */
+const DB_VERSION = 2;
 
 /**
  * Motor IndexedDB.
@@ -20,7 +23,7 @@ export const COLLECTIONS = ['atenciones', 'eliminadas', 'bitacora'];
 export async function idbBackend(dbName, idb = globalThis.indexedDB) {
   if (!idb) throw new Error('IndexedDB no disponible');
   const db = await new Promise((resolve, reject) => {
-    const req = idb.open(dbName, 1);
+    const req = idb.open(dbName, DB_VERSION);
     req.onupgradeneeded = () => {
       for (const col of COLLECTIONS) if (!req.result.objectStoreNames.contains(col)) req.result.createObjectStore(col, { keyPath: 'id' });
     };

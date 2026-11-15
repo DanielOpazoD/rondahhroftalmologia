@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { openApp, tab, fillPatient, save, openPatient } from './helpers.js';
+import { openApp, tab, fillPatient, save, openPatient, showPatientRecord } from './helpers.js';
 
 test.beforeEach(async ({ page }) => openApp(page));
 
@@ -17,10 +17,10 @@ test('guardar una atención completa y verla en Pacientes', async ({ page }) => 
   await expect(page.locator('#tbState')).toHaveText('Guardada');
 
   await tab(page, 'Pacientes');
-  const row = page.locator('.prow', { hasText: 'Ana Tuki Prueba' });
+  const row = page.locator('#regList .prow', { hasText: 'Ana Tuki Prueba' });
   await expect(row).toBeVisible();
   await expect(row.locator('.tag', { hasText: 'Glaucoma' })).toBeVisible();
-  await expect(row.locator('.tag', { hasText: '1 proc.' })).toBeVisible();
+  await expect(row.locator('.tag', { hasText: '1 atención' })).toBeVisible();
 });
 
 test('no guarda sin nombre ni RUT y lo indica junto al campo', async ({ page }) => {
@@ -57,16 +57,17 @@ test('copiar la nota para Eloísa', async ({ page, context }) => {
 test('eliminar pide confirmación con el diálogo de la app', async ({ page }) => {
   await fillPatient(page, { nombre: 'Para Borrar' });
   await save(page);
-  await tab(page, 'Pacientes');
-  await page.locator('.prow', { hasText: 'Para Borrar' }).locator('[data-a="del"]').click();
+  await showPatientRecord(page, 'Para Borrar');
+  const attention = page.locator('#patAttentions .prow');
+  await attention.first().locator('[data-a="del"]').click();
   const dlg = page.locator('#msgDlg');
   await expect(dlg).toBeVisible();
   await expect(dlg.locator('#msgTitle')).toHaveText('Eliminar atención');
   await dlg.getByRole('button', { name: 'Cancelar' }).click();
-  await expect(page.locator('.prow', { hasText: 'Para Borrar' })).toBeVisible();
-  await page.locator('.prow', { hasText: 'Para Borrar' }).locator('[data-a="del"]').click();
+  await expect(attention).toHaveCount(1);
+  await attention.first().locator('[data-a="del"]').click();
   await dlg.getByRole('button', { name: 'Eliminar' }).click();
-  await expect(page.locator('.prow', { hasText: 'Para Borrar' })).toHaveCount(0);
+  await expect(attention).toHaveCount(0);
 });
 
 test('crear un médico desde el menú rellena la atención', async ({ page }) => {

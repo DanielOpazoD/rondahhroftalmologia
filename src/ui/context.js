@@ -5,8 +5,8 @@
  *   evento de UI -> acción del contexto -> store (localStorage) -> render de vistas
  * Las vistas nunca escriben en localStorage directamente.
  */
-import { APP } from '../config/catalogs.js';
-import { blankRecord, normalizeRecord, newRecordId, validateRecord, findDuplicate } from '../core/record.js';
+import { APP, ESPECIALIDAD } from '../config/catalogs.js';
+import { blankRecord, normalizeRecord, newRecordId, validateRecord, findDuplicate, applyBirthDate } from '../core/record.js';
 import { buildNote, filterRecords, buildAttentionPdf, pdfFileName } from '../specialties/activa/index.js';
 import { fmtDate } from '../core/format.js';
 import { createSecret } from '../core/pseudonym.js';
@@ -18,7 +18,9 @@ import { renderStats, renderFilter, placeFilter } from './statsView.js';
 import { renderExportView } from './exportView.js';
 import { renderSettings } from './settingsView.js';
 import { uiConfirm, uiCopy, uiChoose } from './modal.js';
-import { stampChanges, mergeRecords } from '../core/merge.js';
+import { stampChanges, mergeRecords, sameContent } from '../core/merge.js';
+import { patientIdFor, patientFields, missingPatients, isAttended, PATIENT_FIELDS } from '../core/patient.js';
+import { renderIntake } from './intakeView.js';
 import { clock } from '../core/clock.js';
 import { makeAuditEntry } from '../core/audit.js';
 import { renderCatalogSelects, renderCatalogSettings } from './catalogView.js';
@@ -124,12 +126,15 @@ export function createContext(store, templateB64) {
       // Si otro equipo cambió esta atención mientras se editaba, se fusiona campo a campo.
       const stored = ctx.records.find((r) => r.id === rec.id);
       if (stored) rec = normalizeRecord(mergeRecords(stored, rec));
+      // Vínculo con la ficha del paciente (unidad que agrupa sus atenciones).
+      rec.pacienteId ||= patientIdFor(rec.f) || undefined;
       rec.updated = Math.max(now, (stored?.updated || 0) + 1);
       rec.procNames = Object.fromEntries(
         Object.keys(rec.proc).map((id) => [id, ctx.procs.find((p) => p.id === id)?.n || rec.procNames?.[id] || id]),
       );
       const ok = ctx.persist(() => {
         ctx.records = store.upsertRecord(rec);
+        ctx.syncPatientFromRecord(rec);
         // Bitácora: qué cambió, cuándo y desde qué equipo.
         const entry = makeAuditEntry({
           tipo: stored ? 'editada' : 'creada',
@@ -173,8 +178,104 @@ export function createContext(store, templateB64) {
       if (!r) return;
       if (ctx.dirty && ctx.rec.id !== id && !(await confirmDiscard('abrir otra atención'))) return;
       ctx.loadIntoForm(r);
+      // Paciente preingresado sin médico: se propone el médico habitual de este equipo.
+      const remembered = store.loadMedico();
+      if (!isAttended(ctx.rec) && !ctx.rec.f.medico_nombre && remembered.n) {
+        ctx.rec.f.medico_nombre = remembered.n;
+        ctx.rec.f.medico_rut = remembered.r || '';
+        ctx.changed();
+      }
       ctx.showTab('t-at');
       scrollTo(0, 0);
+    },
+
+    /**
+     * Preingreso: registra (o actualiza) al paciente y lo agrega a la lista de
+     * atención de una fecha, sin datos clínicos. Si ya está en la lista de esa
+     * fecha, no se duplica.
+     * @param {Record<string, string>} data campos paciente_*
+     * @param {{fecha: string, operativo?: string}} where
+     * @returns {{ok: boolean, id?: string}}
+     */
+    admitPatient(data, { fecha, operativo = '' }) {
+      const f = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== ''));
+      if (!f.paciente_nombre && !f.paciente_rut) {
+        toast('Escribe al menos el nombre o el RUT');
+        return { ok: false };
+      }
+      const pacienteId = patientIdFor(f);
+      const existing = ctx.records.find((r) => r.pacienteId === pacienteId && r.f.fecha_atencion === fecha);
+      if (existing) {
+        toast(`${existing.f.paciente_nombre || existing.f.paciente_rut} ya está en la lista de ese día`, 3500);
+        return { ok: true, id: existing.id };
+      }
+      const now = clock.tick();
+      const master = store.getPatient(pacienteId);
+      const rec = blankRecord({ op: operativo });
+      rec.f.fecha_atencion = fecha;
+      Object.assign(rec.f, patientFields(master?.f), f);
+      applyBirthDate(rec);
+      Object.assign(rec, { id: newRecordId(now), created: now, updated: now, pacienteId });
+      stampChanges(rec, { f: {} }, now);
+      const saved = normalizeRecord(rec);
+      const ok = ctx.persist(() => {
+        ctx.records = store.upsertRecord(saved);
+        ctx.syncPatientFromRecord(saved);
+        const entry = makeAuditEntry({
+          tipo: 'ingresada',
+          after: saved,
+          at: now,
+          equipo: ctx.deviceName(),
+          equipoId: store.loadDeviceId(),
+        });
+        if (entry) store.addAuditEntry(saved.id, entry);
+      });
+      if (!ok) return { ok: false };
+      ctx.refreshLists();
+      ctx.sync?.schedule();
+      toast(`${saved.f.paciente_nombre || saved.f.paciente_rut} agregado a la lista`);
+      return { ok: true, id: saved.id };
+    },
+
+    /** Nueva atención (otro día u otra consulta) para un paciente ya registrado. */
+    async newAttentionFor(pacienteId) {
+      const p = store.getPatient(pacienteId);
+      if (!p) return;
+      if (ctx.dirty && !(await confirmDiscard('empezar una atención nueva'))) return;
+      ctx.rec = blankRecord(store.loadMedico());
+      Object.assign(ctx.rec.f, patientFields(p.f));
+      ctx.rec.pacienteId = pacienteId;
+      applyBirthDate(ctx.rec);
+      ctx.snap = structuredClone(ctx.rec);
+      ctx.dirty = true;
+      ctx.persist(() => store.saveDraft(ctx.rec));
+      syncAttentionView(ctx);
+      ctx.showTab('t-at');
+      scrollTo(0, 0);
+    },
+
+    /**
+     * Si la atención nueva corresponde a un paciente ya registrado, completa
+     * sus datos vacíos desde la ficha (sin sobrescribir lo escrito).
+     */
+    fillFromPatient() {
+      if (ctx.rec.id) return false;
+      const id = ctx.rec.pacienteId || patientIdFor(ctx.rec.f);
+      const p = id && store.getPatient(id);
+      if (!p) return false;
+      let changed = false;
+      for (const [k, v] of Object.entries(patientFields(p.f))) {
+        if (!ctx.rec.f[k]) {
+          ctx.rec.f[k] = v;
+          changed = true;
+        }
+      }
+      ctx.rec.pacienteId = id;
+      if (changed) {
+        applyBirthDate(ctx.rec);
+        ctx.changed();
+      }
+      return changed;
     },
 
     /**
@@ -293,8 +394,47 @@ export function createContext(store, templateB64) {
     refreshLists() {
       renderFilter(ctx);
       renderRegistry(ctx);
+      renderIntake(ctx);
       if (ctx.currentTab === 't-est') renderStats(ctx);
       if (ctx.currentTab === 't-exp') renderExportView(ctx);
+    },
+
+    /**
+     * Actualiza la ficha del paciente con los datos de la atención. Se fusiona
+     * campo a campo con la ficha existente (gana lo editado más recientemente),
+     * así un cambio de teléfono hecho en el ingreso y otro dato corregido por
+     * el médico se conservan ambos.
+     */
+    syncPatientFromRecord(rec) {
+      if (!rec.pacienteId) return;
+      const fields = patientFields(rec.f);
+      const ft = {};
+      for (const k of PATIENT_FIELDS) {
+        const t = rec.ft?.['f.' + k] ?? (fields[k] ? rec.updated : undefined);
+        if (t) ft['f.' + k] = t;
+      }
+      const candidate = {
+        id: rec.pacienteId,
+        created: rec.created || rec.updated,
+        updated: rec.updated,
+        f: fields,
+        ft,
+        checks: {},
+        proc: {},
+      };
+      const current = store.getPatient(rec.pacienteId);
+      const next = current ? mergeRecords(current, candidate) : candidate;
+      if (current && sameContent(next, current)) return;
+      next.updated = Math.max(current?.updated || 0, rec.updated || 0, clock.tick());
+      store.upsertPatient(next);
+    },
+
+    /** Crea las fichas que falten (atenciones de versiones anteriores o recibidas antes que su ficha). */
+    ensurePatients() {
+      const existing = new Map(store.loadPatients().map((p) => [p.id, p]));
+      const missing = missingPatients(ctx.records, existing);
+      if (missing.length) store.savePatients(missing);
+      return missing.length;
     },
 
     /** Completa los catálogos con médicos y operativos de atenciones antiguas (una vez por equipo). */
@@ -356,6 +496,7 @@ export function createContext(store, templateB64) {
       ctx.medicos = store.loadMedicos();
       ctx.operativos = store.loadOperativos();
       ctx.seedCatalogs();
+      ctx.ensurePatients(); // respaldos anteriores a la 2.9.0 no traen fichas
       renderCatalogSettings(ctx);
       renderProcList(ctx);
       renderSettings(ctx);
@@ -371,6 +512,7 @@ export function createContext(store, templateB64) {
       });
       $$('.tab').forEach((t) => t.classList.toggle('on', t.id === id));
       if (id === 't-reg') renderRegistry(ctx);
+      if (id === 't-ing') renderIntake(ctx);
       if (id === 't-est' || id === 't-exp') {
         placeFilter(id);
         renderFilter(ctx);
@@ -390,6 +532,7 @@ export function createContext(store, templateB64) {
     },
 
     version: APP.version,
+    especialidadNombre: ESPECIALIDAD.nombre,
     /** Controlador de sincronización (se asigna en main.js). */
     sync: null,
   };

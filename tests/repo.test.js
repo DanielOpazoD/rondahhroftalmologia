@@ -6,8 +6,9 @@ import { createRepo } from '../src/storage/repo.js';
 import { memoryStorage, readLegacyData, clearLegacyData } from '../src/storage/store.js';
 import { STORAGE_KEYS as K, SCHEMA_VERSION } from '../src/config/catalogs.js';
 import { minimalRecord } from './fixtures.js';
+import { patientFromRecord } from '../src/core/patient.js';
 
-const LS_KEYS = { atenciones: K.records, eliminadas: K.tombstones, bitacora: K.audit };
+const LS_KEYS = { atenciones: K.records, eliminadas: K.tombstones, bitacora: K.audit, pacientes: K.patients };
 
 /** Motor que cuenta escrituras (para verificar que solo se escribe lo que cambia). */
 function counting(backend) {
@@ -61,6 +62,34 @@ for (const kind of ['indexeddb', 'localstorage']) {
       ['e2', 'e1'],
     );
     assert.equal(again.loadAuditDocs()[0].id, 'b_a');
+  });
+
+  test(`[${kind}] pacientes: fichas propias, separadas de las atenciones, persisten`, async () => {
+    const e = env();
+    const repo = createRepo(await make(e));
+    await repo.init();
+    const ana = patientFromRecord(minimalRecord('a', { paciente_rut: '12.345.678-5', paciente_nombre: 'Ana' }), 10);
+    const luis = patientFromRecord(minimalRecord('b', { paciente_nombre: 'Luis' }), 20);
+    repo.upsertPatient(ana);
+    repo.upsertPatient(luis);
+    repo.upsertPatient({ ...ana, f: { ...ana.f, paciente_fono: '555' }, updated: 30 });
+    assert.equal(repo.upsertPatient({ id: 'no-valido', f: {} }), null, 'rechaza ids que no son de paciente');
+    await repo.flush();
+    const again = createRepo(await make(e));
+    await again.init();
+    assert.deepEqual(again.loadRecords(), [], 'las fichas no son atenciones');
+    assert.equal(again.loadPatients().length, 2);
+    assert.equal(again.getPatient(ana.id).f.paciente_fono, '555');
+    // savePatients (sincronización) agrega o reemplaza, nunca borra fichas.
+    again.savePatients([{ ...again.getPatient(ana.id), f: { ...again.getPatient(ana.id).f, paciente_fono: '777' }, updated: 40 }]);
+    await again.flush();
+    const third = createRepo(await make(e));
+    await third.init();
+    assert.deepEqual(
+      third.loadPatients().map((p) => p.f.paciente_nombre),
+      ['Ana', 'Luis'],
+    );
+    assert.equal(third.getPatient(ana.id).f.paciente_fono, '777');
   });
 }
 

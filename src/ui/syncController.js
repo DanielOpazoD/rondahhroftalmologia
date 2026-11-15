@@ -25,6 +25,8 @@ import { $, toast, copyText } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 
 const INTERVAL_MS = 2 * 60 * 1000;
+/** Espacio del servidor con las fichas de pacientes, compartido por todas las especialidades. */
+export const PATIENTS_SPACE = 'pacientes';
 const DEBOUNCE_MS = 4000;
 
 /** @param {import('./context.js').AppContext} ctx */
@@ -72,6 +74,16 @@ export function createSyncController(ctx) {
         6000,
       );
     }
+  }
+
+  /** Fichas de pacientes (espacio común). */
+  function readPatients() {
+    return { items: store.loadPatients().map((p) => ({ id: p.id, updated: p.updated, kind: 'paciente', data: p })), tombstones: {} };
+  }
+  function writePatients(items) {
+    store.savePatients(items.filter((i) => i.kind === 'paciente').map((i) => ({ ...i.data, id: i.id, updated: i.updated })));
+    for (const i of items) clock.observe(i.updated);
+    ctx.refreshLists();
   }
 
   /** Todo lo que se sincroniza: atenciones, perfiles de médico y operativos. */
@@ -136,16 +148,20 @@ export function createSyncController(ctx) {
     st.running = true;
     setStatus('syncing');
     try {
-      const api = createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id });
-      const res = await syncOnce({
-        api,
-        key: await getKey(),
-        readLocal,
-        writeLocal,
-        mergeFn: syncMerge,
-        fingerprint: syncFingerprint,
-        encKey: st.config.encKey,
+      const key = await getKey();
+      const common = { key, mergeFn: syncMerge, fingerprint: syncFingerprint, encKey: st.config.encKey };
+      // 1) Fichas de pacientes: espacio COMÚN a todas las especialidades.
+      const resP = await syncOnce({
+        ...common,
+        api: createSyncApi({ token: st.config.token, esp: PATIENTS_SPACE }),
+        readLocal: readPatients,
+        writeLocal: writePatients,
       });
+      // 2) Atenciones, catálogos y bitácora: espacio de la especialidad.
+      const api = createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id });
+      const resE = await syncOnce({ ...common, api, readLocal, writeLocal });
+      const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
+      ctx.ensurePatients();
       checkClock(api.serverDate);
       st.config = { ...st.config, lastSync: Date.now() };
       store.saveSyncConfig(st.config);

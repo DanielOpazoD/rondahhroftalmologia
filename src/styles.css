@@ -1624,3 +1624,125 @@ ol.hist ul li {
   padding: 0 4px;
   border-radius: 4px;
 }
+
+/* ------------------------------------------------------ verificador de RUT */
+.rutwrap {
+  position: relative;
+}
+.rutwrap input {
+  padding-right: 34px;
+}
+.rutmark {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 700 12px/1 var(--font);
+  pointer-events: none;
+}
+.rutmark.ok {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+.rutmark.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+/* --------------------------------------------------------------- ingreso */
+.ingfoot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.ingfoot .hint {
+  flex: 1;
+  margin: 0;
+}
+.ingfoot .btn svg {
+  width: 16px;
+  height: 16px;
+}
+.state {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.state.pend {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.state.done {
+  background: color-mix(in srgb, var(--ok) 13%, transparent);
+  color: var(--ok);
+}
+.listhead input[type='date'] {
+  width: auto;
+}
+@media (max-width: 560px) {
+  .ingfoot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* ------------------------------------------------------ ficha del paciente */
+.patcard h2 {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 17px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.patmeta {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+#patBack {
+  margin-bottom: 10px;
+}
+.prevlist {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-strong);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.prevlist b {
+  color: var(--mut);
+  font-weight: 600;
+  margin-right: 2px;
+}
+.prevlist button {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font: 12px var(--font);
+  color: var(--ink);
+  cursor: pointer;
+}
+.prevlist button:hover {
+  border-color: var(--acc);
+  color: var(--acc-text);
+}
+
+.rutmark.inline {
+  position: static;
+  transform: none;
+  display: inline-grid;
+  vertical-align: -4px;
+  margin-left: 2px;
+}

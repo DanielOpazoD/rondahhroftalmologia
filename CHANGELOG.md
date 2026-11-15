@@ -1,5 +1,29 @@
 # Cambios
 
+## 2.9.0 — 2026-11-15
+
+### Nuevo
+- **El paciente es la unidad.** Cada paciente tiene una ficha (RUT, nombre, fecha de nacimiento, sexo, fono), y cada atención es un episodio de su historial, en la fecha y especialidad que corresponda.
+  - La ficha se identifica por el RUT (sin importar el formato) o, sin RUT, por el nombre: dos equipos no la duplican.
+  - Las fichas van en un espacio común del servidor, listo para que un paciente reciba atenciones de varias especialidades.
+  - Las atenciones existentes se vinculan solas a su paciente (esquema v4).
+- **Pestaña Ingreso** para trabajar varios a la vez:
+  - una persona preingresa a los pacientes del día;
+  - la lista del día muestra a cada uno como **Por atender** o **Atendido**;
+  - médicos y otros profesionales abren al paciente desde la lista y registran solo lo suyo (la PIO, el diagnóstico…); todo se fusiona campo a campo;
+  - si el RUT ya existe, se completan sus datos y se avisa cuántas atenciones previas tiene; no se agrega dos veces el mismo paciente el mismo día.
+- **Pacientes** es ahora un registro de pacientes: cada ficha muestra sus datos y su historial de atenciones, y permite crear una nueva atención para ese paciente.
+- **La atención muestra las atenciones previas** del paciente.
+- **Verificador de RUT:** ✓ verde si el dígito verificador es correcto, ✗ roja si no.
+- **Respaldos** incluyen las fichas de pacientes (los anteriores se siguen aceptando).
+
+### Sin cambios
+- PDF, Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
+
+### Pruebas
+- Unitarias: modelo de paciente, migración v4, fichas en IndexedDB y localStorage, sincronización de fichas entre dos equipos (el servidor no ve nombre ni RUT), respaldo con fichas.
+- En navegador: verificador de RUT y **trabajo simultáneo en tres PC** (admisión ingresa, el médico anota diagnóstico y plan, enfermería la PIO; los tres terminan con todo y el paciente pasa a Atendido).
+
 ## 2.8.0 — 2026-11-15
 
 ### Arquitectura (sin cambios visibles; las salidas son idénticas, verificado)
