@@ -19,6 +19,49 @@ Permite que varios PC (por ejemplo, 4 en un operativo) trabajen al mismo tiempo 
 - **Cifrado:** cada atención se cifra entera (nombre, RUT, examen, etc.) con un IV aleatorio. Va «atada» a su id y versión, así que el servidor no puede cambiarla de lugar ni de fecha sin que se note. Las eliminaciones también viajan cifradas.
 - **Qué ve Netlify:** un id aleatorio por atención, la fecha de su última modificación y el texto cifrado. También ve la IP y la hora de cada sincronización.
 
+### Una pasada de sincronización
+
+`syncOnce` repite pasadas (como mucho 3) mientras quede algo por subir. Cada pasada tiene etapas con nombre en `src/sync/client.js`:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant PC as PC (cliente)
+  participant S as Servidor (Netlify)
+  PC->>S: list (completa al abrir; luego list?since=cursor)
+  S-->>PC: versiones {id, u, h} + now
+  Note over PC: preparePass: plan = subir / bajar / conflictos<br/>(huellas verificadas en caché)
+  opt ids en claro antiguos (ADR 0005)
+    PC->>S: purge (los ya migrados) / get (los por migrar)
+  end
+  PC->>S: get (lo que cambió en ambos lados + conflictos)
+  Note over PC: mergeBeforePush: fusión campo a campo;<br/>conflicto sin aporte local → adoptar la del servidor
+  PC->>S: put (lo local más nuevo y lo fusionado, cifrado + huella)
+  S-->>PC: saved / skipped (el servidor ya tenía otra igual o mayor)
+  PC->>S: get (lo más nuevo del servidor)
+  Note over PC: applyChanges: aplicar sobre el estado local ACTUAL
+```
+
+### Dos PC editan el mismo paciente a la vez
+
+```mermaid
+sequenceDiagram
+  participant A as PC enfermería
+  participant S as Servidor
+  participant B as PC médico
+  A->>A: PIO = 21 (f.od_pio, t=100)
+  B->>B: Diagnóstico glaucoma (checks.dx, t=105)
+  A->>S: put versión 100
+  B->>S: list → el servidor tiene 100 y B tiene 105
+  B->>S: get 100
+  Note over B: fusión campo a campo:<br/>PIO de A + diagnóstico de B
+  B->>S: put versión 106 (fusionada)
+  A->>S: list → 106 es más nueva
+  S-->>A: get 106 → A tiene PIO y diagnóstico
+```
+
+Si los dos suben **la misma versión** con contenido distinto (fusionaron a la vez), la huella `h` lo delata. El siguiente equipo que sincroniza baja la del servidor, fusiona y sube una versión mayor (ADR 0004).
+
 ### Cuándo se sincroniza (y qué se pide)
 
 - al abrir la app;

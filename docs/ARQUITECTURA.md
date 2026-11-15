@@ -6,26 +6,29 @@ Las decisiones de fondo, con su porqué, están en el [registro de decisiones (A
 
 1. **Sin conexión y sin instalación.** Se usa en terreno (Rapa Nui), a veces sin internet, abriendo un archivo con doble clic (`file://`). Por eso el producto final es **un único HTML** con todo incrustado: código, estilos, pdf-lib y la plantilla PDF.
 2. **Datos sensibles.** Los datos de pacientes no salen del equipo **sin cifrar**. La política CSP (`connect-src 'self'`) solo permite conectarse con el propio servidor. A ese servidor llegan únicamente atenciones cifradas en el PC (ver [SINCRONIZACION.md](SINCRONIZACION.md)).
-3. **Varios PC a la vez.** Cada PC es la fuente de verdad local (*local-first*). La sincronización intercambia versiones y queda la más reciente (*last-write-wins*), igual que la unión de respaldos.
-3. **Mantenible.** El código fuente está en módulos ES pequeños con responsabilidades claras. Un *build* los une en el HTML final.
+3. **Varios PC a la vez.** Cada PC es la fuente de verdad local (*local-first*). La sincronización fusiona **campo a campo**: en cada campo gana la edición más reciente (ADR 0003). Así dos profesionales pueden registrar datos distintos del mismo paciente a la vez sin perder nada. Igual funciona la unión de respaldos.
+4. **Mantenible.** El código fuente está en módulos ES pequeños con responsabilidades claras. Un *build* los une en el HTML final.
 
 ## Capas
 
-```
-            ┌──────────────────────────────────────────────┐
-  ui/       │ vistas: intake, attention, registry, stats,  │  DOM, eventos
-            │ export, settings · context.js (controlador)  │
-            └───────────────┬──────────────────────────────┘
-                            │ llama a
-     ┌──────────────────────┼─────────────────────────┐
-     ▼                      ▼                         ▼
-  storage/repo.js      core/* (lógica pura)       specialties/activa/*
-  storage/store.js     record, patient, merge,    (catálogos, clínica,
-  IndexedDB            migrations, audit, clock,   nota, PDF, Excel)
-                       backup, format
-                            │
-                            ▼
-                     lib/* (sha256, zip, xlsx) · config/catalogs.js
+Cada flecha es una dependencia permitida (ESLint impide las demás: las capas puras no tocan el DOM, y la plataforma solo ve la especialidad a través de `specialties/activa/`).
+
+```mermaid
+flowchart TD
+  UI["ui/ — vistas, diálogos, context.js<br/>ui/actions/ (orquestan) · events.js (bus)"]
+  APP["app/ — reglas de las acciones (puras)<br/>attentions.js · syncData.js"]
+  SYNC["sync/ — cifrado, protocolo, cliente, servidor"]
+  CORE["core/ — modelo y reglas puras<br/>record, patient, merge, migrations, audit, clock, compat, pin…"]
+  SPEC["specialties/activa/ → oftalmologia/<br/>catálogos, clínica, PDF, nota, Excel"]
+  STORE["storage/ — repo (IndexedDB) · store (localStorage)"]
+  LIB["lib/ — sha256, zip, xlsx"]
+  FN["netlify/functions/sync.mjs"]
+  UI --> APP & SYNC & CORE & SPEC & STORE
+  APP --> CORE & SPEC
+  SYNC --> CORE & LIB
+  CORE --> LIB & SPEC
+  STORE --> CORE
+  FN --> SYNC
 ```
 
 - **`app/` es la capa de aplicación:** las reglas de negocio de las acciones (preparar un guardado, preingresar, re-vincular una atención, actualizar la ficha del paciente) como funciones puras. `ui/actions/` solo orquesta: confirma con el usuario, persiste y re-dibuja. Así cada regla se prueba en Node (`tests/app.test.js`).
