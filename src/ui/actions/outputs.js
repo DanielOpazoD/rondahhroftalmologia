@@ -4,7 +4,8 @@
 import { buildAttentionPdf, pdfFileName } from '../../specialties/activa/index.js';
 import { createSecret } from '../../core/pseudonym.js';
 import { toast, download, copyText, withBusy } from '../dom.js';
-import { uiCopy, uiChoose } from '../modal.js';
+import { uiCopy } from '../modal.js';
+import { openMenu } from '../menu.js';
 import { appendAnnexes } from '../../core/pdfAnexos.js';
 import { kindOf } from '../../core/attachments.js';
 import { toPng } from '../images.js';
@@ -37,22 +38,27 @@ async function annexFrom(m, bytes) {
 export function outputActions(ctx, store) {
   return {
     /**
-     * Descarga el PDF de la atención. Si tiene adjuntos, pregunta si se
-     * incluyen como anexos en el mismo documento (ver core/pdfAnexos.js).
+     * Descarga el PDF de la atención: un menú junto al botón ofrece «PDF»
+     * (la hoja) o «PDF + adjuntos» (en el mismo documento, ver core/pdfAnexos.js).
      */
     async downloadPdf(rec, button) {
       const metas = rec.id ? store.loadAttachments(rec.id) : [];
-      let withAnnexes = false;
-      if (metas.length) {
-        const choice = await uiChoose({
-          title: 'Descargar PDF',
-          message: `Esta atención tiene ${metas.length} ${metas.length === 1 ? 'adjunto' : 'adjuntos'}. ¿Incluirlos como anexos en el mismo PDF?`,
-          okLabel: 'Con anexos',
-          altLabel: 'Solo la hoja',
-        });
-        if (!choice) return undefined;
-        withAnnexes = choice === 'ok';
-      }
+      const n = metas.length;
+      const choice = await openMenu(
+        button,
+        [
+          { value: 'pdf', label: 'PDF', hint: 'Hoja de la atención' },
+          {
+            value: 'anexos',
+            label: 'PDF + adjuntos',
+            hint: n ? `La hoja y ${n} ${n === 1 ? 'adjunto' : 'adjuntos'} en un solo PDF` : 'Esta atención no tiene adjuntos',
+            disabled: !n,
+          },
+        ],
+        { label: 'Descargar PDF' },
+      );
+      if (!choice) return undefined;
+      const withAnnexes = choice === 'anexos';
       return withBusy(button, async () => {
         const r = await buildAttentionPdf(ctx.templateBytes(), rec, ctx.procs, ctx.pdfOptions());
         if (!withAnnexes) {

@@ -133,7 +133,7 @@ export function syncAttentionView(ctx) {
     const el = /** @type {HTMLInputElement | null} */ (document.getElementById(k));
     if (el && el.value !== (rec.f[k] || '')) el.value = rec.f[k] || '';
   }
-  $$('.chip').forEach((c) => setPressed(c, !!rec.checks[c.dataset.k]));
+  $$('.chip[data-k]').forEach((c) => setPressed(c, !!rec.checks[c.dataset.k]));
   $('#cxBox').hidden = !rec.checks.antecedente_cirugia;
   $('#schBox').hidden = !rec.checks.procedimiento_test_schirmer;
   $('#catBox').hidden = !rec.checks.diagnostico_catarata;
@@ -152,8 +152,6 @@ export function syncAttentionView(ctx) {
       i.closest('.pf').hidden = !!p && !coversEye(p.eye, i.dataset.e);
     });
   });
-  // Procedimientos guardados que ya no están en la lista configurada.
-  n += Object.keys(rec.proc).filter((id) => !ctx.procs.some((p) => p.id === id)).length;
   $('#procBadge').textContent = n;
   const fromBirth = isIsoDate(rec.f.paciente_fnac);
   $('#paciente_edad').readOnly = fromBirth;

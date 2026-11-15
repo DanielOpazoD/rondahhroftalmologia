@@ -111,7 +111,7 @@
     <div class="tb-actions">
       <button type="button" class="ib" id="bNew" title="Nueva atención" aria-label="Nueva atención"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
       <button type="button" class="ib" id="bCopy" title="Copiar nota para Eloísa" aria-label="Copiar nota para Eloísa"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
-      <button type="button" class="ib" id="bPdf" title="Descargar PDF" aria-label="Descargar PDF"><svg aria-hidden="true"><use href="#i-pdf"/></svg></button>
+      <button type="button" class="ib" id="bPdf" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-pdf"/></svg></button>
       <button type="button" class="btn p" id="bSave" title="Guardar (Ctrl/⌘ + S)"><svg aria-hidden="true"><use href="#i-check"/></svg><span>Guardar</span></button>
     </div>
   </div>
@@ -186,8 +186,10 @@
   </div>
   <div id="patDetailView" hidden>
     <button type="button" class="btn sm" id="patBack">← Pacientes</button>
-    <div class="card patcard" id="patCard"></div>
-    <div class="row u-mb10"><button type="button" class="btn p sm" id="patNew"><svg aria-hidden="true"><use href="#i-plus"/></svg>Nueva atención para este paciente</button></div>
+    <div class="card patcard" id="patCard">
+      <div id="patCardInfo"></div>
+      <button type="button" class="btn p sm" id="patNew"><svg aria-hidden="true"><use href="#i-plus"/></svg>Nueva atención</button>
+    </div>
     <div id="patAttentions" class="plist"></div>
   </div>
 </section>
@@ -309,7 +311,7 @@
 
   <div class="card">
     <h2>Procedimientos realizados</h2>
-    <p class="muted">Agrega, ordena o quita procedimientos. «PIO» marcado pide la presión por ojo. Las atenciones guardadas conservan los suyos.</p>
+    <p class="muted">Agrega, ordena o quita procedimientos. «PIO» indica los que piden la presión intraocular por ojo. Un procedimiento quitado deja de mostrarse y de contarse (si lo restauras, vuelve con sus datos).</p>
     <div class="list" id="ajList"></div>
     <div class="row u-mt10">
       <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" class="u-grow u-minw160">

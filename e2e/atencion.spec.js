@@ -41,7 +41,8 @@ test('la fecha de nacimiento calcula la edad (solo lectura)', async ({ page }) =
 
 test('descarga el PDF con nombre normalizado', async ({ page }) => {
   await fillPatient(page, { nombre: 'Pdf Paciente', rut: '11.111.111-1' });
-  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#bPdf').click()]);
+  await page.locator('#bPdf').click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
   expect(download.suggestedFilename()).toBe('Oftalmo_2026-11-14_11111111-1_Pdf_Paciente.pdf');
 });
 
@@ -141,4 +142,29 @@ test('ficha creada por error: aparece en «sin atenciones» y se elimina; volver
   await save(page);
   await showPatientRecord(page, 'Ficha Por Error');
   await expect(page.locator('#patAttentions .prow')).toHaveCount(1);
+});
+
+test('procedimientos: «PIO» solo en los que la piden; uno quitado de la lista no se muestra ni se cuenta', async ({ page }) => {
+  await fillPatient(page, { nombre: 'Paciente Procedimiento' });
+  // Marca un procedimiento nuevo (agregado en Ajustes) y guarda.
+  await tab(page, 'Ajustes');
+  await page.locator('#ajNew').fill('vvv');
+  await page.locator('#ajAdd').click();
+  const pio = page.locator('#ajList .piotg');
+  // Solo T. Aplanática, T. Neumática y Curva de tensión piden PIO (y siguen así tras usar la atención).
+  await expect(page.locator('#ajList .piotg.on')).toHaveCount(3);
+  await expect(pio.filter({ hasText: /^PIO$/ })).toHaveCount(3);
+  await tab(page, 'Atención');
+  await page.locator('#procList .proc', { hasText: 'vvv' }).getByRole('button', { name: 'OI' }).click();
+  await save(page);
+  await expect(page.locator('#procBadge')).toHaveText('1');
+  await tab(page, 'Ajustes');
+  await expect(page.locator('#ajList .piotg.on')).toHaveCount(3);
+  // Se quita «vvv» de la lista: deja de contarse en la atención y en la estadística.
+  await page.locator('#ajList .it', { hasText: 'vvv' }).getByRole('button', { name: 'Quitar' }).click();
+  await page.locator('#msgDlg').getByRole('button', { name: 'Quitar' }).click();
+  await tab(page, 'Atención');
+  await expect(page.locator('#procBadge')).toHaveText('0');
+  await tab(page, 'Estadística');
+  await expect(page.locator('#t-est')).not.toContainText('vvv');
 });

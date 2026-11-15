@@ -145,8 +145,8 @@ test('lados: coversEye y procedimientos realizados en orden de la lista', () => 
     [
       ['Lavado de oído', 'OD', 1],
       ['Audiometría tonal', 'AO', 2],
-      ['Procedimiento antiguo', 'OI', 1],
     ],
+    'el procedimiento que ya no está en la lista no se muestra',
   );
   assert.equal(orl.procName('x', {}, PROCS), 'x');
   assert.equal(orl.sideCount(''), 0);
@@ -194,7 +194,7 @@ test('estadística ORL: misma forma que la que lee la interfaz (ui/statsView.js)
   assert.deepEqual(Object.keys(S).sort(), Object.keys(O).sort());
   assert.deepEqual(Object.keys(S.gest), Object.keys(O.gest));
   assert.deepEqual(S.proc['Lavado de oído'], { pac: 2, od: 2, oi: 1, ojos: 3 });
-  assert.equal(S.ojos, 6);
+  assert.equal(S.ojos, 5); // sin el procedimiento que ya no está en la lista
   assert.equal(S.pacientes, 3);
   assert.deepEqual(S.sol, { Audiometría: 1, Otros: 1 });
   assert.equal(S.dx['Otros diagnósticos'], 1);

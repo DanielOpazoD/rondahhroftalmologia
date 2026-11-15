@@ -188,8 +188,10 @@ export function createSyncController(ctx) {
       st.config = { ...st.config, lastSync: Date.now() };
       store.saveSyncConfig(st.config);
       setStatus('idle');
+      // Silenciosa: solo se informa si se pidió con «Sincronizar ahora». Lo que
+      // cambie en la atención abierta se avisa en ella (absorbRemote).
       const got = res.added + res.updated + res.deleted;
-      if (!quiet || got) {
+      if (!quiet) {
         toast(
           got ? `Sincronizado: ${got} ${got === 1 ? 'cambio recibido' : 'cambios recibidos'} de otros equipos` : 'Sincronizado',
           got ? 3500 : 1800,

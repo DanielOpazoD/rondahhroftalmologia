@@ -108,8 +108,10 @@ test('PDF con anexos: desde el botón PDF, la hoja y sus adjuntos en un solo doc
   await openApp(page);
   await page.locator('#paciente_nombre').fill('Paciente PDF Anexos');
   await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
-  // Sin adjuntos: el PDF se descarga como siempre, sin preguntar.
-  const [plain] = await Promise.all([page.waitForEvent('download'), page.locator('#bPdf').click()]);
+  // Sin adjuntos: el menú ofrece el PDF; «PDF + adjuntos» está desactivado.
+  await page.locator('#bPdf').click();
+  await expect(page.getByRole('menuitem', { name: /PDF \+ adjuntos/ })).toBeDisabled();
+  const [plain] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
   const plainPages = (await PDFDocument.load(await (await import('node:fs/promises')).readFile(await plain.path()))).getPageCount();
   await attach(page, [
     { name: 'retina.png', mimeType: 'image/png', buffer: PNG },
@@ -123,12 +125,12 @@ test('PDF con anexos: desde el botón PDF, la hoja y sus adjuntos en un solo doc
   await expect(page.locator('#attCount')).toHaveText('3');
   // «Solo la hoja»: igual que antes.
   await page.locator('#bPdf').click();
-  await expect(page.locator('#msgTitle')).toHaveText('Descargar PDF');
-  const [only] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Solo la hoja' }).click()]);
+  await expect(page.getByRole('menu', { name: 'Descargar PDF' })).toBeVisible();
+  const [only] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
   expect(only.suggestedFilename()).not.toContain('con_anexos');
   // «Con anexos»: hoja + índice + imagen + PDF adjunto; el Word va dentro.
   await page.locator('#bPdf').click();
-  const [full] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Con anexos' }).click()]);
+  const [full] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /PDF \+ adjuntos/ }).click()]);
   expect(full.suggestedFilename()).toMatch(/_con_anexos\.pdf$/);
   const doc = await PDFDocument.load(await (await import('node:fs/promises')).readFile(await full.path()));
   expect(doc.getPageCount()).toBe(plainPages + 3);
