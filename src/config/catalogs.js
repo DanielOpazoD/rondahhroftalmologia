@@ -72,6 +72,7 @@ export const ROLES = [
   { key: 'enfermeria', label: 'Enfermería' },
   { key: 'tens', label: 'TENS' },
   { key: 'tecnologo', label: 'Tecnólogo/a médico/a' },
+  { key: 'administrativo', label: 'Administrativo/a' },
   { key: 'admision', label: 'Admisión' },
   { key: 'otro', label: 'Otro' },
 ];

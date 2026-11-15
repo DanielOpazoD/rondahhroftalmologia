@@ -17,5 +17,6 @@ Cada ADR explica una decisión de fondo: el contexto, qué se decidió, sus cons
 | [0011](0011.md) | Modo práctica con almacenamiento aislado | Aceptada |
 | [0012](0012.md) | Lector tolerante entre versiones de la app | Aceptada |
 | [0013](0013.md) | Respaldos diarios del servidor, cifrados | Aceptada |
+| [0014](0014.md) | Cuentas de usuario por RUT, roles y registro de accesos | Aceptada |
 
 Plantilla para una nueva: **Estado** (Propuesta / Aceptada / Reemplazada por ADR N), **Contexto**, **Decisión**, **Consecuencias** y **Alternativas descartadas**.
