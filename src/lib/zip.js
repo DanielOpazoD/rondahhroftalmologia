@@ -1,9 +1,10 @@
 /**
- * Generador mínimo de archivos ZIP (método "store", sin compresión).
+ * Generador y lector mínimos de archivos ZIP (método "store", sin compresión).
  *
  * Se usa para:
  *  - empaquetar el .xlsx (un .xlsx es un ZIP con XML adentro);
- *  - descargar en un solo archivo los PDF de un operativo completo.
+ *  - descargar en un solo archivo los PDF de un operativo completo;
+ *  - el respaldo con adjuntos (y leerlo al importarlo).
  *
  * Los PDF ya vienen comprimidos internamente, así que "store" no pierde nada
  * relevante y mantiene el código simple y sin dependencias.
@@ -128,4 +129,52 @@ function uniqueName(name, used) {
   }
   used.add(candidate.toLowerCase());
   return candidate;
+}
+
+/** ¿Empieza como un ZIP? @param {Uint8Array} bytes */
+export const isZip = (bytes) => bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 3 && bytes[3] === 4;
+
+/**
+ * Lee un ZIP sin compresión (como los que crea createZip). Verifica el CRC de
+ * cada entrada.
+ * @param {Uint8Array} bytes
+ * @returns {Map<string, Uint8Array>} nombre → contenido (vistas sobre `bytes`)
+ * @throws {Error} si no es un ZIP legible, usa compresión o está dañado
+ */
+export function readZip(bytes) {
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // Fin del directorio central: al final, tras un comentario de hasta 64 KiB.
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 0xffff); i--) {
+    if (v.getUint32(i, true) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) throw new Error('El archivo no es un ZIP válido');
+  const count = v.getUint16(eocd + 10, true);
+  let pos = v.getUint32(eocd + 16, true);
+  const dec = new TextDecoder();
+  /** @type {Map<string, Uint8Array>} */
+  const out = new Map();
+  for (let n = 0; n < count; n++) {
+    if (pos + 46 > bytes.length || v.getUint32(pos, true) !== 0x02014b50) throw new Error('ZIP dañado');
+    const method = v.getUint16(pos + 10, true);
+    const crc = v.getUint32(pos + 16, true);
+    const size = v.getUint32(pos + 20, true);
+    const nameLen = v.getUint16(pos + 28, true);
+    const extraLen = v.getUint16(pos + 30, true);
+    const commentLen = v.getUint16(pos + 32, true);
+    const local = v.getUint32(pos + 42, true);
+    const name = dec.decode(bytes.subarray(pos + 46, pos + 46 + nameLen));
+    pos += 46 + nameLen + extraLen + commentLen;
+    if (method !== 0) throw new Error('El ZIP está comprimido: usa el archivo tal como lo descargó la app');
+    if (local + 30 > bytes.length || v.getUint32(local, true) !== 0x04034b50) throw new Error('ZIP dañado');
+    const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+    if (start + size > bytes.length) throw new Error('ZIP incompleto');
+    const data = bytes.subarray(start, start + size);
+    if (crc32(data) !== crc) throw new Error(`ZIP dañado (${name})`);
+    out.set(name, data);
+  }
+  return out;
 }

@@ -149,3 +149,29 @@ test('seguridad: un SVG o HTML adjunto se descarga, nunca se abre (no ejecuta sc
   expect(dl.suggestedFilename()).toBe('dibujo.svg');
   expect(opened).toBe(0);
 });
+
+test('respaldo con adjuntos: se descarga como ZIP y al importarlo en otro equipo trae el contenido', async ({ browser }) => {
+  const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
+  const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
+  await openApp(A);
+  await A.locator('#paciente_nombre').fill('Paciente Respaldo Adjuntos');
+  await expect(A.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
+  await attach(A, [{ name: 'retina.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(A.locator('#attCount')).toHaveText('1');
+  await tab(A, 'Ajustes');
+  const [dl] = await Promise.all([A.waitForEvent('download'), A.locator('#bkExp').click()]);
+  expect(dl.suggestedFilename()).toMatch(/^respaldo_oftalmo_.*\.zip$/);
+  await expect(A.locator('#toast')).toContainText('con 1 adjunto');
+  // Otro equipo, sin sincronización: importa el ZIP.
+  await openApp(B);
+  await tab(B, 'Ajustes');
+  await B.locator('#bkImp').setInputFiles(await dl.path());
+  await expect(B.locator('#msgDlg')).toContainText('1 adjunto(s) nuevo(s)');
+  await B.locator('#msgDlg').getByRole('button').first().click();
+  await showPatientRecord(B, 'Paciente Respaldo Adjuntos');
+  await B.locator('#patAttentions .pmain').first().click();
+  await expect(B.locator('#attList')).toContainText('retina.png');
+  await expect(B.locator('#attList .attthumb')).toHaveCount(1); // el contenido llegó
+  await expect(B.locator('#attList')).not.toContainText('llega al sincronizar');
+  await Promise.all([ca.close(), cb.close()]);
+});

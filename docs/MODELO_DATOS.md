@@ -227,6 +227,8 @@ Al abrir la app por primera vez con esta versión, los catálogos se completan c
 
 Al importar, las atenciones y las fichas de pacientes que ya existen se **fusionan campo a campo**, igual que en la sincronización, y la bitácora se une. Se aceptan respaldos v1, v2 y v3. Los respaldos anteriores a la 2.9.0 no traen `pacientes`: las fichas se reconstruyen desde las atenciones.
 
+**Con adjuntos** (desde la 2.15.0), el respaldo es un **ZIP** (`respaldo_oftalmo_AAAA-MM-DD.zip`, sin compresión) con `respaldo.json` (lo anterior, más `adjuntos`: los metadatos) y el contenido de cada adjunto en `adjuntos/<id>`. Al importar, entran los adjuntos que el equipo no tiene; su contenido solo se acepta si coincide con su huella SHA-256. Sin adjuntos, sigue siendo el JSON de siempre. Ojo: a diferencia del servidor, este archivo **no está cifrado**; guárdalo como cualquier documento clínico.
+
 Se aceptan respaldos v1 (sin `anonSecret`). Al importar, si el equipo no tiene clave de seudonimización, adopta la del respaldo. Así los códigos coinciden entre equipos.
 
 ## Validación
