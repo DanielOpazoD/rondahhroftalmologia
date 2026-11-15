@@ -1,3 +1,13 @@
 node_modules/
 .DS_Store
 *.log
+
+# Datos de pacientes: NUNCA versionar (el repositorio es público)
+respaldo_oftalmo_*.json
+oftalmo_seudonimizado_*
+CONFIDENCIAL_*
+estadistica_oftalmo_*
+pdf_oftalmo_*.zip
+Oftalmo_*.pdf
+atenciones_oftalmo*.csv
+*.xlsx
