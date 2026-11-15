@@ -215,4 +215,6 @@ Cada solicitud admite hasta 200 elementos y un cuerpo de hasta 5,5 MB (`413` si 
 
 **Errores:** responden `{error, code}`. `error` es el texto para mostrar; `code` es un identificador estable para el cliente: `especialidad_invalida`, `no_configurado`, `token_invalido`, `cliente_antiguo`, `ruta`, `metodo` (con cabecera `Allow`), `json_invalido`, `demasiado_grande`, `lote_invalido`, `elemento_invalido`, `purga_invalida` e `interno`.
 
+**Intentos fallidos:** tras 20 intentos con una contraseña incorrecta desde la misma red en 15 minutos, esa red recibe `429 demasiados_intentos` (con `Retry-After`) durante 15 minutos. Las solicitudes con la contraseña correcta nunca se bloquean, porque en el hospital varios PC comparten la misma IP pública. La IP no se guarda: solo un HMAC con un secreto del servidor (`_limites/…` en el almacén, fuera de los espacios de datos y de los respaldos).
+
 **Diagnóstico:** cada respuesta lleva `x-request-id`. La función de Netlify escribe una línea JSON por solicitud con acción, especialidad, estado, duración y código; nunca el token ni datos.
