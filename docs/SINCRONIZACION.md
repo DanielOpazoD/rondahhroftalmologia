@@ -35,11 +35,24 @@ Permite que varios PC (por ejemplo, 4 en un operativo) trabajen al mismo tiempo 
 
 ## Puesta en marcha (una vez)
 
-1. **Publicar en Netlify:** *Add new site → Import an existing project →* repositorio `DanielOpazoD/rondahhroftalmologia`. La configuración ya está en `netlify.toml`.
-2. **Crear la contraseña del equipo:** en el PC 1, abre la app desde la dirección de Netlify → **Ajustes → Sincronización → Generar**. Anótala (por ejemplo `K7QM3-XRT9P-ZAWD4-N8F2C`) y presiona **Activar en este PC**.
-3. **Configurar el servidor:** en *Configuración del servidor*, copia el valor mostrado. En Netlify → *Site configuration → Environment variables* crea `SYNC_TOKEN_SHA256` con ese valor. Luego *Deploys → Trigger deploy*.
-4. **Activar los demás PC:** en cada uno, abre la misma dirección → Ajustes → escribe la **misma contraseña** → Activar.
-5. Comprueba que arriba a la derecha aparezca **● Sincronizado**.
+**Estado actual (producción):**
+
+- **Dirección:** https://hhr-rondas.netlify.app (proyecto Netlify `hhr-rondas`).
+- **Despliegue:** automático en cada push a `main` del repositorio `DanielOpazoD/rondahhroftalmologia`.
+- **Servidor:** la variable `SYNC_TOKEN_SHA256` ya está configurada.
+- **Contraseña del equipo:** se generó sin mostrarse en ningún registro y se guardó en el Escritorio del PC de configuración, en el archivo `HHR_Rondas_CONTRASENA_EQUIPO.txt`. Guárdala en un lugar seguro y borra ese archivo.
+
+**En cada PC (los 4):**
+
+1. Abre https://hhr-rondas.netlify.app en Chrome o Edge. Opcionalmente, instálala como app (icono ⊕ en la barra de direcciones).
+2. Ve a **Ajustes → Sincronización entre equipos**, escribe la contraseña del equipo y presiona **Activar en este PC**.
+3. Comprueba que arriba a la derecha aparezca **Sincronizado**, con el punto verde.
+
+**Configurar desde cero** (otro sitio u otra contraseña):
+
+1. Publica el repositorio en Netlify. La configuración ya está en `netlify.toml`.
+2. En un PC, ve a **Ajustes → Generar → Activar**.
+3. En *Configuración del servidor*, copia el valor. En Netlify → *Site configuration → Environment variables* crea `SYNC_TOKEN_SHA256` con ese valor y vuelve a publicar.
 
 ### Cambiar la contraseña
 
