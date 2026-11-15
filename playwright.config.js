@@ -30,7 +30,7 @@ export default defineConfig({
     command: 'npm run build && node scripts/dev-server.mjs',
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
-    env: { PORT: String(PORT), SYNC_TOKEN_SHA256: tokenHash(token) },
+    env: { PORT: String(PORT), SYNC_TOKEN_SHA256: tokenHash(token), E2E_RESET: '1' },
     timeout: 120_000,
   },
 });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { openApp, tab, fillPatient, save, showPatientRecord } from './helpers.js';
 
 /** Crea un perfil desde Ajustes. */

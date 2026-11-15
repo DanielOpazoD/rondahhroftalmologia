@@ -230,7 +230,10 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
           }
           // Primero la marca del índice: si falla lo siguiente, el reintento la
           // reescribe; al revés, una versión podría quedar sin marca.
-          await store.setJSON(changeKey(esp, t, id, u, h), 1);
+          // Hora de la marca: la del momento de escribirla (no la del inicio de la
+          // solicitud), para que el margen del cursor de los clientes la cubra
+          // aunque la solicitud haya tardado.
+          await store.setJSON(changeKey(esp, now(), id, u, h), 1);
           await store.setJSON(keyOf(esp, id, u, h), { iv, ct });
           await Promise.all(existing.map((old) => store.delete(old.key)));
           saved.push(id);

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { openApp, tab, activateSync, syncNow, showPatientRecord } from './helpers.js';
 
 // Fecha propia: el servidor de sincronización es compartido por todas las pruebas.

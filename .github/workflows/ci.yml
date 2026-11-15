@@ -31,8 +31,10 @@ jobs:
         run: npm run format:check
       - name: Tipos (tsc --checkJs)
         run: npm run typecheck
-      - name: Pruebas unitarias e integración
-        run: npm test
+      - name: Pruebas unitarias e integración (con cobertura mínima)
+        run: npm run test:coverage
+      - name: Dependencias de producción sin vulnerabilidades altas
+        run: npm audit --omit=dev --audit-level=high
       - name: Estrés de sincronización (200 escenarios concurrentes)
         run: npm run test:stress
       - name: Build

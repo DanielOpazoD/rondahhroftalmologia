@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { openApp, tab, fillPatient, save, openPatient, activateSync, syncNow } from './helpers.js';
 
 test('migra a IndexedDB las atenciones guardadas por versiones anteriores', async ({ page }) => {

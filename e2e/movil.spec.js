@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { openApp } from './helpers.js';
 
 test('en el celular las pestañas van abajo y la barra usa iconos', async ({ page }) => {
