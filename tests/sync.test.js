@@ -620,3 +620,75 @@ describe('sincronización incremental (años de datos)', () => {
     assert.deepEqual(B.state.items[0].data.entries.map((e) => e.id).sort(), ['e1', 'e2']);
   });
 });
+
+describe('red poco confiable', () => {
+  const okJson = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+
+  test('errores transitorios se reintentan con retroceso; los demás no', async () => {
+    const waits = [];
+    const sleep = async (ms) => void waits.push(ms);
+    let n = 0;
+    const flaky = async () => {
+      n++;
+      if (n === 1) throw new TypeError('fetch failed');
+      if (n === 2) return new Response('{}', { status: 502 });
+      return okJson({ items: [], now: 1, full: true });
+    };
+    const api = createSyncApi({ token: 't', fetchFn: flaky, sleep });
+    assert.deepEqual((await api.list()).items, []);
+    assert.equal(n, 3);
+    assert.equal(waits.length, 2);
+    assert.ok(waits[0] >= 500 && waits[1] >= 1000, 'retroceso exponencial');
+
+    // 401 (contraseña incorrecta) no se reintenta.
+    let m = 0;
+    const denied = async () => (m++, new Response(JSON.stringify({ error: 'no' }), { status: 401 }));
+    await assert.rejects(createSyncApi({ token: 't', fetchFn: denied, sleep }).list(), (e) => e.status === 401);
+    assert.equal(m, 1);
+
+    // Agotados los reintentos, se informa el error.
+    const down = async () => {
+      throw new TypeError('fetch failed');
+    };
+    await assert.rejects(createSyncApi({ token: 't', fetchFn: down, sleep, retries: 1 }).list(), (e) => e.status === 0);
+  });
+
+  test('una solicitud que no responde se corta por tiempo', async () => {
+    const hang = (_url, init) =>
+      new Promise((_res, rej) => init.signal.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))));
+    const api = createSyncApi({ token: 't', fetchFn: hang, timeoutMs: 30, retries: 0 });
+    await assert.rejects(api.list(), (e) => e instanceof SyncHttpError && e.status === 0 && /a tiempo/.test(e.message));
+  });
+
+  test('sincronización completa con un servidor que falla a ratos: converge igual', async () => {
+    const { keys, handler } = await setup();
+    let calls = 0;
+    const flakyFetch = async (url, init) => {
+      calls++;
+      if (calls % 3 === 0) throw new TypeError('fetch failed'); // 1 de cada 3 solicitudes falla
+      return handler(new Request('https://x.test' + url, init));
+    };
+    const key = await importEncKey(keys.encKey);
+    const mk = (records) => {
+      const st = { items: records.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: r })), tombstones: {} };
+      return {
+        st,
+        sync: () =>
+          syncOnce({
+            api: createSyncApi({ token: keys.token, fetchFn: flakyFetch, sleep: async () => {} }),
+            key,
+            encKey: keys.encKey,
+            mergeFn: syncMerge,
+            fingerprint: syncFingerprint,
+            readLocal: () => structuredClone(st),
+            writeLocal: (items, tombstones) => Object.assign(st, { items, tombstones }),
+            batchSize: 3,
+          }),
+      };
+    };
+    const A = mk(Array.from({ length: 8 }, (_, i) => minimalRecord('a' + i, { paciente_nombre: 'A' + i }, { updated: 100 + i })));
+    const B = mk([]);
+    for (const p of [A, B, A, B]) await p.sync();
+    assert.equal(B.st.items.length, 8);
+  });
+});

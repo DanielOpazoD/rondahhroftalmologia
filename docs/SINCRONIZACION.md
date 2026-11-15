@@ -57,6 +57,10 @@ La fusión ocurre dentro de cada PC, antes de cifrar: el servidor sigue sin pode
 - **Causalidad.** Una edición hecha *después* de recibir otra siempre gana, aunque el reloj del PC esté atrasado. La hora de cada edición sale de un reloj lógico (`src/core/clock.js`): la hora del PC, pero nunca anterior a la última recibida de otros equipos.
 - **Reloj desajustado.** Si la hora del PC difiere más de 3 minutos de la del servidor, la app avisa para corregirla. Solo importa al desempatar ediciones *simultáneas* del mismo campo.
 
+### Red poco confiable
+
+Cada solicitud tiene un tiempo máximo de 20 s. Los errores transitorios (sin conexión, tiempo agotado, 429, 502, 504) se reintentan hasta 2 veces con retroceso exponencial y variación aleatoria (0,5 s, 1 s…), para que varios PC que fallaron a la vez no reintenten en el mismo instante. Reintentar es seguro porque todas las operaciones son idempotentes. Los errores definitivos, como la contraseña incorrecta (401), no se reintentan. Probado con un servidor que falla 1 de cada 3 solicitudes: los equipos convergen igual.
+
 ### Sin conexión
 - **Sin internet:** cada PC sigue guardando localmente. Al volver la conexión, sube y baja lo pendiente.
 - **Uso sin conexión desde la web:** una vez abierta la app desde la dirección de Netlify, el navegador la guarda en caché (*service worker*) y se puede abrir sin internet. En Chrome o Edge también se puede **instalar como app** (icono ⊕ en la barra de direcciones).

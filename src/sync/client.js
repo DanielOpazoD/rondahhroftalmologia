@@ -17,13 +17,49 @@ export class SyncHttpError extends Error {
   }
 }
 
+/** Estados HTTP transitorios: se reintenta (el resto, p. ej. 401 o 400, no). */
+export const RETRYABLE_STATUS = new Set([0, 408, 429, 502, 504]);
+
 /**
- * @param {{baseUrl?: string, token: string, esp?: string, fetchFn?: typeof fetch}} opts
+ * Espera antes del reintento `attempt` (0, 1, 2…): retroceso exponencial con
+ * variación aleatoria («jitter»), para que varios PC que fallaron a la vez no
+ * vuelvan a pedir todos en el mismo instante.
+ */
+export const backoffMs = (attempt, rand = Math.random) => Math.min(8000, 500 * 2 ** attempt) + Math.floor(rand() * 250);
+
+/**
+ * Cliente HTTP del servidor de sincronización.
+ *
+ * Robustez de red: cada solicitud tiene un tiempo máximo (`timeoutMs`) y los
+ * errores transitorios (sin conexión, tiempo agotado, 429, 502, 504) se
+ * reintentan hasta `retries` veces con retroceso exponencial. Reintentar es
+ * seguro: list/get son lecturas, put es idempotente (una versión ya guardada
+ * se omite) y purge borra lo que ya no existe sin error.
+ * @param {{baseUrl?: string, token: string, esp?: string, fetchFn?: typeof fetch,
+ *   timeoutMs?: number, retries?: number, sleep?: (ms: number) => Promise<void>}} opts
  *   `esp`: especialidad (espacio de datos separado en el servidor)
  */
-export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = globalThis.fetch.bind(globalThis) }) {
+export function createSyncApi({
+  baseUrl = '/api/sync',
+  token,
+  esp,
+  fetchFn = globalThis.fetch.bind(globalThis),
+  timeoutMs = 20_000,
+  retries = 2,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+}) {
   const qs = esp ? `?esp=${encodeURIComponent(esp)}` : '';
-  const call = async (path, body, extra = '') => {
+
+  /** Una solicitud, con tiempo máximo. */
+  const once = async (path, body, extra) => {
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    let timedOut = false;
+    const timer = ctrl
+      ? setTimeout(() => {
+          timedOut = true;
+          ctrl.abort();
+        }, timeoutMs)
+      : null;
     let res;
     try {
       res = await fetchFn(`${baseUrl}/${path}${qs}${extra ? (qs ? '&' : '?') + extra : ''}`, {
@@ -31,14 +67,29 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
         headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
         body: body ? JSON.stringify(body) : undefined,
         cache: 'no-store',
+        ...(ctrl ? { signal: ctrl.signal } : {}),
       });
-    } catch {
-      throw new SyncHttpError(0, 'Sin conexión con el servidor');
+      api.serverDate = res.headers.get('date') || api.serverDate;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`);
+      return data;
+    } catch (e) {
+      if (e instanceof SyncHttpError) throw e;
+      throw new SyncHttpError(0, timedOut ? 'El servidor no respondió a tiempo' : 'Sin conexión con el servidor');
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    api.serverDate = res.headers.get('date') || api.serverDate;
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`);
-    return data;
+  };
+
+  const call = async (path, body, extra = '') => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await once(path, body, extra);
+      } catch (e) {
+        if (attempt >= retries || !RETRYABLE_STATUS.has(e.status)) throw e;
+        await sleep(backoffMs(attempt));
+      }
+    }
   };
   const api = {
     /** Cabecera Date de la última respuesta (para detectar relojes desajustados). */
