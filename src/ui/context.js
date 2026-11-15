@@ -99,6 +99,7 @@ export function createContext(store, templateB64) {
       ctx.dirty = false;
       syncAttentionView(ctx);
       ctx.refreshLists();
+      ctx.sync?.schedule();
       toast(v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada', v.warnings.length ? 3500 : 2200);
       return true;
     },
@@ -117,17 +118,28 @@ export function createContext(store, templateB64) {
       const r = ctx.records.find((x) => x.id === id);
       if (!r) return;
       if (ctx.dirty && !confirm('Hay cambios sin guardar. ¿Abrir otra atención igual?')) return;
+      ctx.loadIntoForm(r);
+      ctx.showTab('t-at');
+      scrollTo(0, 0);
+    },
+
+    /** Carga una atención guardada en el formulario (sin cambios pendientes). */
+    loadIntoForm(r) {
       ctx.rec = normalizeRecord(r);
       ctx.dirty = false;
       syncAttentionView(ctx);
-      ctx.showTab('t-at');
-      scrollTo(0, 0);
     },
 
     deleteRecord(id) {
       const r = ctx.records.find((x) => x.id === id);
       if (!r || !confirm(`¿Eliminar la atención de ${r.f.paciente_nombre || r.f.paciente_rut} (${fmtDate(r.f.fecha_atencion)})? No se puede deshacer.`)) return;
-      if (!ctx.persist(() => (ctx.records = store.deleteRecord(id)))) return;
+      const ok = ctx.persist(() => {
+        ctx.records = store.deleteRecord(id);
+        // La "lápida" permite propagar la eliminación a los otros equipos.
+        store.addTombstone(id, Math.max(Date.now(), (r.updated || 0) + 1));
+      });
+      if (!ok) return;
+      ctx.sync?.schedule();
       if (ctx.rec.id === id) {
         ctx.rec.id = null;
         syncAttentionView(ctx);
@@ -222,6 +234,8 @@ export function createContext(store, templateB64) {
     },
 
     version: APP.version,
+    /** Controlador de sincronización (se asigna en main.js). */
+    sync: null,
   };
   return ctx;
 }

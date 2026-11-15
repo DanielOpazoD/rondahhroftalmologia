@@ -23,6 +23,13 @@ header { position: sticky; top: 0; z-index: 20; background: #0e4a6b; color: #fff
 .hbar h1 { font-size: 16px; margin: 0; flex: 1; line-height: 1.2; }
 .hbar h1 small { display: block; font-weight: 400; opacity: .8; font-size: 12px; }
 .hbar .ver { font-size: 11px; opacity: .7; }
+.syncBadge { border: 0; border-radius: 99px; padding: 4px 10px; font: 600 12px/1.2 inherit; cursor: pointer; background: rgba(255,255,255,.15); color: #fff; white-space: nowrap; }
+.syncBadge.idle { color: #9ff0c4; }
+.syncBadge.syncing { color: #cfe4f1; }
+.syncBadge.offline { color: #ffd970; }
+.syncBadge.error { color: #ffb3bd; background: rgba(179,38,58,.45); }
+details.setup { margin-top: 12px; }
+details.setup summary { cursor: pointer; font-weight: 600; color: var(--acc2); }
 nav { display: flex; max-width: 980px; margin: 0 auto; overflow-x: auto; scrollbar-width: none; }
 nav button { flex: 1; background: none; border: 0; color: #cfe4f1; font: 600 14px/1 inherit; padding: 11px 10px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
 nav button.on { color: #fff; border-bottom-color: #7fd0ff; }

@@ -11,3 +11,4 @@ pdf_oftalmo_*.zip
 Oftalmo_*.pdf
 atenciones_oftalmo*.csv
 *.xlsx
+.playwright-mcp/

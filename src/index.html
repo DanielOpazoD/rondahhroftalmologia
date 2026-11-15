@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Sin conexiones de red: los datos de pacientes nunca salen del equipo. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<!-- Solo se permite conectar con el propio servidor (sincronización cifrada). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0e4a6b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Atención Oftalmológica · Hospital Hanga Roa</title>
@@ -14,6 +16,7 @@
 <header>
   <div class="hbar">
     <h1>Atención Oftalmológica<small>Rondas y operativos · Hospital Hanga Roa · funciona sin conexión</small></h1>
+    <button type="button" class="syncBadge" id="syncBadge" hidden></button>
     <span class="ver" id="appVersion"></span>
   </div>
   <nav role="tablist" aria-label="Secciones">
@@ -217,6 +220,35 @@
     <label class="check"><input type="checkbox" id="setFooter"> Pie de página con ID de atención y fecha de emisión.</label>
     <label class="l" for="setPie">Línea final de la nota (vacío = sin línea)</label>
     <input id="setPie">
+  </div>
+
+  <div class="card" id="syncCard">
+    <h2>Sincronización entre equipos <span class="badge" id="syncState">Desactivada</span></h2>
+    <p class="muted">Mantiene iguales los datos de varios PC a través del servidor (Netlify). Cada atención se <b>cifra en este equipo</b> con la contraseña del equipo antes de enviarse: el servidor no puede leer nombres, RUT ni datos clínicos. Sin internet se sigue trabajando y se sincroniza al volver la conexión.</p>
+    <div id="syncUnavailable" class="banner warn" hidden>La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa «Respaldo y unión de equipos».</div>
+    <div id="syncSetup">
+      <label class="l" for="syncPass">Contraseña del equipo (la misma en todos los PC)</label>
+      <div class="row">
+        <input id="syncPass" type="password" autocomplete="off" spellcheck="false" style="flex:1;min-width:220px;font-family:ui-monospace,Menlo,monospace">
+        <button type="button" class="btn sm" id="syncGen">Generar</button>
+        <button type="button" class="btn sm" id="syncShow">Mostrar</button>
+      </div>
+      <p class="muted">Genérala en el primer PC y escríbela igual en los demás. Guárdala en un lugar seguro: si se pierde, los datos del servidor no se pueden descifrar (los de cada PC no se pierden).</p>
+      <button type="button" class="btn p sm" id="syncOn">Activar en este PC</button>
+    </div>
+    <div id="syncActive" hidden>
+      <p class="muted" id="syncInfo"></p>
+      <div class="row">
+        <button type="button" class="btn p sm" id="syncNowBtn">Sincronizar ahora</button>
+        <button type="button" class="btn d sm" id="syncOff">Desactivar en este PC</button>
+      </div>
+      <details class="setup">
+        <summary>Configuración del servidor (una sola vez)</summary>
+        <p class="muted">En Netlify → <i>Site configuration → Environment variables</i>, crea la variable <code>SYNC_TOKEN_SHA256</code> con este valor y vuelve a publicar el sitio. Este valor no permite leer los datos.</p>
+        <pre class="note" id="syncHash"></pre>
+        <button type="button" class="btn sm" id="syncCopyHash">Copiar valor</button>
+      </details>
+    </div>
   </div>
 
   <div class="card">

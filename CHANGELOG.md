@@ -1,5 +1,22 @@
 # Cambios
 
+## 2.1.0 — 2026-11-14
+
+### Nuevo
+- **Sincronización cifrada de extremo a extremo** entre varios PC, mediante una Netlify Function y Netlify Blobs:
+  - AES-256-GCM, con la clave derivada de una contraseña del equipo que nunca sale del PC;
+  - el servidor solo guarda un id, la versión y el texto cifrado;
+  - sincroniza en segundo plano, sigue funcionando sin conexión y propaga las eliminaciones;
+  - un indicador en la cabecera muestra el estado.
+- **Instalable y sin conexión desde la web** (service worker y manifest).
+- `netlify.toml` con cabeceras de seguridad, y `npm run dev` para un servidor local con sincronización.
+- Documentación en `docs/SINCRONIZACION.md`.
+
+### Cambiado
+- CSP: `connect-src 'self'`, porque ahora la app se conecta a su propio servidor.
+- El build genera `dist/index.html` (para Netlify) además de la copia para usar con doble clic.
+- 58 tests.
+
 ## 2.0.0 — 2026-11-14
 
 Reescritura modular de `Hoja_Atencion_Oftalmologica.html` (v1). Lee los datos existentes de la v1 sin migración manual.

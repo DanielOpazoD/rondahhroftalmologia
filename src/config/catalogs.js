@@ -11,7 +11,7 @@ export const APP = Object.freeze({
   id: 'oftalmo-operativos',
   nombre: 'Atención Oftalmológica · Rondas y Operativos',
   establecimiento: 'Hospital Hanga Roa',
-  version: '2.0.0',
+  version: '2.1.0',
 });
 
 /** Versión del esquema de cada registro de atención (ver docs/MODELO_DATOS.md). */
@@ -25,6 +25,8 @@ export const STORAGE_KEYS = Object.freeze({
   medico: 'oft_medico_v1',
   settings: 'oft_ajustes_v1',
   anonSecret: 'oft_secreto_anon_v1',
+  tombstones: 'oft_eliminadas_v1',
+  sync: 'oft_sync_v1',
 });
 
 /** @typedef {{key: string, label: string}} CheckDef */

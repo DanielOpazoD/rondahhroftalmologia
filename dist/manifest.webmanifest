@@ -1,0 +1,12 @@
+{
+  "name": "Atención Oftalmológica · Hospital Hanga Roa",
+  "short_name": "Oftalmo HHR",
+  "description": "Registro de atenciones de rondas y operativos de oftalmología.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f1f4f6",
+  "theme_color": "#0e4a6b",
+  "lang": "es",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

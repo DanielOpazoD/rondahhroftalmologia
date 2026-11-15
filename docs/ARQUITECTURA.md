@@ -3,7 +3,8 @@
 ## Restricciones que guían el diseño
 
 1. **Sin conexión y sin instalación.** Se usa en terreno (Rapa Nui), a veces sin internet, abriendo un archivo con doble clic (`file://`). Por eso el producto final es **un único HTML** con todo incrustado: código, estilos, pdf-lib y la plantilla PDF.
-2. **Datos sensibles.** Los datos de pacientes no deben salir del equipo. Una política CSP (`connect-src 'none'`) impide cualquier conexión de red desde la página.
+2. **Datos sensibles.** Los datos de pacientes no salen del equipo **sin cifrar**. La política CSP (`connect-src 'self'`) solo permite conectarse con el propio servidor. A ese servidor llegan únicamente atenciones cifradas en el PC (ver [SINCRONIZACION.md](SINCRONIZACION.md)).
+3. **Varios PC a la vez.** Cada PC es la fuente de verdad local (*local-first*). La sincronización intercambia versiones y queda la más reciente (*last-write-wins*), igual que la unión de respaldos.
 3. **Mantenible.** El código fuente está en módulos ES pequeños con responsabilidades claras. Un *build* los une en el HTML final.
 
 ## Capas
@@ -65,6 +66,7 @@ Un campo que falta en la plantilla se ignora sin error.
 | `anonymize.test.js` | códigos estables, limpieza de textos, opciones, que no queden identificadores en la salida |
 | `storage.test.js` | store en memoria, compatibilidad v1, errores de cuota, respaldo y unión |
 | `pdf.test.js` | relleno de campos, casillas, hoja complementaria, aplanado |
-| `build.test.js` | HTML único, CSP, sin recursos externos |
+| `build.test.js` | HTML único, CSP, sin recursos externos, sitio con service worker |
+| `sync.test.js` | cifrado (clave incorrecta o datos alterados fallan), servidor (autenticación, validación, versiones), 4 PC que convergen sin que el servidor vea datos |
 
 La interfaz (DOM) se verifica manualmente abriendo `dist/` en el navegador: guardar, validar, registro, estadística y cada exportación.

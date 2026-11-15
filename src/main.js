@@ -11,6 +11,7 @@ import { initRegistryView } from './ui/registryView.js';
 import { initFilter } from './ui/statsView.js';
 import { initExportView, exportStatsXlsx } from './ui/exportView.js';
 import { initSettingsView, renderSettings } from './ui/settingsView.js';
+import { createSyncController } from './ui/syncController.js';
 
 function getStorage() {
   try {
@@ -61,12 +62,23 @@ function main() {
     }
   });
 
+  ctx.sync = createSyncController(ctx);
+  ctx.sync.init();
+
   ctx.restoreDraft();
   renderSettings(ctx);
   syncAttentionView(ctx);
   ctx.refreshLists();
   ctx.showTab('t-at');
+  ctx.sync.start();
+  registerServiceWorker();
   if (!persistent) toast('Este navegador no permite guardar datos: las atenciones se perderán al cerrar.', 6000);
+}
+
+/** Permite usar la app sin conexión cuando se abre desde la web (Netlify). */
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker no registrado:', e));
 }
 
 main();

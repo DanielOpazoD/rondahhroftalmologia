@@ -47,6 +47,8 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
 | `oft_medico_v1` | Último médico y operativo: `{n, r, op}`. |
 | `oft_ajustes_v1` | `{pdfFlatten, pdfFooter, notaPie}`. |
 | `oft_secreto_anon_v1` | Clave de seudonimización del equipo (64 caracteres hex). |
+| `oft_eliminadas_v1` | Atenciones eliminadas, `{id: fecha ms}`: propagan la eliminación a los otros PC. |
+| `oft_sync_v1` | Sincronización activa: clave AES derivada, token, huella para el servidor y última sincronización. No guarda la contraseña. |
 
 ## Respaldo (`respaldo_oftalmo_AAAA-MM-DD.json`)
 

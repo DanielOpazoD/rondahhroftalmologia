@@ -71,6 +71,7 @@ export function initSettingsView(ctx) {
         keyMsg = '\nOjo: el respaldo trae otra clave de seudonimización; se mantiene la de este equipo.';
       }
       ctx.reload();
+      ctx.sync?.schedule();
       alert(`Importado: ${merged.added} nuevas, ${merged.updated} actualizadas, ${merged.unchanged} sin cambios.${keyMsg}`);
     } catch (err) {
       alert('No se pudo importar: ' + err.message);
@@ -86,7 +87,8 @@ export function initSettingsView(ctx) {
   $('#wipe').addEventListener('click', () => {
     const n = ctx.records.length;
     if (!n) return toast('No hay atenciones que borrar');
-    if (confirm('¿Borrar TODAS las atenciones guardadas en este equipo? Descarga un respaldo antes.') && confirm(`Confirma de nuevo: se borrarán ${n} atenciones.`)) {
+    const syncNote = ctx.sync?.enabled ? '\n\nSolo se borran en ESTE equipo: con la sincronización activa, las atenciones de los demás equipos se volverán a descargar.' : '';
+    if (confirm('¿Borrar TODAS las atenciones guardadas en este equipo? Descarga un respaldo antes.' + syncNote) && confirm(`Confirma de nuevo: se borrarán ${n} atenciones.`)) {
       ctx.store.saveRecords([]);
       ctx.reload();
     }

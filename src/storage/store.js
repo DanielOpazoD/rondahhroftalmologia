@@ -103,5 +103,27 @@ export function createStore(storage) {
     saveSecret(secret) {
       write(K.anonSecret, secret);
     },
+
+    /** Atenciones eliminadas (para propagar la eliminación a otros equipos): {id: fecha ms}. */
+    loadTombstones() {
+      const t = read(K.tombstones, {});
+      return t && typeof t === 'object' && !Array.isArray(t) ? t : {};
+    },
+    saveTombstones(t) {
+      write(K.tombstones, t);
+    },
+    addTombstone(id, at = Date.now()) {
+      write(K.tombstones, { ...this.loadTombstones(), [id]: at });
+    },
+
+    /** Configuración de sincronización de este equipo, o null si está desactivada. */
+    loadSyncConfig() {
+      const c = read(K.sync, null);
+      return c && typeof c.encKey === 'string' && typeof c.token === 'string' ? c : null;
+    },
+    saveSyncConfig(c) {
+      if (c) write(K.sync, c);
+      else storage.removeItem(K.sync);
+    },
   };
 }
