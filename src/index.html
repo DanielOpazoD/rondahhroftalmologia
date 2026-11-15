@@ -326,6 +326,25 @@
       </div>
     </div>
   </div>
+  <div class="card" id="auditCard" hidden>
+    <h2>Registro de accesos</h2>
+    <p class="hint">Quién entró y cuánto tiempo, qué fichas y atenciones abrió, qué descargó y qué guardó. Lo escribe el servidor, con su hora, y no se puede editar. Hasta 62 días por consulta.</p>
+    <div class="row u-gap8 u-wrap u-aic">
+      <label class="muted" for="audDesde">Desde</label>
+      <input type="date" id="audDesde" class="u-wauto">
+      <label class="muted" for="audHasta">Hasta</label>
+      <input type="date" id="audHasta" class="u-wauto">
+      <button type="button" class="btn p sm" id="audLoad">Consultar</button>
+    </div>
+    <div class="row u-gap8 u-wrap u-aic u-mt10" id="audFilters" hidden>
+      <select id="audUser" aria-label="Persona" class="u-wauto"></select>
+      <select id="audGroup" aria-label="Tipo de evento" class="u-wauto"></select>
+      <input id="audQuery" type="search" placeholder="Buscar paciente, persona o acción" aria-label="Buscar en el registro" class="u-grow u-minw160">
+      <button type="button" class="btn sm" id="audXlsx">Descargar Excel</button>
+    </div>
+    <p class="msg err" id="audErr" role="alert"></p>
+    <div id="audResult"></div>
+  </div>
   <div class="card" id="usersCard" hidden>
     <h2>Usuarios <span class="badge" id="usersCount">0</span></h2>
     <p class="hint">Cada persona entra con su RUT. La clave inicial es su RUT sin dígito verificador (vence en 7 días); al entrar debe crear la suya.</p>

@@ -62,6 +62,7 @@ export const CLIENT_EVENTS = Object.freeze([
   'exportar.excel',
   'exportar.seudonimizado',
   'exportar.pdfs',
+  'exportar.correspondencia',
   'respaldo.descargar',
   'respaldo.importar',
   'sesion.bloqueo',

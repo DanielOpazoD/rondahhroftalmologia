@@ -2404,3 +2404,19 @@ html.hdr-icons .userChip {
   font-size: 12px;
   color: var(--mut);
 }
+
+/* Registro de accesos (Ajustes, administradores). */
+.audh {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+table.st.aud th,
+table.st.aud td {
+  text-align: left;
+}
+table.st.aud td {
+  font-size: 12.5px;
+  vertical-align: top;
+}

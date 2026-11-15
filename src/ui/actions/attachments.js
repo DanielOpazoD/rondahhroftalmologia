@@ -116,6 +116,7 @@ export function attachmentActions(ctx, store) {
     async openAttachment(id) {
       const meta = store.getAttachment(id);
       const data = meta && (await store.loadAttachmentData(id));
+      if (meta && data) ctx.accounts?.event('adjunto.ver', id);
       if (!meta || !data) {
         toast('Este archivo aún no llega a este equipo: se descargará al sincronizar.', 4000);
         return;

@@ -109,6 +109,7 @@ export function initSettingsView(ctx) {
       toast('Respaldo descargado');
     }
     ctx.persist(() => store.saveLastBackup(Date.now()));
+    ctx.accounts?.event('respaldo.descargar', undefined, { n: ctx.records.length });
   });
   $('#bkImpBtn').addEventListener('click', () => $('#bkImp').click());
   $('#bkImp').addEventListener('change', async (e) => {
@@ -167,6 +168,7 @@ export function initSettingsView(ctx) {
       }
       ctx.reload();
       ctx.sync?.schedule();
+      ctx.accounts?.event('respaldo.importar', undefined, { n: merged.added + merged.updated });
       uiAlert({
         title: 'Respaldo importado',
         message: `${merged.added} nuevas, ${merged.updated} actualizadas y ${merged.unchanged} sin cambios.${attMsg}${keyMsg}`,

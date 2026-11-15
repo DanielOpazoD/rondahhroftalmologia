@@ -112,6 +112,7 @@ export function attentionActions(ctx, store) {
       if (!r) return;
       if (ctx.dirty && ctx.rec.id !== id && !(await confirmDiscard('abrir otra atención'))) return;
       ctx.loadIntoForm(r);
+      ctx.accounts?.event('atencion.ver', id);
       // Paciente preingresado sin médico: se propone el médico habitual de este equipo.
       const remembered = store.loadMedico();
       if (!isAttended(ctx.rec) && !ctx.rec.f.medico_nombre && remembered.n) {
