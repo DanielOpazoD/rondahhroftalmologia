@@ -6,7 +6,7 @@
  */
 import { blankRecord, normalizeRecord, newRecordId, applyBirthDate } from '../core/record.js';
 import { mergeRecords, sameContent, stampChanges, ensureFt } from '../core/merge.js';
-import { resolvePatientId, patientFields, PATIENT_FIELDS } from '../core/patient.js';
+import { resolvePatientId, patientFields, PATIENT_FIELDS, isDeletedPatient, DELETED_FIELD } from '../core/patient.js';
 
 /**
  * Atención lista para guardar: normalizada, fusionada con la versión guardada
@@ -91,6 +91,8 @@ export function patientUpdateFromRecord(rec, current, now) {
     const t = rec.ft?.['f.' + k] ?? (fields[k] ? rec.updated : undefined);
     if (t) ft['f.' + k] = t;
   }
+  // Una atención que vuelve a usar una ficha eliminada la restaura (la restauración gana a la eliminación).
+  if (current && isDeletedPatient(current)) ft['f.' + DELETED_FIELD] = Math.max(now, current.ft?.['f.' + DELETED_FIELD] || 0) + 1;
   const candidate = { id: rec.pacienteId, created: rec.created || rec.updated, updated: rec.updated, f: fields, ft, checks: {}, proc: {} };
   const next = current ? mergeRecords(current, candidate) : candidate;
   if (current && sameContent(next, current)) return null;

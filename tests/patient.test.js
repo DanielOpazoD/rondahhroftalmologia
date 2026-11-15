@@ -175,3 +175,44 @@ test('mergePatients: completa los datos vacíos, marca la absorbida y no une RUT
   assert.throws(() => mergePatients(keep, otro, 100), /RUT distintos/);
   assert.equal(normalizePatient({ id: 'p_k000000001', f: { fusionado_en: 'p_k000000001' } }).f.fusionado_en, undefined, 'no consigo misma');
 });
+
+test('ficha eliminada (creada por error): viaja campo a campo, sale de duplicados y una atención la restaura', async () => {
+  const { deletePatient, restorePatient, isDeletedPatient, DELETED_FIELD } = await import('../src/core/patient.js');
+  const { patientUpdateFromRecord } = await import('../src/app/attentions.js');
+  const T = 1_800_000_000_000;
+  const p = normalizePatient({
+    id: 'p_a',
+    created: T,
+    updated: T,
+    f: { paciente_nombre: 'Juan Pérez', paciente_rut: '11.111.111-1' },
+    ft: { 'f.paciente_nombre': T },
+  });
+  const twin = normalizePatient({ id: 'p_b', created: T, updated: T, f: { paciente_nombre: 'Juan Pérez' } });
+  assert.equal(findDuplicatePairs([p, twin]).length, 1);
+  const d = deletePatient(p, T + 10);
+  assert.ok(isDeletedPatient(d));
+  assert.equal(d.f.paciente_nombre, 'Juan Pérez', 'los datos no se borran (la ficha es común a las especialidades)');
+  assert.equal(findDuplicatePairs([d, twin]).length, 0, 'una ficha eliminada no se propone como duplicado');
+  // Otro equipo que aún tiene la versión anterior: la eliminación gana al fusionar.
+  assert.ok(isDeletedPatient(normalizePatient(mergeRecords(p, d))));
+  assert.ok(isDeletedPatient(normalizePatient(mergeRecords(d, p))));
+  // Una marca inválida (manipulada) se descarta.
+  assert.equal(isDeletedPatient(normalizePatient({ ...p, f: { ...p.f, [DELETED_FIELD]: '<script>' } })), false);
+  // Restaurar: gana a la eliminación al fusionar, en cualquier orden.
+  const r = restorePatient(d, T + 20);
+  assert.equal(isDeletedPatient(r), false);
+  assert.equal(isDeletedPatient(normalizePatient(mergeRecords(d, r))), false);
+  assert.equal(isDeletedPatient(normalizePatient(mergeRecords(r, d))), false);
+  // Guardar una atención que usa la ficha eliminada la restaura.
+  const rec = {
+    id: 'a1',
+    pacienteId: 'p_a',
+    created: T + 30,
+    updated: T + 30,
+    f: { paciente_nombre: 'Juan Pérez' },
+    ft: { 'f.paciente_nombre': T + 30 },
+  };
+  const next = patientUpdateFromRecord(rec, d, T + 31);
+  assert.equal(isDeletedPatient(normalizePatient(next)), false);
+  assert.equal(isDeletedPatient(normalizePatient(mergeRecords(d, next))), false);
+});

@@ -1030,6 +1030,12 @@ details.setup summary {
 .pmain:hover .pname {
   color: var(--acc-text);
 }
+.pmain.static {
+  cursor: default;
+}
+.pmain.static:hover .pname {
+  color: inherit;
+}
 .pname {
   font-weight: 600;
   font-size: 14px;
