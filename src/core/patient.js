@@ -26,6 +26,7 @@
  */
 import { sha256 } from '../lib/sha256.js';
 import { rutKey, normalizeText } from './format.js';
+import { unknownFields, isSafeField } from './compat.js';
 
 /** Campos de la ficha del paciente (mismos nombres que en la atención). */
 export const PATIENT_FIELDS = ['paciente_rut', 'paciente_nombre', 'paciente_fnac', 'paciente_sexo', 'paciente_fono'];
@@ -65,16 +66,20 @@ export function patientFields(f = {}) {
  */
 export function normalizePatient(raw) {
   if (!raw || typeof raw !== 'object' || !isValidId(raw.id) || !raw.id.startsWith('p_')) return null;
+  /** @type {Record<string, any>} */
   const p = {
+    // Campos que agregue una versión más nueva se conservan (ver core/compat.js).
+    ...unknownFields(raw, ['id', 'tipo', 'v', 'created', 'updated', 'f', 'ft', 'checks', 'proc']),
     id: raw.id,
     tipo: 'paciente',
-    v: PATIENT_SCHEMA,
+    v: Math.max(PATIENT_SCHEMA, Number(raw.v) || 0),
     created: Number(raw.created) || Number(raw.updated) || 0,
     updated: Number(raw.updated) || 0,
-    f: patientFields(raw.f),
+    f: { ...unknownTextFields(raw.f), ...patientFields(raw.f) },
     checks: {},
     proc: {},
   };
+  delete p.f[MERGED_FIELD];
   const into = raw.f?.[MERGED_FIELD];
   if (isValidId(into) && into.startsWith('p_') && into !== raw.id) p.f[MERGED_FIELD] = into;
   if (raw.ft && typeof raw.ft === 'object') {
@@ -82,6 +87,18 @@ export function normalizePatient(raw) {
     for (const [k, v] of Object.entries(raw.ft)) if (k.startsWith('f.') && Number.isFinite(v)) p.ft[k] = v;
   }
   return p;
+}
+
+/** Textos de la ficha que esta versión no conoce (de una versión más nueva): se conservan. */
+function unknownTextFields(f) {
+  const out = {};
+  if (!f || typeof f !== 'object') return out;
+  for (const [k, v] of Object.entries(f)) {
+    if (!PATIENT_FIELDS.includes(k) && k !== MERGED_FIELD && isSafeField(k) && typeof v === 'string' && v.trim() && v.length <= 2000) {
+      out[k] = v;
+    }
+  }
+  return out;
 }
 
 /**

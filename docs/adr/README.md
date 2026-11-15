@@ -15,5 +15,6 @@ Cada ADR explica una decisión de fondo: el contexto, qué se decidió, sus cons
 | [0009](0009.md) | HTML seguro por construcción | Aceptada |
 | [0010](0010.md) | Bloqueo con PIN como protección de pantalla | Aceptada |
 | [0011](0011.md) | Modo práctica con almacenamiento aislado | Aceptada |
+| [0012](0012.md) | Lector tolerante entre versiones de la app | Aceptada |
 
 Plantilla para una nueva: **Estado** (Propuesta / Aceptada / Reemplazada por ADR N), **Contexto**, **Decisión**, **Consecuencias** y **Alternativas descartadas**.

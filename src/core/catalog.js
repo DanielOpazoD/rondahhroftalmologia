@@ -13,6 +13,7 @@ import { hmacSha256 } from '../lib/sha256.js';
 import { normalizeText, rutKey, formatRut } from './format.js';
 import { isValidId } from './record.js';
 import { ROLES } from '../config/catalogs.js';
+import { unknownFields } from './compat.js';
 
 const B32 = '0123456789abcdefghjkmnpqrstvwxyz';
 const shortHash = (s) => Array.from(hmacSha256('catalogo', s).slice(0, 8), (b) => B32[b & 31]).join('');
@@ -42,17 +43,32 @@ export function operativoId(nombre) {
  * @param {number} [now]
  * @returns {Medico|null}
  */
-export function makeMedico({ nombre, rut = '', rol, id, created, updated } = {}, now = Date.now()) {
+export function makeMedico(m = {}, now = Date.now()) {
+  const { nombre, rut = '', rol, id, created, updated } = m;
   const n = String(nombre ?? '').trim();
   if (!n) return null;
   const r = String(rut ?? '').trim() ? formatRut(rut) : '';
   const mid = isValidId(id) ? id : medicoId(n, r);
-  const role = ROLES.some((x) => x.key === rol) ? rol : 'medico';
-  return { id: mid, nombre: n, rut: r, rol: role, created: created || now, updated: updated || now };
+  // Sin rol (perfiles anteriores a los roles) = médico. Un rol que esta versión
+  // no conoce (agregado por una versión más nueva) se conserva tal cual, y NO
+  // se trata como médico.
+  const role = rol === undefined || rol === null || rol === '' ? 'medico' : isRoleKey(rol) ? rol : 'otro';
+  return {
+    ...unknownFields(m, MEDICO_FIELDS),
+    id: mid,
+    nombre: n,
+    rut: r,
+    rol: role,
+    created: created || now,
+    updated: updated || now,
+  };
 }
+const MEDICO_FIELDS = ['id', 'nombre', 'rut', 'rol', 'created', 'updated'];
+/** Clave de rol con forma válida (conocida o de una versión más nueva). */
+const isRoleKey = (r) => typeof r === 'string' && /^[a-z][a-z0-9_-]{0,31}$/.test(r);
 
 /** Etiqueta del rol de un perfil. */
-export const rolLabel = (rol) => ROLES.find((x) => x.key === rol)?.label || 'Médico/a';
+export const rolLabel = (rol) => (!rol ? 'Médico/a' : ROLES.find((x) => x.key === rol)?.label || 'Otro');
 
 /** Solo los perfiles que pueden ser médico responsable de una atención. */
 export const onlyDoctors = (list) => list.filter((m) => (m.rol || 'medico') === 'medico');
@@ -63,12 +79,19 @@ export const onlyDoctors = (list) => list.filter((m) => (m.rol || 'medico') === 
  * @param {number} [now]
  * @returns {Operativo|null}
  */
-export function makeOperativo({ nombre, id, created, updated } = {}, now = Date.now()) {
+export function makeOperativo(o = {}, now = Date.now()) {
+  const { nombre, id, created, updated } = o;
   const n = String(nombre ?? '')
     .replace(/\s+/g, ' ')
     .trim();
   if (!n) return null;
-  return { id: isValidId(id) ? id : operativoId(n), nombre: n, created: created || now, updated: updated || now };
+  return {
+    ...unknownFields(o, ['id', 'nombre', 'created', 'updated']),
+    id: isValidId(id) ? id : operativoId(n),
+    nombre: n,
+    created: created || now,
+    updated: updated || now,
+  };
 }
 
 /** Ordena por nombre (es-CL, sin importar tildes). */
