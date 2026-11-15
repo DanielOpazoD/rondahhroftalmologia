@@ -11,7 +11,7 @@
  * cifrados (el script nunca ve contenido legible).
  */
 import { getStore } from '@netlify/blobs';
-import { listBackups, restoreBackup } from '../src/sync/backup.js';
+import { listBackups, restoreBackup, restoreAttachments } from '../src/sync/backup.js';
 
 const siteID = process.env.NETLIFY_SITE_ID;
 const token = process.env.NETLIFY_AUTH_TOKEN;
@@ -34,9 +34,12 @@ if (!args.length || args.includes('--list')) {
   }
   const dryRun = args.includes('--dry-run');
   const r = await restoreBackup({ source: respaldos, target: sync, day, dryRun });
+  console.log(dryRun ? `Prueba: se restaurarían ${r.claves} versiones del ${day}.` : `Restauradas ${r.escritas} versiones del ${day}.`);
+  // Contenido de adjuntos que falte en el servidor (respaldo incremental).
+  const a = await restoreAttachments({ source: respaldos, target: sync, dryRun });
   console.log(
     dryRun
-      ? `Prueba: se restaurarían ${r.claves} versiones del ${day}.`
-      : `Restauradas ${r.escritas} versiones del ${day}. Recarga la app en los PC.`,
+      ? `Prueba: se restaurarían ${a.partes} partes de adjuntos.`
+      : `Restauradas ${a.escritas} partes de adjuntos. Recarga la app en los PC.`,
   );
 }
