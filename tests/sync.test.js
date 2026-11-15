@@ -7,6 +7,7 @@ import { localVersions, remoteVersions, planSync, applyPulled } from '../src/syn
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createSyncApi, syncOnce, SyncHttpError } from '../src/sync/client.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
+import { syncMerge, stampChanges } from '../src/core/merge.js';
 
 const PASS = 'K7QM3-XRT9P-ZAWD4-N8F2C';
 
@@ -64,7 +65,7 @@ describe('protocolo', () => {
     assert.deepEqual(r.items.map((x) => x.id).sort(), ['a', 'n']);
     assert.deepEqual(r.tombstones, { b: 20 });
     assert.deepEqual([r.added, r.updated, r.deleted], [1, 0, 1]);
-    assert.deepEqual(r.items.find((x) => x.id === 'n'), { id: 'n', updated: 7, kind: 'medico', data: { nombre: 'Dra. Nueva' } });
+    assert.deepEqual(r.items.find((x) => x.id === 'n'), { id: 'n', updated: 7, kind: 'medico', data: { nombre: 'Dra. Nueva', id: 'n', updated: 7 } });
   });
 });
 
@@ -88,6 +89,7 @@ async function setup() {
           api: createSyncApi({ token: keys.token, fetchFn, esp: 'oftalmologia' }),
           key,
           readLocal: () => ({ items: toItems(structuredClone(state.records)), tombstones: { ...state.tombstones } }),
+          mergeFn: syncMerge,
           writeLocal: (items, tombstones) => Object.assign(state, { records: items.map((i) => ({ ...i.data, id: i.id, updated: i.updated })), tombstones }),
           batchSize: 2,
         }),
@@ -171,7 +173,7 @@ describe('convergencia de varios PC', () => {
 
     // Sincronizar de nuevo no cambia nada.
     const again = await pcs[1].sync();
-    assert.deepEqual(again, { pushed: 0, skipped: 0, added: 0, updated: 0, deleted: 0 });
+    assert.deepEqual(again, { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false });
   });
 
   test('un PC con otra contraseña no puede leer ni escribir', async () => {
@@ -211,5 +213,74 @@ describe('especialidades', () => {
     await syncOnce({ api, key, readLocal: () => ({ items: [], tombstones: {} }), writeLocal: (items) => (got = items) });
     assert.equal(got[0].kind, 'atencion');
     assert.equal(got[0].data.f.paciente_nombre, 'Formato antiguo');
+  });
+});
+
+describe('mismo paciente editado en dos PC a la vez', () => {
+  /** Edición local: cambia campos, los sella y sube la versión. */
+  const editLocal = (pc, id, t, fn) => {
+    const i = pc.state.records.findIndex((r) => r.id === id);
+    const before = structuredClone(pc.state.records[i]);
+    const next = structuredClone(before);
+    fn(next);
+    next.updated = t;
+    pc.state.records[i] = stampChanges(next, before, t);
+  };
+
+  for (const order of ['PC1 sincroniza primero', 'PC2 sincroniza primero']) {
+    test(`campos distintos se conservan (${order})`, async () => {
+      const { pc } = await setup();
+      const pc1 = pc();
+      const pc2 = pc();
+      const t0 = Date.now();
+      pc1.state.records.push(minimalRecord('pac1', { paciente_nombre: 'Ana Tuki', paciente_rut: '12.345.678-5' }, { updated: t0, ft: {} }));
+      await pc1.sync();
+      await pc2.sync(); // ambos tienen la atención
+
+      // Sin sincronizar entre medio: PC1 anota la PIO, PC2 el diagnóstico y un procedimiento.
+      editLocal(pc1, 'pac1', t0 + 100, (r) => {
+        r.f.od_pio = '18';
+        r.proc.t_aplan = { eye: 'AO', od: '18', oi: '17' };
+      });
+      editLocal(pc2, 'pac1', t0 + 200, (r) => {
+        r.checks.diagnostico_glaucoma = true;
+        r.proc.campimetria = { eye: 'AO' };
+      });
+
+      const [first, second] = order.startsWith('PC1') ? [pc1, pc2] : [pc2, pc1];
+      await first.sync();
+      await second.sync();
+      await first.sync();
+      await second.sync();
+
+      for (const p of [pc1, pc2]) {
+        const r = p.state.records.find((x) => x.id === 'pac1');
+        assert.equal(r.f.od_pio, '18', 'PIO de PC1');
+        assert.deepEqual(r.proc.t_aplan, { eye: 'AO', od: '18', oi: '17' });
+        assert.equal(r.checks.diagnostico_glaucoma, true, 'diagnóstico de PC2');
+        assert.deepEqual(r.proc.campimetria, { eye: 'AO' });
+      }
+      assert.deepEqual(
+        JSON.stringify(pc1.state.records.find((x) => x.id === 'pac1').f),
+        JSON.stringify(pc2.state.records.find((x) => x.id === 'pac1').f),
+      );
+    });
+  }
+
+  test('el mismo campo en ambos: queda la edición más reciente', async () => {
+    const { pc } = await setup();
+    const pc1 = pc();
+    const pc2 = pc();
+    const t0 = Date.now();
+    pc1.state.records.push(minimalRecord('pac2', { paciente_nombre: 'Juan' }, { updated: t0, ft: {} }));
+    await pc1.sync();
+    await pc2.sync();
+    editLocal(pc1, 'pac2', t0 + 300, (r) => (r.f.od_pio = '21'));
+    editLocal(pc2, 'pac2', t0 + 100, (r) => (r.f.od_pio = '15'));
+    for (let i = 0; i < 2; i++) {
+      await pc2.sync();
+      await pc1.sync();
+    }
+    for (const p of [pc1, pc2]) assert.equal(p.state.records.find((x) => x.id === 'pac2').f.od_pio, '21');
   });
 });

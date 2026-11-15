@@ -7,6 +7,7 @@
  */
 import { sortRecords } from '../core/record.js';
 import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
+import { syncMerge } from '../core/merge.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
 import { fmtDateTime } from '../core/format.js';
 import {
@@ -69,9 +70,11 @@ export function createSyncController(ctx) {
     store.saveTombstones(tombstones);
     ctx.reloadCatalogs();
     ctx.records = store.loadRecords();
-    if (ctx.rec.id && !ctx.dirty) {
+    // Atención abierta en el formulario: incorporar lo que otro equipo grabó en ella
+    // (si se está editando, se fusiona campo a campo sin perder lo escrito).
+    if (ctx.rec.id) {
       const fresh = ctx.records.find((r) => r.id === ctx.rec.id);
-      if (fresh && fresh.updated !== ctx.rec.updated) ctx.loadIntoForm(fresh);
+      if (fresh && fresh.updated !== ctx.rec.updated) ctx.absorbRemote(fresh);
       if (!fresh) toast('La atención abierta fue eliminada en otro equipo', 4000);
     }
     ctx.refreshLists();
@@ -91,6 +94,7 @@ export function createSyncController(ctx) {
         key: await getKey(),
         readLocal,
         writeLocal,
+        mergeFn: syncMerge,
       });
       st.config = { ...st.config, lastSync: Date.now() };
       store.saveSyncConfig(st.config);

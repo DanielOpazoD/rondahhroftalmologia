@@ -1,6 +1,23 @@
 # Cambios
 
-## 2.4.1 — 2026-11-14
+## 2.5.0 — 2026-11-14
+
+### Nuevo
+- **Fusión campo a campo** cuando varios PC editan al mismo paciente: si uno anota la PIO y otro un diagnóstico, se conservan ambos. Solo si editan el mismo campo gana la edición más reciente.
+  - Cada atención guarda la fecha de edición de cada campo (`ft`).
+  - Antes de subir, el PC fusiona con la versión del servidor, así nunca sobrescribe lo de otro.
+  - Al bajar, fusiona con lo local; los cambios de otros PC aparecen en la atención abierta sin perder lo que se está escribiendo.
+  - La fusión es determinista: todos los PC llegan al mismo resultado.
+- **Mismo paciente, mismo día:**
+  - al escribir el RUT de un paciente que ya tiene una atención ese día, aparece un aviso con «Continuar en esa atención» (lo escrito se agrega);
+  - al guardar se ofrece «Combinar» o «Guardar aparte».
+- **Avisos y confirmaciones con diálogos propios de la app** (ya no los del navegador).
+- **«Generar» contraseña** solo aparece si el servidor aún no tiene una.
+
+### Pruebas
+- 84 tests, entre ellos dos PC que editan campos distintos sin conexión (en ambos órdenes) y el caso del mismo campo.
+
+## 2.4.1 — 2026-11-14 (incluida en 2.5.0)
 
 ### Corregido
 - **«Generar» ya no aparece cuando el servidor tiene contraseña.** Antes se podía generar una contraseña nueva que no coincidía con la del equipo («Esta contraseña no coincide…»). La app ahora consulta al servidor:

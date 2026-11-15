@@ -49,14 +49,16 @@ export function planSync(local, remote) {
  * 'atencion' | 'medico' | 'operativo'. La aplicación los separa por tipo.
  * @param {{id: string, updated: number, kind: string, data: object}[]} items
  * @param {{id: string, u: number, deleted?: boolean, kind?: string, data?: object}[]} pulled
- * @returns {{items: object[], tombstones: Record<string, number>, added: number, updated: number, deleted: number}}
+ * @param {MergeFn} [mergeFn] fusión por tipo (atenciones: campo a campo). Sin ella, gana la versión más nueva entera.
+ * @returns {{items: object[], tombstones: Record<string, number>, added: number, updated: number, deleted: number, needsPush: boolean}}
  */
-export function applyPulled(items, tombstones, pulled) {
+export function applyPulled(items, tombstones, pulled, mergeFn) {
   const byId = new Map(items.map((r) => [r.id, r]));
   const tomb = { ...tombstones };
   let added = 0;
   let updated = 0;
   let deleted = 0;
+  let needsPush = false;
   for (const item of pulled) {
     if (!isValidId(item.id)) continue;
     const cur = byId.get(item.id);
@@ -70,14 +72,34 @@ export function applyPulled(items, tombstones, pulled) {
       tomb[item.id] = item.u;
     } else {
       if (!item.data || typeof item.data !== 'object') continue;
+      const kind = item.kind || 'atencion';
+      let data = item.data;
+      let u = item.u;
+      const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
+      if (m) {
+        data = m.data;
+        // Si la fusión agregó algo local que el servidor no tiene, es una versión nueva que hay que subir.
+        if (!m.sameAsRemote) {
+          u = Math.max(cur.updated || 0, item.u) + 1;
+          needsPush = true;
+        }
+      }
       if (cur) updated++;
       else added++;
-      byId.set(item.id, { id: item.id, updated: item.u, kind: item.kind || 'atencion', data: item.data });
+      byId.set(item.id, { id: item.id, updated: u, kind, data: { ...data, id: item.id, updated: u } });
       delete tomb[item.id];
     }
   }
-  return { items: [...byId.values()], tombstones: tomb, added, updated, deleted };
+  return { items: [...byId.values()], tombstones: tomb, added, updated, deleted, needsPush };
 }
+
+/**
+ * @callback MergeFn
+ * @param {string} kind tipo del elemento
+ * @param {object} local datos locales
+ * @param {object} remote datos remotos (con id y updated)
+ * @returns {{data: object, sameAsRemote: boolean} | null} null = sin fusión (gana la versión más nueva)
+ */
 
 /** Divide un arreglo en lotes. */
 export function chunks(arr, size) {

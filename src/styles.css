@@ -438,3 +438,9 @@ dialog.msgdlg::backdrop { background: rgba(16, 24, 40, .38); backdrop-filter: bl
 .btn.dangerfill { background: var(--bad); border-color: var(--bad); color: #fff; }
 .btn.dangerfill:hover { background: color-mix(in srgb, var(--bad) 88%, #000); }
 @media (max-width: 460px) { .msgtext { margin-left: 0; } }
+
+/* Aviso de paciente con atención existente */
+.dupbar { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; }
+.dupbar span { flex: 1; }
+.dupbar .btn { flex: none; border-color: color-mix(in srgb, var(--warn) 40%, transparent); color: var(--warn); background: var(--surface); }
+@media (max-width: 560px) { .dupbar { flex-direction: column; align-items: stretch; } }

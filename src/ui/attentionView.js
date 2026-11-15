@@ -4,7 +4,7 @@
  */
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, SEXOS, OJOS } from '../config/catalogs.js';
 import { escapeHtml, formatRut, isIsoDate } from '../core/format.js';
-import { validateRecord, applyBirthDate } from '../core/record.js';
+import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
 import { coversEye } from '../core/clinical.js';
 import { $, $$ } from './dom.js';
@@ -74,6 +74,7 @@ export function initAttentionView(ctx) {
       ctx.changed({ silent: !ageChanged && k !== 'paciente_fnac' });
     }
   });
+  $('#dupJoin').addEventListener('click', () => ctx.joinExisting($('#dupBanner').dataset.id));
   $('#paciente_rut').addEventListener('blur', (e) => {
     if (!e.target.value.trim()) return;
     ctx.rec.f.paciente_rut = formatRut(e.target.value);
@@ -137,6 +138,13 @@ export function syncAttentionView(ctx) {
 /** Título y estado de la barra superior: a quién se atiende y si hay cambios sin guardar. */
 export function renderToolbar(ctx) {
   const f = ctx.rec.f;
+  // Atención nueva de un paciente (mismo RUT o nombre) que ya tiene una ese día.
+  const dup = !ctx.rec.id && (f.paciente_rut?.trim() || f.paciente_nombre?.trim()) ? findDuplicate(ctx.rec, ctx.records) : null;
+  $('#dupBanner').hidden = !dup;
+  if (dup) {
+    $('#dupBanner').dataset.id = dup.id;
+    $('#dupText').textContent = `${dup.f.paciente_nombre || dup.f.paciente_rut} ya tiene una atención este día (en este u otro equipo). Continúa en ella para no duplicar: lo que escribiste se agrega.`;
+  }
   $('#tbName').textContent = f.paciente_nombre?.trim() || (ctx.rec.id ? '(sin nombre)' : 'Nueva atención');
   const state = ctx.dirty ? (ctx.rec.id ? 'Cambios sin guardar' : 'Sin guardar') : ctx.rec.id ? 'Guardada' : 'Sin datos';
   const el = $('#tbState');

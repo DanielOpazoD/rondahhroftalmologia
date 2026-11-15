@@ -11,7 +11,8 @@
  *   checks: { [key]: boolean },   // antecedentes / solicitados / diagnósticos
  *   cat: '' | 'OD' | 'OI' | 'AO', // lateralidad de catarata
  *   proc: { [procId]: { eye: 'OD'|'OI'|'AO', od?: string, oi?: string } },
- *   procNames: { [procId]: string } // nombre del procedimiento al guardar
+ *   procNames: { [procId]: string }, // nombre del procedimiento al guardar
+ *   ft: { [ruta]: number }   // fecha de edición de cada campo (fusión entre equipos, ver merge.js)
  * }
  */
 import { SCHEMA_VERSION, LIMITS, OJOS, SEXOS, ESPECIALIDAD } from '../config/catalogs.js';
@@ -29,6 +30,7 @@ export function blankRecord(medico = {}, now = new Date()) {
     checks: {},
     cat: '',
     proc: {},
+    ft: {}, // fecha de edición por campo (ver core/merge.js)
     f: {
       fecha_atencion: todayIso(now),
       medico_nombre: medico.n || '',
@@ -52,6 +54,10 @@ export function normalizeRecord(raw) {
   r.checks = r.checks && typeof r.checks === 'object' ? r.checks : {};
   r.proc = r.proc && typeof r.proc === 'object' ? r.proc : {};
   r.cat = OJOS.includes(r.cat) ? r.cat : '';
+  if (r.ft !== undefined) {
+    if (!r.ft || typeof r.ft !== 'object' || Array.isArray(r.ft)) delete r.ft;
+    else for (const [k, v] of Object.entries(r.ft)) if (!Number.isFinite(v)) delete r.ft[k];
+  }
   for (const [id, p] of Object.entries(r.proc)) {
     if (!p || !OJOS.includes(p.eye)) delete r.proc[id];
   }

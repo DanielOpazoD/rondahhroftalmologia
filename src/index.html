@@ -68,6 +68,11 @@
     </div>
   </div>
 
+  <div class="banner warn dupbar" id="dupBanner" hidden>
+    <span id="dupText"></span>
+    <button type="button" class="btn sm" id="dupJoin">Continuar en esa atención</button>
+  </div>
+
   <div class="card ctxcard">
     <div class="g3">
       <div><label class="l" for="operativoSel">Operativo</label><select id="operativoSel"></select></div>
@@ -328,6 +333,7 @@
   <textarea id="msgCopy" readonly rows="8" hidden aria-label="Texto para copiar"></textarea>
   <div class="dlg-actions">
     <button type="button" class="btn" id="msgCancel" hidden></button>
+    <button type="button" class="btn" id="msgAlt" hidden></button>
     <button type="button" class="btn p" id="msgOk">Aceptar</button>
   </div>
 </dialog>

@@ -32,13 +32,25 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
     "t_aplan": { "eye": "AO", "od": "14", "oi": "16" },
     "fo": { "eye": "OI" }
   },
-  "procNames": { "t_aplan": "T. Aplanática", "fo": "Fondo de ojo (FO)" }
+  "procNames": { "t_aplan": "T. Aplanática", "fo": "Fondo de ojo (FO)" },
+  "ft": { "f.od_pio": 1763150000000, "checks.diagnostico_glaucoma": 1763150050000, "proc.t_aplan.od": 1763150000000 }
 }
 ```
 
 - `proc[id].od / .oi` son la PIO en mmHg y solo existen en procedimientos con `pio: 1`.
 - `procNames` guarda el nombre del procedimiento al momento de guardar. Así, si después se quita de la lista en Ajustes, la estadística sigue mostrando su nombre.
 - `normalizeRecord()` acepta registros v1, v2 o incompletos y los lleva a v3 sin perder datos (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
+
+### Fechas por campo (`ft`)
+
+`ft` guarda cuándo se editó cada campo. Las rutas son:
+
+- `f.<campo>` para cada texto;
+- `checks.<clave>` para cada casilla;
+- `cat` para el ojo de la catarata;
+- `proc.<id>.eye`, `proc.<id>.od` y `proc.<id>.oi` para cada procedimiento.
+
+Con `ft`, dos versiones de una misma atención se fusionan campo a campo (`src/core/merge.js`): en cada campo gana la edición más reciente. Las atenciones antiguas sin `ft` usan su `updated` para todos sus campos.
 
 ### Especialidades
 

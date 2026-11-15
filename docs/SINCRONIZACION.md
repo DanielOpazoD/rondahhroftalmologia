@@ -27,9 +27,19 @@ Permite que varios PC (por ejemplo, 4 en un operativo) trabajen al mismo tiempo 
 - al volver la conexión o al volver a la pestaña;
 - con el botón «Sincronizar ahora».
 
-### Conflictos y sin conexión
+### Varios PC editando al mismo paciente (fusión campo a campo)
 
-- **Conflictos:** si dos PC modifican la misma atención, queda la modificación más reciente, como al importar respaldos. En la práctica es raro, porque cada PC registra a sus propios pacientes.
+Cada atención guarda la fecha en que se editó **cada campo**: cada texto, cada casilla, el ojo de cada procedimiento y cada PIO.
+
+- **Campos distintos:** si dos PC editan la misma atención a la vez, por ejemplo uno anota la PIO y otro un diagnóstico, se conservan los dos datos.
+- **El mismo campo:** solo si ambos editan el mismo campo queda la edición más reciente.
+- **Antes de subir:** si el servidor tiene una versión más nueva de esa atención, el PC la baja y la fusiona primero. Así nunca sobrescribe lo que otro grabó.
+- **Atención abierta:** si llegan datos de otro PC para la atención que se está editando, se incorporan al formulario sin perder lo que se está escribiendo.
+- **Mismo paciente en una atención nueva:** si un PC crea una atención nueva para un paciente que ya tiene una ese día (mismo RUT, o mismo nombre si no hay RUT), la app avisa al escribir el RUT y ofrece «Continuar en esa atención»: lo escrito se agrega a la existente. Al guardar también ofrece «Combinar» o «Guardar aparte».
+
+La fusión ocurre dentro de cada PC, antes de cifrar: el servidor sigue sin poder leer nada.
+
+### Sin conexión
 - **Sin internet:** cada PC sigue guardando localmente. Al volver la conexión, sube y baja lo pendiente.
 - **Uso sin conexión desde la web:** una vez abierta la app desde la dirección de Netlify, el navegador la guarda en caché (*service worker*) y se puede abrir sin internet. En Chrome o Edge también se puede **instalar como app** (icono ⊕ en la barra de direcciones).
 

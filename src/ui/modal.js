@@ -34,6 +34,9 @@ function show(o) {
   area.value = o.copyText ?? '';
   const ok = $('#msgOk');
   const cancel = $('#msgCancel');
+  const alt = $('#msgAlt');
+  alt.hidden = !o.altLabel;
+  alt.textContent = o.altLabel || '';
   ok.textContent = o.okLabel || 'Aceptar';
   // Rojo solo para confirmar acciones destructivas; un aviso se cierra con el botón normal.
   ok.className = 'btn ' + (tone === 'danger' && o.cancelLabel ? 'dangerfill' : 'p');
@@ -48,7 +51,8 @@ function show(o) {
       resolve(v);
     };
     pending = finish;
-    ok.onclick = () => finish(true);
+    ok.onclick = () => finish(o.altLabel ? 'ok' : true);
+    alt.onclick = () => finish('alt');
     cancel.onclick = () => finish(false);
     dlg.oncancel = (e) => {
       e.preventDefault();
@@ -70,3 +74,9 @@ export const uiConfirm = (o) => show({ cancelLabel: 'Cancelar', okLabel: 'Contin
 
 /** Muestra un texto seleccionado para copiarlo a mano (si el portapapeles falla). */
 export const uiCopy = (o) => show({ tone: 'info', okLabel: 'Listo', ...o, cancelLabel: null }).then(() => undefined);
+
+/**
+ * Tres opciones: resuelve 'ok' (botón principal), 'alt' (alternativa) o false (cancelar).
+ * @returns {Promise<'ok'|'alt'|false>}
+ */
+export const uiChoose = (o) => show({ cancelLabel: 'Cancelar', ...o });

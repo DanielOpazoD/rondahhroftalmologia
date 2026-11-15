@@ -47,25 +47,78 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
 
 /**
  * Ejecuta una sincronización completa.
+ *
+ * Antes de SUBIR una atención que también cambió en el servidor, se baja la
+ * versión del servidor y se fusiona campo a campo (mergeFn): así un equipo
+ * nunca sobrescribe lo que otro grabó en otros campos. Al BAJAR, también se
+ * fusiona con lo local.
+ *
  * @param {{
  *   api: ReturnType<typeof createSyncApi>,
  *   key: CryptoKey,
  *   readLocal: () => {items: {id: string, updated: number, kind: string, data: object}[], tombstones: Record<string, number>},
  *   writeLocal: (items: object[], tombstones: Record<string, number>) => void,
+ *   mergeFn?: import('./protocol.js').MergeFn,
  *   batchSize?: number,
  * }} deps
- * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number}>}
+ * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
  */
-export async function syncOnce({ api, key, readLocal, writeLocal, batchSize = 100 }) {
+export async function syncOnce(deps) {
+  // Si al bajar se fusionó algo que el servidor aún no tiene, una segunda
+  // pasada lo sube de inmediato (así los otros equipos lo reciben antes).
+  const total = { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false };
+  for (let pass = 0; pass < 3; pass++) {
+    const r = await syncPass(deps);
+    for (const k of ['pushed', 'skipped', 'merged', 'added', 'updated', 'deleted']) total[k] += r[k];
+    total.needsPush = r.needsPush;
+    if (!r.needsPush) break;
+  }
+  return total;
+}
+
+async function syncPass({ api, key, readLocal, writeLocal, mergeFn, batchSize = 100 }) {
   const { items } = await api.list();
   const remote = remoteVersions(items || []);
   const local0 = readLocal();
   const plan = planSync(localVersions(local0.items, local0.tombstones), remote);
+  const byId = new Map(local0.items.map((r) => [r.id, r]));
+  const pulled = [];
 
-  // Subir
+  /** Baja y descifra versiones del servidor. */
+  const fetchItems = async (list) => {
+    const out = [];
+    for (const batch of chunks(list, batchSize)) {
+      const res = await api.get(batch);
+      for (const it of res.items || []) {
+        if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
+        const content = await decryptPayload(key, it.id, it.u, it);
+        // `record` = formato de la v2.1 (solo atenciones)
+        out.push({ id: it.id, u: it.u, deleted: !!content.deleted, kind: content.kind || 'atencion', data: content.data ?? content.record });
+      }
+    }
+    return out;
+  };
+
+  // 1. Fusionar antes de subir lo que también cambió en el servidor.
+  let merged = 0;
+  if (mergeFn) {
+    const both = plan.push.filter((id) => remote.has(id) && byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated));
+    for (const r of await fetchItems(both.map((id) => ({ id, u: remote.get(id) })))) {
+      const local = byId.get(r.id);
+      if (r.deleted || r.kind !== local.kind) continue;
+      const m = mergeFn(r.kind, local.data, { ...r.data, id: r.id, updated: r.u });
+      if (!m) continue;
+      const u = Math.max(local.updated, r.u) + 1;
+      const data = { ...m.data, id: r.id, updated: u };
+      byId.set(r.id, { ...local, updated: u, data });
+      pulled.push({ id: r.id, u, kind: r.kind, data });
+      merged++;
+    }
+  }
+
+  // 2. Subir
   let pushed = 0;
   let skipped = 0;
-  const byId = new Map(local0.items.map((r) => [r.id, r]));
   for (const ids of chunks(plan.push, batchSize)) {
     const payload = await Promise.all(
       ids.map(async (id) => {
@@ -81,25 +134,16 @@ export async function syncOnce({ api, key, readLocal, writeLocal, batchSize = 10
     skipped += res.skipped?.length || 0;
   }
 
-  // Bajar
-  const pulled = [];
-  for (const batch of chunks(plan.pull, batchSize)) {
-    const res = await api.get(batch);
-    for (const it of res.items || []) {
-      if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
-      const content = await decryptPayload(key, it.id, it.u, it);
-      // `record` = formato de la v2.1 (solo atenciones)
-      pulled.push({ id: it.id, u: it.u, deleted: !!content.deleted, kind: content.kind || 'atencion', data: content.data ?? content.record });
-    }
-  }
+  // 3. Bajar lo que es más nuevo en el servidor
+  pulled.push(...(await fetchItems(plan.pull)));
 
-  // Aplicar sobre el estado local ACTUAL (pudo cambiar mientras se esperaba la red).
-  let result = { added: 0, updated: 0, deleted: 0 };
+  // 4. Aplicar sobre el estado local ACTUAL (pudo cambiar mientras se esperaba la red).
+  let result = { added: 0, updated: 0, deleted: 0, needsPush: false };
   if (pulled.length) {
     const cur = readLocal();
-    const applied = applyPulled(cur.items, cur.tombstones, pulled);
+    const applied = applyPulled(cur.items, cur.tombstones, pulled, mergeFn);
     writeLocal(applied.items, applied.tombstones);
     result = applied;
   }
-  return { pushed, skipped, added: result.added, updated: result.updated, deleted: result.deleted };
+  return { pushed, skipped, merged, added: result.added, updated: result.updated, deleted: result.deleted, needsPush: result.needsPush || skipped > 0 };
 }
