@@ -27,6 +27,7 @@
  * para poder probarla en Node con un almacenamiento en memoria.
  */
 import { sha256, toHex } from '../lib/sha256.js';
+import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
 
 export const LIMITS = Object.freeze({ itemsPerRequest: 200, ctMaxChars: 400_000, futureSkewMs: 24 * 3600 * 1000 });
 
@@ -126,7 +127,25 @@ function validItem(it, now, withPayload) {
  * @returns {(req: Request) => Promise<Response>}
  */
 export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now }) {
-  return async function handle(req) {
+  /**
+   * Toda respuesta declara la versión de protocolo del servidor. Un cliente
+   * que declara una versión menor a la mínima recibe 426 con el aviso de
+   * actualizar. Los clientes anteriores a la 2.12 no la declaran y se aceptan.
+   */
+  return async function withProtocol(req) {
+    const declared = req.headers.get(PROTOCOL_HEADER);
+    const res =
+      declared !== null && !(Number(declared) >= MIN_CLIENT_PROTOCOL)
+        ? json(426, {
+            error: 'Esta versión de la app es demasiado antigua para el servidor. Recarga la página para actualizarla.',
+            minProtocol: MIN_CLIENT_PROTOCOL,
+          })
+        : await handle(req);
+    res.headers.set(PROTOCOL_HEADER, String(PROTOCOL_VERSION));
+    return res;
+  };
+
+  async function handle(req) {
     const url = new URL(req.url);
     const esp = url.searchParams.get('esp') || DEFAULT_ESP;
     if (!ESP_RE.test(esp)) return json(400, { error: 'Especialidad inválida' });
@@ -244,7 +263,7 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
       console.error('sync error', e);
       return json(500, { error: 'Error interno del servidor de sincronización' });
     }
-  };
+  }
 }
 
 /** Almacenamiento en memoria con la misma interfaz que Netlify Blobs (tests y servidor local). */

@@ -8,7 +8,7 @@
  */
 import { encryptPayload, decryptPayload, b64ToBytes } from './crypto.js';
 import { hmacSha256, toHex } from '../lib/sha256.js';
-import { localVersions, remoteVersions, planSync, applyPulled, chunks } from './protocol.js';
+import { localVersions, remoteVersions, planSync, applyPulled, chunks, PROTOCOL_VERSION, PROTOCOL_HEADER } from './protocol.js';
 
 export class SyncHttpError extends Error {
   constructor(status, message) {
@@ -64,12 +64,17 @@ export function createSyncApi({
     try {
       res = await fetchFn(`${baseUrl}/${path}${qs}${extra ? (qs ? '&' : '?') + extra : ''}`, {
         method: body ? 'POST' : 'GET',
-        headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+        headers: {
+          authorization: `Bearer ${token}`,
+          [PROTOCOL_HEADER]: String(PROTOCOL_VERSION),
+          ...(body ? { 'content-type': 'application/json' } : {}),
+        },
         body: body ? JSON.stringify(body) : undefined,
         cache: 'no-store',
         ...(ctrl ? { signal: ctrl.signal } : {}),
       });
       api.serverDate = res.headers.get('date') || api.serverDate;
+      api.serverProtocol = Number(res.headers.get(PROTOCOL_HEADER)) || api.serverProtocol;
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`);
       return data;
@@ -94,6 +99,8 @@ export function createSyncApi({
   const api = {
     /** Cabecera Date de la última respuesta (para detectar relojes desajustados). */
     serverDate: null,
+    /** Versión de protocolo que declaró el servidor (0 si no la declara). */
+    serverProtocol: 0,
     /** Versión vigente de cada id; con `since` (hora del servidor), solo lo cambiado desde entonces. */
     list: (since) => call('list', undefined, since ? `since=${Math.floor(since)}` : ''),
     get: (items) => call('get', { items }),

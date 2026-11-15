@@ -11,7 +11,15 @@ import {
   decryptPayload,
   DecryptError,
 } from '../src/sync/crypto.js';
-import { localVersions, remoteVersions, planSync, applyPulled } from '../src/sync/protocol.js';
+import {
+  localVersions,
+  remoteVersions,
+  planSync,
+  applyPulled,
+  PROTOCOL_VERSION,
+  MIN_CLIENT_PROTOCOL,
+  PROTOCOL_HEADER,
+} from '../src/sync/protocol.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createSyncApi, syncOnce, SyncHttpError, serverId, createSyncCache, CURSOR_MARGIN_MS } from '../src/sync/client.js';
 import { CHANGE_LOG_DAYS } from '../src/sync/server.js';
@@ -690,5 +698,30 @@ describe('red poco confiable', () => {
     const B = mk([]);
     for (const p of [A, B, A, B]) await p.sync();
     assert.equal(B.st.items.length, 8);
+  });
+});
+
+describe('versión de protocolo', () => {
+  test('el servidor la declara, acepta clientes al día y antiguos sin cabecera, y rechaza los muy antiguos con 426', async () => {
+    const { keys, fetchFn } = await setup();
+    const req = (headers) => fetchFn('/api/sync/list', { headers: { authorization: 'Bearer ' + keys.token, ...headers } });
+    const current = await req({ [PROTOCOL_HEADER]: String(PROTOCOL_VERSION) });
+    assert.equal(current.status, 200);
+    assert.equal(current.headers.get(PROTOCOL_HEADER), String(PROTOCOL_VERSION));
+    assert.equal((await req({})).status, 200, 'clientes anteriores a la 2.12 (sin cabecera) siguen funcionando');
+    const old = await req({ [PROTOCOL_HEADER]: String(MIN_CLIENT_PROTOCOL - 1) });
+    assert.equal(old.status, 426);
+    assert.match((await old.json()).error, /Recarga la página/);
+    assert.equal((await req({ [PROTOCOL_HEADER]: 'basura' })).status, 426);
+  });
+
+  test('el cliente la envía y recuerda la del servidor', async () => {
+    const { keys, fetchFn } = await setup();
+    let sent;
+    const spy = (url, init) => ((sent = init.headers[PROTOCOL_HEADER]), fetchFn(url, init));
+    const api = createSyncApi({ token: keys.token, fetchFn: spy });
+    await api.list();
+    assert.equal(sent, String(PROTOCOL_VERSION));
+    assert.equal(api.serverProtocol, PROTOCOL_VERSION);
   });
 });
