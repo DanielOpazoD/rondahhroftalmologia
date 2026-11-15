@@ -9,9 +9,14 @@
 
 const SAFE = /^[A-Za-z0-9_-]{1,64}$/;
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
+/** @type {(k: unknown) => k is string} */
 export const isSafeField = (k) => typeof k === 'string' && SAFE.test(k) && !FORBIDDEN.has(k);
 
-/** ¿Es un valor de datos (JSON) razonable para conservar? */
+/**
+ * ¿Es un valor de datos (JSON) razonable para conservar?
+ * @param {unknown} v
+ * @returns {boolean}
+ */
 function isDataValue(v, depth = 0) {
   if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) {
     return typeof v !== 'string' || v.length <= 10_000;

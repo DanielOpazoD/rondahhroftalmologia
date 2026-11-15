@@ -19,13 +19,25 @@ export const FREE_ATTEMPTS = 5;
 
 const B32 = 'ABCDEFGHJKMNPQRSTVWXYZ23456789'.split('');
 
+/**
+ * Configuración guardada del bloqueo: derivaciones del PIN y del código de recuperación.
+ * @typedef {{v: number, iter: number, salt: string, hash: string, rsalt: string, rhash: string, minutes: number}} LockConfig
+ */
+
 /** Mensaje si el PIN no es válido; null si sirve. */
+/** @param {unknown} pin */
 export const pinProblem = (pin) => (/^\d{4,8}$/.test(String(pin ?? '')) ? null : 'El PIN debe tener entre 4 y 8 números.');
 
+/** @param {string} hex */
 const hexToBytes = (hex) => Uint8Array.from(hex.match(/../g) || [], (h) => parseInt(h, 16));
+/** @param {number} n */
 const randomHex = (n) => toHex(globalThis.crypto.getRandomValues(new Uint8Array(n)));
 
-/** PBKDF2-HMAC-SHA256 de 32 bytes (un bloque), en hexadecimal. */
+/**
+ * PBKDF2-HMAC-SHA256 de 32 bytes (un bloque), en hexadecimal.
+ * @param {string} secret
+ * @param {string} saltHex
+ */
 export function pbkdf2(secret, saltHex, iterations = PIN_ITERATIONS) {
   const key = utf8(secret);
   const salt = hexToBytes(saltHex);
@@ -45,8 +57,9 @@ export function pbkdf2(secret, saltHex, iterations = PIN_ITERATIONS) {
 export function generateRecoveryCode() {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const s = Array.from(bytes, (b) => B32[b % B32.length]).join('');
-  return s.match(/.{4}/g).join('-');
+  return /** @type {RegExpMatchArray} */ (s.match(/.{4}/g)).join('-');
 }
+/** @param {unknown} c */
 const normCode = (c) =>
   String(c ?? '')
     .toUpperCase()
@@ -54,7 +67,8 @@ const normCode = (c) =>
 
 /**
  * Configuración nueva del bloqueo.
- * @returns {{lock: object, recoveryCode: string}}
+ * @param {string|number} pin
+ * @returns {{lock: LockConfig, recoveryCode: string}}
  */
 export function createLockConfig(pin, minutes = DEFAULT_MINUTES, iterations = PIN_ITERATIONS) {
   const problem = pinProblem(pin);
@@ -76,7 +90,11 @@ export function createLockConfig(pin, minutes = DEFAULT_MINUTES, iterations = PI
   };
 }
 
-/** Comparación en tiempo constante. */
+/**
+ * Comparación en tiempo constante.
+ * @param {unknown} a
+ * @param {unknown} b
+ */
 function same(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
   let d = 0;
@@ -84,10 +102,13 @@ function same(a, b) {
   return d === 0;
 }
 
+/** @type {(lock: LockConfig | null | undefined, pin: unknown) => boolean} */
 export const verifyPin = (lock, pin) => Boolean(lock?.hash) && same(pbkdf2(String(pin ?? ''), lock.salt, lock.iter), lock.hash);
+/** @type {(lock: LockConfig | null | undefined, code: unknown) => boolean} */
 export const verifyRecovery = (lock, code) => Boolean(lock?.rhash) && same(pbkdf2(normCode(code), lock.rsalt, lock.iter), lock.rhash);
 
 /** ¿Es una configuración de bloqueo válida? (lo guardado puede venir alterado o de otra versión) */
+/** @type {(l: any) => boolean} lo guardado, sin validar */
 export const isLockConfig = (l) =>
   Boolean(l) &&
   typeof l === 'object' &&

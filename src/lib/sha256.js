@@ -18,12 +18,18 @@ const K = new Uint32Array([
   0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ]);
 
-/** Codifica un string como bytes UTF-8. */
+/**
+ * Codifica un string como bytes UTF-8.
+ * @param {unknown} str
+ */
 export function utf8(str) {
   return new TextEncoder().encode(String(str));
 }
 
-/** Convierte bytes a hexadecimal en minúsculas. */
+/**
+ * Convierte bytes a hexadecimal en minúsculas.
+ * @param {ArrayLike<number>} bytes
+ */
 export function toHex(bytes) {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -46,6 +52,7 @@ export function sha256(input) {
 
   const H = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
   const W = new Uint32Array(64);
+  /** @type {(x: number, n: number) => number} */
   const rotr = (x, n) => (x >>> n) | (x << (32 - n));
 
   for (let off = 0; off < padded.length; off += 64) {

@@ -19,7 +19,9 @@ const PACIENTES = [
   ['Luis Simulado Teao', '6666666', '1966-02-08', 'M'],
 ];
 
+/** @param {string} body */
 const rut = (body) => formatRut(body + rutCheckDigit(body));
+/** @type {(iso: string, days: number) => string} */
 const shift = (iso, days) => {
   const d = new Date(iso + 'T12:00:00');
   d.setDate(d.getDate() + days);
@@ -27,7 +29,7 @@ const shift = (iso, days) => {
 };
 
 /**
- * @param {{today: string, now: number, casos: {f: object, checks: object, proc: object, cat?: string}[]}} o
+ * @param {{today: string, now: number, casos: import('../domain').CasoEjemplo[]}} o
  *   `casos`: parte clínica de ejemplo que aporta la especialidad.
  */
 export function buildPracticeData({ today, now, casos }) {
@@ -38,6 +40,7 @@ export function buildPracticeData({ today, now, casos }) {
     makeMedico({ nombre: 'Admisión Ejemplo', rol: 'admision' }, now),
   ];
   let seq = 0;
+  /** @type {(p: string[], fecha: string, caso: import('../domain').CasoEjemplo | null) => import('../domain').Atencion} */
   const record = (p, fecha, caso) => {
     const [nombre, body, fnac, sexo] = p;
     const r = blankRecord({ op: operativo.nombre });
@@ -59,6 +62,7 @@ export function buildPracticeData({ today, now, casos }) {
     applyBirthDate(r);
     return normalizeRecord(r);
   };
+  /** @param {number} i */
   const c = (i) => casos[i % Math.max(casos.length, 1)];
   const records = [
     // Historial: atenciones de operativos anteriores.

@@ -21,6 +21,9 @@ import { MEDIDAS_PROC } from '../specialties/activa/config.js';
 import { isFutureVersion } from './migrations.js';
 import { mergeAuditDocs } from './audit.js';
 
+/** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
+/** Valor de una ruta: texto, o `true` para una casilla marcada. @typedef {string | true} ValorRuta */
+
 /** Partes de un procedimiento realizado: el lado (`eye`) y las medidas por lado de la especialidad. */
 const PROC_KEYS = ['eye', ...MEDIDAS_PROC];
 
@@ -30,10 +33,16 @@ const PROC_KEYS = ['eye', ...MEDIDAS_PROC];
  * `__proto__`/`constructor`/`prototype` (contaminación de prototipos).
  */
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
+/** @type {(k: unknown) => k is string} */
 export const isSafeKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(k) && !FORBIDDEN.has(k);
 
-/** Valores presentes de la atención como mapa ruta -> valor (vacíos y `false` se omiten). */
+/**
+ * Valores presentes de la atención como mapa ruta -> valor (vacíos y `false` se omiten).
+ * @param {RegistroFusionable | null | undefined} rec
+ * @returns {Map<string, ValorRuta>}
+ */
 export function flatten(rec) {
+  /** @type {Map<string, ValorRuta>} */
   const m = new Map();
   for (const [k, v] of Object.entries(rec?.f || {})) {
     if (isSafeKey(k) && v !== undefined && v !== null && v !== '') m.set('f.' + k, String(v));
@@ -41,33 +50,39 @@ export function flatten(rec) {
   for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
   if (rec?.cat) m.set('cat', String(rec.cat));
   if (rec?.pacienteId) m.set('pacienteId', String(rec.pacienteId));
-  for (const [id, p] of Object.entries(rec?.proc || {})) {
+  // Cada procedimiento se recorre por partes (`eye` y las medidas de la especialidad).
+  for (const [id, p] of /** @type {[string, Record<string, unknown>][]} */ (Object.entries(rec?.proc || {}))) {
     if (!isSafeKey(id) || !p || typeof p !== 'object') continue;
     for (const k of PROC_KEYS) if (p[k] !== undefined && p[k] !== null && p[k] !== '') m.set(`proc.${id}.${k}`, String(p[k]));
   }
   return m;
 }
 
-/** Reconstruye f / checks / cat / proc desde un mapa ruta -> valor. */
+/**
+ * Reconstruye f / checks / cat / proc desde un mapa ruta -> valor.
+ * @param {Map<string, ValorRuta>} m
+ */
 export function unflatten(m) {
+  /** @type {{f: Record<string, string>, checks: Record<string, boolean>, cat: string, pacienteId?: string, proc: Record<string, import('../domain').ProcRealizado>}} */
   const out = { f: {}, checks: {}, cat: '', proc: {} };
   for (const [path, v] of m) {
     if (path.startsWith('f.')) {
       const k = path.slice(2);
-      if (isSafeKey(k)) out.f[k] = v;
+      if (isSafeKey(k)) out.f[k] = /** @type {string} */ (v);
     } else if (path.startsWith('checks.')) {
       const k = path.slice(7);
       if (isSafeKey(k)) out.checks[k] = true;
-    } else if (path === 'cat') out.cat = v;
-    else if (path === 'pacienteId') out.pacienteId = v;
+    } else if (path === 'cat') out.cat = /** @type {string} */ (v);
+    else if (path === 'pacienteId') out.pacienteId = /** @type {string} */ (v);
     else if (path.startsWith('proc.')) {
       const rest = path.slice(5);
       const dot = rest.lastIndexOf('.');
       const id = rest.slice(0, dot);
       const key = rest.slice(dot + 1);
       if (!isSafeKey(id) || !PROC_KEYS.includes(key)) continue;
-      if (!Object.hasOwn(out.proc, id)) out.proc[id] = {};
-      out.proc[id][key] = v;
+      // Se arma por partes: el que quede sin `eye` se descarta abajo.
+      if (!Object.hasOwn(out.proc, id)) out.proc[id] = /** @type {import('../domain').ProcRealizado} */ ({});
+      /** @type {Record<string, string>} */ (out.proc[id])[key] = /** @type {string} */ (v);
     }
   }
   // Un procedimiento sin ojo no existe (p. ej. se quitó el ojo pero quedó una PIO).
@@ -75,16 +90,26 @@ export function unflatten(m) {
   return out;
 }
 
-/** Rutas cuyo valor cambió entre dos versiones. */
+/**
+ * Rutas cuyo valor cambió entre dos versiones.
+ * @param {RegistroFusionable | null | undefined} before
+ * @param {RegistroFusionable | null | undefined} after
+ */
 export function changedPaths(before, after) {
   const a = flatten(before);
   const b = flatten(after);
+  /** @type {string[]} */
   const out = [];
   for (const p of new Set([...a.keys(), ...b.keys()])) if (a.get(p) !== b.get(p)) out.push(p);
   return out;
 }
 
-/** Fecha de edición de un campo (registros sin `ft`: su `updated`). */
+/**
+ * Fecha de edición de un campo (registros sin `ft`: su `updated`).
+ * @param {RegistroFusionable | null | undefined} rec
+ * @param {string} path
+ * @returns {number}
+ */
 export function ftOf(rec, path) {
   return rec?.ft ? rec.ft[path] || 0 : rec?.updated || 0;
 }
@@ -92,6 +117,10 @@ export function ftOf(rec, path) {
 /**
  * Marca como editados ahora los campos que cambiaron respecto de `before`.
  * Modifica y devuelve `rec`.
+ * @template {RegistroFusionable} T
+ * @param {T} rec
+ * @param {RegistroFusionable | null | undefined} before
+ * @returns {T}
  */
 export function stampChanges(rec, before, now = Date.now()) {
   const paths = changedPaths(before, rec);
@@ -101,7 +130,12 @@ export function stampChanges(rec, before, now = Date.now()) {
   return rec;
 }
 
-/** Da `ft` a un registro antiguo: todos sus campos con su fecha `updated`. */
+/**
+ * Da `ft` a un registro antiguo: todos sus campos con su fecha `updated`.
+ * @template {RegistroFusionable} T
+ * @param {T} rec
+ * @returns {T}
+ */
 export function ensureFt(rec) {
   if (rec.ft) return rec;
   const t = rec.updated || 0;
@@ -111,11 +145,15 @@ export function ensureFt(rec) {
 }
 
 /** Compara valores de forma determinista (para desempates). */
+/** @param {unknown} v */
 const rank = (v) => (v === undefined ? '' : JSON.stringify(v));
 
 /**
  * Fusiona dos versiones de la MISMA atención (mismo id, o una atención nueva
  * que se combina con una existente). Devuelve un registro nuevo.
+ * @param {RegistroFusionable} a
+ * @param {RegistroFusionable} b
+ * @returns {RegistroFusionable}
  */
 export function mergeRecords(a, b) {
   const fa = flatten(a);
@@ -148,7 +186,11 @@ export function mergeRecords(a, b) {
   };
 }
 
-/** ¿Tienen los mismos datos (sin mirar fechas)? */
+/**
+ * ¿Tienen los mismos datos (sin mirar fechas)?
+ * @param {RegistroFusionable | null | undefined} a
+ * @param {RegistroFusionable | null | undefined} b
+ */
 export function sameContent(a, b) {
   return changedPaths(a, b).length === 0;
 }
@@ -156,21 +198,24 @@ export function sameContent(a, b) {
 /**
  * Función de fusión para la sincronización (ver sync/protocol.js, MergeFn):
  * las atenciones se fusionan campo a campo; médicos y operativos, la versión más nueva.
+ * Los datos llegan descifrados de otro equipo (forma no verificada): cada rama
+ * los trata según su tipo.
+ * @type {import('../sync/protocol.js').MergeFn}
  */
 export function syncMerge(kind, local, remote) {
   if (kind === 'bitacora') {
     const data = mergeAuditDocs(local, remote);
-    return { data, sameAsRemote: data.entries.length === (remote.entries || []).length };
+    return { data, sameAsRemote: data.entries.length === /** @type {unknown[]} */ (remote.entries || []).length };
   }
   if (kind === 'paciente') {
-    const data = mergeRecords(local, remote);
-    return { data, sameAsRemote: sameContent(data, remote) };
+    const data = mergeRecords(/** @type {RegistroFusionable} */ (local), /** @type {RegistroFusionable} */ (remote));
+    return { data, sameAsRemote: sameContent(data, /** @type {RegistroFusionable} */ (remote)) };
   }
   if (kind !== 'atencion') return null;
   // Una versión más nueva de la app no se fusiona con lógica antigua: gana entera la más nueva.
   if (isFutureVersion(local) || isFutureVersion(remote)) return null;
   const data = mergeRecords(normalizeRecord(local), normalizeRecord(remote));
-  return { data, sameAsRemote: sameContent(data, remote) };
+  return { data, sameAsRemote: sameContent(data, /** @type {RegistroFusionable} */ (remote)) };
 }
 
 /**
@@ -178,13 +223,15 @@ export function syncMerge(kind, local, remote) {
  * fechas de edición): dos versiones con igual huella tienen los mismos datos.
  * La sincronización la usa para detectar versiones con el mismo número pero
  * distinto contenido (dos equipos que fusionaron a la vez).
+ * @param {string} kind
+ * @param {Record<string, unknown>} data datos descifrados del elemento (forma según `kind`)
  */
 export function syncFingerprint(kind, data) {
   if (kind === 'atencion' || kind === 'paciente') {
-    return JSON.stringify([...flatten(data)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
+    return JSON.stringify([...flatten(/** @type {RegistroFusionable} */ (data))].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
   }
   if (kind === 'medico') return JSON.stringify([data?.nombre || '', data?.rut || '']);
   if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
-  if (kind === 'bitacora') return JSON.stringify((data?.entries || []).map((e) => e.id).sort());
+  if (kind === 'bitacora') return JSON.stringify(/** @type {{id: string}[]} */ (data?.entries || []).map((e) => e.id).sort());
   return JSON.stringify(data ?? null);
 }

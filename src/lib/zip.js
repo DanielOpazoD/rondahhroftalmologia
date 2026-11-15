@@ -19,14 +19,20 @@ const CRC_TABLE = (() => {
   return t;
 })();
 
-/** CRC-32 (IEEE 802.3), el mismo que exige el formato ZIP. */
+/**
+ * CRC-32 (IEEE 802.3), el mismo que exige el formato ZIP.
+ * @param {ArrayLike<number>} bytes
+ */
 export function crc32(bytes) {
   let c = 0xffffffff;
   for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** Fecha/hora en formato MS-DOS que usa ZIP. */
+/**
+ * Fecha/hora en formato MS-DOS que usa ZIP.
+ * @param {Date} date
+ */
 function dosDateTime(date) {
   const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
   const day = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
@@ -109,11 +115,15 @@ export function createZip(entries, date = new Date()) {
 }
 
 /** Evita nombres repetidos dentro del ZIP agregando " (2)", " (3)", ... */
+/**
+ * @param {string} name
+ * @param {Set<string>} used
+ */
 function uniqueName(name, used) {
   let candidate = name;
   let i = 2;
   while (used.has(candidate.toLowerCase())) {
-    candidate = name.replace(/(\.[^./]+)?$/, (ext) => ` (${i})${ext || ''}`);
+    candidate = name.replace(/(\.[^./]+)?$/, (/** @type {string} */ ext) => ` (${i})${ext || ''}`);
     i++;
   }
   used.add(candidate.toLowerCase());

@@ -28,7 +28,10 @@ export function createClock({ now = Date.now, load = () => 0, save = () => {} } 
       save(last);
       return last;
     },
-    /** Registra una fecha recibida de otro equipo. */
+    /**
+     * Registra una fecha recibida de otro equipo.
+     * @param {number} t
+     */
     observe(t) {
       if (!Number.isFinite(t)) return;
       const capped = Math.min(t, now() + MAX_AHEAD_MS);
@@ -45,6 +48,7 @@ export function createClock({ now = Date.now, load = () => 0, save = () => {} } 
 
 /** Reloj de la aplicación (se configura con persistencia en main.js). */
 export let clock = createClock();
+/** @param {ReturnType<typeof createClock>} c */
 export function setClock(c) {
   clock = c;
 }

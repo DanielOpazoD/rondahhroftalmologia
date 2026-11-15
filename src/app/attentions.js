@@ -39,7 +39,7 @@ export function prepareSave({ rec: draft, stored = null, patients, procs, now })
 /**
  * Preingreso: atención «por atender» con los datos del paciente (completados
  * desde su ficha, si existe), sin datos clínicos.
- * @param {{fields: Record<string, string>, fecha: string, operativo?: string, master?: object | null, pacienteId: string, now: number}} o
+ * @param {{fields: Record<string, string>, fecha: string, operativo?: string, master?: {f?: Record<string, string>} | null, pacienteId: string, now: number}} o
  */
 export function buildAdmission({ fields, fecha, operativo = '', master = null, pacienteId, now }) {
   const rec = blankRecord({ op: operativo });
@@ -51,7 +51,12 @@ export function buildAdmission({ fields, fecha, operativo = '', master = null, p
   return normalizeRecord(rec);
 }
 
-/** Campos no vacíos de un formulario de preingreso. */
+/**
+ * Campos no vacíos de un formulario de preingreso.
+ * @template T
+ * @param {Record<string, T>} data
+ * @returns {Record<string, T>}
+ */
 export const nonEmpty = (data) =>
   Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== ''));
 
@@ -59,6 +64,9 @@ export const nonEmpty = (data) =>
  * La atención pasa a la ficha `pacienteId`: el cambio queda fechado y se
  * sincroniza campo a campo. Una atención antigua sin fechas por campo
  * conserva las de sus otros campos (ensureFt).
+ * @param {import('../domain').Atencion} r
+ * @param {string} pacienteId
+ * @param {number} at
  */
 export function relinkRecord(r, pacienteId, at) {
   const u = Math.max(at, (r.updated || 0) + 1);
@@ -69,11 +77,15 @@ export function relinkRecord(r, pacienteId, at) {
 /**
  * Ficha del paciente actualizada con los datos de una atención, fusionada
  * campo a campo con la existente (gana lo editado más recientemente).
- * @returns {object | null} la ficha a guardar, o null si no cambia nada
+ * @param {import('../domain').Atencion} rec
+ * @param {import('../domain').Paciente | null | undefined} current
+ * @param {number} now
+ * @returns {import('../domain').RegistroFusionable | null} la ficha a guardar, o null si no cambia nada
  */
 export function patientUpdateFromRecord(rec, current, now) {
   if (!rec.pacienteId) return null;
   const fields = patientFields(rec.f);
+  /** @type {import('../domain').FechasPorCampo} */
   const ft = {};
   for (const k of PATIENT_FIELDS) {
     const t = rec.ft?.['f.' + k] ?? (fields[k] ? rec.updated : undefined);

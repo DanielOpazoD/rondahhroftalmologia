@@ -19,7 +19,7 @@ export interface Atencion {
   f: Record<string, string>;
   checks: Record<string, boolean>;
   cat: '' | 'OD' | 'OI' | 'AO';
-  proc: Record<string, { eye: 'OD' | 'OI' | 'AO'; od?: string; oi?: string }>;
+  proc: Record<string, ProcRealizado>;
   procNames?: Record<string, string>;
   ft?: FechasPorCampo;
   [campoDeOtraVersion: string]: unknown;
@@ -61,4 +61,108 @@ export interface ElementoSync {
   updated: number;
   kind: TipoSync | string;
   data: Record<string, unknown>;
+}
+
+/**
+ * Procedimiento realizado en una atención: el ojo y las medidas por lado de la especialidad.
+ * (Alias de tipo y no `interface`: así se puede recorrer como Record<string, string>.)
+ */
+export type ProcRealizado = {
+  eye: 'OD' | 'OI' | 'AO';
+  od?: string;
+  oi?: string;
+};
+
+/** Parte clínica de una atención de ejemplo para el modo práctica (la aporta la especialidad). */
+export interface CasoEjemplo {
+  f: Record<string, string>;
+  checks: Record<string, boolean>;
+  proc: Record<string, ProcRealizado>;
+  cat?: Atencion['cat'];
+}
+
+/**
+ * Lo común a atenciones y fichas de paciente que maneja la fusión campo a campo
+ * (core/merge.js). Todo es opcional: puede venir de otra versión o de otro equipo.
+ */
+export interface RegistroFusionable {
+  id?: string | null;
+  created?: number;
+  updated?: number;
+  pacienteId?: string;
+  f?: Record<string, string>;
+  checks?: Record<string, boolean>;
+  cat?: string;
+  proc?: Record<string, ProcRealizado>;
+  procNames?: Record<string, string>;
+  ft?: FechasPorCampo;
+  [campoDeOtraVersion: string]: unknown;
+}
+
+/** Procedimiento del catálogo (editable en Ajustes). `pio: 1` = registra presión intraocular por ojo. */
+export interface Procedimiento {
+  id: string;
+  n: string;
+  pio?: 0 | 1;
+}
+
+/** Operativo (ronda en terreno). */
+export interface Operativo {
+  id: string;
+  nombre: string;
+  created: number;
+  updated: number;
+  [campoDeOtraVersion: string]: unknown;
+}
+
+/** Cambio de un campo en una entrada de bitácora: ruta, antes y después (ausente = vacío). */
+export interface AuditChange {
+  c: string;
+  a?: string | true;
+  d?: string | true;
+}
+
+/** Entrada inmutable de la bitácora de una atención (core/audit.js). */
+export interface AuditEntry {
+  id: string;
+  at: number;
+  tipo: 'ingresada' | 'creada' | 'editada' | 'eliminada';
+  equipo: string;
+  equipoId: string;
+  autor?: string;
+  autorId?: string;
+  cambios: AuditChange[];
+}
+
+/** Documento de bitácora de una atención (`b_<idAtención>`), sincronizado como cualquier dato. */
+export interface AuditDoc {
+  id: string;
+  atencionId: string;
+  updated: number;
+  entries: AuditEntry[];
+}
+
+/** Versión de un elemento tal como la ve el servidor de sincronización: id, número y huella. */
+export interface SyncVersion {
+  id: string;
+  u: number;
+  /** Huella de contenido (16 hex), opcional por compatibilidad. */
+  h?: string;
+}
+
+/** Versión cifrada que viaja por `get`/`put` (AES-GCM en base64). */
+export interface SyncBlob extends SyncVersion {
+  iv: string;
+  ct: string;
+}
+
+/** Versión bajada y descifrada (o resuelta localmente) que se aplica sobre el estado local. */
+export interface ElementoBajado {
+  id: string;
+  u: number;
+  deleted?: boolean;
+  kind?: TipoSync | string;
+  data?: Record<string, unknown>;
+  /** Versión del servidor con el mismo número que la local tras resolver un conflicto. */
+  adopt?: boolean;
 }

@@ -15,7 +15,16 @@ export const STYLE = { normal: 0, header: 1, bold: 2, title: 3 };
 
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
-/** Escapa texto para XML y quita caracteres de control inválidos. */
+/**
+ * Hoja del libro. Cada celda es un valor (texto, número, booleano o vacío)
+ * u objeto { v, s } (s = índice de STYLE).
+ * @typedef {{name: string, rows: unknown[][], header?: boolean, widths?: number[]}} Hoja
+ */
+
+/**
+ * Escapa texto para XML y quita caracteres de control inválidos.
+ * @param {unknown} value
+ */
 export function xmlEscape(value) {
   return (
     String(value)
@@ -28,7 +37,10 @@ export function xmlEscape(value) {
   );
 }
 
-/** 0 -> A, 25 -> Z, 26 -> AA ... */
+/**
+ * 0 -> A, 25 -> Z, 26 -> AA ...
+ * @param {number} index
+ */
 export function columnLetter(index) {
   let s = '';
   let n = index + 1;
@@ -41,6 +53,10 @@ export function columnLetter(index) {
 }
 
 /** Nombre de hoja válido para Excel: máx. 31 caracteres, sin []:*?/\ y único. */
+/**
+ * @param {unknown} name
+ * @param {Set<string>} [used]
+ */
 export function sheetName(name, used = new Set()) {
   const base =
     String(name || 'Hoja')
@@ -60,12 +76,18 @@ export function sheetName(name, used = new Set()) {
 /**
  * Normaliza una celda a { v, s }.
  * Acepta valores primitivos u objetos { v, s } (s = índice de STYLE).
+ * @param {unknown} cell
+ * @returns {{v: unknown, s?: number}}
  */
 function normCell(cell) {
   if (cell !== null && typeof cell === 'object' && 'v' in cell) return cell;
   return { v: cell, s: STYLE.normal };
 }
 
+/**
+ * @param {unknown} cell
+ * @param {string} ref
+ */
 function cellXml(cell, ref) {
   const { v, s } = normCell(cell);
   const sAttr = s ? ` s="${s}"` : '';
@@ -75,6 +97,7 @@ function cellXml(cell, ref) {
   return `<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(v)}</t></is></c>`;
 }
 
+/** @param {Hoja} sheet */
 function sheetXml(sheet) {
   const rows = sheet.rows || [];
   const nCols = Math.max(1, ...rows.map((r) => r.length));
@@ -115,7 +138,11 @@ function sheetXml(sheet) {
   );
 }
 
-/** Ancho aproximado según el contenido (entre 8 y 60 caracteres). */
+/**
+ * Ancho aproximado según el contenido (entre 8 y 60 caracteres).
+ * @param {unknown[][]} rows
+ * @param {number} col
+ */
 function autoWidth(rows, col) {
   let max = 8;
   for (const row of rows.slice(0, 500)) {
@@ -154,7 +181,7 @@ const STYLES_XML =
 
 /**
  * Construye un .xlsx.
- * @param {{name: string, rows: any[][], header?: boolean, widths?: number[]}[]} sheets
+ * @param {Hoja[]} sheets
  * @param {{title?: string, creator?: string, date?: Date}} [meta]
  * @returns {Uint8Array}
  */

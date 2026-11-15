@@ -11,22 +11,35 @@
 import { SCHEMA_VERSION } from '../config/catalogs.js';
 import { patientIdFor } from './patient.js';
 
+/**
+ * Registro tal como se guardó en alguna versión del esquema (sin validar).
+ * @typedef {{v: number, [campo: string]: unknown}} RegistroCrudo
+ */
+
 export class FutureVersionError extends Error {
+  /** @param {number} v */
   constructor(v) {
     super(`Registro de una versión más nueva de la app (esquema v${v}). Recarga la página para actualizar.`);
     this.version = v;
   }
 }
 
-/** Versión de esquema de un registro (sin `v` = v1). */
+/**
+ * Versión de esquema de un registro (sin `v` = v1).
+ * @param {unknown} raw
+ */
 export function versionOf(raw) {
-  const v = Number(raw?.v);
+  const v = Number(/** @type {{v?: unknown} | null | undefined} */ (raw)?.v);
   return Number.isInteger(v) && v > 0 ? v : 1;
 }
 
+/** @param {unknown} raw */
 export const isFutureVersion = (raw) => versionOf(raw) > SCHEMA_VERSION;
 
-/** Pasos de migración: STEPS[n](registro vN) -> registro vN+1. */
+/**
+ * Pasos de migración: STEPS[n](registro vN) -> registro vN+1.
+ * @type {Record<number, (r: RegistroCrudo) => RegistroCrudo>}
+ */
 export const STEPS = {
   // v1 -> v2: se agregó `paciente_sexo` (opcional); sin cambios estructurales.
   1: (r) => ({ ...r, v: 2 }),
@@ -34,13 +47,15 @@ export const STEPS = {
   2: (r) => ({ ...r, v: 3, especialidad: r.especialidad || 'oftalmologia' }),
   // v3 -> v4: el paciente pasa a ser una unidad; cada atención apunta a su ficha.
   3: (r) => {
-    const pacienteId = r.pacienteId || patientIdFor(r.f || {});
+    const pacienteId = r.pacienteId || patientIdFor(/** @type {Record<string, unknown>} */ (r.f) || {});
     return pacienteId ? { ...r, v: 4, pacienteId } : { ...r, v: 4 };
   },
 };
 
 /**
  * Lleva un registro a la versión actual aplicando los pasos en orden.
+ * @param {object} raw
+ * @returns {RegistroCrudo}
  * @throws {FutureVersionError} si el registro es de una versión más nueva
  */
 export function migrate(raw) {

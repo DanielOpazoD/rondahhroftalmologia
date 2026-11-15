@@ -40,8 +40,13 @@ export function localVersions(records, tombstones = {}) {
   return map;
 }
 
-/** Lista remota [{id, u, h}] -> Map id -> {u, h} (la versión más nueva; a igual número, mayor huella). */
+/**
+ * Lista remota [{id, u, h}] -> Map id -> {u, h} (la versión más nueva; a igual número, mayor huella).
+ * @param {Iterable<{id: string, u: number, h?: string}>} items
+ * @returns {Map<string, {u: number, h?: string}>}
+ */
 export function remoteVersions(items) {
+  /** @type {Map<string, {u: number, h?: string}>} */
   const map = new Map();
   for (const { id, u, h } of items) {
     const cur = map.get(id);
@@ -78,10 +83,11 @@ export function planSync(local, remote, localHash) {
  * Aplica versiones descargadas y descifradas sobre el estado local.
  * Los elementos son genéricos: {id, updated, kind, data}, donde `kind` es
  * 'atencion' | 'medico' | 'operativo'. La aplicación los separa por tipo.
- * @param {{id: string, updated: number, kind: string, data: object}[]} items
- * @param {{id: string, u: number, deleted?: boolean, kind?: string, data?: object, adopt?: boolean}[]} pulled
+ * @param {import('../domain').ElementoSync[]} items
+ * @param {Record<string, number>} tombstones id -> fecha de eliminación (ms)
+ * @param {import('../domain').ElementoBajado[]} pulled
  * @param {MergeFn} [mergeFn] fusión por tipo (atenciones: campo a campo). Sin ella, gana la versión más nueva entera.
- * @returns {{items: object[], tombstones: Record<string, number>, added: number, updated: number, deleted: number, needsPush: boolean}}
+ * @returns {{items: import('../domain').ElementoSync[], tombstones: Record<string, number>, added: number, updated: number, deleted: number, needsPush: boolean}}
  */
 export function applyPulled(items, tombstones, pulled, mergeFn) {
   const byId = new Map(items.map((r) => [r.id, r]));
@@ -109,7 +115,7 @@ export function applyPulled(items, tombstones, pulled, mergeFn) {
       let u = item.u;
       const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
       if (m) {
-        data = m.data;
+        data = /** @type {Record<string, unknown>} */ (m.data);
         // Si la fusión agregó algo local que el servidor no tiene, es una versión nueva que hay que subir.
         if (!m.sameAsRemote) {
           u = Math.max(cur.updated || 0, item.u) + 1;
@@ -128,12 +134,18 @@ export function applyPulled(items, tombstones, pulled, mergeFn) {
 /**
  * @callback MergeFn
  * @param {string} kind tipo del elemento
- * @param {object} local datos locales
- * @param {object} remote datos remotos (con id y updated)
+ * @param {Record<string, unknown>} local datos locales
+ * @param {Record<string, unknown>} remote datos remotos (con id y updated)
  * @returns {{data: object, sameAsRemote: boolean} | null} null = sin fusión (gana la versión más nueva)
  */
 
-/** Divide un arreglo en lotes. */
+/**
+ * Divide un arreglo en lotes.
+ * @template T
+ * @param {T[]} arr
+ * @param {number} size
+ * @returns {T[][]}
+ */
 export function chunks(arr, size) {
   const out = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));

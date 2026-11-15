@@ -24,7 +24,7 @@ const CHECK_LABELS = Object.fromEntries([
  * @param {{id: string, n: string}[]} [procs]
  */
 export function auditLabel(path, procs = []) {
-  if (path.startsWith('f.')) return ETIQUETAS[path.slice(2)] || path.slice(2);
+  if (path.startsWith('f.')) return /** @type {Record<string, string>} */ (ETIQUETAS)[path.slice(2)] || path.slice(2);
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';
   if (path === 'pacienteId') return 'Paciente (vínculo)';
@@ -33,19 +33,25 @@ export function auditLabel(path, procs = []) {
     const dot = rest.lastIndexOf('.');
     const id = rest.slice(0, dot);
     const name = procs.find((p) => p.id === id)?.n || id;
-    const part = ETIQUETAS_PROC[rest.slice(dot + 1)];
+    const part = /** @type {Record<string, string>} */ (ETIQUETAS_PROC)[rest.slice(dot + 1)];
     return part ? `${name} ${part}` : name;
   }
   return path;
 }
 
-/** Cambios entre dos versiones de una atención: [{c, a, d}] (a/d ausentes = vacío). */
+/**
+ * Cambios entre dos versiones de una atención: [{c, a, d}] (a/d ausentes = vacío).
+ * @param {import('../domain').RegistroFusionable | null | undefined} before
+ * @param {import('../domain').RegistroFusionable | null | undefined} after
+ * @returns {import('../domain').AuditChange[]}
+ */
 export function auditChanges(before, after) {
   const a = flatten(before || {});
   const b = flatten(after || {});
   const out = [];
   for (const c of [...new Set([...a.keys(), ...b.keys()])].sort()) {
     if (a.get(c) === b.get(c)) continue;
+    /** @type {import('../domain').AuditChange} */
     const item = { c };
     if (a.has(c)) item.a = a.get(c);
     if (b.has(c)) item.d = b.get(c);
@@ -56,10 +62,10 @@ export function auditChanges(before, after) {
 
 /**
  * Crea una entrada de bitácora.
- * @param {{tipo: 'ingresada'|'creada'|'editada'|'eliminada', before?: object, after?: object, at: number,
+ * @param {{tipo: import('../domain').AuditEntry['tipo'], before?: import('../domain').RegistroFusionable, after?: import('../domain').RegistroFusionable, at: number,
  *   equipo: string, equipoId: string, autor?: string, autorId?: string, rand?: () => number}} o
  *   `autor`: nombre del perfil que registró (quién), además del equipo (desde dónde).
- * @returns {object|null} null si una edición no cambió nada
+ * @returns {import('../domain').AuditEntry|null} null si una edición no cambió nada
  */
 export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, autor, autorId, rand = Math.random }) {
   const cambios = tipo === 'eliminada' ? [] : auditChanges(before, after);
@@ -75,15 +81,24 @@ export function makeAuditEntry({ tipo, before, after, at, equipo, equipoId, auto
   };
 }
 
-/** Unión de dos documentos de bitácora de la misma atención (sin duplicar entradas). */
+/**
+ * Unión de dos documentos de bitácora de la misma atención (sin duplicar entradas).
+ * @param {Partial<import('../domain').AuditDoc> | null | undefined} a
+ * @param {Partial<import('../domain').AuditDoc> | null | undefined} b
+ * @returns {import('../domain').AuditDoc}
+ */
 export function mergeAuditDocs(a, b) {
+  /** @type {Map<string, import('../domain').AuditEntry>} */
   const byId = new Map();
   for (const e of [...(a?.entries || []), ...(b?.entries || [])]) if (e && typeof e.id === 'string') byId.set(e.id, e);
   const entries = [...byId.values()].sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1));
   return { id: a?.id || b?.id, atencionId: a?.atencionId || b?.atencionId, updated: Math.max(a?.updated || 0, b?.updated || 0), entries };
 }
 
-/** Texto breve de un valor para mostrar en el historial. */
+/**
+ * Texto breve de un valor para mostrar en el historial.
+ * @param {unknown} v
+ */
 export function shortValue(v, max = 40) {
   if (v === undefined || v === null || v === '') return 'vacío';
   if (v === true) return 'sí';

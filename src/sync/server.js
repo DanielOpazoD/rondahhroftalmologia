@@ -29,6 +29,19 @@
 import { sha256, toHex } from '../lib/sha256.js';
 import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
 
+/** @typedef {import('../domain').SyncVersion} SyncVersion */
+/** @typedef {import('../domain').SyncBlob} SyncBlob */
+/**
+ * Interfaz mínima de almacenamiento (la de Netlify Blobs que se usa aquí).
+ * `get` devuelve el JSON guardado (o null si no existe).
+ * @typedef {{
+ *   list: (opts?: {prefix?: string}) => Promise<{blobs: {key: string}[]}>,
+ *   get: (key: string, opts?: {type: 'json'}) => Promise<unknown>,
+ *   setJSON: (key: string, value: unknown) => Promise<unknown>,
+ *   delete: (key: string) => Promise<unknown>,
+ * }} BlobStore
+ */
+
 export const LIMITS = Object.freeze({
   itemsPerRequest: 200,
   ctMaxChars: 400_000,
@@ -37,16 +50,25 @@ export const LIMITS = Object.freeze({
   bodyMaxBytes: 5_500_000,
 });
 
-/** Método HTTP de cada acción. */
+/** Método HTTP de cada acción. @type {Readonly<Record<string, 'GET' | 'POST'>>} */
 const ROUTES = Object.freeze({ list: 'GET', get: 'POST', put: 'POST', purge: 'POST' });
 
 /**
  * Respuesta de error con un `code` estable (para el cliente) y el texto para
  * mostrar. Los códigos no cambian aunque cambie la redacción del mensaje.
+ * @param {number} status
+ * @param {string} code
+ * @param {string} error
+ * @param {Record<string, unknown>} [extra]
  */
 const fail = (status, code, error, extra = {}) => json(status, { error, code, ...extra });
 
 class BodyError extends Error {
+  /**
+   * @param {number} status
+   * @param {string} code
+   * @param {string} message
+   */
   constructor(status, code, message) {
     super(message);
     this.status = status;
@@ -54,7 +76,11 @@ class BodyError extends Error {
   }
 }
 
-/** Lee el cuerpo JSON con límite de tamaño. */
+/**
+ * Lee el cuerpo JSON con límite de tamaño.
+ * @param {Request} req
+ * @returns {Promise<any>} JSON de la solicitud, sin validar
+ */
 async function readJson(req) {
   const declared = Number(req.headers.get('content-length'));
   if (declared > LIMITS.bodyMaxBytes) throw new BodyError(413, 'demasiado_grande', 'La solicitud es demasiado grande');
@@ -91,20 +117,29 @@ const H_RE = /^[0-9a-f]{16}$/;
  * detectar dos versiones con el mismo número y distinto contenido. Sin huella
  * (versiones antiguas) la clave es `<esp>/r/<id>/<versión>`.
  */
+/** @type {(esp: string, id: string, u: number, h?: string) => string} */
 const keyOf = (esp, id, u, h) => `${esp}/r/${id}/${u}${h ? '.' + h : ''}`;
+/** @param {string} esp */
 const keyRe = (esp) => new RegExp(`^${esp}/r/([A-Za-z0-9_-]{1,64})/(\\d{1,16})(?:\\.([0-9a-f]{16}))?$`);
 
 /** Días que se conserva el índice de cambios (un equipo más atrasado recibe la lista completa). */
 export const CHANGE_LOG_DAYS = 30;
 const DAY_MS = 24 * 3600 * 1000;
+/** @param {number} t */
 const dayOf = (t) => new Date(t).toISOString().slice(0, 10).replace(/-/g, '');
+/** @type {(esp: string, t: number, id: string, u: number, h?: string) => string} */
 const changeKey = (esp, t, id, u, h) => `${esp}/c/${dayOf(t)}/${t}.${id}.${u}.${h || ''}`;
+/** @param {string} esp */
 const changeRe = (esp) => new RegExp(`^${esp}/c/(\\d{8})/(\\d{1,16})\\.([A-Za-z0-9_-]{1,64})\\.(\\d{1,16})\\.([0-9a-f]{16})?$`);
 
-/** Orden de versiones: número y, a igual número, huella (desempate determinista). */
+/** Orden de versiones: número y, a igual número, huella (desempate determinista). @type {(a: {u: number, h?: string}, b: {u: number, h?: string}) => boolean} */
 const newer = (a, b) => a.u > b.u || (a.u === b.u && (a.h || '') > (b.h || ''));
 
-/** Comparación en tiempo constante de dos strings hex. */
+/**
+ * Comparación en tiempo constante de dos strings hex.
+ * @param {unknown} a
+ * @param {unknown} b
+ */
 function safeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
   let diff = 0;
@@ -112,13 +147,21 @@ function safeEqual(a, b) {
   return diff === 0;
 }
 
+/** @type {(status: number, body: unknown) => Response} */
 const json = (status, body) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
 
-/** Ejecuta `fn` sobre los elementos con concurrencia limitada. */
+/**
+ * Ejecuta `fn` sobre los elementos con concurrencia limitada.
+ * @template T, R
+ * @param {T[]} items
+ * @param {number} limit
+ * @param {(item: T) => Promise<R>} fn
+ * @returns {Promise<R[]>}
+ */
 async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let i = 0;
@@ -132,17 +175,30 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
-/** Versiones existentes de un id, de la más nueva a la más antigua: [{u, h, key}]. */
+/**
+ * Versiones existentes de un id, de la más nueva a la más antigua: [{u, h, key}].
+ * @param {BlobStore} store
+ * @param {string} esp
+ * @param {string} id
+ * @returns {Promise<{key: string, u: number, h: string | undefined}[]>}
+ */
 async function versionsOf(store, esp, id) {
   const { blobs } = await store.list({ prefix: `${esp}/r/${id}/` });
   const re = keyRe(esp);
   return blobs
-    .map((b) => [b.key, re.exec(b.key)])
+    .map((b) => /** @type {[string, RegExpExecArray | null]} */ ([b.key, re.exec(b.key)]))
     .filter(([, m]) => m && m[1] === id)
     .map(([key, m]) => ({ key, u: Number(m[2]), h: m[3] }))
     .sort((a, b) => (newer(a, b) ? -1 : newer(b, a) ? 1 : 0));
 }
 
+/**
+ * ¿Es un elemento válido de `get` (sin contenido) o `put` (con iv y ct)?
+ * @param {any} it elemento del cuerpo JSON, sin validar
+ * @param {number} now
+ * @param {boolean} withPayload
+ * @returns {boolean}
+ */
 function validItem(it, now, withPayload) {
   if (!it || typeof it !== 'object') return false;
   if (!ID_RE.test(it.id)) return false;
@@ -162,7 +218,7 @@ function validItem(it, now, withPayload) {
 
 /**
  * @param {{
- *   store: {list: Function, get: Function, setJSON: Function, delete: Function},
+ *   store: BlobStore,
  *   tokenHash?: string | ((esp: string) => string | undefined),
  *   now?: () => number,
  *   log?: (entry: {reqId: string, action: string, esp: string, status: number, ms: number, code?: string}) => void,
@@ -215,6 +271,11 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     return res;
   };
 
+  /**
+   * @param {Request} req
+   * @param {string} reqId
+   * @returns {Promise<Response>}
+   */
   async function handle(req, reqId) {
     const url = new URL(req.url);
     const esp = url.searchParams.get('esp') || DEFAULT_ESP;
@@ -240,7 +301,9 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     try {
       if (req.method === 'GET' && action === 'list') {
         const t0 = now();
+        /** @type {Map<string, {u: number, h?: string}>} */
         const latest = new Map();
+        /** @type {(id: string, v: {u: number, h?: string}) => void} */
         const keep = (id, v) => {
           if (!latest.has(id) || newer(v, latest.get(id))) latest.set(id, v);
         };
@@ -273,6 +336,7 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
 
       if (req.method === 'POST' && (action === 'get' || action === 'put')) {
         const body = await readJson(req);
+        /** @type {SyncBlob[] | null} validados abajo con validItem (en `get`, sin iv ni ct) */
         const items = Array.isArray(body?.items) ? body.items : null;
         if (!items || items.length > LIMITS.itemsPerRequest) {
           return fail(400, 'lote_invalido', `Se esperan entre 0 y ${LIMITS.itemsPerRequest} elementos en "items"`);
@@ -282,14 +346,16 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
 
         if (action === 'get') {
           const out = await mapLimit(items, 16, async ({ id, u, h }) => {
-            const v = await store.get(keyOf(esp, id, u, h), { type: 'json' });
+            const v = /** @type {{iv?: string, ct?: string} | null} */ (await store.get(keyOf(esp, id, u, h), { type: 'json' }));
             return v && v.iv && v.ct ? { id, u, ...(h ? { h } : {}), iv: v.iv, ct: v.ct } : { id, u, missing: true };
           });
           return json(200, { items: out });
         }
 
         // put
+        /** @type {string[]} */
         const saved = [];
+        /** @type {string[]} */
         const skipped = [];
         await mapLimit(items, 8, async ({ id, u, h, iv, ct }) => {
           const existing = await versionsOf(store, esp, id);
@@ -314,12 +380,14 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
 
       if (req.method === 'POST' && action === 'purge') {
         const body = await readJson(req);
+        /** @type {unknown[] | null} */
         const ids = Array.isArray(body?.ids) ? body.ids : null;
         if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every((id) => typeof id === 'string' && LEGACY_ID_RE.test(id))) {
           return fail(400, 'purga_invalida', 'Solo se pueden borrar ids antiguos en claro');
         }
+        /** @type {string[]} */
         const purged = [];
-        await mapLimit(ids, 8, async (id) => {
+        await mapLimit(/** @type {string[]} */ (ids), 8, async (id) => {
           const existing = await versionsOf(store, esp, id);
           await Promise.all(existing.map((old) => store.delete(old.key)));
           if (existing.length) purged.push(id);
@@ -338,17 +406,28 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
 
 /** Almacenamiento en memoria con la misma interfaz que Netlify Blobs (tests y servidor local). */
 export function memoryBlobStore() {
+  /** @type {Map<string, string>} */
   const m = new Map();
   return {
+    /** @param {{prefix?: string}} [opts] */
     async list({ prefix = '' } = {}) {
-      return { blobs: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, etag: '' })), directories: [] };
+      return {
+        blobs: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, etag: '' })),
+        directories: /** @type {string[]} */ ([]),
+      };
     },
+    /** @param {string} key */
     async get(key) {
       return m.has(key) ? JSON.parse(m.get(key)) : null;
     },
+    /**
+     * @param {string} key
+     * @param {unknown} v
+     */
     async setJSON(key, v) {
       m.set(key, JSON.stringify(v));
     },
+    /** @param {string} key */
     async delete(key) {
       m.delete(key);
     },

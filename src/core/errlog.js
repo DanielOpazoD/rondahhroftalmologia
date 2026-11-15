@@ -9,6 +9,7 @@ export const MAX_ENTRIES = 50;
  * Entrada del registro, con el mensaje y las primeras líneas de la pila, acotados.
  * @param {string} where dónde ocurrió (acción, sincronización, almacenamiento…)
  * @param {unknown} err
+ * @returns {ErrorEntry}
  */
 export function errorEntry(where, err, now = Date.now(), version = '') {
   const e = /** @type {any} */ (err);
@@ -17,12 +18,24 @@ export function errorEntry(where, err, now = Date.now(), version = '') {
   return { at: now, where: String(where).slice(0, 40), msg, ...(stack ? { stack } : {}), ...(version ? { v: version } : {}) };
 }
 
-/** Agrega una entrada y conserva solo las últimas `max`. */
+/**
+ * @typedef {{at: number, where: string, msg: string, stack?: string, v?: string}} ErrorEntry
+ */
+
+/**
+ * Agrega una entrada y conserva solo las últimas `max`.
+ * @param {unknown} list lo guardado (puede no ser una lista)
+ * @param {ErrorEntry} entry
+ * @returns {ErrorEntry[]}
+ */
 export function pushEntry(list, entry, max = MAX_ENTRIES) {
   return [...(Array.isArray(list) ? list : []), entry].slice(-max);
 }
 
-/** Texto para copiar y enviar a soporte (más reciente primero). */
+/**
+ * Texto para copiar y enviar a soporte (más reciente primero).
+ * @param {ErrorEntry[]} list
+ */
 export function formatLog(list, header = '') {
   const lines = [...list]
     .reverse()
