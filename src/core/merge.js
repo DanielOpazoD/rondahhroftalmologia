@@ -16,17 +16,27 @@
  * llegan al mismo resultado sin importar el orden en que reciben los cambios.
  * Registros antiguos sin `ft` usan su `updated` para todos sus campos.
  */
+import { normalizeRecord } from './record.js';
 
 const PROC_KEYS = ['eye', 'od', 'oi'];
+
+/**
+ * Claves aceptadas para campos, casillas e ids de procedimiento. Los datos
+ * pueden venir de otros equipos o de respaldos: se rechazan claves como
+ * `__proto__`/`constructor`/`prototype` (contaminación de prototipos).
+ */
+const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
+export const isSafeKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(k) && !FORBIDDEN.has(k);
 
 /** Valores presentes de la atención como mapa ruta -> valor (vacíos y `false` se omiten). */
 export function flatten(rec) {
   const m = new Map();
-  for (const [k, v] of Object.entries(rec?.f || {})) if (v !== undefined && v !== null && v !== '') m.set('f.' + k, String(v));
-  for (const [k, v] of Object.entries(rec?.checks || {})) if (v) m.set('checks.' + k, true);
-  if (rec?.cat) m.set('cat', rec.cat);
+  for (const [k, v] of Object.entries(rec?.f || {})) if (isSafeKey(k) && v !== undefined && v !== null && v !== '') m.set('f.' + k, String(v));
+  for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
+  if (rec?.cat) m.set('cat', String(rec.cat));
   for (const [id, p] of Object.entries(rec?.proc || {})) {
-    for (const k of PROC_KEYS) if (p && p[k] !== undefined && p[k] !== null && p[k] !== '') m.set(`proc.${id}.${k}`, String(p[k]));
+    if (!isSafeKey(id) || !p || typeof p !== 'object') continue;
+    for (const k of PROC_KEYS) if (p[k] !== undefined && p[k] !== null && p[k] !== '') m.set(`proc.${id}.${k}`, String(p[k]));
   }
   return m;
 }
@@ -35,14 +45,21 @@ export function flatten(rec) {
 export function unflatten(m) {
   const out = { f: {}, checks: {}, cat: '', proc: {} };
   for (const [path, v] of m) {
-    if (path.startsWith('f.')) out.f[path.slice(2)] = v;
-    else if (path.startsWith('checks.')) out.checks[path.slice(7)] = true;
-    else if (path === 'cat') out.cat = v;
+    if (path.startsWith('f.')) {
+      const k = path.slice(2);
+      if (isSafeKey(k)) out.f[k] = v;
+    } else if (path.startsWith('checks.')) {
+      const k = path.slice(7);
+      if (isSafeKey(k)) out.checks[k] = true;
+    } else if (path === 'cat') out.cat = v;
     else if (path.startsWith('proc.')) {
       const rest = path.slice(5);
       const dot = rest.lastIndexOf('.');
       const id = rest.slice(0, dot);
-      (out.proc[id] ||= {})[rest.slice(dot + 1)] = v;
+      const key = rest.slice(dot + 1);
+      if (!isSafeKey(id) || !PROC_KEYS.includes(key)) continue;
+      if (!Object.hasOwn(out.proc, id)) out.proc[id] = {};
+      out.proc[id][key] = v;
     }
   }
   // Un procedimiento sin ojo no existe (p. ej. se quitó el ojo pero quedó una PIO).
@@ -96,8 +113,8 @@ export function mergeRecords(a, b) {
   const fa = flatten(a);
   const fb = flatten(b);
   const paths = new Set([...fa.keys(), ...fb.keys(), ...Object.keys(a.ft || {}), ...Object.keys(b.ft || {})]);
+  const ft = Object.create(null);
   const values = new Map();
-  const ft = {};
   for (const p of paths) {
     const ta = ftOf(a, p);
     const tb = ftOf(b, p);
@@ -118,8 +135,8 @@ export function mergeRecords(a, b) {
     id: a.id || b.id,
     created: created.length ? Math.min(...created) : undefined,
     updated: Math.max(a.updated || 0, b.updated || 0),
-    procNames: { ...(b.procNames || {}), ...(a.procNames || {}) },
-    ft,
+    procNames: Object.fromEntries(Object.entries({ ...(b.procNames || {}), ...(a.procNames || {}) }).filter(([k]) => isSafeKey(k))),
+    ft: { ...ft },
   };
 }
 
@@ -134,6 +151,6 @@ export function sameContent(a, b) {
  */
 export function syncMerge(kind, local, remote) {
   if (kind !== 'atencion') return null;
-  const data = mergeRecords(local, remote);
+  const data = mergeRecords(normalizeRecord(local), normalizeRecord(remote));
   return { data, sameAsRemote: sameContent(data, remote) };
 }

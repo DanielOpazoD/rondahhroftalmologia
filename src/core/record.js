@@ -59,8 +59,9 @@ export function normalizeRecord(raw) {
     else for (const [k, v] of Object.entries(r.ft)) if (!Number.isFinite(v)) delete r.ft[k];
   }
   for (const [id, p] of Object.entries(r.proc)) {
-    if (!p || !OJOS.includes(p.eye)) delete r.proc[id];
+    if (!SAFE_KEY.test(id) || UNSAFE.has(id) || !p || !OJOS.includes(p.eye)) delete r.proc[id];
   }
+  for (const obj of [r.f, r.checks]) for (const k of Object.keys(obj)) if (!SAFE_KEY.test(k) || UNSAFE.has(k)) delete obj[k];
   for (const [k, v] of Object.entries(r.f)) {
     if (v === null || v === undefined) delete r.f[k];
     else if (typeof v !== 'string') r.f[k] = String(v);
@@ -72,6 +73,10 @@ export function normalizeRecord(raw) {
 export function isValidId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 }
+
+/** Claves aceptadas en f / checks / proc (evita `__proto__` y similares en datos externos). */
+const SAFE_KEY = /^[A-Za-z0-9_-]{1,64}$/;
+const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Genera un id único para una atención. */
 export function newRecordId(now = Date.now(), rand = Math.random) {

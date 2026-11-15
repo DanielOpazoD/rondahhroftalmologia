@@ -126,3 +126,16 @@ test('normalizeRecord conserva ft válido y descarta basura', () => {
   assert.deepEqual(normalizeRecord({ id: 'x', ft: { 'f.a': 5, 'f.b': 'no' } }).ft, { 'f.a': 5 });
   assert.equal(normalizeRecord({ id: 'x', ft: 'mal' }).ft, undefined);
 });
+
+test('claves maliciosas (__proto__, constructor) no contaminan prototipos', () => {
+  const evil = JSON.parse('{"id":"a1","updated":9,"ft":{},"f":{"__proto__":"x","ok":"1"},"checks":{"constructor":true},"proc":{"__proto__":{"eye":"OD","polluted":"yes"},"fo":{"eye":"AO"}}}');
+  const m = mergeRecords(base(), evil);
+  assert.equal({}.polluted, undefined);
+  assert.equal(Object.prototype.eye, undefined);
+  assert.deepEqual(Object.keys(m.proc).sort(), ['fo']);
+  // también por rutas fabricadas en ft
+  mergeRecords({ id: 'a', ft: { 'proc.__proto__.eye': 99 }, f: {}, checks: {}, proc: {} }, base());
+  assert.equal(Object.prototype.eye, undefined);
+  const n = normalizeRecord(evil);
+  assert.ok(!Object.hasOwn(n.proc, '__proto__') && !Object.hasOwn(n.checks, 'constructor'));
+});
