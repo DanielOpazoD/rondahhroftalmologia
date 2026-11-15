@@ -47,6 +47,8 @@ La CI de GitHub (`.github/workflows/ci.yml`) repite todo esto en cada push y pul
 
 ## Reglas de la base de código
 
+Un cambio que contradiga una decisión de [docs/adr](docs/adr/README.md) necesita un ADR nuevo que la reemplace.
+
 | Regla | Cómo se asegura |
 |---|---|
 | `src/core`, `src/lib`, `src/sync` y `src/config` son lógica pura: sin DOM ni `localStorage` | ESLint (`no-restricted-globals`) |
