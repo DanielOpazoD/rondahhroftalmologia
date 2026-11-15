@@ -62,7 +62,8 @@ test('Excel de estadística (todas las hojas)', () => {
 
 test('exportación seudonimizada (JSON y Excel)', () => {
   const res = anonymizeRecords(sample(), PROCS, { secret: 'c'.repeat(64) });
-  golden('seudonimizado.json', anonymizedJson(res, NOW));
+  // La versión de la app cambia en cada publicación: no es parte de la salida a congelar.
+  golden('seudonimizado.json', { ...anonymizedJson(res, NOW), version_app: '<versión>' });
   golden('seudonimizado_excel.json', anonymizedSheets(res, PROCS, NOW));
 });
 

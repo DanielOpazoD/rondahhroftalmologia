@@ -1,7 +1,7 @@
 {
  "descripcion": "Atenciones oftalmológicas seudonimizadas (rondas y operativos). Sin nombres, RUT ni teléfonos. Cada paciente se identifica por codigo_paciente; varias atenciones del mismo paciente comparten el código.",
  "origen": "Atención Oftalmológica · Rondas y Operativos — Hospital Hanga Roa",
- "version_app": "2.7.0",
+ "version_app": "<versión>",
  "generado": "2026-11-14T15:30:00.000Z",
  "opciones": {
   "fechas": "mes",
