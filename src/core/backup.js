@@ -15,14 +15,19 @@ import { normalizePatient } from './patient.js';
 
 /**
  * Crea el objeto de respaldo.
- * @param {{records: object[], futureRecords?: object[], procs: object[], anonSecret?: string|null, auditDocs?: object[], patients?: object[]}} data
+ * @param {{records: object[], futureRecords?: object[], procs: object[], anonSecret?: string|null, auditDocs?: object[], patients?: object[], practica?: boolean}} data
+ *   `practica`: respaldo del modo práctica (datos de ejemplo; no se importa a los datos reales).
  */
-export function buildBackup({ records, futureRecords = [], procs, anonSecret, auditDocs = [], patients = [] }, now = new Date()) {
+export function buildBackup(
+  { records, futureRecords = [], procs, anonSecret, auditDocs = [], patients = [], practica = false },
+  now = new Date(),
+) {
   return {
     app: APP.id,
     v: 3,
     version_app: APP.version,
     exportado: now.toISOString(),
+    ...(practica ? { practica: true } : {}),
     procs,
     // Incluye intactas las atenciones de versiones más nuevas de la app.
     atenciones: [...records, ...futureRecords],
@@ -72,6 +77,7 @@ export function parseBackup(text) {
       : [],
     auditDocs: Array.isArray(data.bitacora) ? data.bitacora.filter(validAuditDoc) : [],
     patients: Array.isArray(data.pacientes) ? data.pacientes.map(normalizePatient).filter(Boolean) : [],
+    practica: data.practica === true,
     anonSecret: typeof data.anonSecret === 'string' && /^[0-9a-f]{64}$/.test(data.anonSecret) ? data.anonSecret : null,
   };
 }

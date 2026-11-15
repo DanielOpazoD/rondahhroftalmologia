@@ -1,5 +1,52 @@
 # Cambios
 
+## 2.11.0 — 2026-11-15
+
+### Nuevo
+- **Chequeo del equipo antes del operativo** (Ajustes → Antes del operativo). Revisa:
+  - si el PC tiene la última versión publicada (el sitio publica `version.json` y la app conoce su compilación);
+  - si la sincronización funciona y la hora del equipo es correcta;
+  - si hay nombre del equipo, perfiles y operativo;
+  - el almacenamiento (y pide al navegador protegerlo del borrado automático), el último respaldo y el bloqueo con PIN.
+
+  Cada punto pendiente trae su botón para resolverlo. Aparece solo al abrir la app tras 7 días o más sin uso.
+- **Modo práctica** para capacitar.
+  - Pacientes de ejemplo con historial y la lista del día, perfiles y un operativo.
+  - Almacenamiento separado: los datos reales no se leen ni se tocan.
+  - Nunca se sincroniza, y las descargas llevan el prefijo `PRACTICA_`.
+  - «Reiniciar» y «Salir».
+- **Bloqueo con PIN por equipo.**
+  - Se bloquea al abrir, tras 5 a 30 minutos sin uso y con el candado del encabezado.
+  - Código de recuperación, o la contraseña del equipo con la sincronización activa.
+  - Espera creciente tras 5 intentos fallidos.
+  - Solo se guarda una derivación PBKDF2 del PIN. Es una protección de pantalla, no cifra los datos.
+
+### Accesibilidad
+- **Revisión automática WCAG 2.1 A/AA** (axe-core) en todas las pestañas, diálogos, la pantalla de bloqueo y el modo práctica, en tema claro, oscuro y en celular: sin infracciones.
+- **Contraste:** el texto secundario pasó de 3,0:1 a 4,7:1 o más (oscuro: 4,3:1 a 5,6:1 o más).
+- **Teclado:**
+  - enlace «Saltar al contenido»;
+  - pestañas con el patrón estándar (flechas, Inicio, Fin; solo la activa en el orden de Tab);
+  - foco visible en el chip de perfil, la sincronización y los enlaces.
+- **Lectores de pantalla:** cada mensaje de error o advertencia queda asociado a su campo (`aria-describedby`).
+
+### Revisión independiente (bloqueo y modo práctica)
+- Corregido, con una prueba en navegador para cada punto:
+  - con el equipo bloqueado, **Ctrl+P** imprimía la atención de detrás: ahora todo lo que no es la pantalla de bloqueo se oculta, en pantalla y al imprimir;
+  - **Escape dos veces** cerraba el bloqueo un instante: se reabre en el acto y la app sigue oculta;
+  - un diálogo abierto encima del bloqueo (p. ej. un aviso de sincronización) le quitaba el foco: el bloqueo queda siempre arriba, sin intervalos;
+  - **otras pestañas:** bloquear una bloquea todas; la actividad se comparte, así una pestaña inactiva no bloquea a la que se está usando, y abrir una pestaña nueva no bloquea las demás;
+  - el perfil elegido en el modo práctica quedaba como la sesión de la app real: ahora cada modo tiene el suyo;
+  - un respaldo del modo práctica se podía importar a los datos reales: ahora los respaldos de práctica van marcados y se rechazan fuera de ella (y al revés);
+  - el chequeo decía «Al día» sin conexión porque `version.json` venía de la caché: ahora siempre se pide a la red.
+- Confirmado sin problemas: aislamiento del modo práctica (cero llamadas al servidor y datos reales intactos tras practicar, reiniciar y salir), límite de intentos, recuperación y cambio o retiro del PIN.
+- Límites conocidos:
+  - el PIN protege la pantalla, no cifra los datos del navegador;
+  - una copia antigua del archivo abierta con doble clic no tiene bloqueo.
+
+### Sin cambios
+- PDF, Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
+
 ## 2.10.0 — 2026-11-15
 
 ### Nuevo

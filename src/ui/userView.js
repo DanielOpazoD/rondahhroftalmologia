@@ -16,23 +16,26 @@ import { html, setHtml } from './html.js';
 import { openDialog } from './dialog.js';
 import { editProfile } from './catalogView.js';
 import { syncAttentionView } from './attentionView.js';
+import { PRACTICE_PREFIX } from './practice.js';
 
 const NEW = '__nuevo';
 const SKIP = '__ninguno';
 const SESSION_KEY = `${ESPECIALIDAD.prefijo}usuario_sesion`;
+/** En el modo práctica, el perfil elegido se guarda aparte (no se mezcla con la sesión real). */
+let sessionKey = SESSION_KEY;
 
 /** sessionStorage puede no estar disponible (modo privado estricto): se tolera. */
 const session = {
   get() {
     try {
-      return sessionStorage.getItem(SESSION_KEY);
+      return sessionStorage.getItem(sessionKey);
     } catch {
       return null;
     }
   },
   set(v) {
     try {
-      sessionStorage.setItem(SESSION_KEY, v);
+      sessionStorage.setItem(sessionKey, v);
     } catch {
       /* sin sesión: se volverá a preguntar */
     }
@@ -41,6 +44,7 @@ const session = {
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initUserView(ctx) {
+  sessionKey = (ctx.practice ? PRACTICE_PREFIX : '') + SESSION_KEY;
   const s = session.get();
   ctx.userId = s && s !== SKIP ? s : null;
   ctx.userAsked = Boolean(s);

@@ -59,7 +59,11 @@ test('buildSite escribe el sitio para Netlify con service worker versionado', as
     'index.html',
     'manifest.webmanifest',
     'sw.js',
+    'version.json',
   ]);
+  const pub = JSON.parse(readFileSync(join(dir, 'version.json'), 'utf8'));
+  assert.match(pub.build, /^[0-9a-f]{12}$/);
+  assert.ok(readFileSync(join(dir, 'index.html'), 'utf8').includes(`data-build="${pub.build}"`), 'la app conoce su compilación');
   const sw = readFileSync(join(dir, 'sw.js'), 'utf8');
   assert.ok(sw.includes(`oftalmo-${buildId}`) && !sw.includes('__BUILD_ID__'));
   assert.ok(sw.includes("startsWith('/api/')"), 'la API no se guarda en caché');

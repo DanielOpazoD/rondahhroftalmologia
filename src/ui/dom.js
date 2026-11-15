@@ -22,7 +22,9 @@ export function toast(message, ms = 2200) {
 }
 
 /** Descarga un contenido como archivo. */
-export function download(data, filename, mime) {
+export function download(data, fileName, mime) {
+  // En el modo práctica, los archivos se distinguen de los reales.
+  const filename = document.body.classList.contains('practice') ? 'PRACTICA_' + fileName : fileName;
   const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

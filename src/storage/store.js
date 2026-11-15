@@ -171,6 +171,24 @@ export function createStore(storage, repo) {
     saveNotDuplicates(set) {
       write(K.notDuplicates, [...set]);
     },
+    /** Fecha (ms) del último uso / último respaldo descargado en este equipo. */
+    loadLastUse: () => Number(read(K.lastUse, 0)) || 0,
+    saveLastUse: (t) => write(K.lastUse, t),
+    loadLastBackup: () => Number(read(K.lastBackup, 0)) || 0,
+    saveLastBackup: (t) => write(K.lastBackup, t),
+    /** Bloqueo con PIN (ver core/pin.js). */
+    loadLock: () => read(K.lock, null),
+    saveLock: (l) => write(K.lock, l),
+    loadLockFails: () => {
+      const f = read(K.lockFails, null);
+      return { fails: Number(f?.fails) || 0, until: Number(f?.until) || 0 };
+    },
+    saveLockFails: (f) => write(K.lockFails, f),
+    saveLockSignal: (t) => write(K.lockSignal, t),
+    /** Clave del aviso entre pestañas (el evento "storage" trae la clave real). */
+    lockSignalKey: K.lockSignal,
+    loadLockActivity: () => Number(read(K.lockActivity, 0)) || 0,
+    saveLockActivity: (t) => write(K.lockActivity, t),
     /** Operativos / rondas (catálogo compartido). */
     loadOperativos() {
       const l = read(K.operativos, []);

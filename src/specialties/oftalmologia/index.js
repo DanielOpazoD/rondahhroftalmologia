@@ -10,3 +10,4 @@ export * from './estadistica.js';
 export * from './reportes.js';
 export * from './seudonimizacion.js';
 export * from './validacion.js';
+export * from './ejemplos.js';

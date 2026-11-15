@@ -78,10 +78,12 @@ export function initSettingsView(ctx) {
       futureRecords: ctx.store.loadFutureRecords(),
       procs: ctx.procs,
       anonSecret: ctx.store.loadSecret(),
+      practica: ctx.practice,
       auditDocs: ctx.store.loadAuditDocs(),
       patients: ctx.store.loadPatients(),
     });
     download(JSON.stringify(data), `respaldo_oftalmo_${todayIso()}.json`, 'application/json');
+    ctx.persist(() => ctx.store.saveLastBackup(Date.now()));
     toast('Respaldo descargado');
   });
   $('#bkImpBtn').addEventListener('click', () => $('#bkImp').click());
@@ -91,6 +93,14 @@ export function initSettingsView(ctx) {
     if (!file) return;
     try {
       const incoming = parseBackup(await file.text());
+      // Los datos de ejemplo nunca entran a los datos reales (ni al revés).
+      if (incoming.practica !== Boolean(ctx.practice)) {
+        throw new Error(
+          incoming.practica
+            ? 'Es un respaldo del modo práctica (datos de ejemplo): no se importa a los datos reales.'
+            : 'En el modo práctica solo se importan respaldos del modo práctica.',
+        );
+      }
       const localData = {
         records: ctx.records,
         futureRecords: ctx.store.loadFutureRecords(),

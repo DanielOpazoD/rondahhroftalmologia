@@ -10,7 +10,7 @@
   --surface-2: #f2f4f7;
   --ink: #101828;
   --ink-2: #475467;
-  --mut: #8b95a5;
+  --mut: #636d7e; /* ≥ 4,5:1 sobre todos los fondos (WCAG AA) */
   --line: #e7eaef;
   --line-strong: #d6dbe3;
   --acc: #0f6e8c;
@@ -37,7 +37,7 @@
     --surface-2: #1c2129;
     --ink: #e9ecf1;
     --ink-2: #b3bcc8;
-    --mut: #7b8594;
+    --mut: #8f99a8;
     --line: #242a33;
     --line-strong: #313945;
     --acc: #4fb3d4;
@@ -1855,4 +1855,204 @@ ol.hist ul li {
 .verfoot {
   text-align: center;
   margin: 18px 0 4px;
+}
+
+/* ------------------------------------------------ modo práctica */
+.practiceBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  background: #6d28d9;
+  color: #fff;
+  font-size: 13px;
+}
+.practiceBar span {
+  flex: 1;
+  min-width: 180px;
+  opacity: 0.92;
+}
+.practiceBar .btn {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+/* Mientras se practica, la cabecera (siempre visible) lo recuerda. */
+body.practice header.top {
+  border-bottom: 3px solid #6d28d9;
+}
+body.practice .brand small {
+  color: #6d28d9;
+  font-weight: 600;
+}
+body.practice .logo {
+  background: #6d28d9;
+}
+
+/* ------------------------------------------------ chequeo del equipo */
+dialog.checkdlg {
+  width: min(520px, calc(100% - 32px));
+}
+dialog.checkdlg h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.checklist {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: min(60vh, 520px);
+  overflow: auto;
+}
+.checklist li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-top: 1px solid var(--line);
+}
+.checklist .cmark {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font: 700 12px/1 var(--font);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.checklist li.ok .cmark {
+  background: var(--ok-soft, #e7f6ec);
+  color: var(--ok);
+}
+.checklist li.warn .cmark {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.checklist li.bad .cmark {
+  background: var(--bad-soft, #fdecec);
+  color: var(--bad);
+}
+.checklist .ctext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.checklist .ctext span {
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------ bloqueo con PIN */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 4px;
+  color: var(--acc);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+dialog.lockdlg {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--ink);
+  display: none;
+}
+dialog.lockdlg[open] {
+  display: grid;
+  place-items: center;
+}
+/* Fondo opaco: nada de la app se ve detrás. */
+dialog.lockdlg::backdrop {
+  background: var(--bg);
+}
+.lockbox {
+  width: min(340px, 100%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.lockbox .logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+.lockbox .logo svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+}
+.lockbox h3 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+.lockbox form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lockbox #lockPin {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.3em;
+}
+
+/* ------------------------------------------------ accesibilidad */
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--acc);
+  color: var(--acc-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip:focus {
+  top: 8px;
+}
+main:focus {
+  outline: none;
+}
+.userChip:focus-visible,
+.syncBadge:focus-visible,
+.linkbtn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* Bloqueado: nada fuera de la pantalla de bloqueo se ve ni se imprime. */
+html.locked body > *:not(#lockDlg) {
+  visibility: hidden !important;
+}
+@media print {
+  html.locked body > *:not(#lockDlg) {
+    display: none !important;
+  }
 }

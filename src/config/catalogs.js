@@ -13,6 +13,8 @@ export const APP = Object.freeze({
   establecimiento: 'Hospital Hanga Roa',
   /** Única fuente de verdad: package.json (se incrusta al construir). */
   version: pkg.version,
+  /** Compilación (la reemplaza el build; en pruebas queda el marcador). */
+  build: '__APP_BUILD__',
 });
 
 /** Versión del esquema de cada registro de atención (ver docs/MODELO_DATOS.md y core/migrations.js). */
@@ -39,6 +41,18 @@ export const STORAGE_KEYS = Object.freeze({
   user: `${P}usuario_v1`,
   /** Pares de fichas marcadas como personas distintas ("idA|idB"). */
   notDuplicates: `${P}no_duplicados_v1`,
+  /** Último uso de la app en este equipo (para el chequeo tras días sin uso). */
+  lastUse: `${P}ultimo_uso_v1`,
+  /** Último respaldo descargado en este equipo. */
+  lastBackup: `${P}ultimo_respaldo_v1`,
+  /** Bloqueo con PIN de este equipo (solo derivaciones, nunca el PIN). */
+  lock: `${P}bloqueo_v1`,
+  /** Intentos fallidos de desbloqueo: {fails, until}. */
+  lockFails: `${P}bloqueo_intentos_v1`,
+  /** Aviso entre pestañas: «se bloqueó» (hora). */
+  lockSignal: `${P}bloqueo_aviso_v1`,
+  /** Última actividad en cualquier pestaña (para la inactividad compartida). */
+  lockActivity: `${P}bloqueo_actividad_v1`,
 });
 
 /**

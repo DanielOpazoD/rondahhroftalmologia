@@ -22,6 +22,7 @@ La plataforma ve la especialidad **solo** a través de `src/specialties/activa/`
 | `config.js` | Datos sin lógica: `ESPECIALIDAD` (id, nombre, prefijo), antecedentes, solicitados, diagnósticos, procedimientos por defecto, lados (`OJOS`), medidas por lado (`MEDIDAS_PROC`), campos (`TEXT_FIELDS`), etiquetas |
 | `validacion.js` | `validarClinico(rec, warn, note)`: reglas clínicas propias |
 | `clinica.js`, `nota.js`, `pdf.js`, `estadistica.js`, `reportes.js`, `seudonimizacion.js` | Lógica clínica y salidas |
+| `ejemplos.js` | `casosDeEjemplo()`: casos clínicos inventados para el modo práctica |
 | `index.js` | Reexporta todo lo anterior |
 | `formulario.html` | Parte clínica del formulario de atención |
 | `plantilla.pdf` | Hoja oficial con campos rellenables |

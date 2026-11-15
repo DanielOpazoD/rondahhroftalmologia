@@ -20,6 +20,7 @@ import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import pkg from '../package.json' with { type: 'json' };
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outArg = process.argv.indexOf('--out');
@@ -74,6 +75,12 @@ export function contentSecurityPolicy(scriptHash) {
   ].join('; ');
 }
 
+/** Huella del contenido de la app (código, estilos y HTML), sin depender de sí misma. */
+export const buildIdOf = (...parts) => createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 12);
+
+/** Compilación que contiene un HTML ya construido (la escribe el build en APP.build). */
+export const appBuildOf = (html) => /data-build="([0-9a-f]{12})"/.exec(html)?.[1] || '';
+
 /** @returns {Promise<string>} el HTML final de la app */
 export async function buildHtml() {
   const id = especialidadActiva();
@@ -92,9 +99,13 @@ export async function buildHtml() {
     logLevel: 'warning',
   });
   // Evita que "</script" dentro del código cierre la etiqueta antes de tiempo.
-  const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+  let js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const css = await readFile(resolve(root, 'src/styles.css'), 'utf8');
   const html = await readFile(resolve(root, 'src/index.html'), 'utf8');
+  // Identificador de esta compilación, que la app conoce (APP.build) y que el
+  // sitio publica en version.json: así un equipo sabe si tiene la última.
+  const appBuild = buildIdOf(js, css, html, formHtml);
+  js = js.replace('__APP_BUILD__', () => appBuild);
   for (const marker of ['<!-- @STYLES -->', '<!-- @SCRIPT -->', '<!-- @FORMULARIO -->', '<!-- @CSP -->']) {
     if (!html.includes(marker)) throw new Error(`src/index.html debe contener el marcador ${marker}`);
   }
@@ -102,6 +113,7 @@ export async function buildHtml() {
   const csp = contentSecurityPolicy(cspHash(scriptBody));
   // Funciones de reemplazo: evitan que "$&" u otros patrones del código se interpreten.
   return html
+    .replace('<html', () => `<html data-build="${appBuild}"`)
     .replace('<!-- @CSP -->', () => `<meta http-equiv="Content-Security-Policy" content="${csp}">`)
     .replace('<!-- @FORMULARIO -->', () => formHtml)
     .replace('<!-- @STYLES -->', () => `<style>\n${css}</style>`)
@@ -127,6 +139,8 @@ export async function buildSite(outDir = resolve(root, 'dist')) {
   await writeFile(resolve(outDir, 'Hoja_Atencion_Oftalmologica.html'), html);
   // Cabeceras HTTP para Netlify: la misma CSP (con el hash del script) y protección contra iframes.
   await writeFile(resolve(outDir, '_headers'), `/*\n  Content-Security-Policy: ${cspOf(html)}; frame-ancestors 'none'\n`);
+  // Versión publicada: los equipos la comparan con la que tienen abierta.
+  await writeFile(resolve(outDir, 'version.json'), JSON.stringify({ version: pkg.version, build: appBuildOf(html) }) + '\n');
   for (const name of await readdir(resolve(root, 'public'))) {
     let content = await readFile(resolve(root, 'public', name), 'utf8');
     if (name === 'sw.js') content = content.replace('__BUILD_ID__', buildId);

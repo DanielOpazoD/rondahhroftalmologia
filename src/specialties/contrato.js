@@ -46,6 +46,8 @@ export const REQUIRED_FUNCTIONS = [
   'anonymizeRecords',
   'anonymizedJson',
   'anonymizedSheets',
+  // modo práctica
+  'casosDeEjemplo',
 ];
 
 const SAFE_KEY = /^[A-Za-z0-9_-]{1,64}$/;

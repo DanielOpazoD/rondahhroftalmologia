@@ -4,7 +4,7 @@
  * - /api/*: nunca se guarda en caché (datos cifrados de sincronización).
  * CACHE se reemplaza en cada build por una huella del contenido.
  */
-const CACHE = 'oftalmo-0b6a85664426';
+const CACHE = 'oftalmo-8a4fbdccd9eb';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -27,7 +27,14 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  if (
+    e.request.method !== 'GET' ||
+    url.origin !== location.origin ||
+    url.pathname.startsWith('/api/') ||
+    url.pathname.endsWith('/version.json')
+  ) {
+    return;
+  }
   e.respondWith(
     fetch(e.request)
       .then((res) => {

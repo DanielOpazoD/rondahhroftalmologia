@@ -26,9 +26,31 @@ Los campos de RUT muestran **✓ verde** si el dígito verificador es correcto y
 **Quién registra:** en Ajustes → Perfiles se crean los perfiles de médicos y otros profesionales (enfermería, TENS, tecnólogo, admisión). La primera vez que se guarda en una sesión, la app pregunta quién registra; el chip del encabezado lo muestra y permite cambiarlo. El historial de cambios guarda quién y desde qué equipo. Si quien registra es médico, las atenciones nuevas lo traen como médico.
 
 **Posibles duplicados:** si un paciente quedó registrado dos veces (por ejemplo, primero sin RUT), Pacientes lo avisa y permite unir las fichas sin perder atenciones, o marcarlas como personas distintas.
+
+### Antes de cada operativo
+
+La app se usa de forma ocasional, así que conviene revisar los equipos antes de empezar:
+
+- **Chequeo del equipo** (Ajustes → Antes del operativo). Revisa:
+  - si el PC tiene la última versión publicada;
+  - si la sincronización funciona y la hora del equipo es correcta;
+  - si hay nombre del equipo, perfiles y operativo;
+  - el almacenamiento, el respaldo y el bloqueo con PIN.
+
+  Cada punto pendiente trae su botón para resolverlo. **Aparece solo** al abrir la app después de 7 días o más sin uso.
+- **Modo práctica** (Ajustes → Abrir modo práctica): la misma app con pacientes de ejemplo, para capacitar al personal.
+  - Usa un almacenamiento aparte: los datos reales no se leen ni se tocan.
+  - Nunca se sincroniza, y los archivos descargados llevan el prefijo `PRACTICA_`.
+  - «Reiniciar» vuelve a los datos de ejemplo y «Salir» regresa a la app real.
+- **Bloqueo con PIN** (Ajustes → Bloqueo con PIN, por equipo). La pantalla se bloquea:
+  - al abrir la app;
+  - tras 5 a 30 minutos sin uso;
+  - con el candado del encabezado.
+
+  Al configurarlo se entrega un **código de recuperación**: guárdalo con la contraseña del equipo. Si se olvida el PIN, desbloquea con ese código o, con la sincronización activa, con la contraseña del equipo. Tras 5 intentos fallidos hay que esperar, cada vez más. Es una protección de pantalla: evita que otra persona vea los pacientes, pero no cifra los datos guardados en el navegador.
 | Estadística | Indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día. |
 | Exportar | ZIP con todos los PDF, Excel de estadística, datos seudonimizados para IA. |
-| Ajustes | Perfiles y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
+| Ajustes | Chequeo del equipo, modo práctica, bloqueo con PIN, perfiles y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
 
 Cada atención guardada muestra al final su **Historial de cambios**: quién (qué equipo), cuándo, y qué campo cambió de qué valor a cuál.
 

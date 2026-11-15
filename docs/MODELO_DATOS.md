@@ -193,6 +193,14 @@ Al abrir la app por primera vez con esta versión, los catálogos se completan c
 | `oft_medicos_v1` | Perfiles de médico `[{id, nombre, rut, created, updated}]`. Se sincronizan. |
 | `oft_operativos_v1` | Operativos `[{id, nombre, created, updated}]`. Se sincronizan. |
 | `oft_sync_v1` | Sincronización activa: clave AES derivada, token, huella para el servidor y última sincronización. No guarda la contraseña. |
+| `oft_usuario_v1` | Último perfil que registró en este equipo: `{id}`. |
+| `oft_no_duplicados_v1` | Pares de fichas marcadas como personas distintas. |
+| `oft_ultimo_uso_v1` | Último uso de la app (el chequeo aparece solo tras 7 días sin uso). |
+| `oft_ultimo_respaldo_v1` | Último respaldo descargado en este equipo. |
+| `oft_bloqueo_v1` | Bloqueo con PIN: `{v, iter, salt, hash, rsalt, rhash, minutes}`. Solo derivaciones PBKDF2-HMAC-SHA256 (20.000 iteraciones) del PIN y del código de recuperación; nunca el PIN. |
+| `oft_bloqueo_intentos_v1` | Intentos fallidos de desbloqueo: `{fails, until}`. |
+
+**Modo práctica:** usa la base IndexedDB `hhr-rondas-oftalmologia-practica` y las mismas claves con el prefijo `practica:` (por ejemplo, `practica:oft_medicos_v1`). Así nunca toca los datos reales. Sus datos de ejemplo salen de `core/demo.js`, con los casos clínicos que aporta la especialidad (`casosDeEjemplo`).
 
 ## Respaldo (`respaldo_oftalmo_AAAA-MM-DD.json`)
 

@@ -50,7 +50,8 @@ export function createSyncController(ctx) {
     st.caches = { pacientes: createSyncCache(), especialidad: createSyncCache() };
   };
 
-  const available = () => cryptoAvailable() && /^https?:$/.test(location.protocol);
+  // En modo práctica nunca se sincroniza: los datos de ejemplo no salen del equipo.
+  const available = () => !ctx.practice && cryptoAvailable() && /^https?:$/.test(location.protocol);
 
   const setStatus = (status, message = '') => {
     st.status = status;
@@ -227,6 +228,7 @@ export function createSyncController(ctx) {
   }
 
   async function activate(passphrase) {
+    if (ctx.practice) return;
     const problem = passphraseProblem(passphrase);
     if (problem) return toast(problem, 4000);
     setStatus('syncing', 'Preparando claves…');
@@ -327,6 +329,9 @@ export function createSyncController(ctx) {
   function render() {
     const on = !!st.config;
     $('#syncUnavailable').hidden = available();
+    $('#syncUnavailable').textContent = ctx.practice
+      ? 'En el modo práctica no hay sincronización: los datos de ejemplo quedan solo en este equipo.'
+      : 'La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa el respaldo.';
     $('#syncSetup').hidden = on || !available();
     // «Generar» solo en la primera configuración: si el servidor ya tiene
     // contraseña, generar otra solo produce una que no coincide.
@@ -360,6 +365,23 @@ export function createSyncController(ctx) {
     syncNow,
     get enabled() {
       return !!st.config;
+    },
+    /** ¿Es la contraseña del equipo? (desbloquear si se olvidó el PIN). */
+    async verifyTeamPassword(pass) {
+      if (!st.config || passphraseProblem(pass)) return false;
+      const keys = await deriveTeamKeys(pass);
+      return tokenHash(keys.token) === st.config.hash;
+    },
+    /** Estado para el chequeo antes del operativo. */
+    get state() {
+      return {
+        available: available(),
+        configured: !!st.config,
+        status: st.status,
+        message: st.message,
+        lastSync: st.config?.lastSync || null,
+        skewMin: st.skewMin || 0,
+      };
     },
   };
 }

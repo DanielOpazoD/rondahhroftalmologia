@@ -59,6 +59,14 @@ export function createContext(store, templateB64) {
     templateBytes: () => (templateCache ||= base64ToBytes(templateB64)),
     pdfOptions: () => ({ flatten: !!ctx.settings.pdfFlatten, footer: !!ctx.settings.pdfFooter }),
     note: (rec) => buildNote(rec, ctx.procs, { pie: ctx.settings.notaPie }),
+    /** Modo práctica (datos de ejemplo, sin sincronización; ver practice.js). */
+    practice: false,
+    /** Dónde se guardan los datos clínicos: 'indexeddb' o 'localstorage' (lo asigna main.js). */
+    storageKind: 'indexeddb',
+    /** Bloqueo con PIN (lo asigna lock.js). */
+    lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
+      null
+    ),
     /** Perfil que registra en esta sesión (ver userView.js); null si no se eligió. */
     userId: /** @type {string | null} */ (null),
     /** Ya se preguntó quién registra en esta sesión. */
@@ -139,6 +147,8 @@ export function createContext(store, templateB64) {
       $$('nav button').forEach((b) => {
         b.classList.toggle('on', b.dataset.tab === id);
         b.setAttribute('aria-selected', String(b.dataset.tab === id));
+        // Patrón de pestañas: solo la activa entra en el orden de Tab; las flechas cambian de pestaña.
+        b.tabIndex = b.dataset.tab === id ? 0 : -1;
       });
       $$('.tab').forEach((t) => t.classList.toggle('on', t.id === id));
       if (id === 't-reg') renderRegistry(ctx);

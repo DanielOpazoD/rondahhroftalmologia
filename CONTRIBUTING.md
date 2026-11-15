@@ -41,6 +41,8 @@ npm run test:stress
 
 `test:e2e` corre las pruebas en un navegador real. `test:stress` corre 200 escenarios de varios PC sincronizando a la vez.
 
+`e2e/accesibilidad.spec.js` revisa con axe-core que cada pestaña, diálogo, la pantalla de bloqueo y el modo práctica no tengan infracciones WCAG 2.1 A/AA, en tema claro, oscuro y en celular. También prueba el teclado: saltar al contenido, flechas entre pestañas y errores asociados a su campo. Si agregas pantallas o colores, agrégalos ahí.
+
 La CI de GitHub (`.github/workflows/ci.yml`) repite todo esto en cada push y pull request. También verifica que `dist/` esté reconstruido: el archivo `dist/Hoja_Atencion_Oftalmologica.html` se distribuye para usarlo con doble clic, así que siempre debe coincidir con el código.
 
 ## Reglas de la base de código
@@ -49,7 +51,8 @@ La CI de GitHub (`.github/workflows/ci.yml`) repite todo esto en cada push y pul
 |---|---|
 | `src/core`, `src/lib`, `src/sync` y `src/config` son lógica pura: sin DOM ni `localStorage` | ESLint (`no-restricted-globals`) |
 | La interfaz no usa `alert`, `confirm` ni `prompt` (usa `ui/modal.js`) | ESLint y una prueba |
-| Todo texto ingresado por el usuario que va a `innerHTML` pasa por `escapeHtml` | Revisión de código |
+| El HTML de la interfaz se arma con `html` y se escribe con `setHtml` (`ui/html.js`), que escapan solos | ESLint prohíbe `innerHTML`, `outerHTML` e `insertAdjacentHTML` |
+| Sin infracciones WCAG 2.1 A/AA en pestañas y diálogos | Prueba (`e2e/accesibilidad.spec.js`) |
 | Cada id que usa la interfaz existe en `index.html` | Prueba |
 | La versión vive solo en `package.json` | `src/config/catalogs.js` la importa |
 | Dependencias con versión exacta | `package.json` y `package-lock.json` |

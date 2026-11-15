@@ -193,6 +193,9 @@ export function showValidation(ctx, { showErrors = false } = {}) {
       input.classList.toggle('invalid', show && item.level === 'error');
       input.classList.toggle('warned', show && item.level === 'warn');
       input.setAttribute('aria-invalid', String(show));
+      // El lector de pantalla lee el mensaje al llegar al campo.
+      m.id ||= 'msg_' + k;
+      input.setAttribute('aria-describedby', m.id);
     }
   });
 }
