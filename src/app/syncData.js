@@ -22,6 +22,7 @@ import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
  *   loadOperativos: () => Documento[], saveOperativos: (list: Documento[]) => void,
  *   loadAuditDocs: () => Documento[], saveAuditDocs: (list: Documento[]) => void,
  *   loadTombstones: () => Record<string, number>, saveTombstones: (t: Record<string, number>) => void,
+ *   loadAttachments: () => Documento[], saveAttachments: (list: Documento[]) => unknown, removeAttachment: (id: string) => void,
  * }} SyncStore
  */
 
@@ -66,6 +67,7 @@ export function readSpecialtyItems(store) {
       ...store.loadMedicos().map(wrap('medico')),
       ...store.loadOperativos().map(wrap('operativo')),
       ...store.loadAuditDocs().map(wrap('bitacora')),
+      ...store.loadAttachments().map(wrap('adjunto')),
     ],
     tombstones: store.loadTombstones(),
   };
@@ -96,5 +98,9 @@ export function writeSpecialtyItems(store, items, tombstones) {
         .filter(Boolean),
     ),
   );
+  // Adjuntos: los recibidos se agregan; los eliminados en otro equipo (lápida) se quitan.
+  store.saveAttachments(of('adjunto'));
+  const live = new Set(items.filter((i) => i.kind === 'adjunto').map((i) => i.id));
+  for (const a of store.loadAttachments()) if (!live.has(a.id) && tombstones[a.id]) store.removeAttachment(a.id);
   store.saveTombstones(tombstones);
 }

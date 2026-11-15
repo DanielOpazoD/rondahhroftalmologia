@@ -4,7 +4,7 @@
  * - /api/*: nunca se guarda en caché (datos cifrados de sincronización).
  * CACHE se reemplaza en cada build por una huella del contenido.
  */
-const CACHE = 'oftalmo-664cef4222ef';
+const CACHE = 'oftalmo-4438b128d38d';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {

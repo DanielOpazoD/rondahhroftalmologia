@@ -12,12 +12,14 @@
  * Los objetos devueltos son de solo lectura: para modificar, copiar y guardar.
  */
 import { appendAuditEntry } from '../core/audit.js';
+import { normalizeAttachment } from '../core/attachments.js';
 import { normalizeRecord, sortRecords, isValidId } from '../core/record.js';
 import { isFutureVersion } from '../core/migrations.js';
 import { normalizePatient, patientLabel } from '../core/patient.js';
 
 /**
- * @typedef {{getAll: Function, put: Function, putMany: Function, delete: Function, clear: Function, name: string}} Backend
+ * @typedef {{getAll: Function, put: Function, putMany: Function, delete: Function, clear: Function, name: string,
+ *   get: Function, keys: Function, binary?: boolean}} Backend
  * @typedef {{id: string, atencionId: string, updated: number, entries: object[]}} AuditDoc
  */
 
@@ -42,6 +44,8 @@ export function createRepo(
   const audit = new Map();
   /** Fichas de pacientes (comunes a todas las especialidades). */
   const patients = new Map();
+  /** Metadatos de adjuntos (los bytes se leen de a uno: ver loadAttachmentData). */
+  const attachments = new Map();
   /** Última versión persistida de cada documento (para escribir solo lo que cambió). */
   const persisted = new Map();
   const pending = new Set();
@@ -161,12 +165,19 @@ export function createRepo(
      * @param {{legacy?: {records: object[], tombstones: Record<string, number>}, clearLegacy?: () => void}} [migration]
      */
     async init({ legacy, clearLegacy } = {}) {
-      const [recs, dels, docs, pats] = await Promise.all([
+      const [recs, dels, docs, pats, atts] = await Promise.all([
         backend.getAll('atenciones'),
         backend.getAll('eliminadas'),
         backend.getAll('bitacora'),
         backend.getAll('pacientes'),
+        backend.getAll('adjuntos').catch(() => []),
       ]);
+      for (const raw of atts) {
+        const a = normalizeAttachment(raw);
+        if (!a) continue;
+        attachments.set(a.id, a);
+        persisted.set(keyOf('adjuntos', a.id), JSON.stringify(a));
+      }
       for (const raw of pats) {
         const p = normalizePatient(raw);
         if (!p) continue;
@@ -302,6 +313,44 @@ export function createRepo(
       for (const p of valid) patients.set(p.id, p);
       putManyIfChanged('pacientes', valid);
     },
+
+    /* ----------------------------------------------------------- adjuntos */
+
+    /** ¿Este almacenamiento puede guardar archivos? (localStorage no). */
+    supportsAttachments: () => backend.binary !== false,
+    /** Metadatos de todos los adjuntos, o los de una atención (por fecha de creación). */
+    loadAttachments: (atencionId) =>
+      [...attachments.values()]
+        .filter((a) => !atencionId || a.atencionId === atencionId)
+        .sort((a, b) => a.created - b.created || (a.id < b.id ? -1 : 1)),
+    getAttachment: (id) => attachments.get(id),
+    /** Reemplaza/agrega metadatos (al adjuntar o al recibir de otro equipo). */
+    saveAttachments(list) {
+      const valid = list.map(normalizeAttachment).filter(Boolean);
+      for (const a of valid) attachments.set(a.id, a);
+      putManyIfChanged('adjuntos', valid);
+      return valid;
+    },
+    /** Quita los metadatos (la lápida la agrega quien elimina). */
+    removeAttachment(id) {
+      if (!attachments.delete(id)) return;
+      remove('adjuntos', id);
+    },
+    /** Contenido de un adjunto (o undefined si este equipo aún no lo tiene). */
+    async loadAttachmentData(id) {
+      const doc = await backend.get('adjuntos_datos', id);
+      return doc ? { bytes: /** @type {Uint8Array} */ (doc.bytes) } : undefined;
+    },
+    /** Guarda el contenido (en una transacción propia; se espera a que quede escrito). */
+    async saveAttachmentData(id, bytes) {
+      if (backend.binary === false) throw new Error('Este navegador no permite guardar adjuntos (sin IndexedDB).');
+      await backend.put('adjuntos_datos', { id, bytes });
+    },
+    async deleteAttachmentData(id) {
+      await backend.delete('adjuntos_datos', id);
+    },
+    /** Ids de los adjuntos cuyo contenido está en este equipo. */
+    attachmentDataIds: async () => /** @type {string[]} */ (await backend.keys('adjuntos_datos')),
 
     /* ----------------------------------------------------------- bitácora */
 

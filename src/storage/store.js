@@ -93,6 +93,27 @@ export function createStore(storage, repo) {
     addAuditEntry: (id, e) => repo.addAuditEntry(id, e),
     loadAuditDocs: () => repo.loadAuditDocs(),
     saveAuditDocs: (docs) => repo.saveAuditDocs(docs),
+    supportsAttachments: () => repo.supportsAttachments(),
+    loadAttachments: (atencionId) => repo.loadAttachments(atencionId),
+    getAttachment: (id) => repo.getAttachment(id),
+    saveAttachments: (list) => repo.saveAttachments(list),
+    removeAttachment: (id) => repo.removeAttachment(id),
+    loadAttachmentData: (id) => repo.loadAttachmentData(id),
+    saveAttachmentData: (id, bytes) => repo.saveAttachmentData(id, bytes),
+    /** Adjuntos cuyo contenido ya está confirmado en el servidor (ids). */
+    loadAttachmentsUploaded: () => {
+      const l = read(K.attachmentsUploaded, []);
+      return new Set(Array.isArray(l) ? l.filter((x) => typeof x === 'string') : []);
+    },
+    saveAttachmentsUploaded: (set) => write(K.attachmentsUploaded, [...set]),
+    deleteAttachmentData: (id) => repo.deleteAttachmentData(id),
+    attachmentDataIds: () => repo.attachmentDataIds(),
+    /** Ids de adjuntos eliminados cuyo contenido aún hay que borrar del servidor. */
+    loadAttachmentPurges: () => {
+      const l = read(K.attachmentPurges, []);
+      return Array.isArray(l) ? l.filter((x) => typeof x === 'string') : [];
+    },
+    saveAttachmentPurges: (l) => write(K.attachmentPurges, l),
     loadPatients: () => repo.loadPatients(),
     getPatient: (id) => repo.getPatient(id),
     upsertPatient: (p) => repo.upsertPatient(p),

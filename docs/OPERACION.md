@@ -10,6 +10,8 @@ El servidor (Netlify) solo guarda datos **cifrados** en los equipos. Esta guía 
 - Lo copiado sigue cifrado: un respaldo tampoco se puede leer sin la contraseña del equipo.
 - Cada ejecución deja en los logs de la función una línea `{"fn":"respaldo","dia":…,"claves":…,"borrados":[…]}`. En Netlify: *Logs → Functions → backup*.
 
+**No incluyen el contenido de los adjuntos** (fotos, PDF, Word): pueden pesar gigabytes y la función programada tiene poco tiempo. Ese contenido está en cada PC que sincroniza y en sus respaldos; los metadatos de los adjuntos sí se respaldan.
+
 Los respaldos del servidor **complementan**, no reemplazan, la copia local de cada PC ni el «Descargar respaldo» de Ajustes. Además, cada PC con la sincronización activa tiene una copia completa de los datos.
 
 ## Restaurar un respaldo

@@ -13,6 +13,12 @@
 
 export const KEEP_DAYS = 30;
 const VERSION_KEY = /^[a-z][a-z0-9-]{1,39}\/r\//;
+/**
+ * El contenido de los adjuntos (`<especialidad>-adjuntos`) no entra en el
+ * respaldo diario: puede pesar gigabytes y la función programada tiene poco
+ * tiempo. Está en cada PC que sincroniza (y sus metadatos sí se respaldan).
+ */
+const isBackedUp = (/** @type {string} */ key) => VERSION_KEY.test(key) && !/^[a-z0-9-]+-adjuntos\//.test(key);
 const DAY_RE = /^(\d{4}-\d{2}-\d{2})\.json$/;
 
 /**
@@ -37,7 +43,7 @@ export async function dailyBackup({ source, target, now = Date.now(), keepDays =
   /** @type {Record<string, unknown>} */
   const claves = {};
   for (const { key } of blobs) {
-    if (!VERSION_KEY.test(key)) continue;
+    if (!isBackedUp(key)) continue;
     const v = await source.get(key, { type: 'json' });
     if (v !== null && v !== undefined) claves[key] = v;
   }
