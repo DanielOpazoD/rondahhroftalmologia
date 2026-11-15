@@ -81,6 +81,12 @@ export function renderRegistry(ctx) {
   sel.innerHTML = '<option value="">Todos los operativos</option>' + ops.map((o) => `<option>${escapeHtml(o)}</option>`).join('');
   sel.value = ops.includes(cur) ? cur : '';
 
+  const future = ctx.store.loadFutureRecords().length;
+  $('#futureBanner').hidden = !future;
+  $('#futureBanner').textContent = future
+    ? `Hay ${future} atención(es) guardadas con una versión más nueva de la app. Recarga la página para verlas y editarlas.`
+    : '';
+
   const q = $('#regSearch').value.trim();
   const op = sel.value;
   const list = ctx.records.filter((r) => (!op || r.f.operativo === op) && matchesQuery(r, q));

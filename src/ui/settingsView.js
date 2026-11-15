@@ -64,14 +64,21 @@ export function initSettingsView(ctx) {
       pdfFlatten: $('#setFlatten').checked,
       pdfFooter: $('#setFooter').checked,
       notaPie: $('#setPie').value,
+      deviceName: $('#setDevice').value.trim(),
     };
     ctx.store.saveSettings(ctx.settings);
   };
   ['#setFlatten', '#setFooter'].forEach((s) => $(s).addEventListener('change', saveSettings));
-  $('#setPie').addEventListener('change', saveSettings);
+  ['#setPie', '#setDevice'].forEach((s) => $(s).addEventListener('change', saveSettings));
 
   $('#bkExp').addEventListener('click', () => {
-    const data = buildBackup({ records: ctx.records, procs: ctx.procs, anonSecret: ctx.store.loadSecret() });
+    const data = buildBackup({
+      records: ctx.records,
+      futureRecords: ctx.store.loadFutureRecords(),
+      procs: ctx.procs,
+      anonSecret: ctx.store.loadSecret(),
+      auditDocs: ctx.store.loadAuditDocs(),
+    });
     download(JSON.stringify(data), `respaldo_oftalmo_${todayIso()}.json`, 'application/json');
     toast('Respaldo descargado');
   });
@@ -82,8 +89,12 @@ export function initSettingsView(ctx) {
     if (!file) return;
     try {
       const incoming = parseBackup(await file.text());
-      const merged = mergeBackup({ records: ctx.records, procs: ctx.procs }, incoming);
-      ctx.store.saveRecords(merged.records);
+      const merged = mergeBackup(
+        { records: ctx.records, futureRecords: ctx.store.loadFutureRecords(), procs: ctx.procs, auditDocs: ctx.store.loadAuditDocs() },
+        incoming,
+      );
+      ctx.store.saveRecords([...merged.records, ...merged.futureRecords]);
+      ctx.store.saveAuditDocs(merged.auditDocs);
       ctx.store.saveProcs(merged.procs);
       let keyMsg = '';
       const local = ctx.store.loadSecret();
@@ -151,4 +162,5 @@ export function renderSettings(ctx) {
   $('#setFlatten').checked = !!ctx.settings.pdfFlatten;
   $('#setFooter').checked = !!ctx.settings.pdfFooter;
   $('#setPie').value = ctx.settings.notaPie || '';
+  $('#setDevice').value = ctx.settings.deviceName || '';
 }

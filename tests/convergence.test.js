@@ -168,3 +168,64 @@ for (const seed of [5, 11, 31, 77]) {
     }
   });
 }
+
+test('bitácora: 4 PC agregan entradas a la vez y todos terminan con todas', async () => {
+  const keys = await deriveTeamKeys('K7QM3-XRT9P-ZAWD4-N8F2C', 1000);
+  const handler = createSyncHandler({ store: memoryBlobStore(), tokenHash: tokenHash(keys.token) });
+  const timing = rng(4242);
+  const fetchFn = async (url, init) => {
+    await new Promise((r) => setTimeout(r, Math.floor(timing() * 3)));
+    return handler(new Request('https://x' + url, init));
+  };
+  const key = await importEncKey(keys.encKey);
+  const mk = (name) => {
+    const st = { docs: new Map() };
+    return {
+      name,
+      st,
+      add(id, at) {
+        const cur = st.docs.get('b_p1') || { id: 'b_p1', atencionId: 'p1', updated: 0, entries: [] };
+        st.docs.set('b_p1', { ...cur, updated: Math.max(at, cur.updated + 1), entries: [...cur.entries, { id, at }] });
+      },
+      sync: () =>
+        syncOnce({
+          api: createSyncApi({ token: keys.token, fetchFn }),
+          key,
+          encKey: keys.encKey,
+          mergeFn: syncMerge,
+          fingerprint: syncFingerprint,
+          readLocal: () => ({
+            items: [...st.docs.values()].map((d) => ({ id: d.id, updated: d.updated, kind: 'bitacora', data: structuredClone(d) })),
+            tombstones: {},
+          }),
+          writeLocal: (items) => {
+            st.docs = new Map(items.map((i) => [i.id, { ...i.data, id: i.id, updated: i.updated }]));
+          },
+        }),
+    };
+  };
+  const pcs = ['A', 'B', 'C', 'D'].map(mk);
+  const rand = rng(9);
+  const all = [];
+  let t = Date.now();
+  for (let round = 0; round < 10; round++) {
+    for (const p of pcs.filter(() => rand() < 0.6)) {
+      const id = `${p.name}${round}`;
+      p.add(id, (t += 1));
+      all.push(id);
+    }
+    await Promise.all(pcs.filter(() => rand() < 0.6).map((p) => p.sync()));
+  }
+  for (let i = 0; i < 4; i++) await Promise.all(pcs.map((p) => p.sync()));
+  for (const p of pcs) await p.sync();
+  for (const p of pcs) {
+    assert.deepEqual(
+      p.st.docs
+        .get('b_p1')
+        .entries.map((e) => e.id)
+        .sort(),
+      [...all].sort(),
+      `PC ${p.name}`,
+    );
+  }
+});

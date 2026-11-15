@@ -16,6 +16,7 @@
  * }
  */
 import { SCHEMA_VERSION, LIMITS, OJOS, SEXOS, ESPECIALIDAD } from '../config/catalogs.js';
+import { migrate } from './migrations.js';
 import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt } from './format.js';
 
 /**
@@ -41,12 +42,13 @@ export function blankRecord(medico = {}, now = new Date()) {
 }
 
 /**
- * Lleva cualquier registro (v1 o v2, posiblemente incompleto) a la forma
- * actual sin perder información. No modifica el objeto recibido.
+ * Lleva cualquier registro (versión anterior, posiblemente incompleto) a la
+ * forma actual sin perder información. No modifica el objeto recibido.
+ * @throws {import('./migrations.js').FutureVersionError} si es de una versión más nueva
  */
 export function normalizeRecord(raw) {
-  const r = raw && typeof raw === 'object' ? structuredCloneSafe(raw) : {};
-  r.v = SCHEMA_VERSION;
+  // Migra paso a paso (lanza FutureVersionError si es de una versión más nueva: no se degrada).
+  const r = migrate(raw && typeof raw === 'object' ? structuredCloneSafe(raw) : {});
   r.especialidad = typeof r.especialidad === 'string' && r.especialidad ? r.especialidad : ESPECIALIDAD.id;
   // Los ids vienen también de respaldos importados: solo se aceptan caracteres seguros.
   r.id = isValidId(r.id) ? r.id : null;

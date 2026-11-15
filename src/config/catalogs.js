@@ -46,6 +46,8 @@ export const STORAGE_KEYS = Object.freeze({
   medicos: `${P}medicos_v1`,
   operativos: `${P}operativos_v1`,
   clock: `${P}reloj_v1`,
+  audit: `${P}bitacora_v1`,
+  device: `${P}equipo_v1`,
 });
 
 /** @typedef {{key: string, label: string}} CheckDef */
@@ -197,6 +199,8 @@ export const LIMITS = Object.freeze({ edadMax: 120, pioMin: 0, pioMax: 80 });
 
 /** Ajustes por defecto de la app. */
 export const DEFAULT_SETTINGS = Object.freeze({
+  /** Nombre de este equipo en la bitácora (p. ej. «Box 1»). */
+  deviceName: '',
   pdfFlatten: true,
   pdfFooter: true,
   notaPie: '(Registro en hoja de contingencia por caída de plataforma)',

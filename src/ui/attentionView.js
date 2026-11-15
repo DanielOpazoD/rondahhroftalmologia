@@ -3,7 +3,8 @@
  * con el registro en edición y lo refleja en pantalla (`sync`).
  */
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, SEXOS, OJOS } from '../config/catalogs.js';
-import { escapeHtml, formatRut, isIsoDate } from '../core/format.js';
+import { escapeHtml, formatRut, isIsoDate, fmtDateTime } from '../core/format.js';
+import { auditLabel, shortValue } from '../core/audit.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
 import { coversEye } from '../core/clinical.js';
@@ -141,6 +142,7 @@ export function syncAttentionView(ctx) {
   $('#paciente_edad').readOnly = fromBirth;
   $('#paciente_edad').title = fromBirth ? 'Calculada desde la fecha de nacimiento' : '';
   renderCatalogSelects(ctx);
+  renderHistory(ctx);
   renderToolbar(ctx);
   showValidation(ctx);
 }
@@ -182,4 +184,27 @@ export function showValidation(ctx, { showErrors = false } = {}) {
       input.setAttribute('aria-invalid', String(show));
     }
   });
+}
+
+const TIPO = { creada: 'Creada', editada: 'Editada', eliminada: 'Eliminada' };
+
+/** Historial de cambios (bitácora) de la atención abierta. */
+export function renderHistory(ctx) {
+  const id = ctx.rec.id;
+  const entries = id ? ctx.store.auditFor(id) : [];
+  $('#histCard').hidden = !entries.length;
+  $('#histCount').textContent = entries.length;
+  $('#histList').innerHTML = entries
+    .map((e) => {
+      const cambios = (e.cambios || [])
+        .slice(0, 30)
+        .map(
+          (c) =>
+            `<li>${escapeHtml(auditLabel(c.c, ctx.procs))}: <span class="hval">${escapeHtml(shortValue(c.a))}</span> → <span class="hval">${escapeHtml(shortValue(c.d))}</span></li>`,
+        )
+        .join('');
+      const more = (e.cambios || []).length > 30 ? `<li>… y ${e.cambios.length - 30} cambios más</li>` : '';
+      return `<li><div class="hmeta"><b>${TIPO[e.tipo] || escapeHtml(e.tipo)}</b> · ${escapeHtml(fmtDateTime(new Date(e.at)))} · ${escapeHtml(e.equipo)}</div>${cambios || more ? `<ul>${cambios}${more}</ul>` : ''}</li>`;
+    })
+    .join('');
 }

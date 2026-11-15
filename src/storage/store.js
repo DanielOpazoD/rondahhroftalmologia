@@ -1,12 +1,11 @@
 /**
- * Persistencia local (localStorage) detrás de una interfaz pequeña.
+ * Persistencia local detrás de una interfaz pequeña (localStorage + repositorio IndexedDB).
  *
  * Toda lectura/escritura de datos pasa por aquí: la interfaz no toca
  * localStorage directamente. Recibe el `storage` por parámetro para poder
  * probarlo con un objeto en memoria.
  */
 import { STORAGE_KEYS as K, DEFAULT_PROCS, DEFAULT_SETTINGS } from '../config/catalogs.js';
-import { normalizeRecord, sortRecords } from '../core/record.js';
 import { makeMedico, makeOperativo } from '../core/catalog.js';
 
 export class StorageError extends Error {}
@@ -27,9 +26,41 @@ export function memoryStorage() {
 }
 
 /**
- * @param {KeyValueStorage} storage normalmente window.localStorage
+ * Lee los datos clínicos que versiones anteriores guardaban en localStorage
+ * (para migrarlos a IndexedDB). Registros sin id válido se descartan.
+ * @param {KeyValueStorage} storage
  */
-export function createStore(storage) {
+export function readLegacyData(storage) {
+  const parse = (k, fb) => {
+    try {
+      const v = JSON.parse(storage.getItem(k) || 'null');
+      return v ?? fb;
+    } catch {
+      return fb;
+    }
+  };
+  const records = parse(K.records, []);
+  const tombstones = parse(K.tombstones, {});
+  return {
+    records: Array.isArray(records) ? records.filter((r) => r && typeof r === 'object' && r.id) : [],
+    tombstones: tombstones && typeof tombstones === 'object' && !Array.isArray(tombstones) ? tombstones : {},
+  };
+}
+
+/** Libera el espacio de los datos antiguos tras migrarlos. */
+export function clearLegacyData(storage) {
+  storage.removeItem(K.records);
+  storage.removeItem(K.tombstones);
+}
+
+/**
+ * Almacenamiento de la app. Los datos clínicos (atenciones, eliminaciones,
+ * bitácora) viven en el repositorio (IndexedDB, ver repo.js); el resto
+ * (ajustes, catálogos, borrador, sincronización) en localStorage.
+ * @param {KeyValueStorage} storage normalmente window.localStorage
+ * @param {ReturnType<import('./repo.js').createRepo>} repo
+ */
+export function createStore(storage, repo) {
   const read = (key, fallback) => {
     try {
       const v = storage.getItem(key);
@@ -47,28 +78,29 @@ export function createStore(storage) {
   };
 
   return {
-    /** Todas las atenciones, normalizadas y ordenadas. */
-    loadRecords() {
-      const raw = read(K.records, []);
-      return Array.isArray(raw) ? sortRecords(raw.map(normalizeRecord).filter((r) => r.id)) : [];
-    },
-    saveRecords(records) {
-      write(K.records, records);
-    },
-    /** Inserta o reemplaza una atención (por id). Devuelve la lista nueva. */
-    upsertRecord(record) {
-      const all = this.loadRecords();
-      const i = all.findIndex((r) => r.id === record.id);
-      if (i >= 0) all[i] = record;
-      else all.unshift(record);
-      const sorted = sortRecords(all);
-      write(K.records, sorted);
-      return sorted;
-    },
-    deleteRecord(id) {
-      const all = this.loadRecords().filter((r) => r.id !== id);
-      write(K.records, all);
-      return all;
+    /* Datos clínicos: repositorio */
+    repo,
+    loadRecords: () => repo.loadRecords(),
+    upsertRecord: (r) => repo.upsertRecord(r),
+    deleteRecord: (id) => repo.deleteRecord(id),
+    saveRecords: (list) => repo.saveRecords(list),
+    loadFutureRecords: () => repo.loadFutureRecords(),
+    loadTombstones: () => repo.loadTombstones(),
+    saveTombstones: (t) => repo.saveTombstones(t),
+    addTombstone: (id, t) => repo.addTombstone(id, t),
+    auditFor: (id) => repo.auditFor(id),
+    addAuditEntry: (id, e) => repo.addAuditEntry(id, e),
+    loadAuditDocs: () => repo.loadAuditDocs(),
+    saveAuditDocs: (docs) => repo.saveAuditDocs(docs),
+
+    /** Identificador estable de este equipo (para la bitácora). */
+    loadDeviceId() {
+      let id = read(K.device, null);
+      if (typeof id !== 'string' || !/^[a-z0-9]{6,20}$/.test(id)) {
+        id = 'pc' + Math.random().toString(36).slice(2, 10);
+        write(K.device, id);
+      }
+      return id;
     },
 
     loadProcs() {
@@ -108,18 +140,6 @@ export function createStore(storage) {
     },
     saveSecret(secret) {
       write(K.anonSecret, secret);
-    },
-
-    /** Atenciones eliminadas (para propagar la eliminación a otros equipos): {id: fecha ms}. */
-    loadTombstones() {
-      const t = read(K.tombstones, {});
-      return t && typeof t === 'object' && !Array.isArray(t) ? t : {};
-    },
-    saveTombstones(t) {
-      write(K.tombstones, t);
-    },
-    addTombstone(id, at = Date.now()) {
-      write(K.tombstones, { ...this.loadTombstones(), [id]: at });
     },
 
     /** Perfiles de médico (catálogo compartido). */

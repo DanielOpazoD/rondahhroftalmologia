@@ -22,6 +22,7 @@ import { renderSettings } from './settingsView.js';
 import { uiConfirm, uiCopy, uiChoose } from './modal.js';
 import { stampChanges, mergeRecords } from '../core/merge.js';
 import { clock } from '../core/clock.js';
+import { makeAuditEntry } from '../core/audit.js';
 import { renderCatalogSelects, renderCatalogSettings } from './catalogView.js';
 import { seedCatalogs, upsert, byName } from '../core/catalog.js';
 
@@ -67,6 +68,8 @@ export function createContext(store, templateB64) {
     templateBytes: () => (templateCache ||= base64ToBytes(templateB64)),
     pdfOptions: () => ({ flatten: !!ctx.settings.pdfFlatten, footer: !!ctx.settings.pdfFooter }),
     note: (rec) => buildNote(rec, ctx.procs, { pie: ctx.settings.notaPie }),
+    /** Nombre de este equipo en la bitácora. */
+    deviceName: () => ctx.settings.deviceName?.trim() || 'Equipo ' + store.loadDeviceId().slice(-4).toUpperCase(),
 
     /** Guarda en localStorage informando al usuario si falla. Devuelve true si funcionó. */
     persist(fn) {
@@ -129,6 +132,16 @@ export function createContext(store, templateB64) {
       );
       const ok = ctx.persist(() => {
         ctx.records = store.upsertRecord(rec);
+        // Bitácora: qué cambió, cuándo y desde qué equipo.
+        const entry = makeAuditEntry({
+          tipo: stored ? 'editada' : 'creada',
+          before: stored,
+          after: rec,
+          at: rec.updated,
+          equipo: ctx.deviceName(),
+          equipoId: store.loadDeviceId(),
+        });
+        if (entry) store.addAuditEntry(rec.id, entry);
         store.saveMedico({ n: rec.f.medico_nombre, r: rec.f.medico_rut, op: rec.f.operativo });
         store.saveDraft(rec);
       });
@@ -216,6 +229,8 @@ export function createContext(store, templateB64) {
       if (!ok) return;
       const done = ctx.persist(() => {
         ctx.records = store.deleteRecord(id);
+        const at = clock.tick();
+        store.addAuditEntry(id, makeAuditEntry({ tipo: 'eliminada', at, equipo: ctx.deviceName(), equipoId: store.loadDeviceId() }));
         // La "lápida" permite propagar la eliminación a los otros equipos.
         store.addTombstone(id, Math.max(clock.tick(), (r.updated || 0) + 1));
       });

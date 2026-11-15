@@ -17,6 +17,8 @@
  * Registros antiguos sin `ft` usan su `updated` para todos sus campos.
  */
 import { normalizeRecord } from './record.js';
+import { isFutureVersion } from './migrations.js';
+import { mergeAuditDocs } from './audit.js';
 
 const PROC_KEYS = ['eye', 'od', 'oi'];
 
@@ -152,7 +154,13 @@ export function sameContent(a, b) {
  * las atenciones se fusionan campo a campo; médicos y operativos, la versión más nueva.
  */
 export function syncMerge(kind, local, remote) {
+  if (kind === 'bitacora') {
+    const data = mergeAuditDocs(local, remote);
+    return { data, sameAsRemote: data.entries.length === (remote.entries || []).length };
+  }
   if (kind !== 'atencion') return null;
+  // Una versión más nueva de la app no se fusiona con lógica antigua: gana entera la más nueva.
+  if (isFutureVersion(local) || isFutureVersion(remote)) return null;
   const data = mergeRecords(normalizeRecord(local), normalizeRecord(remote));
   return { data, sameAsRemote: sameContent(data, remote) };
 }
@@ -167,5 +175,6 @@ export function syncFingerprint(kind, data) {
   if (kind === 'atencion') return JSON.stringify([...flatten(data)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
   if (kind === 'medico') return JSON.stringify([data?.nombre || '', data?.rut || '']);
   if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
+  if (kind === 'bitacora') return JSON.stringify((data?.entries || []).map((e) => e.id).sort());
   return JSON.stringify(data ?? null);
 }

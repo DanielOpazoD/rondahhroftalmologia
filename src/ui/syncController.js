@@ -83,8 +83,11 @@ export function createSyncController(ctx) {
           .loadRecords()
           .filter((r) => r.updated)
           .map(wrap('atencion')),
+        // Atenciones de versiones más nuevas de la app: se sincronizan intactas.
+        ...store.loadFutureRecords().map(wrap('atencion')),
         ...store.loadMedicos().map(wrap('medico')),
         ...store.loadOperativos().map(wrap('operativo')),
+        ...store.loadAuditDocs().map(wrap('bitacora')),
       ],
       tombstones: store.loadTombstones(),
     };
@@ -94,6 +97,7 @@ export function createSyncController(ctx) {
   function writeLocal(items, tombstones) {
     const of = (kind) => items.filter((i) => i.kind === kind).map((i) => ({ ...i.data, id: i.id, updated: i.updated }));
     store.saveRecords(sortRecords(of('atencion')));
+    store.saveAuditDocs(of('bitacora'));
     store.saveMedicos(
       byName(
         of('medico')

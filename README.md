@@ -20,7 +20,9 @@ Registro de atenciones de las **rondas y operativos de oftalmología**. Es un so
 | Pacientes | Atendidos por día, con diagnósticos y número de procedimientos. Busca por nombre (sin tildes) o RUT y filtra por operativo. En cada fila: copiar nota, PDF o eliminar. |
 | Estadística | Indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día. |
 | Exportar | ZIP con todos los PDF, Excel de estadística, datos seudonimizados para IA. |
-| Ajustes | Médicos y operativos (compartidos entre PC), sincronización, lista de procedimientos, opciones del PDF y respaldo. |
+| Ajustes | Médicos y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
+
+Cada atención guardada muestra al final su **Historial de cambios**: quién (qué equipo), cuándo, y qué campo cambió de qué valor a cuál.
 
 ### Exportaciones
 

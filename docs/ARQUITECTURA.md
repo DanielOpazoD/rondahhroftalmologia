@@ -27,7 +27,10 @@
 ```
 
 - **`core/` y `lib/` no tocan el DOM ni `localStorage`.** Reciben datos y devuelven datos, así que se prueban directamente en Node (`tests/`).
-- **`storage/store.js`** es la única puerta a `localStorage`. Recibe el `storage` por parámetro: en los tests se usa uno en memoria.
+- **Almacenamiento:**
+  - `storage/repo.js` maneja los datos clínicos (atenciones, eliminaciones, bitácora). Los mantiene en memoria y persiste en **IndexedDB** solo lo que cambió (`storage/backends.js`, con localStorage como respaldo).
+  - `storage/store.js` guarda lo pequeño: ajustes, catálogos, borrador y sincronización. Recibe el `storage` por parámetro, y en las pruebas se usa uno en memoria (IndexedDB simulado con `fake-indexeddb`).
+  - **Rendimiento medido:** guardar una atención toma unos 25 ms; una sincronización sin cambios con 3.000 atenciones, menos de 200 ms; la descarga inicial de 3.000 atenciones, unos 0,3 s.
 - **`ui/context.js`** guarda el estado (atención en edición, registros, filtro, ajustes) y expone acciones (`save`, `openRecord`, `downloadPdf`…). Las vistas llaman a esas acciones; nunca escriben en el almacenamiento directamente.
 
 Flujo típico: `evento → acción del contexto → store → render de las vistas afectadas`.

@@ -2,7 +2,7 @@
 
 ## Atención (esquema v3)
 
-Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conserva el nombre de la v1 para no perder datos.
+Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atenciones`, con un documento por atención (`src/storage/repo.js`). Si IndexedDB no está disponible, se usa localStorage como respaldo. Al abrir esta versión por primera vez, las atenciones que versiones anteriores guardaban en `localStorage["oft_atenciones_v1"]` se migran a IndexedDB y se libera ese espacio.
 
 ```jsonc
 {
@@ -52,6 +52,42 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
 
 Con `ft`, dos versiones de una misma atención se fusionan campo a campo (`src/core/merge.js`): en cada campo gana la edición más reciente. Las atenciones antiguas sin `ft` usan su `updated` para todos sus campos.
 
+### Migraciones de esquema
+
+`src/core/migrations.js` define un paso por versión (`STEPS[n]` lleva de vN a vN+1). Para cambiar el formato:
+
+1. agregar el paso;
+2. subir `SCHEMA_VERSION`;
+3. agregar una prueba.
+
+Un registro de una versión **más nueva** que la app (creado por un PC ya actualizado) no se degrada:
+
+- se guarda y sincroniza intacto;
+- no se muestra ni se edita;
+- la app pide recargar la página para actualizarse.
+
+### Bitácora de auditoría
+
+Colección `bitacora`, con un documento `b_<idAtención>` por atención:
+
+```jsonc
+{ "id": "b_amhz3k2a9x1", "atencionId": "amhz3k2a9x1", "updated": 1763150000000,
+  "entries": [
+    { "id": "e…", "at": 1763150000000, "tipo": "editada",       // creada | editada | eliminada
+      "equipo": "Box 1", "equipoId": "pc3k9…",
+      "cambios": [ { "c": "f.od_pio", "a": "14", "d": "19" } ] } // campo, antes, después
+  ] }
+```
+
+- **Cuándo se agrega:** cada guardado que cambia algo y cada eliminación agregan una entrada inmutable.
+- **Sincronización:** los documentos se sincronizan cifrados. Si dos PC agregan entradas a la vez, se unen sin perder ninguna.
+- **Dónde se ve:** en el **Historial de cambios** de cada atención, con el nombre de cada equipo (Ajustes → «Nombre de este equipo»).
+- **Respaldos:** incluyen la bitácora.
+
+### Eliminaciones
+
+La colección `eliminadas` guarda `{id, t}`. Ocupa unos pocos bytes por eliminación y no se poda: si un PC estuvo desconectado mucho tiempo, la eliminación igual le llega.
+
 ### Especialidades
 
 Cada atención guarda `especialidad`. Las claves de `localStorage` llevan el prefijo de la especialidad (`oft_`), y en el servidor cada especialidad tiene su propio espacio (`<especialidad>/r/...`).
@@ -75,7 +111,9 @@ Al abrir la app por primera vez con esta versión, los catálogos se completan c
 | `oft_medico_v1` | Último médico y operativo: `{n, r, op}`. |
 | `oft_ajustes_v1` | `{pdfFlatten, pdfFooter, notaPie}`. |
 | `oft_secreto_anon_v1` | Clave de seudonimización del equipo (64 caracteres hex). |
-| `oft_eliminadas_v1` | Atenciones eliminadas, `{id: fecha ms}`: propagan la eliminación a los otros PC. |
+| `oft_eliminadas_v1` | (Antes de la 2.7.0: eliminaciones; ahora en IndexedDB.) |
+| `oft_equipo_v1` | Identificador aleatorio de este equipo (bitácora). |
+| `oft_reloj_v1` | Última hora del reloj lógico. |
 | `oft_medicos_v1` | Perfiles de médico `[{id, nombre, rut, created, updated}]`. Se sincronizan. |
 | `oft_operativos_v1` | Operativos `[{id, nombre, created, updated}]`. Se sincronizan. |
 | `oft_sync_v1` | Sincronización activa: clave AES derivada, token, huella para el servidor y última sincronización. No guarda la contraseña. |
@@ -83,9 +121,11 @@ Al abrir la app por primera vez con esta versión, los catálogos se completan c
 ## Respaldo (`respaldo_oftalmo_AAAA-MM-DD.json`)
 
 ```json
-{ "app": "oftalmo-operativos", "v": 2, "version_app": "2.0.0", "exportado": "ISO-8601",
-  "procs": [ ... ], "atenciones": [ ... ], "anonSecret": "…" }
+{ "app": "oftalmo-operativos", "v": 3, "version_app": "2.7.0", "exportado": "ISO-8601",
+  "procs": [ ... ], "atenciones": [ ... ], "bitacora": [ ... ], "anonSecret": "…" }
 ```
+
+Al importar, las atenciones que ya existen se **fusionan campo a campo**, igual que en la sincronización, y la bitácora se une. Se aceptan respaldos v1, v2 y v3.
 
 Se aceptan respaldos v1 (sin `anonSecret`). Al importar, si el equipo no tiene clave de seudonimización, adopta la del respaldo. Así los códigos coinciden entre equipos.
 

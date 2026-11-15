@@ -123,6 +123,7 @@ Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<v
 | `atencion` | la atención completa |
 | `medico` | perfil de médico: nombre y RUT |
 | `operativo` | nombre del operativo o ronda |
+| `bitacora` | historial de cambios de una atención; dos PC se fusionan por unión de entradas |
 
 **Separación por especialidad:** las solicitudes llevan `?esp=oftalmologia`, y cada especialidad tiene su propio espacio en el servidor. Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
 

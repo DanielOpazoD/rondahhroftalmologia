@@ -1,5 +1,35 @@
 # Cambios
 
+## 2.7.0 — 2026-11-14
+
+### Nuevo
+- **Historial de cambios (bitácora de auditoría)** en cada atención:
+  - qué equipo, cuándo y qué campo cambió, con su valor anterior y el nuevo;
+  - se sincroniza cifrado entre los PC, y las entradas simultáneas se unen sin perder ninguna;
+  - se incluye en los respaldos.
+- **Nombre de este equipo** en Ajustes (aparece en el historial).
+- **Almacenamiento en IndexedDB**:
+  - un documento por atención, sin el límite de ~5 MB de localStorage;
+  - cada guardado escribe solo lo que cambió;
+  - migración automática de los datos existentes, con localStorage como respaldo si IndexedDB no está disponible.
+- **Migraciones de esquema versionadas** (`core/migrations.js`). Los datos de una versión más nueva de la app se conservan intactos y se pide recargar, en vez de degradarlos.
+- **Importar un respaldo** ahora fusiona campo a campo, como la sincronización.
+
+### Rendimiento
+- Guardar una atención: unos 25 ms.
+- Sincronización sin cambios con 3.000 atenciones: menos de 200 ms.
+- Descarga inicial de 3.000 atenciones: 0,3 s (antes 8,5 s, porque escribía una por una).
+
+### Pruebas
+- 118 unitarias:
+  - repositorio sobre IndexedDB y localStorage;
+  - migración;
+  - versiones futuras;
+  - bitácora;
+  - respaldo v3;
+  - convergencia de la bitácora con 4 PC concurrentes.
+- 14 en navegador: se agregan la migración a IndexedDB y el historial (propio y de otro equipo).
+
 ## 2.6.0 — 2026-11-14
 
 ### Calidad y proceso (sin cambios visibles para el usuario)

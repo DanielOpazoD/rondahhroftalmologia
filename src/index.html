@@ -164,10 +164,15 @@
     </div>
   </div>
 
+  <details class="card history" id="histCard" hidden>
+    <summary>Historial de cambios <span class="badge" id="histCount">0</span></summary>
+    <ol class="hist" id="histList"></ol>
+  </details>
 </section>
 
 <!-- ================= PACIENTES ================= -->
 <section id="t-reg" class="tab" role="tabpanel" aria-label="Pacientes atendidos">
+  <div class="banner warn" id="futureBanner" hidden></div>
   <div class="listhead">
     <label class="search"><svg><use href="#i-search"/></svg><input id="regSearch" type="search" aria-label="Buscar paciente" placeholder="Buscar por nombre o RUT"></label>
     <select id="regOp" aria-label="Operativo"></select>
@@ -242,6 +247,8 @@
   <div class="card" id="syncCard">
     <h2>Sincronización entre equipos <span class="badge" id="syncState">Desactivada</span></h2>
     <p class="muted">Atenciones, médicos y operativos se comparten entre los PC a través del servidor. Todo se <b>cifra en este equipo</b> antes de enviarse: el servidor no puede leer nombres, RUT ni datos clínicos. Sin internet se sigue trabajando.</p>
+    <label class="l" for="setDevice">Nombre de este equipo <span class="muted">(aparece en el historial de cambios)</span></label>
+    <input id="setDevice" placeholder="Ej: Box 1, Tablet enfermería" maxlength="40">
     <div id="syncUnavailable" class="banner warn" hidden>La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa el respaldo.</div>
     <div id="syncSetup">
       <label class="l" for="syncPass" id="syncPassLabel">Contraseña del equipo</label>

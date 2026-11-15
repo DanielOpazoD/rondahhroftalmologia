@@ -3,7 +3,10 @@
  * enlaza la barra inferior y las pestañas.
  */
 import TEMPLATE_PDF_B64 from '../assets/plantilla_hoja_atencion.pdf';
-import { createStore, memoryStorage } from './storage/store.js';
+import { createStore, memoryStorage, readLegacyData, clearLegacyData } from './storage/store.js';
+import { createRepo } from './storage/repo.js';
+import { idbBackend, localStorageBackend } from './storage/backends.js';
+import { ESPECIALIDAD, STORAGE_KEYS as K } from './config/catalogs.js';
 import { createContext } from './ui/context.js';
 import { $, $$, toast } from './ui/dom.js';
 import { initAttentionView, syncAttentionView } from './ui/attentionView.js';
@@ -26,9 +29,31 @@ function getStorage() {
   }
 }
 
-function main() {
+/**
+ * Abre el almacenamiento de datos clínicos: IndexedDB (preferido) o, si no
+ * está disponible, localStorage. La primera vez migra los datos antiguos.
+ */
+async function openRepo(storage) {
+  const onError = (e) => toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
+  try {
+    const repo = createRepo(await idbBackend(`hhr-rondas-${ESPECIALIDAD.id}`), { onError });
+    const { migrated } = await repo.init({ legacy: readLegacyData(storage), clearLegacy: () => clearLegacyData(storage) });
+    if (migrated) toast(`Datos actualizados al nuevo almacenamiento (${migrated} atenciones).`, 4000);
+    return repo;
+  } catch (e) {
+    console.warn('IndexedDB no disponible; se usa localStorage:', e);
+    const repo = createRepo(localStorageBackend(storage, { atenciones: K.records, eliminadas: K.tombstones, bitacora: K.audit }), {
+      onError,
+    });
+    await repo.init();
+    return repo;
+  }
+}
+
+async function main() {
   const { storage, persistent } = getStorage();
-  const store = createStore(storage);
+  const repo = await openRepo(storage);
+  const store = createStore(storage, repo);
   // Reloj lógico persistente: una edición posterior a otra recibida siempre queda con fecha posterior.
   setClock(createClock({ load: () => store.loadClock(), save: (t) => ctx.persist(() => store.saveClock(t)) }));
   const ctx = createContext(store, TEMPLATE_PDF_B64);
@@ -74,6 +99,8 @@ function main() {
   ctx.showTab('t-at');
   ctx.sync.start();
   registerServiceWorker();
+  // Termina de escribir lo pendiente al ocultar o cerrar la página.
+  window.addEventListener('pagehide', () => void repo.flush());
   if (!persistent) toast('Este navegador no permite guardar datos: las atenciones se perderán al cerrar.', 6000);
 }
 
@@ -83,4 +110,10 @@ function registerServiceWorker() {
   navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker no registrado:', e));
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  document.body.insertAdjacentHTML(
+    'afterbegin',
+    '<div class="banner warn" style="margin:16px">No se pudo iniciar la aplicación. Recarga la página; si persiste, avisa al equipo de soporte.</div>',
+  );
+});

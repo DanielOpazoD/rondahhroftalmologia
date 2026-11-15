@@ -54,6 +54,8 @@ La CI de GitHub (`.github/workflows/ci.yml`) repite todo esto en cada push y pul
 | La versión vive solo en `package.json` | `src/config/catalogs.js` la importa |
 | Dependencias con versión exacta | `package.json` y `package-lock.json` |
 | Cambios en datos o sincronización van con pruebas, incluida convergencia con varios PC | Revisión de código |
+| Un cambio de formato de las atenciones agrega un paso en `core/migrations.js` y sube `SCHEMA_VERSION` | Prueba (`audit.test.js`: existe un paso por versión) |
+| Los datos clínicos se leen y escriben solo a través de `storage/repo.js` | Revisión de código |
 
 ## Versiones y publicación
 
