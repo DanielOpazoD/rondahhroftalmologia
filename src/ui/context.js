@@ -7,11 +7,9 @@
  */
 import { APP } from '../config/catalogs.js';
 import { blankRecord, normalizeRecord, newRecordId, validateRecord, findDuplicate } from '../core/record.js';
-import { buildNote } from '../core/note.js';
-import { filterRecords } from '../core/stats.js';
+import { buildNote, filterRecords, buildAttentionPdf, pdfFileName } from '../specialties/activa/index.js';
 import { fmtDate } from '../core/format.js';
-import { createSecret } from '../core/anonymize.js';
-import { buildAttentionPdf, pdfFileName } from '../pdf/attentionPdf.js';
+import { createSecret } from '../core/pseudonym.js';
 import { StorageError } from '../storage/store.js';
 import { $$, toast, download, copyText, withBusy, base64ToBytes } from './dom.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';

@@ -2,20 +2,17 @@
  * Pestaña Exportar: PDFs en lote, Excel de estadística y datos seudonimizados.
  */
 import { todayIso, fileSafe } from '../core/format.js';
-import { statsWorkbook } from '../core/reports.js';
 import {
-  ANON_DEFAULTS,
-  ANON_OPTIONS,
+  statsWorkbook,
   anonymizeRecords,
   anonymizedJson,
   anonymizedSheets,
-  correspondenciaSheets,
-  findLeaks,
-  secretFingerprint,
-} from '../core/anonymize.js';
+  buildAttentionPdf,
+  pdfFileName,
+} from '../specialties/activa/index.js';
+import { ANON_DEFAULTS, ANON_OPTIONS, correspondenciaSheets, findLeaks, secretFingerprint } from '../core/pseudonym.js';
 import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createZip } from '../lib/zip.js';
-import { buildAttentionPdf, pdfFileName } from '../pdf/attentionPdf.js';
 import { $, download, toast, withBusy, nextFrame } from './dom.js';
 import { uiConfirm } from './modal.js';
 

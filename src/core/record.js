@@ -15,7 +15,9 @@
  *   ft: { [ruta]: number }   // fecha de edición de cada campo (fusión entre equipos, ver merge.js)
  * }
  */
-import { SCHEMA_VERSION, LIMITS, OJOS, SEXOS, ESPECIALIDAD } from '../config/catalogs.js';
+import { SCHEMA_VERSION, LIMITS, SEXOS, ESPECIALIDAD } from '../config/catalogs.js';
+import { OJOS } from '../specialties/activa/config.js';
+import { validarClinico } from '../specialties/activa/validacion.js';
 import { migrate } from './migrations.js';
 import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt } from './format.js';
 
@@ -133,22 +135,8 @@ export function validateRecord(rec, now = new Date()) {
   }
   if (f.paciente_sexo && !SEXOS.some((s) => s.key === f.paciente_sexo)) warn('paciente_sexo', 'Sexo no reconocido');
 
-  const pioOk = (v) => {
-    const n = parseNumber(v);
-    return n !== null && n >= LIMITS.pioMin && n <= LIMITS.pioMax;
-  };
-  for (const e of ['od', 'oi']) {
-    const v = f[`${e}_pio`];
-    if (v?.trim() && !pioOk(v)) warn(`${e}_pio`, `PIO ${e.toUpperCase()} fuera de rango (0–80 mmHg)`);
-  }
-  for (const p of Object.values(rec.proc || {})) {
-    for (const e of ['od', 'oi']) {
-      if (p[e]?.trim() && !pioOk(p[e])) {
-        warnings.push(`PIO ${e.toUpperCase()} de un procedimiento fuera de rango (0–80 mmHg)`);
-      }
-    }
-  }
-  if (rec.checks?.diagnostico_catarata && !rec.cat) warn('catSeg', 'Catarata sin ojo indicado');
+  // Validaciones clínicas propias de la especialidad activa.
+  validarClinico(rec, warn, (msg) => warnings.push(msg));
 
   return { errors, warnings, fields };
 }

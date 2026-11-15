@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PDFDocument } from 'pdf-lib';
-import { buildAttentionPdf, pdfFileName, wrapText } from '../src/pdf/attentionPdf.js';
+import { buildAttentionPdf, pdfFileName, wrapText } from '../src/specialties/oftalmologia/pdf.js';
 import { fullRecord, minimalRecord, PROCS } from './fixtures.js';
 
-const TEMPLATE = readFileSync(new URL('../assets/plantilla_hoja_atencion.pdf', import.meta.url));
+const TEMPLATE = readFileSync(new URL('../src/specialties/oftalmologia/plantilla.pdf', import.meta.url));
 const NOW = new Date(2026, 10, 14, 10, 30);
 
 test('pdfFileName incluye fecha, RUT y nombre sin caracteres problemáticos', () => {

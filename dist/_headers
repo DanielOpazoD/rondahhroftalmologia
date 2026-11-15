@@ -1,0 +1,2 @@
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-+qkCEJlGFYOyEGwc/pjuwzIpeP8dSvA86tISRCa0z7s='; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'

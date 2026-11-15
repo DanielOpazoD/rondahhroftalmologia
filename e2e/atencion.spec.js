@@ -96,3 +96,15 @@ test('estadística y exportar Excel', async ({ page }) => {
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#stXlsx').click()]);
   expect(download.suggestedFilename()).toMatch(/^estadistica_oftalmo_.*\.xlsx$/);
 });
+
+test('la política de seguridad bloquea scripts inyectados', async ({ page }) => {
+  const violations = [];
+  page.on('console', (m) => m.type() === 'error' && /Content Security Policy/i.test(m.text()) && violations.push(m.text()));
+  await page.evaluate(() => {
+    const s = document.createElement('script');
+    s.textContent = 'window.__inyectado = true';
+    document.body.append(s);
+  });
+  expect(await page.evaluate(() => window.__inyectado)).toBeUndefined();
+  expect(violations.length).toBeGreaterThan(0);
+});

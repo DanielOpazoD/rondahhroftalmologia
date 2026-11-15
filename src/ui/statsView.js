@@ -2,7 +2,7 @@
  * Filtro compartido (Estadística / Exportar) y tablero de estadística.
  */
 import { escapeHtml, fmtDate } from '../core/format.js';
-import { computeStats, operativosOf, sortedEntries, ageGroupLabels } from '../core/stats.js';
+import { computeStats, operativosOf, sortedEntries, ageGroupLabels } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 
 /** @param {import('./context.js').AppContext} ctx */

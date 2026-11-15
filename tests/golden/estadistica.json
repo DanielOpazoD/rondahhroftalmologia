@@ -1,0 +1,940 @@
+[
+ {
+  "name": "Resumen",
+  "header": false,
+  "rows": [
+   [
+    {
+     "v": "Atención Oftalmológica · Rondas y Operativos — Hospital Hanga Roa",
+     "s": 2
+    }
+   ],
+   [
+    "Filtro",
+    "Todos los operativos"
+   ],
+   [
+    "Generado",
+    "14-11-2026 10:30"
+   ],
+   [],
+   [
+    {
+     "v": "Indicador",
+     "s": 2
+    },
+    {
+     "v": "Valor",
+     "s": 2
+    }
+   ],
+   [
+    "Atenciones",
+    3
+   ],
+   [
+    "Pacientes distintos",
+    3
+   ],
+   [
+    "Procedimientos realizados",
+    7
+   ],
+   [
+    "Ojos intervenidos (suma)",
+    12
+   ],
+   [
+    "Edad promedio (años)",
+    43
+   ],
+   [
+    "Edad mediana (años)",
+    54
+   ],
+   [
+    "Rango de edad",
+    "8–67"
+   ],
+   [],
+   [
+    {
+     "v": "Procedimientos realizados",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Procedimiento",
+     "s": 2
+    },
+    {
+     "v": "Pacientes",
+     "s": 2
+    },
+    {
+     "v": "OD",
+     "s": 2
+    },
+    {
+     "v": "OI",
+     "s": 2
+    },
+    {
+     "v": "Ojos",
+     "s": 2
+    }
+   ],
+   [
+    "Autorrefractometría",
+    2,
+    2,
+    2,
+    4
+   ],
+   [
+    "Curva de tensión",
+    1,
+    1,
+    1,
+    2
+   ],
+   [
+    "Fondo de ojo (FO)",
+    1,
+    1,
+    1,
+    2
+   ],
+   [
+    "OCT",
+    1,
+    0,
+    1,
+    1
+   ],
+   [
+    "T. Aplanática",
+    1,
+    1,
+    1,
+    2
+   ],
+   [
+    "T. Neumática",
+    1,
+    1,
+    0,
+    1
+   ],
+   [
+    {
+     "v": "Total",
+     "s": 2
+    },
+    {
+     "v": 7,
+     "s": 2
+    },
+    {
+     "v": 6,
+     "s": 2
+    },
+    {
+     "v": 6,
+     "s": 2
+    },
+    {
+     "v": 12,
+     "s": 2
+    }
+   ],
+   [],
+   [
+    {
+     "v": "Diagnósticos",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Diagnóstico",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    },
+    {
+     "v": "% atenciones",
+     "s": 2
+    }
+   ],
+   [
+    "Catarata",
+    1,
+    33.3
+   ],
+   [
+    "Glaucoma",
+    1,
+    33.3
+   ],
+   [
+    "Miopía",
+    1,
+    33.3
+   ],
+   [
+    "Otros diagnósticos",
+    1,
+    33.3
+   ],
+   [
+    "RDNP",
+    1,
+    33.3
+   ],
+   [],
+   [
+    {
+     "v": "Procedimientos solicitados",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Procedimiento",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    },
+    {
+     "v": "% atenciones",
+     "s": 2
+    }
+   ],
+   [
+    "OCT",
+    1,
+    33.3
+   ],
+   [
+    "Test Schirmer",
+    1,
+    33.3
+   ],
+   [],
+   [
+    {
+     "v": "Antecedentes",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Antecedente",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    },
+    {
+     "v": "% atenciones",
+     "s": 2
+    }
+   ],
+   [
+    "Cirugía",
+    1,
+    33.3
+   ],
+   [
+    "DM2",
+    1,
+    33.3
+   ],
+   [
+    "HTA",
+    1,
+    33.3
+   ],
+   [],
+   [
+    {
+     "v": "Gestiones",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Gestión",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    },
+    {
+     "v": "% atenciones",
+     "s": 2
+    }
+   ],
+   [
+    "Con GES",
+    1,
+    33.3
+   ],
+   [
+    "Con interconsulta",
+    1,
+    33.3
+   ],
+   [
+    "Con receta",
+    1,
+    33.3
+   ],
+   [
+    "Con seguimiento",
+    1,
+    33.3
+   ],
+   [
+    "Con alta",
+    0,
+    0
+   ],
+   [],
+   [
+    {
+     "v": "Sexo",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Sexo",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    },
+    {
+     "v": "%",
+     "s": 2
+    }
+   ],
+   [
+    "Femenino",
+    2,
+    66.7
+   ],
+   [
+    "Masculino",
+    1,
+    33.3
+   ],
+   [
+    "Otro / no informa",
+    0,
+    0
+   ],
+   [
+    "Sin dato",
+    0,
+    0
+   ],
+   [],
+   [
+    {
+     "v": "Atenciones por operativo",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Operativo",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    }
+   ],
+   [
+    "Operativo Prueba Nov 2026",
+    2
+   ],
+   [
+    "Sin operativo",
+    1
+   ],
+   [],
+   [
+    {
+     "v": "Atenciones por médico",
+     "s": 2
+    }
+   ],
+   [
+    {
+     "v": "Médico",
+     "s": 2
+    },
+    {
+     "v": "N°",
+     "s": 2
+    }
+   ],
+   [
+    "Sin dato",
+    2
+   ],
+   [
+    "Dra. Ana Pérez Soto",
+    1
+   ]
+  ],
+  "widths": [
+   34,
+   16,
+   12,
+   12,
+   12
+  ]
+ },
+ {
+  "name": "Atenciones",
+  "header": true,
+  "rows": [
+   [
+    "ID atención",
+    "Fecha",
+    "Operativo",
+    "Nombre",
+    "RUT",
+    "Edad",
+    "Grupo etario",
+    "Sexo",
+    "Fono",
+    "Antecedentes",
+    "Motivo de consulta",
+    "AV OD",
+    "PIO OD",
+    "AV OI",
+    "PIO OI",
+    "Hallazgos OD",
+    "Hallazgos OI",
+    "Obs. examen",
+    "Autorrefractometría",
+    "T. Aplanática",
+    "T. Neumática",
+    "Curva de tensión",
+    "Fondo de ojo (FO)",
+    "Agudeza visual (AV)",
+    "BMC",
+    "Biometría",
+    "Láser",
+    "OCT",
+    "CTA",
+    "Paquimetría",
+    "Topografía corneal",
+    "Campimetría",
+    "Ecografía ocular",
+    "N° procedimientos",
+    "N° ojos (proc.)",
+    "Proc. solicitados",
+    "Dx RDP",
+    "Dx RDNP",
+    "Dx Glaucoma",
+    "Dx DDR",
+    "Dx DMRE",
+    "Dx Uveítis",
+    "Dx Catarata",
+    "Dx Presbicia",
+    "Dx Miopía",
+    "Dx Astigmatismo",
+    "Dx Hipermetropía",
+    "Dx Ojo seco",
+    "Dx Estrabismo",
+    "Catarata ojo",
+    "Otros diagnósticos",
+    "Diagnósticos (texto)",
+    "GES",
+    "IC",
+    "Receta",
+    "Otras acciones",
+    "Plan",
+    "Seguimiento",
+    "Alta",
+    "Médico",
+    "RUT médico"
+   ],
+   [
+    "atest0001",
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "María José Tepano Pakarati",
+    "11.111.111-1",
+    67,
+    "65-79",
+    "Femenino",
+    "+56 9 8765 4321",
+    "DM2, HTA, Cx: Facoemulsificación OI 2019, Hipotiroidismo",
+    "Disminución de agudeza visual progresiva OD de 6 meses. Hija Ana Tepano acompaña, contacto 987654321.",
+    "20/80",
+    "14 Apl",
+    "20/30",
+    "16 Apl",
+    "Catarata nuclear N3",
+    "Pseudofaquia",
+    "Paciente colaboradora",
+    "AO",
+    "AO",
+    "OD",
+    "",
+    "AO",
+    "",
+    "",
+    "",
+    "",
+    "OI",
+    "",
+    "",
+    "",
+    "",
+    "",
+    5,
+    8,
+    "OCT, Test Schirmer",
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    "OD",
+    "Blefaritis crónica",
+    "RDNP, Catarata OD, Blefaritis crónica",
+    "Catarata",
+    "Cirugía catarata OD",
+    "Lágrimas artificiales",
+    null,
+    "Control con biometría. Llamar a María al 9 8765 4321 para coordinar.",
+    "3 meses",
+    "",
+    "Dra. Ana Pérez Soto",
+    "22.222.222-2"
+   ],
+   [
+    "b",
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "Juan Pérez",
+    "12.345.678-5",
+    54,
+    "45-64",
+    "Masculino",
+    null,
+    "",
+    null,
+    null,
+    22,
+    null,
+    24,
+    null,
+    null,
+    null,
+    "",
+    "",
+    "",
+    "AO",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    1,
+    2,
+    "",
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    "",
+    null,
+    "Glaucoma",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   [
+    "c",
+    "15-11-2026",
+    null,
+    "Niña Prueba",
+    null,
+    8,
+    "0-14",
+    "Femenino",
+    null,
+    "",
+    null,
+    null,
+    "",
+    null,
+    "",
+    null,
+    null,
+    null,
+    "AO",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    1,
+    2,
+    "",
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    "",
+    null,
+    "Miopía",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Prestaciones",
+  "header": true,
+  "rows": [
+   [
+    "Fecha",
+    "Operativo",
+    "ID atención",
+    "Nombre",
+    "RUT",
+    "Edad",
+    "Sexo",
+    "Procedimiento",
+    "Ojo",
+    "N° ojos",
+    "PIO OD",
+    "PIO OI",
+    "Médico"
+   ],
+   [
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "atest0001",
+    "María José Tepano Pakarati",
+    "11.111.111-1",
+    67,
+    "Femenino",
+    "Autorrefractometría",
+    "AO",
+    2,
+    "",
+    "",
+    "Dra. Ana Pérez Soto"
+   ],
+   [
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "atest0001",
+    "María José Tepano Pakarati",
+    "11.111.111-1",
+    67,
+    "Femenino",
+    "T. Aplanática",
+    "AO",
+    2,
+    14,
+    16,
+    "Dra. Ana Pérez Soto"
+   ],
+   [
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "atest0001",
+    "María José Tepano Pakarati",
+    "11.111.111-1",
+    67,
+    "Femenino",
+    "T. Neumática",
+    "OD",
+    1,
+    18,
+    "",
+    "Dra. Ana Pérez Soto"
+   ],
+   [
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "atest0001",
+    "María José Tepano Pakarati",
+    "11.111.111-1",
+    67,
+    "Femenino",
+    "Fondo de ojo (FO)",
+    "AO",
+    2,
+    "",
+    "",
+    "Dra. Ana Pérez Soto"
+   ],
+   [
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "atest0001",
+    "María José Tepano Pakarati",
+    "11.111.111-1",
+    67,
+    "Femenino",
+    "OCT",
+    "OI",
+    1,
+    "",
+    "",
+    "Dra. Ana Pérez Soto"
+   ],
+   [
+    "14-11-2026",
+    "Operativo Prueba Nov 2026",
+    "b",
+    "Juan Pérez",
+    "12.345.678-5",
+    54,
+    "Masculino",
+    "Curva de tensión",
+    "AO",
+    2,
+    22,
+    24,
+    null
+   ],
+   [
+    "15-11-2026",
+    null,
+    "c",
+    "Niña Prueba",
+    null,
+    8,
+    "Femenino",
+    "Autorrefractometría",
+    "AO",
+    2,
+    "",
+    "",
+    null
+   ]
+  ]
+ },
+ {
+  "name": "Por día",
+  "header": true,
+  "rows": [
+   [
+    "Fecha",
+    "Atenciones",
+    "Pacientes",
+    "Procedimientos",
+    "Ojos"
+   ],
+   [
+    "14-11-2026",
+    2,
+    2,
+    6,
+    10
+   ],
+   [
+    "15-11-2026",
+    1,
+    1,
+    1,
+    2
+   ],
+   [
+    {
+     "v": "Total",
+     "s": 2
+    },
+    {
+     "v": 3,
+     "s": 2
+    },
+    {
+     "v": 3,
+     "s": 2
+    },
+    {
+     "v": 7,
+     "s": 2
+    },
+    {
+     "v": 12,
+     "s": 2
+    }
+   ]
+  ]
+ },
+ {
+  "name": "Edad y sexo",
+  "header": true,
+  "rows": [
+   [
+    "Grupo etario",
+    "Femenino",
+    "Masculino",
+    "Otro",
+    "Sin dato",
+    "Total"
+   ],
+   [
+    "0-14",
+    1,
+    0,
+    0,
+    0,
+    1
+   ],
+   [
+    "15-19",
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    "20-44",
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    "45-64",
+    0,
+    1,
+    0,
+    0,
+    1
+   ],
+   [
+    "65-79",
+    1,
+    0,
+    0,
+    0,
+    1
+   ],
+   [
+    "80+",
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    "Sin dato",
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    {
+     "v": "Total",
+     "s": 2
+    },
+    {
+     "v": 2,
+     "s": 2
+    },
+    {
+     "v": 1,
+     "s": 2
+    },
+    {
+     "v": 0,
+     "s": 2
+    },
+    {
+     "v": 0,
+     "s": 2
+    },
+    {
+     "v": 3,
+     "s": 2
+    }
+   ]
+  ]
+ }
+]

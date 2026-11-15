@@ -1,0 +1,509 @@
+[
+ {
+  "name": "Datos",
+  "header": true,
+  "rows": [
+   [
+    "Código paciente",
+    "Código atención",
+    "Operativo",
+    "Mes",
+    "Edad",
+    "Sexo",
+    "Ant DM2",
+    "Ant DM2 IR",
+    "Ant HTA",
+    "Ant TBQ",
+    "Ant Cirugía",
+    "Motivo de consulta",
+    "AV OD",
+    "PIO OD",
+    "AV OI",
+    "PIO OI",
+    "Hallazgos OD",
+    "Hallazgos OI",
+    "Autorrefractometría",
+    "T. Aplanática",
+    "T. Neumática",
+    "Curva de tensión",
+    "Fondo de ojo (FO)",
+    "Agudeza visual (AV)",
+    "BMC",
+    "Biometría",
+    "Láser",
+    "OCT",
+    "CTA",
+    "Paquimetría",
+    "Topografía corneal",
+    "Campimetría",
+    "Ecografía ocular",
+    "N° procedimientos",
+    "Sol Tonometría",
+    "Sol Curva tensión",
+    "Sol FO",
+    "Sol Biometría",
+    "Sol OCT",
+    "Sol Campimetría",
+    "Sol Láser",
+    "Sol Autoref",
+    "Sol Topografía corneal",
+    "Sol Test Schirmer",
+    "Dx RDP",
+    "Dx RDNP",
+    "Dx Glaucoma",
+    "Dx DDR",
+    "Dx DMRE",
+    "Dx Uveítis",
+    "Dx Catarata",
+    "Dx Presbicia",
+    "Dx Miopía",
+    "Dx Astigmatismo",
+    "Dx Hipermetropía",
+    "Dx Ojo seco",
+    "Dx Estrabismo",
+    "Catarata ojo",
+    "Otros diagnósticos",
+    "GES",
+    "IC",
+    "Receta",
+    "Plan",
+    "Seguimiento",
+    "Alta",
+    "Código médico"
+   ],
+   [
+    "P-P21Z1X5D",
+    "A-TWJ09A33",
+    "Operativo Prueba Nov 2026",
+    "2026-11",
+    "65-69",
+    "Femenino",
+    1,
+    0,
+    1,
+    0,
+    1,
+    "Disminución de agudeza visual progresiva OD de 6 meses. Hija [NOMBRE] [NOMBRE] acompaña, contacto [NÚMERO].",
+    "20/80",
+    "14 Apl",
+    "20/30",
+    "16 Apl",
+    "Catarata nuclear N3",
+    "Pseudofaquia",
+    "AO",
+    "AO",
+    "OD",
+    "",
+    "AO",
+    "",
+    "",
+    "",
+    "",
+    "OI",
+    "",
+    "",
+    "",
+    "",
+    "",
+    5,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    "OD",
+    "Blefaritis crónica",
+    "Catarata",
+    "Cirugía catarata OD",
+    "Lágrimas artificiales",
+    "Control con biometría. Llamar a [NOMBRE] al [NÚMERO] para coordinar.",
+    "3 meses",
+    "",
+    "M-3H80GH"
+   ],
+   [
+    "P-JAXTPBTM",
+    "A-RCBQNZKT",
+    "Operativo Prueba Nov 2026",
+    "2026-11",
+    "50-54",
+    "Masculino",
+    0,
+    0,
+    0,
+    0,
+    0,
+    "",
+    "",
+    "22",
+    "",
+    "24",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "AO",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   [
+    "P-8SV6XAJA",
+    "A-J01EA11H",
+    "",
+    "2026-11",
+    "5-9",
+    "Femenino",
+    0,
+    0,
+    0,
+    0,
+    0,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "AO",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "Prestaciones",
+  "header": true,
+  "rows": [
+   [
+    "Código paciente",
+    "Código atención",
+    "Mes",
+    "Edad",
+    "Sexo",
+    "Procedimiento",
+    "Ojo",
+    "PIO OD",
+    "PIO OI"
+   ],
+   [
+    "P-P21Z1X5D",
+    "A-TWJ09A33",
+    "2026-11",
+    "65-69",
+    "Femenino",
+    "Autorrefractometría",
+    "AO",
+    "",
+    ""
+   ],
+   [
+    "P-P21Z1X5D",
+    "A-TWJ09A33",
+    "2026-11",
+    "65-69",
+    "Femenino",
+    "T. Aplanática",
+    "AO",
+    "14",
+    "16"
+   ],
+   [
+    "P-P21Z1X5D",
+    "A-TWJ09A33",
+    "2026-11",
+    "65-69",
+    "Femenino",
+    "T. Neumática",
+    "OD",
+    "18",
+    ""
+   ],
+   [
+    "P-P21Z1X5D",
+    "A-TWJ09A33",
+    "2026-11",
+    "65-69",
+    "Femenino",
+    "Fondo de ojo (FO)",
+    "AO",
+    "",
+    ""
+   ],
+   [
+    "P-P21Z1X5D",
+    "A-TWJ09A33",
+    "2026-11",
+    "65-69",
+    "Femenino",
+    "OCT",
+    "OI",
+    "",
+    ""
+   ],
+   [
+    "P-JAXTPBTM",
+    "A-RCBQNZKT",
+    "2026-11",
+    "50-54",
+    "Masculino",
+    "Curva de tensión",
+    "AO",
+    "22",
+    "24"
+   ],
+   [
+    "P-8SV6XAJA",
+    "A-J01EA11H",
+    "2026-11",
+    "5-9",
+    "Femenino",
+    "Autorrefractometría",
+    "AO",
+    "",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "Info y diccionario",
+  "rows": [
+   [
+    {
+     "v": "Datos seudonimizados — Hospital Hanga Roa",
+     "s": 2
+    }
+   ],
+   [
+    "Generado",
+    "14-11-2026 10:30"
+   ],
+   [
+    "Atenciones",
+    3
+   ],
+   [
+    "Pacientes (códigos distintos)",
+    3
+   ],
+   [
+    "Fechas",
+    "Solo mes y año"
+   ],
+   [
+    "Edad",
+    "Rango de 5 años"
+   ],
+   [
+    "Textos libres",
+    "Incluir, limpiando identificadores"
+   ],
+   [],
+   [
+    {
+     "v": "Advertencia",
+     "s": 2
+    }
+   ],
+   [
+    "Los textos libres se limpian automáticamente, pero conviene revisarlos antes de compartir."
+   ],
+   [
+    "Sin la tabla de correspondencia (archivo aparte, confidencial) los códigos no permiten identificar pacientes."
+   ],
+   [],
+   [
+    {
+     "v": "Variable",
+     "s": 2
+    },
+    {
+     "v": "Descripción",
+     "s": 2
+    }
+   ],
+   [
+    "codigo_paciente",
+    "Código seudónimo estable del paciente (HMAC-SHA256 de RUT o nombre con clave del equipo)."
+   ],
+   [
+    "codigo_atencion",
+    "Código seudónimo de la atención."
+   ],
+   [
+    "base_codigo",
+    "Con qué se generó el código: 'rut' (más confiable) o 'nombre'."
+   ],
+   [
+    "operativo",
+    "Nombre del operativo o ronda."
+   ],
+   [
+    "mes / dia_relativo / fecha",
+    "Fecha de atención generalizada según la opción elegida."
+   ],
+   [
+    "edad",
+    "Edad en años o rango de 5 años; 90+ agrupado."
+   ],
+   [
+    "sexo",
+    "Femenino / Masculino / Otro o no informa."
+   ],
+   [
+    "antecedentes",
+    "Lista marcada de: DM2, DM2 IR, HTA, TBQ, Cirugía."
+   ],
+   [
+    "motivo_consulta",
+    "Texto libre limpio de identificadores."
+   ],
+   [
+    "examen.od / examen.oi",
+    "Por ojo: av (agudeza visual), pio (mmHg; \"Apl\"/\"Neu\" = tonómetro), otro_examen, otro_resultado, hallazgos."
+   ],
+   [
+    "procedimientos_realizados",
+    "Lista de {procedimiento, ojo (OD/OI/AO), pio_od, pio_oi}."
+   ],
+   [
+    "procedimientos_solicitados",
+    "Lista marcada de: Tonometría, Curva tensión, FO, Biometría, OCT, Campimetría, Láser, Autoref, Topografía corneal, Test Schirmer."
+   ],
+   [
+    "diagnosticos",
+    "Lista marcada de: RDP, RDNP, Glaucoma, DDR, DMRE, Uveítis, Catarata, Presbicia, Miopía, Astigmatismo, Hipermetropía, Ojo seco, Estrabismo."
+   ],
+   [
+    "catarata_ojo",
+    "Lateralidad de la catarata (OD/OI/AO)."
+   ],
+   [
+    "ges, interconsulta, receta, otras_acciones",
+    "Gestiones registradas (texto limpio)."
+   ],
+   [
+    "plan, seguimiento, alta",
+    "Plan e indicaciones (texto limpio)."
+   ],
+   [
+    "codigo_medico",
+    "Código seudónimo del médico tratante."
+   ],
+   [
+    "[NOMBRE] [RUT] [NÚMERO] [FECHA] [EMAIL]",
+    "Marcadores que reemplazan identificadores encontrados en textos libres."
+   ]
+  ],
+  "widths": [
+   40,
+   100
+  ]
+ }
+]

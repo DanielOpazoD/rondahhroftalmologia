@@ -1,13 +1,13 @@
 /**
  * Nota clínica en texto plano, para copiar y pegar en la ficha electrónica (Eloísa).
  */
-import { fmtDate, doctorName } from './format.js';
-import { SEXOS } from '../config/catalogs.js';
-import { antecedentsList, requestedList, diagnosesList, proceduresDone, procLabel, eyeSummary, actionsList } from './clinical.js';
+import { fmtDate, doctorName } from '../../core/format.js';
+import { SEXOS } from '../../config/catalogs.js';
+import { antecedentsList, requestedList, diagnosesList, proceduresDone, procLabel, eyeSummary, actionsList } from './clinica.js';
 
 /**
  * @param {object} rec registro de atención
- * @param {import('../config/catalogs.js').ProcDef[]} procs lista de procedimientos
+ * @param {import('./config.js').ProcDef[]} procs lista de procedimientos
  * @param {{pie?: string}} [opts] `pie`: línea final opcional
  * @returns {string}
  */

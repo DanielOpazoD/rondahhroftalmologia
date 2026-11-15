@@ -30,6 +30,34 @@ export default [
       'no-restricted-globals': ['error', 'document', 'window', 'localStorage', 'sessionStorage', 'alert', 'confirm', 'prompt'],
     },
   },
+  // La plataforma conoce la especialidad SOLO a través de src/specialties/activa/
+  {
+    files: ['src/**/*.js'],
+    ignores: ['src/specialties/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/specialties/*/*', '!**/specialties/activa/*', '!**/specialties/contrato.js'],
+              message: 'Importa la especialidad a través de src/specialties/activa/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Las especialidades no dependen de la interfaz
+  {
+    files: ['src/specialties/**/*.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: [{ group: ['**/ui/*'], message: 'Una especialidad no puede depender de la interfaz.' }] },
+      ],
+    },
+  },
   // La interfaz usa los diálogos propios (ui/modal.js), no los del navegador
   { files: ['src/ui/**/*.js'], rules: { 'no-restricted-globals': ['error', 'alert', 'confirm', 'prompt'] } },
   // Node: scripts, función de Netlify y pruebas

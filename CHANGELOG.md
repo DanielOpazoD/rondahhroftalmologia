@@ -1,5 +1,20 @@
 # Cambios
 
+## 2.8.0 — 2026-11-15
+
+### Arquitectura (sin cambios visibles; las salidas son idénticas, verificado)
+- **Especialidad como módulo** (`src/specialties/oftalmologia/`): catálogos, clínica, formulario, plantilla PDF, nota, Excel y seudonimización.
+- La plataforma la usa solo a través de `src/specialties/activa/`. ESLint lo exige.
+- **Contrato de especialidad** (`src/specialties/contrato.js`), validado en las pruebas y antes de cada build.
+- `ESPECIALIDAD=<id> npm run build` construye otra especialidad. Ver `docs/ESPECIALIDADES.md`.
+- La seudonimización genérica pasa a `core/pseudonym.js`.
+- **Pruebas de referencia** (`tests/golden.test.js`): nota, Excel, exportación seudonimizada y campos del PDF quedan congelados.
+
+### Seguridad
+- **CSP sin `'unsafe-inline'` para scripts**: solo se ejecuta el script de la app, identificado por su hash SHA-256, que el build calcula.
+- La misma política se envía como cabecera HTTP (`dist/_headers`), con `frame-ancestors 'none'`.
+- Prueba en navegador de que un script inyectado se bloquea.
+
 ## 2.7.0 — 2026-11-14
 
 ### Nuevo

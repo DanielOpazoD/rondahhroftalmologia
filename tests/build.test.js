@@ -3,21 +3,30 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildHtml, buildSite } from '../scripts/build.mjs';
+import { buildHtml, buildSite, cspOf, cspHash } from '../scripts/build.mjs';
 
 test('el build produce un HTML autocontenido y sin recursos externos', async () => {
   const html = await buildHtml();
   assert.ok(html.startsWith('<!DOCTYPE html>'));
   assert.ok(!html.includes('<!-- @STYLES -->') && !html.includes('<!-- @SCRIPT -->'));
   assert.match(html, /Content-Security-Policy[^>]+connect-src 'self'/, 'solo puede conectarse con su propio servidor');
+  // El único script permitido es el de la app, por su hash (sin 'unsafe-inline').
+  const csp = cspOf(html);
+  assert.ok(!/script-src[^;]*unsafe-inline/.test(csp), 'script-src sin unsafe-inline');
+  const script = /<script>([\s\S]*)<\/script>/.exec(html)[1];
+  assert.ok(csp.includes(cspHash(script)), 'el hash de la CSP corresponde al script incrustado');
+  assert.ok(!/<!-- @(CSP|FORMULARIO|STYLES|SCRIPT) -->/.test(html), 'sin marcadores sin reemplazar');
   assert.ok(!/<(script|link|img)[^>]+(src|href)=["']https?:/i.test(html), 'no carga recursos de internet');
   assert.equal((html.match(/<\/script>/g) || []).length, 1, 'un solo bloque de script');
   assert.ok(html.includes('JVBERi0'), 'plantilla PDF incrustada');
+  assert.ok(html.includes('id="motivo_consulta"'), 'formulario de la especialidad incrustado');
   assert.ok(html.length > 1_000_000 && html.length < 6_000_000);
 });
 
 test('cada id que usa la interfaz existe en el HTML', () => {
-  const html = readFileSync(new URL('../src/index.html', import.meta.url), 'utf8');
+  const html =
+    readFileSync(new URL('../src/index.html', import.meta.url), 'utf8') +
+    readFileSync(new URL('../src/specialties/oftalmologia/formulario.html', import.meta.url), 'utf8');
   const dir = new URL('../src/ui/', import.meta.url);
   const sources = [
     ...readdirSync(dir).map((f) => readFileSync(new URL(f, dir), 'utf8')),
@@ -41,6 +50,7 @@ test('buildSite escribe el sitio para Netlify con service worker versionado', as
   const { buildId } = await buildSite(dir);
   assert.deepEqual(readdirSync(dir).sort(), [
     'Hoja_Atencion_Oftalmologica.html',
+    '_headers',
     'icon.svg',
     'index.html',
     'manifest.webmanifest',
@@ -50,4 +60,7 @@ test('buildSite escribe el sitio para Netlify con service worker versionado', as
   assert.ok(sw.includes(`oftalmo-${buildId}`) && !sw.includes('__BUILD_ID__'));
   assert.ok(sw.includes("startsWith('/api/')"), 'la API no se guarda en caché');
   JSON.parse(readFileSync(join(dir, 'manifest.webmanifest'), 'utf8'));
+  const headers = readFileSync(join(dir, '_headers'), 'utf8');
+  assert.match(headers, /Content-Security-Policy: default-src 'none'; script-src 'sha256-/);
+  assert.match(headers, /frame-ancestors 'none'/);
 });

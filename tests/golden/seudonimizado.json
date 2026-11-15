@@ -1,0 +1,155 @@
+{
+ "descripcion": "Atenciones oftalmológicas seudonimizadas (rondas y operativos). Sin nombres, RUT ni teléfonos. Cada paciente se identifica por codigo_paciente; varias atenciones del mismo paciente comparten el código.",
+ "origen": "Atención Oftalmológica · Rondas y Operativos — Hospital Hanga Roa",
+ "version_app": "2.7.0",
+ "generado": "2026-11-14T15:30:00.000Z",
+ "opciones": {
+  "fechas": "mes",
+  "edad": "rango5",
+  "texto": "limpiar"
+ },
+ "n_atenciones": 3,
+ "n_pacientes": 3,
+ "diccionario": {
+  "codigo_paciente": "Código seudónimo estable del paciente (HMAC-SHA256 de RUT o nombre con clave del equipo).",
+  "codigo_atencion": "Código seudónimo de la atención.",
+  "base_codigo": "Con qué se generó el código: 'rut' (más confiable) o 'nombre'.",
+  "operativo": "Nombre del operativo o ronda.",
+  "mes / dia_relativo / fecha": "Fecha de atención generalizada según la opción elegida.",
+  "edad": "Edad en años o rango de 5 años; 90+ agrupado.",
+  "sexo": "Femenino / Masculino / Otro o no informa.",
+  "antecedentes": "Lista marcada de: DM2, DM2 IR, HTA, TBQ, Cirugía.",
+  "motivo_consulta": "Texto libre limpio de identificadores.",
+  "examen.od / examen.oi": "Por ojo: av (agudeza visual), pio (mmHg; \"Apl\"/\"Neu\" = tonómetro), otro_examen, otro_resultado, hallazgos.",
+  "procedimientos_realizados": "Lista de {procedimiento, ojo (OD/OI/AO), pio_od, pio_oi}.",
+  "procedimientos_solicitados": "Lista marcada de: Tonometría, Curva tensión, FO, Biometría, OCT, Campimetría, Láser, Autoref, Topografía corneal, Test Schirmer.",
+  "diagnosticos": "Lista marcada de: RDP, RDNP, Glaucoma, DDR, DMRE, Uveítis, Catarata, Presbicia, Miopía, Astigmatismo, Hipermetropía, Ojo seco, Estrabismo.",
+  "catarata_ojo": "Lateralidad de la catarata (OD/OI/AO).",
+  "ges, interconsulta, receta, otras_acciones": "Gestiones registradas (texto limpio).",
+  "plan, seguimiento, alta": "Plan e indicaciones (texto limpio).",
+  "codigo_medico": "Código seudónimo del médico tratante.",
+  "[NOMBRE] [RUT] [NÚMERO] [FECHA] [EMAIL]": "Marcadores que reemplazan identificadores encontrados en textos libres."
+ },
+ "atenciones": [
+  {
+   "codigo_paciente": "P-P21Z1X5D",
+   "codigo_atencion": "A-TWJ09A33",
+   "base_codigo": "rut",
+   "operativo": "Operativo Prueba Nov 2026",
+   "edad": "65-69",
+   "sexo": "Femenino",
+   "antecedentes": [
+    "DM2",
+    "HTA",
+    "Cirugía"
+   ],
+   "antecedente_cirugia_detalle": "Facoemulsificación OI 2019",
+   "antecedentes_otros": "Hipotiroidismo",
+   "motivo_consulta": "Disminución de agudeza visual progresiva OD de 6 meses. Hija [NOMBRE] [NOMBRE] acompaña, contacto [NÚMERO].",
+   "examen": {
+    "od": {
+     "av": "20/80",
+     "pio": "14 Apl",
+     "hallazgos": "Catarata nuclear N3"
+    },
+    "oi": {
+     "av": "20/30",
+     "pio": "16 Apl",
+     "hallazgos": "Pseudofaquia"
+    },
+    "observaciones": "Paciente colaboradora"
+   },
+   "procedimientos_realizados": [
+    {
+     "procedimiento": "Autorrefractometría",
+     "ojo": "AO"
+    },
+    {
+     "procedimiento": "T. Aplanática",
+     "ojo": "AO",
+     "pio_od": "14",
+     "pio_oi": "16"
+    },
+    {
+     "procedimiento": "T. Neumática",
+     "ojo": "OD",
+     "pio_od": "18"
+    },
+    {
+     "procedimiento": "Fondo de ojo (FO)",
+     "ojo": "AO"
+    },
+    {
+     "procedimiento": "OCT",
+     "ojo": "OI"
+    }
+   ],
+   "procedimientos_solicitados": [
+    "OCT",
+    "Test Schirmer"
+   ],
+   "diagnosticos": [
+    "RDNP",
+    "Catarata"
+   ],
+   "catarata_ojo": "OD",
+   "diagnosticos_otros": "Blefaritis crónica",
+   "ges": "Catarata",
+   "interconsulta": "Cirugía catarata OD",
+   "receta": "Lágrimas artificiales",
+   "plan": "Control con biometría. Llamar a [NOMBRE] al [NÚMERO] para coordinar.",
+   "seguimiento": "3 meses",
+   "codigo_medico": "M-3H80GH",
+   "mes": "2026-11"
+  },
+  {
+   "codigo_paciente": "P-JAXTPBTM",
+   "codigo_atencion": "A-RCBQNZKT",
+   "base_codigo": "rut",
+   "operativo": "Operativo Prueba Nov 2026",
+   "edad": "50-54",
+   "sexo": "Masculino",
+   "antecedentes": [],
+   "examen": {
+    "od": {
+     "pio": "22"
+    },
+    "oi": {
+     "pio": "24"
+    }
+   },
+   "procedimientos_realizados": [
+    {
+     "procedimiento": "Curva de tensión",
+     "ojo": "AO",
+     "pio_od": "22",
+     "pio_oi": "24"
+    }
+   ],
+   "procedimientos_solicitados": [],
+   "diagnosticos": [
+    "Glaucoma"
+   ],
+   "mes": "2026-11"
+  },
+  {
+   "codigo_paciente": "P-8SV6XAJA",
+   "codigo_atencion": "A-J01EA11H",
+   "base_codigo": "nombre",
+   "edad": "5-9",
+   "sexo": "Femenino",
+   "antecedentes": [],
+   "procedimientos_realizados": [
+    {
+     "procedimiento": "Autorrefractometría",
+     "ojo": "AO"
+    }
+   ],
+   "procedimientos_solicitados": [],
+   "diagnosticos": [
+    "Miopía"
+   ],
+   "mes": "2026-11"
+  }
+ ]
+}

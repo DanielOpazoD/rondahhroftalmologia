@@ -4,8 +4,7 @@
  */
 import { SEXOS } from '../config/catalogs.js';
 import { escapeHtml, fmtDate, normalizeText, cleanRut } from '../core/format.js';
-import { operativosOf } from '../core/stats.js';
-import { diagnosesList } from '../core/clinical.js';
+import { operativosOf, diagnosesList } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 
 /** @param {import('./context.js').AppContext} ctx */

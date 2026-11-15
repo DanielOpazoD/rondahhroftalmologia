@@ -1,0 +1,68 @@
+{
+ "atest0001": {
+  "archivo": "Oftalmo_2026-11-14_11111111-1_Maria_Jose_Tepano_Pakarati.pdf",
+  "paginas": 1,
+  "hojaComplementaria": [],
+  "campos": {
+   "paciente_nombre": "María José Tepano Pakarati",
+   "paciente_rut": "11.111.111-1",
+   "paciente_edad": "67",
+   "fecha_atencion": "14-11-2026",
+   "paciente_fono": "+56 9 8765 4321",
+   "antecedente_dm2": true,
+   "antecedente_hta": true,
+   "antecedente_cirugia": true,
+   "antecedente_cirugia_detalle": "Facoemulsificación OI 2019",
+   "antecedentes_otros": "Hipotiroidismo",
+   "motivo_consulta_1": "Disminución de agudeza visual progresiva OD de 6 meses. Hija Ana Tepano acompaña, contacto 987654321.",
+   "od_av": "20/80",
+   "od_pio": "14 Apl",
+   "od_hallazgos": "Catarata nuclear N3",
+   "oi_av": "20/30",
+   "oi_pio": "16 Apl",
+   "oi_hallazgos": "Pseudofaquia",
+   "examen_observaciones_1": "Paciente colaboradora | Proc. realizados: Autorrefractometría AO; T. Aplanática AO (OD 14 / OI 16 mmHg); T.",
+   "examen_observaciones_2": "Neumática OD (OD 18 mmHg); Fondo de ojo (FO) AO; OCT OI.",
+   "procedimiento_oct": true,
+   "procedimiento_test_schirmer": true,
+   "diagnostico_rdnp": true,
+   "diagnostico_catarata": true,
+   "diagnostico_catarata_od": true,
+   "diagnosticos_otros": "Blefaritis crónica",
+   "ges": "Catarata",
+   "interconsulta": "Cirugía catarata OD",
+   "receta": "Lágrimas artificiales",
+   "plan_indicaciones_1": "Control con biometría. Llamar a María al 9 8765 4321 para coordinar.",
+   "seguimiento": "3 meses",
+   "medico_nombre": "Dra. Ana Pérez Soto",
+   "medico_rut": "22.222.222-2"
+  }
+ },
+ "b": {
+  "archivo": "Oftalmo_2026-11-14_12345678-5_Juan_Perez.pdf",
+  "paginas": 1,
+  "hojaComplementaria": [],
+  "campos": {
+   "paciente_nombre": "Juan Pérez",
+   "paciente_rut": "12.345.678-5",
+   "paciente_edad": "54",
+   "fecha_atencion": "14-11-2026",
+   "od_pio": "22",
+   "oi_pio": "24",
+   "examen_observaciones_1": "Proc. realizados: Curva de tensión AO (OD 22 / OI 24 mmHg).",
+   "diagnostico_glaucoma": true
+  }
+ },
+ "c": {
+  "archivo": "Oftalmo_2026-11-15_Nina_Prueba.pdf",
+  "paginas": 1,
+  "hojaComplementaria": [],
+  "campos": {
+   "paciente_nombre": "Niña Prueba",
+   "paciente_edad": "8",
+   "fecha_atencion": "15-11-2026",
+   "examen_observaciones_1": "Proc. realizados: Autorrefractometría AO.",
+   "diagnostico_miopia": true
+  }
+ }
+}

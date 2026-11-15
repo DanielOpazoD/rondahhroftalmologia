@@ -17,10 +17,12 @@
  * Registros antiguos sin `ft` usan su `updated` para todos sus campos.
  */
 import { normalizeRecord } from './record.js';
+import { MEDIDAS_PROC } from '../specialties/activa/config.js';
 import { isFutureVersion } from './migrations.js';
 import { mergeAuditDocs } from './audit.js';
 
-const PROC_KEYS = ['eye', 'od', 'oi'];
+/** Partes de un procedimiento realizado: el lado (`eye`) y las medidas por lado de la especialidad. */
+const PROC_KEYS = ['eye', ...MEDIDAS_PROC];
 
 /**
  * Claves aceptadas para campos, casillas e ids de procedimiento. Los datos

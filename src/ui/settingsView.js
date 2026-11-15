@@ -1,10 +1,10 @@
 /**
  * Pestaña Ajustes: lista de procedimientos, opciones de PDF/nota, respaldo y zona de cuidado.
  */
-import { DEFAULT_PROCS } from '../config/catalogs.js';
+import { DEFAULT_PROCS } from '../specialties/activa/config.js';
 import { escapeHtml, todayIso } from '../core/format.js';
 import { buildBackup, parseBackup, mergeBackup } from '../core/backup.js';
-import { createSecret } from '../core/anonymize.js';
+import { createSecret } from '../core/pseudonym.js';
 import { $, download, toast } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 

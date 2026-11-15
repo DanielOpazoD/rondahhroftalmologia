@@ -5,7 +5,8 @@
  * localStorage directamente. Recibe el `storage` por parámetro para poder
  * probarlo con un objeto en memoria.
  */
-import { STORAGE_KEYS as K, DEFAULT_PROCS, DEFAULT_SETTINGS } from '../config/catalogs.js';
+import { STORAGE_KEYS as K, DEFAULT_SETTINGS } from '../config/catalogs.js';
+import { DEFAULT_PROCS } from '../specialties/activa/config.js';
 import { makeMedico, makeOperativo } from '../core/catalog.js';
 
 export class StorageError extends Error {}

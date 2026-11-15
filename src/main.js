@@ -2,7 +2,7 @@
  * Punto de entrada. Crea el almacenamiento y el contexto, inicializa vistas y
  * enlaza la barra inferior y las pestañas.
  */
-import TEMPLATE_PDF_B64 from '../assets/plantilla_hoja_atencion.pdf';
+import TEMPLATE_PDF_B64 from './specialties/activa/plantilla.js';
 import { createStore, memoryStorage, readLegacyData, clearLegacyData } from './storage/store.js';
 import { createRepo } from './storage/repo.js';
 import { idbBackend, localStorageBackend } from './storage/backends.js';

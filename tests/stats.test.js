@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeStats, filterRecords, ageGroup, ageGroupLabels, operativosOf, describeFilter } from '../src/core/stats.js';
-import { statsWorkbook } from '../src/core/reports.js';
+import {
+  computeStats,
+  filterRecords,
+  ageGroup,
+  ageGroupLabels,
+  operativosOf,
+  describeFilter,
+} from '../src/specialties/oftalmologia/estadistica.js';
+import { statsWorkbook } from '../src/specialties/oftalmologia/reportes.js';
 import { buildXlsx } from '../src/lib/xlsx.js';
 import { fullRecord, minimalRecord, PROCS } from './fixtures.js';
 import { readZipWithPython, sheetCells } from './helpers.js';

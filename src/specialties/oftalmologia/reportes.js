@@ -3,11 +3,12 @@
  * Devuelve estructuras { name, rows, header, widths } que consume lib/xlsx.js.
  * No contiene lógica de archivo ni de DOM: se prueba en Node.
  */
-import { APP, DIAGNOSTICOS, SEXOS } from '../config/catalogs.js';
-import { fmtDate, fmtDateTime } from './format.js';
-import { STYLE } from '../lib/xlsx.js';
-import { computeStats, sortedEntries, ageOf, ageGroup, ageGroupLabels, describeFilter } from './stats.js';
-import { proceduresDone, pioFor, antecedentsList, requestedList, diagnosesList, procName } from './clinical.js';
+import { APP, SEXOS } from '../../config/catalogs.js';
+import { DIAGNOSTICOS } from './config.js';
+import { fmtDate, fmtDateTime } from '../../core/format.js';
+import { STYLE } from '../../lib/xlsx.js';
+import { computeStats, sortedEntries, ageOf, ageGroup, ageGroupLabels, describeFilter } from './estadistica.js';
+import { proceduresDone, pioFor, antecedentsList, requestedList, diagnosesList, procName } from './clinica.js';
 
 const b = (v) => ({ v, s: STYLE.bold });
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);

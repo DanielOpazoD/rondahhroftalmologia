@@ -2,12 +2,12 @@
  * Formulario de atención: dibuja casillas y procedimientos, enlaza entradas
  * con el registro en edición y lo refleja en pantalla (`sync`).
  */
-import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, SEXOS, OJOS } from '../config/catalogs.js';
+import { SEXOS } from '../config/catalogs.js';
+import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, OJOS, coversEye } from '../specialties/activa/index.js';
 import { escapeHtml, formatRut, isIsoDate, fmtDateTime } from '../core/format.js';
 import { auditLabel, shortValue } from '../core/audit.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
-import { coversEye } from '../core/clinical.js';
 import { $, $$ } from './dom.js';
 
 /** @param {import('./context.js').AppContext} ctx */

@@ -10,45 +10,8 @@
  * entradas a la vez se fusionan por UNIÓN (nunca se pierde una entrada).
  */
 import { flatten } from './merge.js';
-import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS } from '../config/catalogs.js';
+import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, ETIQUETAS, ETIQUETAS_PROC } from '../specialties/activa/config.js';
 
-/** Nombres legibles de los campos de texto. */
-const FIELD_LABELS = {
-  operativo: 'Operativo',
-  fecha_atencion: 'Fecha',
-  paciente_nombre: 'Nombre',
-  paciente_rut: 'RUT',
-  paciente_fnac: 'Fecha de nacimiento',
-  paciente_edad: 'Edad',
-  paciente_sexo: 'Sexo',
-  paciente_fono: 'Fono',
-  antecedente_cirugia_detalle: 'Cirugía (detalle)',
-  antecedentes_otros: 'Otros antecedentes',
-  motivo_consulta: 'Motivo de consulta',
-  od_av: 'AV OD',
-  od_pio: 'PIO OD',
-  od_otro_examen: 'Otro examen OD',
-  od_otro_resultado: 'Resultado OD',
-  od_hallazgos: 'Hallazgos OD',
-  oi_av: 'AV OI',
-  oi_pio: 'PIO OI',
-  oi_otro_examen: 'Otro examen OI',
-  oi_otro_resultado: 'Resultado OI',
-  oi_hallazgos: 'Hallazgos OI',
-  examen_obs: 'Observaciones',
-  test_schirmer_detalle: 'Schirmer (detalle)',
-  procedimientos_otros: 'Otros solicitados',
-  diagnosticos_otros: 'Otros diagnósticos',
-  ges: 'GES',
-  interconsulta: 'Interconsulta',
-  receta: 'Receta',
-  diagnosticos_acciones_otros: 'Otras acciones',
-  plan: 'Plan',
-  seguimiento: 'Seguimiento',
-  alta: 'Alta',
-  medico_nombre: 'Médico',
-  medico_rut: 'RUT médico',
-};
 const CHECK_LABELS = Object.fromEntries([
   ...ANTECEDENTES.map((d) => [d.key, 'Antecedente ' + d.label]),
   ...SOLICITADOS.map((d) => [d.key, 'Solicitado ' + d.label]),
@@ -61,7 +24,7 @@ const CHECK_LABELS = Object.fromEntries([
  * @param {{id: string, n: string}[]} [procs]
  */
 export function auditLabel(path, procs = []) {
-  if (path.startsWith('f.')) return FIELD_LABELS[path.slice(2)] || path.slice(2);
+  if (path.startsWith('f.')) return ETIQUETAS[path.slice(2)] || path.slice(2);
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';
   if (path.startsWith('proc.')) {
@@ -69,7 +32,8 @@ export function auditLabel(path, procs = []) {
     const dot = rest.lastIndexOf('.');
     const id = rest.slice(0, dot);
     const name = procs.find((p) => p.id === id)?.n || id;
-    return { eye: `${name} (ojo)`, od: `${name} PIO OD`, oi: `${name} PIO OI` }[rest.slice(dot + 1)] || name;
+    const part = ETIQUETAS_PROC[rest.slice(dot + 1)];
+    return part ? `${name} ${part}` : name;
   }
   return path;
 }

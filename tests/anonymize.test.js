@@ -8,13 +8,11 @@ import {
   scrubText,
   generalizeAge,
   generalizeDate,
-  anonymizeRecords,
-  anonymizedJson,
-  anonymizedSheets,
   correspondenciaSheets,
   findLeaks,
   nameTokens,
-} from '../src/core/anonymize.js';
+} from '../src/core/pseudonym.js';
+import { anonymizeRecords, anonymizedJson, anonymizedSheets } from '../src/specialties/oftalmologia/seudonimizacion.js';
 import { buildXlsx } from '../src/lib/xlsx.js';
 import { fullRecord, minimalRecord, PROCS } from './fixtures.js';
 import { readZipWithPython } from './helpers.js';

@@ -5,7 +5,7 @@
  * Todas las funciones son puras: reciben el registro y la lista de
  * procedimientos configurada (`procs`) y devuelven datos.
  */
-import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, PIO_SUFFIX } from '../config/catalogs.js';
+import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, PIO_SUFFIX } from './config.js';
 
 /** N.º de ojos que cubre una lateralidad. */
 export function eyeCount(eye) {

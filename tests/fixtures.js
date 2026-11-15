@@ -1,7 +1,7 @@
 /**
  * Datos de prueba ficticios (ningún paciente real).
  */
-import { DEFAULT_PROCS } from '../src/config/catalogs.js';
+import { DEFAULT_PROCS } from '../src/specialties/oftalmologia/config.js';
 import { normalizeRecord } from '../src/core/record.js';
 
 export const PROCS = structuredClone(DEFAULT_PROCS);

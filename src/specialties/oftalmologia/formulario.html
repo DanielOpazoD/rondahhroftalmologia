@@ -1,0 +1,96 @@
+<!--
+  Especialidad OFTALMOLOGÍA — parte clínica del formulario de atención.
+  El build la inserta en src/index.html (marcador @FORMULARIO).
+  Los id de los campos deben coincidir con TEXT_FIELDS y los contenedores de casillas
+  (antChips, solChips, dxChips, procList) con lo que usa ui/attentionView.js.
+-->
+<div class="card">
+  <h2>Antecedentes</h2>
+  <div class="chips" id="antChips"></div>
+  <div class="g2">
+    <div id="cxBox" hidden>
+      <label class="l" for="antecedente_cirugia_detalle">Cirugía: ¿cuál?</label><input id="antecedente_cirugia_detalle" />
+    </div>
+    <div><label class="l" for="antecedentes_otros">Otros antecedentes</label><input id="antecedentes_otros" /></div>
+  </div>
+  <label class="l" for="motivo_consulta">Motivo de consulta</label><textarea id="motivo_consulta" rows="2"></textarea>
+</div>
+
+<div class="card">
+  <h2>Examen físico</h2>
+  <div class="g2 eyes">
+    <div class="eye">
+      <h3>OD</h3>
+      <div class="g4 tight">
+        <div><label class="l" for="od_av">AV</label><input id="od_av" /></div>
+        <div>
+          <label class="l" for="od_pio">PIO</label><input id="od_pio" inputmode="decimal" placeholder="mmHg" /><small
+            class="msg"
+            data-msg="od_pio"
+          ></small>
+        </div>
+        <div><label class="l" for="od_otro_examen">Otro</label><input id="od_otro_examen" maxlength="5" placeholder="sigla" /></div>
+        <div><label class="l" for="od_otro_resultado">Result.</label><input id="od_otro_resultado" /></div>
+      </div>
+      <label class="l" for="od_hallazgos">Hallazgos</label><textarea id="od_hallazgos" rows="2"></textarea>
+    </div>
+    <div class="eye">
+      <h3>OI</h3>
+      <div class="g4 tight">
+        <div><label class="l" for="oi_av">AV</label><input id="oi_av" /></div>
+        <div>
+          <label class="l" for="oi_pio">PIO</label><input id="oi_pio" inputmode="decimal" placeholder="mmHg" /><small
+            class="msg"
+            data-msg="oi_pio"
+          ></small>
+        </div>
+        <div><label class="l" for="oi_otro_examen">Otro</label><input id="oi_otro_examen" maxlength="5" placeholder="sigla" /></div>
+        <div><label class="l" for="oi_otro_resultado">Result.</label><input id="oi_otro_resultado" /></div>
+      </div>
+      <label class="l" for="oi_hallazgos">Hallazgos</label><textarea id="oi_hallazgos" rows="2"></textarea>
+    </div>
+  </div>
+  <label class="l" for="examen_obs">Observaciones</label><input id="examen_obs" />
+</div>
+
+<div class="card">
+  <h2>Procedimientos realizados <span class="badge" id="procBadge">0</span></h2>
+  <div id="procList" class="procs"></div>
+</div>
+
+<div class="card">
+  <h2>Procedimientos solicitados</h2>
+  <div class="chips" id="solChips"></div>
+  <div class="g2">
+    <div id="schBox" hidden>
+      <label class="l" for="test_schirmer_detalle">Test Schirmer: detalle</label><input id="test_schirmer_detalle" maxlength="8" />
+    </div>
+    <div><label class="l" for="procedimientos_otros">Otros</label><input id="procedimientos_otros" /></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Diagnósticos</h2>
+  <div class="chips" id="dxChips"></div>
+  <div id="catBox" hidden class="inline">
+    <span class="l">Catarata</span>
+    <div class="seg" id="catSeg" role="group" aria-label="Ojo con catarata"></div>
+    <small class="msg" data-msg="catSeg"></small>
+  </div>
+  <label class="l" for="diagnosticos_otros">Otros diagnósticos</label><input id="diagnosticos_otros" />
+  <div class="g4">
+    <div><label class="l" for="ges">GES</label><input id="ges" /></div>
+    <div><label class="l" for="interconsulta">IC</label><input id="interconsulta" /></div>
+    <div><label class="l" for="receta">Receta</label><input id="receta" /></div>
+    <div><label class="l" for="diagnosticos_acciones_otros">Otros</label><input id="diagnosticos_acciones_otros" /></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Plan e indicaciones</h2>
+  <textarea id="plan" aria-label="Plan e indicaciones" rows="4"></textarea>
+  <div class="g2">
+    <div><label class="l" for="seguimiento">Seguimiento</label><input id="seguimiento" /></div>
+    <div><label class="l" for="alta">Alta</label><input id="alta" /></div>
+  </div>
+</div>

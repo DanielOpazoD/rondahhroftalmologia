@@ -2,10 +2,11 @@
  * Estadística de atenciones: filtros y agregados.
  * Puro (sin DOM): la interfaz y los reportes Excel consumen el mismo resultado.
  */
-import { AGE_GROUPS, DIAGNOSTICOS, SOLICITADOS, ANTECEDENTES, SEXOS } from '../config/catalogs.js';
-import { parseNumber } from './format.js';
-import { patientKey } from './record.js';
-import { proceduresDone } from './clinical.js';
+import { SEXOS } from '../../config/catalogs.js';
+import { AGE_GROUPS, DIAGNOSTICOS, SOLICITADOS, ANTECEDENTES } from './config.js';
+import { parseNumber } from '../../core/format.js';
+import { patientKey } from '../../core/record.js';
+import { proceduresDone } from './clinica.js';
 
 /**
  * @typedef {{operativo?: string, desde?: string, hasta?: string}} RecordFilter
@@ -72,7 +73,7 @@ function median(nums) {
 /**
  * Calcula todos los agregados de un conjunto de atenciones.
  * @param {object[]} records
- * @param {import('../config/catalogs.js').ProcDef[]} procs
+ * @param {import('./config.js').ProcDef[]} procs
  */
 export function computeStats(records, procs) {
   const proc = {}; // nombre -> {pac, od, oi, ojos}

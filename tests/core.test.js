@@ -17,8 +17,16 @@ import {
   escapeHtml,
 } from '../src/core/format.js';
 import { blankRecord, normalizeRecord, validateRecord, patientKey, findDuplicate, sortRecords, newRecordId } from '../src/core/record.js';
-import { proceduresDone, pioFor, procLabel, diagnosesList, requestedList, antecedentsList, eyeCount } from '../src/core/clinical.js';
-import { buildNote } from '../src/core/note.js';
+import {
+  proceduresDone,
+  pioFor,
+  procLabel,
+  diagnosesList,
+  requestedList,
+  antecedentsList,
+  eyeCount,
+} from '../src/specialties/oftalmologia/clinica.js';
+import { buildNote } from '../src/specialties/oftalmologia/nota.js';
 import { fullRecord, minimalRecord, PROCS } from './fixtures.js';
 
 describe('format', () => {

@@ -15,9 +15,10 @@
  *    en cualquier visor o sistema al que se suba.
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, APP } from '../config/catalogs.js';
-import { fmtDate, fmtDateTime, toWinAnsi, fileSafe, rutKey, doctorName } from '../core/format.js';
-import { proceduresDone, procLabel, pioFor } from '../core/clinical.js';
+import { APP } from '../../config/catalogs.js';
+import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS } from './config.js';
+import { fmtDate, fmtDateTime, toWinAnsi, fileSafe, rutKey, doctorName } from '../../core/format.js';
+import { proceduresDone, procLabel, pioFor } from './clinica.js';
 
 const MIN_LINE_PT = 7; // tamaño mínimo legible en líneas
 const MIN_BOX_PT = 6.5; // tamaño mínimo en recuadros multilínea
@@ -66,7 +67,7 @@ export function pdfFileName(rec) {
  * Rellena la plantilla con una atención.
  * @param {Uint8Array} templateBytes bytes de la plantilla PDF
  * @param {object} rec registro de atención
- * @param {import('../config/catalogs.js').ProcDef[]} procs
+ * @param {import('./config.js').ProcDef[]} procs
  * @param {{flatten?: boolean, footer?: boolean, now?: Date}} [opts]
  * @returns {Promise<{bytes: Uint8Array, pages: number, overflow: string[]}>}
  *   `overflow`: secciones que se completaron en la hoja complementaria.

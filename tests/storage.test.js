@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createStore, memoryStorage, StorageError } from '../src/storage/store.js';
 import { buildBackup, parseBackup, mergeBackup } from '../src/core/backup.js';
-import { DEFAULT_PROCS, DEFAULT_SETTINGS } from '../src/config/catalogs.js';
+import { DEFAULT_SETTINGS } from '../src/config/catalogs.js';
+import { DEFAULT_PROCS } from '../src/specialties/oftalmologia/config.js';
 import { minimalRecord, PROCS } from './fixtures.js';
 
 test('store: valores por defecto, ajustes y clave', () => {
