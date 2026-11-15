@@ -1,6 +1,6 @@
 {
   "name": "hoja-atencion-oftalmologica",
-  "version": "2.12.0",
+  "version": "2.12.1",
   "private": true,
   "description": "Hoja de atención oftalmológica offline para rondas y operativos del Hospital Hanga Roa.",
   "type": "module",
