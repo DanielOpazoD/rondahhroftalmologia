@@ -60,7 +60,7 @@ export function renderUserChip(ctx) {
   const chip = $('#userChip');
   chip.hidden = !ctx.medicos.length;
   const u = ctx.currentUser();
-  setHtml(chip, html`<svg><use href="#i-user"/></svg><span>${u ? u.nombre : 'Elegir perfil'}</span>`);
+  setHtml(chip, html`<svg aria-hidden="true"><use href="#i-user"/></svg><span>${u ? u.nombre : 'Elegir perfil'}</span>`);
   chip.title = u ? `Registrando como ${u.nombre} (${rolLabel(u.rol)}). Clic para cambiar.` : 'Elegir quién registra';
   chip.classList.toggle('unset', !u);
 }

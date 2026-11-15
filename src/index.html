@@ -56,19 +56,19 @@
 <header class="top">
   <div class="topin">
     <div class="brand" title="Oftalmología · Rondas Hospital Hanga Roa">
-      <span class="logo"><svg><use href="#i-eye"/></svg></span>
+      <span class="logo"><svg aria-hidden="true"><use href="#i-eye"/></svg></span>
       <div><b>Oftalmología</b><small>Rondas · Hospital Hanga Roa</small></div>
     </div>
     <nav role="tablist" aria-label="Secciones">
-      <button type="button" role="tab" id="tab-t-ing" aria-controls="t-ing" data-tab="t-ing"><svg><use href="#i-userplus"/></svg><span>Ingreso</span></button>
-      <button type="button" role="tab" id="tab-t-at" aria-controls="t-at" data-tab="t-at" class="on"><svg><use href="#i-form"/></svg><span>Atención</span></button>
-      <button type="button" role="tab" id="tab-t-reg" aria-controls="t-reg" data-tab="t-reg"><svg><use href="#i-users"/></svg><span>Pacientes</span></button>
-      <button type="button" role="tab" id="tab-t-est" aria-controls="t-est" data-tab="t-est"><svg><use href="#i-chart"/></svg><span>Estadística</span></button>
-      <button type="button" role="tab" id="tab-t-exp" aria-controls="t-exp" data-tab="t-exp"><svg><use href="#i-export"/></svg><span>Exportar</span></button>
-      <button type="button" role="tab" id="tab-t-aj" aria-controls="t-aj" data-tab="t-aj"><svg><use href="#i-gear"/></svg><span>Ajustes</span></button>
+      <button type="button" role="tab" id="tab-t-ing" aria-controls="t-ing" data-tab="t-ing"><svg aria-hidden="true"><use href="#i-userplus"/></svg><span>Ingreso</span></button>
+      <button type="button" role="tab" id="tab-t-at" aria-controls="t-at" data-tab="t-at" class="on"><svg aria-hidden="true"><use href="#i-form"/></svg><span>Atención</span></button>
+      <button type="button" role="tab" id="tab-t-reg" aria-controls="t-reg" data-tab="t-reg"><svg aria-hidden="true"><use href="#i-users"/></svg><span>Pacientes</span></button>
+      <button type="button" role="tab" id="tab-t-est" aria-controls="t-est" data-tab="t-est"><svg aria-hidden="true"><use href="#i-chart"/></svg><span>Estadística</span></button>
+      <button type="button" role="tab" id="tab-t-exp" aria-controls="t-exp" data-tab="t-exp"><svg aria-hidden="true"><use href="#i-export"/></svg><span>Exportar</span></button>
+      <button type="button" role="tab" id="tab-t-aj" aria-controls="t-aj" data-tab="t-aj"><svg aria-hidden="true"><use href="#i-gear"/></svg><span>Ajustes</span></button>
     </nav>
     <div class="topr">
-      <button type="button" class="ib sm" id="lockNow" title="Bloquear ahora" aria-label="Bloquear ahora" hidden><svg><use href="#i-lock"/></svg></button>
+      <button type="button" class="ib sm" id="lockNow" title="Bloquear ahora" aria-label="Bloquear ahora" hidden><svg aria-hidden="true"><use href="#i-lock"/></svg></button>
       <button type="button" class="userChip" id="userChip" hidden></button>
       <button type="button" class="syncBadge" id="syncBadge" hidden></button>
       <span class="ver" id="appVersion"></span>
@@ -91,7 +91,7 @@
     </div>
     <div class="ingfoot">
       <p class="hint" id="ingHint"></p>
-      <button type="button" class="btn p" id="ingAdd"><svg><use href="#i-plus"/></svg><span>Agregar a la lista</span></button>
+      <button type="button" class="btn p" id="ingAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg><span>Agregar a la lista</span></button>
     </div>
   </div>
 
@@ -106,12 +106,12 @@
 <!-- ================= ATENCIÓN ================= -->
 <section id="t-at" class="tab on" role="tabpanel" aria-label="Atención">
   <div class="toolbar">
-    <div class="tb-title"><b id="tbName">Nueva atención</b><span id="tbState">Sin guardar</span></div>
+    <div class="tb-title"><b id="tbName">Nueva atención</b><span id="tbState" role="status" aria-live="polite">Sin guardar</span></div>
     <div class="tb-actions">
-      <button type="button" class="ib" id="bNew" title="Nueva atención" aria-label="Nueva atención"><svg><use href="#i-plus"/></svg></button>
-      <button type="button" class="ib" id="bCopy" title="Copiar nota para Eloísa" aria-label="Copiar nota para Eloísa"><svg><use href="#i-copy"/></svg></button>
-      <button type="button" class="ib" id="bPdf" title="Descargar PDF" aria-label="Descargar PDF"><svg><use href="#i-pdf"/></svg></button>
-      <button type="button" class="btn p" id="bSave" title="Guardar (Ctrl/⌘ + S)"><svg><use href="#i-check"/></svg><span>Guardar</span></button>
+      <button type="button" class="ib" id="bNew" title="Nueva atención" aria-label="Nueva atención"><svg aria-hidden="true"><use href="#i-plus"/></svg></button>
+      <button type="button" class="ib" id="bCopy" title="Copiar nota para Eloísa" aria-label="Copiar nota para Eloísa"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
+      <button type="button" class="ib" id="bPdf" title="Descargar PDF" aria-label="Descargar PDF"><svg aria-hidden="true"><use href="#i-pdf"/></svg></button>
+      <button type="button" class="btn p" id="bSave" title="Guardar (Ctrl/⌘ + S)"><svg aria-hidden="true"><use href="#i-check"/></svg><span>Guardar</span></button>
     </div>
   </div>
 
@@ -154,12 +154,12 @@
   <div class="banner warn" id="futureBanner" hidden></div>
   <div id="patListView">
     <div class="listhead">
-      <label class="search"><svg><use href="#i-search"/></svg><input id="regSearch" type="search" aria-label="Buscar paciente" placeholder="Buscar por nombre o RUT"></label>
+      <label class="search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="regSearch" type="search" aria-label="Buscar paciente" placeholder="Buscar por nombre o RUT"></label>
       <select id="regOp" aria-label="Operativo"></select>
     </div>
     <p class="listcount"><b id="regCount">0</b> pacientes</p>
     <details class="dups" id="dupBox" hidden>
-      <summary><svg><use href="#i-users"/></svg><span id="dupTitle"></span></summary>
+      <summary><svg aria-hidden="true"><use href="#i-users"/></svg><span id="dupTitle"></span></summary>
       <p class="hint">Pueden ser la misma persona registrada dos veces (por ejemplo, primero sin RUT). Al unir, sus atenciones quedan en una sola ficha; nada se borra.</p>
       <div id="dupList" class="plist"></div>
     </details>
@@ -168,7 +168,7 @@
   <div id="patDetailView" hidden>
     <button type="button" class="btn sm" id="patBack">← Pacientes</button>
     <div class="card patcard" id="patCard"></div>
-    <div class="row u-mb10"><button type="button" class="btn p sm" id="patNew"><svg><use href="#i-plus"/></svg>Nueva atención para este paciente</button></div>
+    <div class="row u-mb10"><button type="button" class="btn p sm" id="patNew"><svg aria-hidden="true"><use href="#i-plus"/></svg>Nueva atención para este paciente</button></div>
     <div id="patAttentions" class="plist"></div>
   </div>
 </section>
@@ -177,7 +177,7 @@
 <section id="t-est" class="tab" role="tabpanel" aria-label="Estadística">
   <div class="viewhead">
     <div class="filterSlot"></div>
-    <button type="button" class="btn sm noprint" id="stXlsx" title="Descargar estadística en Excel"><svg><use href="#i-export"/></svg>Excel</button>
+    <button type="button" class="btn sm noprint" id="stXlsx" title="Descargar estadística en Excel"><svg aria-hidden="true"><use href="#i-export"/></svg>Excel</button>
   </div>
   <div id="stOut"></div>
 </section>
@@ -188,17 +188,17 @@
 
   <div class="xlist">
     <div class="xrow">
-      <span class="xi"><svg><use href="#i-pdf"/></svg></span>
+      <span class="xi"><svg aria-hidden="true"><use href="#i-pdf"/></svg></span>
       <div class="xt"><b>PDF de cada atención</b><small>Hoja oficial por paciente, en un archivo ZIP. <span id="expPdfProg" aria-live="polite"></span></small></div>
       <button type="button" class="btn sm" id="expPdfZip">Descargar</button>
     </div>
     <div class="xrow">
-      <span class="xi"><svg><use href="#i-chart"/></svg></span>
+      <span class="xi"><svg aria-hidden="true"><use href="#i-chart"/></svg></span>
       <div class="xt"><b>Estadística</b><small>Excel: resumen, atenciones, prestaciones, por día, edad y sexo.</small></div>
       <button type="button" class="btn sm" id="expXlsx">Descargar</button>
     </div>
     <div class="xrow">
-      <span class="xi"><svg><use href="#i-shield"/></svg></span>
+      <span class="xi"><svg aria-hidden="true"><use href="#i-shield"/></svg></span>
       <div class="xt"><b>Datos seudonimizados</b><small>Sin nombre, RUT ni teléfono; cada paciente con un código. Para análisis o IA.</small></div>
       <div class="xbtns"><button type="button" class="btn sm" id="anXlsx">Excel</button><button type="button" class="btn sm" id="anJson">JSON</button></div>
     </div>
@@ -228,12 +228,12 @@
       <h2>Perfiles <span class="badge" id="medCount">0</span></h2>
       <p class="hint">Médicos y otros profesionales. Cada uno elige su perfil al registrar: el historial de cambios guarda quién hizo cada cambio.</p>
       <div class="list" id="medList"></div>
-      <button type="button" class="btn sm addbtn" id="medAdd"><svg><use href="#i-plus"/></svg>Agregar perfil</button>
+      <button type="button" class="btn sm addbtn" id="medAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar perfil</button>
     </div>
     <div class="card">
       <h2>Operativos <span class="badge" id="opCount">0</span></h2>
       <div class="list" id="opList"></div>
-      <button type="button" class="btn sm addbtn" id="opAdd"><svg><use href="#i-plus"/></svg>Agregar operativo</button>
+      <button type="button" class="btn sm addbtn" id="opAdd"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar operativo</button>
     </div>
   </div>
 
@@ -242,7 +242,7 @@
     <h2>Antes del operativo</h2>
     <p class="hint">Revisa que este equipo esté listo (versión, sincronización, perfiles, respaldo…) o practica con datos de ejemplo sin tocar los reales.</p>
     <div class="row u-gap8 u-wrap">
-      <button type="button" class="btn p sm" id="checkOpen"><svg><use href="#i-check"/></svg>Chequeo del equipo</button>
+      <button type="button" class="btn p sm" id="checkOpen"><svg aria-hidden="true"><use href="#i-check"/></svg>Chequeo del equipo</button>
       <button type="button" class="btn sm" id="practiceEnter">Abrir modo práctica</button>
     </div>
   </div>
@@ -381,7 +381,7 @@
 
 <dialog id="lockDlg" class="lockdlg" aria-labelledby="lockTitle">
   <div class="lockbox">
-    <span class="logo"><svg><use href="#i-lock"/></svg></span>
+    <span class="logo"><svg aria-hidden="true"><use href="#i-lock"/></svg></span>
     <h3 id="lockTitle">Equipo bloqueado</h3>
     <p class="muted">Ingresa el PIN de este equipo para continuar.</p>
     <form id="lockForm" autocomplete="off">

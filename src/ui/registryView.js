@@ -9,7 +9,7 @@ import { diagnosesList } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 import { html, setHtml, join } from './html.js';
 
-const ICON = (name) => html`<svg><use href="#i-${name}"/></svg>`;
+const ICON = (name) => html`<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initRegistryView(ctx) {

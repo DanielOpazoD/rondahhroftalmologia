@@ -6,10 +6,10 @@ import { $ } from './dom.js';
 import { html, setHtml, SafeHtml } from './html.js';
 
 const ICONS = {
-  info: html`<svg><use href="#i-info"/></svg>`,
-  ok: html`<svg><use href="#i-check"/></svg>`,
-  warn: html`<svg><use href="#i-alert"/></svg>`,
-  danger: html`<svg><use href="#i-alert"/></svg>`,
+  info: html`<svg aria-hidden="true"><use href="#i-info"/></svg>`,
+  ok: html`<svg aria-hidden="true"><use href="#i-check"/></svg>`,
+  warn: html`<svg aria-hidden="true"><use href="#i-alert"/></svg>`,
+  danger: html`<svg aria-hidden="true"><use href="#i-alert"/></svg>`,
 };
 
 /** Texto plano con saltos de línea como <br> (el texto se escapa). */
