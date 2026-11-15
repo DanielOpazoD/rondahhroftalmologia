@@ -128,12 +128,21 @@ Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<v
 
 **Separación por especialidad:** las solicitudes llevan `?esp=oftalmologia`, y cada especialidad tiene su propio espacio en el servidor. Las **fichas de pacientes** van en un espacio común, `?esp=pacientes`, porque un mismo paciente puede atenderse en varias especialidades. Cada sincronización hace primero las fichas y después el espacio de la especialidad.
 
-**Ids opacos en el espacio de pacientes.** El id local de una ficha es una huella del RUT, y como hay pocos RUT posibles, se podría adivinar probándolos todos. Por eso el servidor nunca lo ve: recibe `h_` + HMAC del id local, con una subclave de la clave del equipo. Todos los equipos calculan el mismo id opaco, pero sin la contraseña no se puede revertir. El id local viaja solo dentro del contenido cifrado, y cada equipo verifica que corresponda al id opaco antes de aceptarlo (`serverId` en `src/sync/client.js`). Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
+**Ids opacos.** El id local de una ficha de paciente y el de un perfil de médico son huellas del RUT (o del nombre). Como hay pocos RUT posibles, se podrían adivinar probándolos todos. Por eso el servidor nunca los ve: recibe `h_` + HMAC del id local, con una subclave de la clave del equipo. Todos los equipos calculan el mismo id opaco, pero sin la contraseña no se puede revertir. El id local viaja solo dentro del contenido cifrado, y cada equipo verifica que corresponda al id opaco antes de aceptarlo (`serverId` en `src/sync/client.js`). Las atenciones (id aleatorio), la bitácora y los operativos conservan su id.
+
+**Migración de ids en claro.** Las versiones hasta la 2.9.1 subían los perfiles de médico con su id en claro. Al sincronizar, cada equipo:
+
+1. baja esos elementos y los aplica con su id opaco (si son más nuevos, se fusionan);
+2. los sube con el id opaco;
+3. cuando la versión opaca ya está en el servidor, borra la antigua con `POST /api/sync/purge`.
+
+`purge` solo acepta ids con la forma de los antiguos (`m_` + 8, `p_` + 10 caracteres): no puede borrar atenciones ni ids opacos. Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
 
 API (todas con `Authorization: Bearer <token>`):
 
 - `GET /api/sync/list`
 - `POST /api/sync/get`
 - `POST /api/sync/put`
+- `POST /api/sync/purge` (solo ids antiguos en claro)
 
 Cada solicitud admite hasta 200 elementos.

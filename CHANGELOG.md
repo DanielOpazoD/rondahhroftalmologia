@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.9.2 — 2026-11-15
+
+### Seguridad
+- **Los perfiles de médico también se sincronizan con id opaco.** Su id local es una huella del RUT del médico y era visible en el servidor. El riesgo era bajo (el RUT de los profesionales de salud es público), pero ahora el servidor ve solo un HMAC con una subclave de la contraseña del equipo.
+- **Migración automática:** cada equipo vuelve a subir los perfiles existentes con id opaco y después borra del servidor los ids antiguos (`POST /api/sync/purge`, que solo acepta ids antiguos en claro). Si un equipo aún sin actualizar sube un cambio con el id antiguo, se fusiona antes de borrarlo. No hace falta hacer nada a mano.
+
 ## 2.9.1 — 2026-11-15
 
 ### Seguridad

@@ -46,6 +46,8 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
     list: () => call('list'),
     get: (items) => call('get', { items }),
     put: (items) => call('put', { items }),
+    /** Borra del servidor ids en claro de versiones anteriores (ya migrados a id opaco). */
+    purge: (ids) => call('purge', { ids }),
   };
   return api;
 }
@@ -67,20 +69,22 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
  *   encKey?: string,
  *   fingerprint?: (kind: string, data: object) => string,
  *   batchSize?: number,
- *   opaqueIds?: boolean,
+ *   opaqueIds?: boolean | ((localId: string) => boolean),
  * }} deps
  *   `encKey`: clave del equipo (base64), para la huella de contenido de cada versión;
  *   `fingerprint`: representación canónica del contenido (ver core/merge.js);
- *   `opaqueIds`: el servidor ve un id opaco (`serverId`) en vez del id local.
- *   Necesario cuando el id local se deriva de datos personales (fichas de
- *   pacientes: id = huella del RUT, que se podría adivinar probando RUTs).
+ *   `opaqueIds`: el servidor ve un id opaco (`serverId`) en vez del id local
+ *   (todos, o los que indique la función). Necesario cuando el id local se
+ *   deriva de datos personales: fichas de pacientes y perfiles de médico usan
+ *   una huella del RUT, que se podría adivinar probando RUTs. Los ids en claro
+ *   que subieron versiones anteriores se migran solos (ver `syncPass`).
  * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
  */
 export async function syncOnce(deps) {
   // Si al bajar se fusionó algo que el servidor aún no tiene, una segunda
   // pasada lo sube de inmediato (así los otros equipos lo reciben antes).
   const total = { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false };
-  const pass0 = deps.opaqueIds ? withOpaqueIds(deps) : { ...deps, lids: null };
+  const pass0 = deps.opaqueIds ? withOpaqueIds(deps) : { ...deps, lids: null, wire: null };
   for (let pass = 0; pass < 3; pass++) {
     const r = await syncPass(pass0);
     for (const k of ['pushed', 'skipped', 'merged', 'added', 'updated', 'deleted']) total[k] += r[k];
@@ -126,10 +130,13 @@ export function serverId(encKey, localId) {
  */
 function withOpaqueIds(deps) {
   if (!deps.encKey) throw new Error('opaqueIds requiere encKey');
+  const isOpaque = typeof deps.opaqueIds === 'function' ? deps.opaqueIds : () => true;
+  /** id local → id que ve el servidor */
+  const wire = (lid) => (isOpaque(lid) ? serverId(deps.encKey, lid) : lid);
   /** id del servidor → id local */
   const lids = new Map();
   const toServer = (lid) => {
-    const sid = serverId(deps.encKey, lid);
+    const sid = wire(lid);
     lids.set(sid, lid);
     return sid;
   };
@@ -137,6 +144,9 @@ function withOpaqueIds(deps) {
   return {
     ...deps,
     lids,
+    wire,
+    /** ¿Es un id en claro que debería ser opaco? (subido por una versión anterior) */
+    isLegacy: (id) => !id.startsWith('h_') && isOpaque(id),
     readLocal() {
       const { items, tombstones } = deps.readLocal();
       return { items: items.map((i) => ({ ...i, id: toServer(i.id) })), tombstones: mapKeys(tombstones, toServer) };
@@ -156,10 +166,35 @@ function withOpaqueIds(deps) {
   };
 }
 
-/** @param {Parameters<typeof syncOnce>[0] & {lids: Map<string, string> | null}} deps */
-async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100, lids }) {
+/**
+ * @param {Parameters<typeof syncOnce>[0] & {
+ *   lids: Map<string, string> | null,
+ *   wire: ((lid: string) => string) | null,
+ *   isLegacy?: (id: string) => boolean,
+ * }} deps
+ */
+async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100, lids, wire, isLegacy }) {
   const { items } = await api.list();
   const remote = remoteVersions(items || []);
+
+  // Ids en claro de versiones anteriores: no entran al plan. Si su versión
+  // opaca ya está en el servidor, se borran; si no, se bajan y se aplican con
+  // su id opaco (la próxima pasada los sube así).
+  const legacy = [];
+  if (lids && isLegacy) {
+    for (const [id, v] of remote) {
+      if (!isLegacy(id)) continue;
+      remote.delete(id);
+      legacy.push({ id, u: v.u, ...(v.h ? { h: v.h } : {}) });
+    }
+  }
+  // Ya migrado = la versión opaca existe y no es más antigua. Si lo antiguo es
+  // más nuevo (lo volvió a subir un equipo aún sin actualizar), primero se
+  // fusiona y después se borra.
+  const isMigrated = (l) => remote.has(wire(l.id)) && remote.get(wire(l.id)).u >= l.u;
+  const migrated = legacy.filter(isMigrated);
+  if (migrated.length) await api.purge(migrated.map((l) => l.id));
+  const toMigrate = legacy.filter((l) => !isMigrated(l));
   const local0 = readLocal();
   const byId = new Map(local0.items.map((r) => [r.id, r]));
   const local = localVersions(local0.items, local0.tombstones);
@@ -181,31 +216,42 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
   const extraPush = [];
   const tombBumps = {};
 
-  /** Baja y descifra versiones del servidor. */
-  const fetchItems = async (list) => {
+  /** Baja y descifra versiones del servidor (`fromLegacy`: ids en claro que se migran a opacos). */
+  const fetchItems = async (list, { fromLegacy = false } = {}) => {
     const out = [];
     for (const batch of chunks(list, batchSize)) {
       const res = await api.get(batch);
       for (const it of res.items || []) {
         if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
         const content = await decryptPayload(key, it.id, it.u, it);
+        let id = it.id;
         if (lids) {
-          // Id opaco: el id local viene dentro del contenido cifrado y debe corresponder.
-          if (typeof content.lid !== 'string' || serverId(encKey, content.lid) !== it.id) continue;
-          lids.set(it.id, content.lid);
+          // El id local viene dentro del contenido cifrado (o es el mismo id) y
+          // debe corresponder al id del servidor. El cifrado está atado al id
+          // del servidor, así que un elemento no se puede reubicar.
+          const lid = content.lid ?? it.id;
+          if (typeof lid !== 'string') continue;
+          if (fromLegacy) {
+            if (content.lid !== undefined || lid !== it.id) continue;
+            id = wire(lid);
+          } else if (wire(lid) !== it.id) continue;
+          lids.set(id, lid);
         }
         // `record` = formato de la v2.1 (solo atenciones)
+        const data = content.data ?? content.record;
         out.push({
-          id: it.id,
+          id,
           u: it.u,
           deleted: !!content.deleted,
           kind: content.kind || 'atencion',
-          data: content.data ?? content.record,
+          data: data && fromLegacy ? { ...data, id, updated: it.u } : data,
         });
       }
     }
     return out;
   };
+
+  const legacyPulled = toMigrate.length ? await fetchItems(toMigrate, { fromLegacy: true }) : [];
 
   // 1. Fusionar antes de subir lo que también cambió en el servidor, y resolver
   //    conflictos (mismo número de versión, distinto contenido).
@@ -269,7 +315,7 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
         const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
-        if (lids) content.lid = lids.get(id);
+        if (lids && lids.get(id) !== id) content.lid = lids.get(id);
         const h =
           encKey && fingerprint
             ? content.deleted
@@ -284,8 +330,8 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
     skipped += res.skipped?.length || 0;
   }
 
-  // 3. Bajar lo que es más nuevo en el servidor
-  pulled.push(...(await fetchItems(plan.pull)));
+  // 3. Bajar lo que es más nuevo en el servidor (y lo migrado desde ids en claro)
+  pulled.push(...(await fetchItems(plan.pull)), ...legacyPulled);
 
   // 4. Aplicar sobre el estado local ACTUAL (pudo cambiar mientras se esperaba la red).
   let result = { added: 0, updated: 0, deleted: 0, needsPush: false };
@@ -302,6 +348,7 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
     added: result.added,
     updated: result.updated,
     deleted: result.deleted,
-    needsPush: result.needsPush || skipped > 0 || plan.conflicts.length > 0,
+    // Lo migrado se sube con id opaco en la próxima pasada, y entonces se borra lo antiguo.
+    needsPush: result.needsPush || skipped > 0 || plan.conflicts.length > 0 || legacyPulled.length > 0,
   };
 }

@@ -161,7 +161,8 @@ export function createSyncController(ctx) {
       });
       // 2) Atenciones, catálogos y bitácora: espacio de la especialidad.
       const api = createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id });
-      const resE = await syncOnce({ ...common, api, readLocal, writeLocal });
+      // El id de un perfil de médico es la huella de su RUT: el servidor ve un id opaco.
+      const resE = await syncOnce({ ...common, api, readLocal, writeLocal, opaqueIds: (id) => id.startsWith('m_') });
       const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
       ctx.ensurePatients();
       checkClock(api.serverDate);

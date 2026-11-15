@@ -16,6 +16,7 @@ import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createSyncApi, syncOnce, SyncHttpError, serverId } from '../src/sync/client.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
 import { patientFromRecord, normalizePatient } from '../src/core/patient.js';
+import { makeMedico } from '../src/core/catalog.js';
 import { syncMerge, syncFingerprint, stampChanges } from '../src/core/merge.js';
 
 const PASS = 'K7QM3-XRT9P-ZAWD4-N8F2C';
@@ -423,5 +424,81 @@ describe('fichas de pacientes (espacio común)', () => {
       writeLocal: (items) => (state.patients = items),
     });
     assert.deepEqual(state.patients, []);
+  });
+
+  test('migración: médicos subidos con id en claro pasan a id opaco y lo antiguo se borra', async () => {
+    const { keys, fetchFn, store } = await setup();
+    const key = await importEncKey(keys.encKey);
+    const api = createSyncApi({ token: keys.token, fetchFn, esp: 'oftalmologia' });
+    const med = makeMedico({ nombre: 'Dra. Antigua', rut: '12.345.678-5' }, 1000);
+    const nuevo = makeMedico({ nombre: 'Dr. Local', rut: '10.000.013-K' }, 2000);
+    const atencion = minimalRecord('aten1', { paciente_nombre: 'X' }, { updated: 1000 });
+    // Así subía la 2.9.1: id en claro (huella del RUT), sin `lid`.
+    for (const [id, kind, data] of [
+      [med.id, 'medico', med],
+      [atencion.id, 'atencion', atencion],
+    ]) {
+      await api.put([{ id, u: 1000, ...(await encryptPayload(key, id, 1000, { kind, data })) }]);
+    }
+    const state = { items: [{ id: nuevo.id, updated: 2000, kind: 'medico', data: nuevo }], tombstones: {} };
+    const sync = () =>
+      syncOnce({
+        api,
+        key,
+        encKey: keys.encKey,
+        fingerprint: syncFingerprint,
+        mergeFn: syncMerge,
+        opaqueIds: (id) => id.startsWith('m_'),
+        readLocal: () => structuredClone(state),
+        writeLocal: (items, tombstones) => Object.assign(state, { items, tombstones }),
+      });
+    await sync();
+    const ids = () => [...store._map.keys()].map((k) => k.split('/')[2]).sort();
+    assert.deepEqual(
+      ids(),
+      [atencion.id, serverId(keys.encKey, med.id), serverId(keys.encKey, nuevo.id)].sort(),
+      'sin ids de médico en claro',
+    );
+    assert.deepEqual(state.items.map((i) => i.id).sort(), [atencion.id, med.id, nuevo.id].sort(), 'localmente conserva sus ids');
+    assert.equal(state.items.find((i) => i.id === med.id).data.nombre, 'Dra. Antigua');
+    // Otro equipo recibe todo con sus ids locales.
+    const other = { items: [], tombstones: {} };
+    await syncOnce({
+      api,
+      key,
+      encKey: keys.encKey,
+      fingerprint: syncFingerprint,
+      mergeFn: syncMerge,
+      opaqueIds: (id) => id.startsWith('m_'),
+      readLocal: () => structuredClone(other),
+      writeLocal: (items, tombstones) => Object.assign(other, { items, tombstones }),
+    });
+    assert.deepEqual(other.items.map((i) => [i.id, i.data.id]).sort(), state.items.map((i) => [i.id, i.id]).sort());
+
+    // Un equipo aún sin actualizar vuelve a subir al médico en claro, con un cambio más nuevo:
+    // se incorpora a la versión opaca antes de borrar lo antiguo.
+    const editado = { ...med, rut: '12.345.678-5', nombre: 'Dra. Antigua Editada', updated: 5000 };
+    await api.put([{ id: med.id, u: 5000, ...(await encryptPayload(key, med.id, 5000, { kind: 'medico', data: editado })) }]);
+    await sync();
+    assert.equal(state.items.find((i) => i.id === med.id).data.nombre, 'Dra. Antigua Editada');
+    assert.ok(!ids().includes(med.id), 'lo antiguo se borró tras fusionarlo');
+  });
+});
+
+describe('purge', () => {
+  test('solo borra ids antiguos en claro (nunca atenciones ni ids opacos)', async () => {
+    const { keys, fetchFn, store } = await setup();
+    const api = createSyncApi({ token: keys.token, fetchFn });
+    const iv = 'AAAAAAAAAAAAAAAA';
+    await api.put([
+      { id: 'm_abcdefgh', u: 10, iv, ct: 'AQ==' },
+      { id: 'aten1', u: 10, iv, ct: 'AQ==' },
+    ]);
+    for (const ids of [['aten1'], ['h_' + 'a'.repeat(32)], ['m_abc'], ['../x']]) {
+      await assert.rejects(api.purge(ids), (e) => e instanceof SyncHttpError && e.status === 400);
+    }
+    assert.deepEqual(await api.purge(['m_abcdefgh', 'p_0123456789']), { purged: ['m_abcdefgh'] });
+    assert.deepEqual([...store._map.keys()], ['oftalmologia/r/aten1/10']);
+    await assert.rejects(createSyncApi({ token: 'malo', fetchFn }).purge(['m_abcdefgh']), (e) => e.status === 401);
   });
 });

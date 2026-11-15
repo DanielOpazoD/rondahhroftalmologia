@@ -13,6 +13,7 @@
  *   GET  /api/sync/list   -> { items: [{id, u, h}] }
  *   POST /api/sync/get    { items: [{id, u, h}] }            -> { items: [{id, u, h, iv, ct} | {id, u, missing}] }
  *   POST /api/sync/put    { items: [{id, u, h, iv, ct}] }    -> { saved: [id], skipped: [id] }
+ *   POST /api/sync/purge  { ids: [id] }                      -> { purged: [id] }   (solo ids antiguos en claro, ver LEGACY_ID_RE)
  * `h` = huella de 16 hex del contenido (opcional por compatibilidad).
  *
  * Se escribe contra una interfaz mínima de "store" (list/get/setJSON/delete)
@@ -24,6 +25,12 @@ export const LIMITS = Object.freeze({ itemsPerRequest: 200, ctMaxChars: 400_000,
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const ESP_RE = /^[a-z][a-z0-9-]{1,39}$/;
+/**
+ * Ids en claro que versiones anteriores derivaban de datos personales (médico:
+ * `m_` + 8, paciente: `p_` + 10). Hoy viajan con id opaco; `purge` solo puede
+ * borrar ids con esta forma (nunca atenciones ni ids opacos).
+ */
+export const LEGACY_ID_RE = /^(?:m_[0-9a-z]{8}|p_[0-9a-z]{10})$/;
 export const DEFAULT_ESP = 'oftalmologia';
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
@@ -172,6 +179,26 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
           saved.push(id);
         });
         return json(200, { saved, skipped });
+      }
+
+      if (req.method === 'POST' && action === 'purge') {
+        let body;
+        try {
+          body = await req.json();
+        } catch {
+          return json(400, { error: 'JSON inválido' });
+        }
+        const ids = Array.isArray(body?.ids) ? body.ids : null;
+        if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every((id) => typeof id === 'string' && LEGACY_ID_RE.test(id))) {
+          return json(400, { error: 'Solo se pueden borrar ids antiguos en claro' });
+        }
+        const purged = [];
+        await mapLimit(ids, 8, async (id) => {
+          const existing = await versionsOf(store, esp, id);
+          await Promise.all(existing.map((old) => store.delete(old.key)));
+          if (existing.length) purged.push(id);
+        });
+        return json(200, { purged });
       }
 
       return json(404, { error: 'Ruta no encontrada' });
