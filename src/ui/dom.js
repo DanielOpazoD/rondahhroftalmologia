@@ -70,7 +70,8 @@ export async function withBusy(button, fn) {
     return await fn();
   } catch (e) {
     console.error(e);
-    alert('No se pudo completar la acción: ' + (e?.message || e));
+    // Import dinámico para no crear una dependencia circular dom ↔ modal.
+    import('./modal.js').then(({ uiAlert }) => uiAlert({ title: 'No se pudo completar la acción', message: String(e?.message || e), tone: 'danger' }));
     return undefined;
   } finally {
     if (button) button.disabled = false;

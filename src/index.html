@@ -30,6 +30,8 @@
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></symbol>
     <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
   </defs>
 </svg>
@@ -237,14 +239,14 @@
     <p class="muted">Atenciones, médicos y operativos se comparten entre los PC a través del servidor. Todo se <b>cifra en este equipo</b> antes de enviarse: el servidor no puede leer nombres, RUT ni datos clínicos. Sin internet se sigue trabajando.</p>
     <div id="syncUnavailable" class="banner warn" hidden>La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa el respaldo.</div>
     <div id="syncSetup">
-      <label class="l" for="syncPass">Contraseña del equipo (la misma en todos los PC)</label>
+      <label class="l" for="syncPass" id="syncPassLabel">Contraseña del equipo</label>
       <div class="row">
         <input id="syncPass" type="password" autocomplete="off" spellcheck="false" style="flex:1;min-width:220px;font-family:var(--mono)">
         <button type="button" class="btn sm" id="syncShow">Mostrar</button>
-        <button type="button" class="btn sm" id="syncGen">Generar</button>
+        <button type="button" class="btn sm" id="syncGen" hidden>Generar</button>
         <button type="button" class="btn p sm" id="syncOn">Activar</button>
       </div>
-      <p class="hint">Si se pierde la contraseña, los datos del servidor no se pueden descifrar (los de cada PC no se pierden).</p>
+      <p class="hint" id="syncSetupHint"></p>
     </div>
     <div id="syncActive" hidden>
       <div class="row">
@@ -317,6 +319,16 @@
   <div class="dlg-actions">
     <button type="button" class="btn" id="dlgCancel">Cancelar</button>
     <button type="button" class="btn p" id="dlgOk">Guardar</button>
+  </div>
+</dialog>
+
+<dialog id="msgDlg" class="msgdlg" aria-labelledby="msgTitle">
+  <div class="msghead"><span class="msgicon" id="msgIcon"></span><h3 id="msgTitle"></h3></div>
+  <div class="msgtext" id="msgText"></div>
+  <textarea id="msgCopy" readonly rows="8" hidden aria-label="Texto para copiar"></textarea>
+  <div class="dlg-actions">
+    <button type="button" class="btn" id="msgCancel" hidden></button>
+    <button type="button" class="btn p" id="msgOk">Aceptar</button>
   </div>
 </dialog>
 

@@ -7,6 +7,7 @@ import { escapeHtml, isValidRut } from '../core/format.js';
 import { makeMedico, makeOperativo, findMedico } from '../core/catalog.js';
 import { $ } from './dom.js';
 import { openDialog } from './dialog.js';
+import { uiConfirm } from './modal.js';
 
 const NEW = '__nuevo';
 const CUR = '__actual';
@@ -27,16 +28,21 @@ export function initCatalogView(ctx) {
 
   $('#medAdd').addEventListener('click', () => editMedico(ctx));
   $('#opAdd').addEventListener('click', () => editOperativo(ctx));
-  const listClick = (kind) => (e) => {
+  const listClick = (kind) => async (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
     const list = kind === 'medico' ? ctx.medicos : ctx.operativos;
     const item = list.find((x) => x.id === b.dataset.id);
     if (!item) return;
     if (b.dataset.a === 'edit') return kind === 'medico' ? editMedico(ctx, item) : editOperativo(ctx, item);
-    if (b.dataset.a === 'del' && confirm(`¿Eliminar «${item.nombre}» de la lista? Las atenciones ya guardadas no cambian.`)) {
-      ctx.deleteCatalog(kind, item.id);
-    }
+    if (b.dataset.a !== 'del') return;
+    const ok = await uiConfirm({
+      title: kind === 'medico' ? 'Eliminar médico' : 'Eliminar operativo',
+      message: `«${item.nombre}» se quitará de la lista en todos los equipos. Las atenciones ya guardadas no cambian.`,
+      tone: 'danger',
+      okLabel: 'Eliminar',
+    });
+    if (ok) ctx.deleteCatalog(kind, item.id);
   };
   $('#medList').addEventListener('click', listClick('medico'));
   $('#opList').addEventListener('click', listClick('operativo'));

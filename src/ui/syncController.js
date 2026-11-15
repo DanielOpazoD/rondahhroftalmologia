@@ -14,6 +14,7 @@ import {
 } from '../sync/crypto.js';
 import { createSyncApi, syncOnce, SyncHttpError } from '../sync/client.js';
 import { $, toast, copyText } from './dom.js';
+import { uiAlert, uiConfirm } from './modal.js';
 
 const INTERVAL_MS = 2 * 60 * 1000;
 const DEBOUNCE_MS = 4000;
@@ -25,6 +26,7 @@ export function createSyncController(ctx) {
     config: store.loadSyncConfig(),
     key: null,
     running: false,
+    server: 'unknown', // configured | unconfigured | unknown
     again: false,
     status: 'off', // off | idle | syncing | offline | error
     message: '',
@@ -136,28 +138,57 @@ export function createSyncController(ctx) {
     try {
       const keys = await deriveTeamKeys(passphrase);
       const hash = tokenHash(keys.token);
+      let serverReady = true;
       try {
         await createSyncApi({ token: keys.token, esp: ESPECIALIDAD.id }).list();
       } catch (e) {
         if (e.status === 401) {
           setStatus('off');
-          return alert('Esta contraseña no coincide con la configurada en el servidor. Usa la misma contraseña que en los otros PC.');
+          st.server = 'configured';
+          render();
+          $('#syncPass').select();
+          return uiAlert({
+            title: 'Contraseña incorrecta',
+            tone: 'danger',
+            html:
+              'Esta no es la contraseña del equipo. El servidor ya tiene una configurada: escribe <b>la misma que usan los otros PC</b>; no generes una nueva.' +
+              '<br><br>Si nadie la tiene, hay que reemplazarla en el servidor (ver «Cambiar la contraseña» en la documentación).',
+          });
         }
         if (e.status !== 503 && e.status !== 0 && e.status !== 404) throw e;
         // 503/404: servidor aún sin configurar; 0: sin conexión. Se activa igual.
+        serverReady = e.status === 0;
       }
       st.config = { encKey: keys.encKey, token: keys.token, hash, activatedAt: Date.now(), lastSync: null };
       st.key = null;
       store.saveSyncConfig(st.config);
       $('#syncPass').value = '';
       start();
+      if (!serverReady) {
+        $('#syncActive details.setup').open = true;
+        uiAlert({
+          title: 'Falta configurar el servidor',
+          tone: 'warn',
+          html:
+            'La sincronización quedó activa en este PC, pero el servidor aún no tiene contraseña. ' +
+            'Copia el valor de <b>Configuración del servidor</b> y créalo en Netlify como <code>SYNC_TOKEN_SHA256</code>; luego vuelve a publicar el sitio.',
+        });
+      } else {
+        toast('Sincronización activada en este PC');
+      }
     } catch (e) {
       setStatus('error', e.message || String(e));
     }
   }
 
-  function deactivate() {
-    if (!confirm('¿Desactivar la sincronización en este PC? Los datos locales se conservan; los cambios dejarán de compartirse.')) return;
+  async function deactivate() {
+    const ok = await uiConfirm({
+      title: 'Desactivar sincronización',
+      message: 'Los datos de este PC se conservan, pero sus cambios dejarán de compartirse con los otros equipos.',
+      tone: 'warn',
+      okLabel: 'Desactivar',
+    });
+    if (!ok) return;
     clearInterval(st.interval);
     st.config = null;
     st.key = null;
@@ -165,7 +196,23 @@ export function createSyncController(ctx) {
     setStatus('off');
   }
 
+  /**
+   * Pregunta al servidor, sin contraseña, si ya tiene una configurada:
+   * 401 = sí (hay que usar la del equipo); 503 = no (primera configuración).
+   */
+  async function probeServer() {
+    if (!available()) return;
+    try {
+      const res = await fetch(`/api/sync/list?esp=${ESPECIALIDAD.id}`, { cache: 'no-store' });
+      st.server = res.status === 401 ? 'configured' : res.status === 503 ? 'unconfigured' : 'unknown';
+    } catch {
+      st.server = 'unknown';
+    }
+    render();
+  }
+
   function init() {
+    probeServer();
     $('#syncGen').addEventListener('click', () => {
       $('#syncPass').value = generatePassphrase();
       $('#syncPass').type = 'text';
@@ -186,6 +233,14 @@ export function createSyncController(ctx) {
     const on = !!st.config;
     $('#syncUnavailable').hidden = available();
     $('#syncSetup').hidden = on || !available();
+    // «Generar» solo en la primera configuración: si el servidor ya tiene
+    // contraseña, generar otra solo produce una que no coincide.
+    const firstSetup = st.server === 'unconfigured';
+    $('#syncGen').hidden = !firstSetup;
+    $('#syncPassLabel').textContent = firstSetup ? 'Nueva contraseña del equipo' : 'Contraseña del equipo';
+    $('#syncSetupHint').textContent = firstSetup
+      ? 'Primera configuración: genera la contraseña del equipo, anótala en un lugar seguro y actívala. Luego se usa la misma en todos los PC.'
+      : 'Escribe la contraseña del equipo, la misma de los otros PC (formato XXXXX-XXXXX-XXXXX-XXXXX). Si se pierde, los datos del servidor no se pueden descifrar.';
     $('#syncActive').hidden = !on || !available();
     $('#syncState').textContent = LABELS[st.status];
     const badge = $('#syncBadge');

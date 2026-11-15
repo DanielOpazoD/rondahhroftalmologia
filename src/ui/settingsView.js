@@ -6,20 +6,23 @@ import { escapeHtml, todayIso } from '../core/format.js';
 import { buildBackup, parseBackup, mergeBackup } from '../core/backup.js';
 import { createSecret } from '../core/anonymize.js';
 import { $, download, toast } from './dom.js';
+import { uiAlert, uiConfirm } from './modal.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initSettingsView(ctx) {
-  $('#ajList').addEventListener('click', (e) => {
+  $('#ajList').addEventListener('click', async (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.id === 'ajReset') {
-      if (confirm('¿Volver a la lista original de procedimientos?')) ctx.setProcs(structuredClone(DEFAULT_PROCS));
+      if (await uiConfirm({ title: 'Restaurar lista', message: '¿Volver a la lista original de procedimientos? Las atenciones guardadas no cambian.', okLabel: 'Restaurar' })) {
+        ctx.setProcs(structuredClone(DEFAULT_PROCS));
+      }
       return;
     }
     const i = Number(b.dataset.i);
     const procs = [...ctx.procs];
     if (b.dataset.a === 'rm') {
-      if (!confirm(`¿Quitar «${procs[i].n}» de la lista? Las atenciones ya guardadas lo conservan.`)) return;
+      if (!(await uiConfirm({ title: 'Quitar procedimiento', message: `«${procs[i].n}» se quitará de la lista. Las atenciones ya guardadas lo conservan.`, tone: 'danger', okLabel: 'Quitar' }))) return;
       procs.splice(i, 1);
     } else if (b.dataset.a === 'up' && i > 0) {
       [procs[i - 1], procs[i]] = [procs[i], procs[i - 1]];
@@ -66,29 +69,41 @@ export function initSettingsView(ctx) {
       const local = ctx.store.loadSecret();
       if (incoming.anonSecret && !local) {
         ctx.store.saveSecret(incoming.anonSecret);
-        keyMsg = '\nSe adoptó la clave de seudonimización del respaldo.';
+        keyMsg = '\n\nSe adoptó la clave de seudonimización del respaldo.';
       } else if (incoming.anonSecret && local && incoming.anonSecret !== local) {
-        keyMsg = '\nOjo: el respaldo trae otra clave de seudonimización; se mantiene la de este equipo.';
+        keyMsg = '\n\nOjo: el respaldo trae otra clave de seudonimización; se mantiene la de este equipo.';
       }
       ctx.reload();
       ctx.sync?.schedule();
-      alert(`Importado: ${merged.added} nuevas, ${merged.updated} actualizadas, ${merged.unchanged} sin cambios.${keyMsg}`);
+      uiAlert({ title: 'Respaldo importado', message: `${merged.added} nuevas, ${merged.updated} actualizadas y ${merged.unchanged} sin cambios.${keyMsg}`, tone: 'ok' });
     } catch (err) {
-      alert('No se pudo importar: ' + err.message);
+      uiAlert({ title: 'No se pudo importar', message: err.message, tone: 'danger' });
     }
   });
 
-  $('#anRegen').addEventListener('click', () => {
-    if (!confirm('Con una clave nueva, los mismos pacientes tendrán códigos distintos en las próximas exportaciones seudonimizadas y las anteriores ya no coincidirán. ¿Continuar?')) return;
+  $('#anRegen').addEventListener('click', async () => {
+    const ok = await uiConfirm({
+      title: 'Nueva clave de seudonimización',
+      message: 'Con una clave nueva, los mismos pacientes tendrán códigos distintos en las próximas exportaciones, y las anteriores ya no coincidirán.',
+      tone: 'warn',
+      okLabel: 'Generar clave nueva',
+    });
+    if (!ok) return;
     ctx.store.saveSecret(createSecret());
     ctx.reload();
     toast('Nueva clave generada');
   });
-  $('#wipe').addEventListener('click', () => {
+  $('#wipe').addEventListener('click', async () => {
     const n = ctx.records.length;
     if (!n) return toast('No hay atenciones que borrar');
     const syncNote = ctx.sync?.enabled ? '\n\nSolo se borran en ESTE equipo: con la sincronización activa, las atenciones de los demás equipos se volverán a descargar.' : '';
-    if (confirm('¿Borrar TODAS las atenciones guardadas en este equipo? Descarga un respaldo antes.' + syncNote) && confirm(`Confirma de nuevo: se borrarán ${n} atenciones.`)) {
+    const ok = await uiConfirm({
+      title: 'Borrar atenciones de este equipo',
+      message: `Se borrarán las ${n} atenciones guardadas en este equipo. Descarga un respaldo antes.${syncNote}`,
+      tone: 'danger',
+      okLabel: `Borrar ${n} atenciones`,
+    });
+    if (ok) {
       ctx.store.saveRecords([]);
       ctx.reload();
     }

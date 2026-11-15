@@ -10,6 +10,7 @@ import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createZip } from '../lib/zip.js';
 import { buildAttentionPdf, pdfFileName } from '../pdf/attentionPdf.js';
 import { $, download, toast, withBusy, nextFrame } from './dom.js';
+import { uiConfirm } from './modal.js';
 
 /** Sufijo de archivo según el filtro: _OperativoNov_2026-11-14. */
 function suffix(ctx) {
@@ -127,7 +128,10 @@ function exportAnon(ctx, format, button) {
   if (!list) return;
   return withBusy(button, async () => {
     const { result, leaks } = runAnon(ctx, list);
-    if (leaks.length && !confirm('La verificación encontró posibles identificadores en los textos. ¿Descargar igual?')) return;
+    if (
+      leaks.length &&
+      !(await uiConfirm({ title: 'Posibles identificadores', message: 'La verificación encontró posibles identificadores en los textos (detalle bajo la lista). ¿Descargar igual?', tone: 'warn', okLabel: 'Descargar igual' }))
+    ) return;
     const name = `oftalmo_seudonimizado_${suffix(ctx)}`;
     if (format === 'json') {
       download(JSON.stringify(anonymizedJson(result), null, 2), name + '.json', 'application/json');
@@ -138,10 +142,17 @@ function exportAnon(ctx, format, button) {
   });
 }
 
-function exportKeyTable(ctx, button) {
+async function exportKeyTable(ctx, button) {
   const list = requireData(ctx);
   if (!list) return;
-  if (!confirm('La tabla de correspondencia contiene nombres y RUT. Guárdala en un lugar seguro y separada de los datos seudonimizados. ¿Descargar?')) return;
+  if (
+    !(await uiConfirm({
+      title: 'Tabla de correspondencia',
+      message: 'Contiene nombres y RUT: permite volver a identificar a los pacientes. Guárdala en un lugar seguro, separada de los datos seudonimizados, y no la subas a servicios externos.',
+      tone: 'warn',
+      okLabel: 'Descargar',
+    }))
+  ) return;
   return withBusy(button, async () => {
     const result = anonymizeRecords(list, ctx.procs, { ...anonOptions(), secret: secret(ctx) });
     download(buildXlsx(correspondenciaSheets(result), { title: 'CONFIDENCIAL' }), `CONFIDENCIAL_correspondencia_${suffix(ctx)}.xlsx`, XLSX_MIME);

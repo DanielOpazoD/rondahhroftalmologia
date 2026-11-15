@@ -11,7 +11,7 @@ export const APP = Object.freeze({
   id: 'oftalmo-operativos',
   nombre: 'Atención Oftalmológica · Rondas y Operativos',
   establecimiento: 'Hospital Hanga Roa',
-  version: '2.4.0',
+  version: '2.4.1',
 });
 
 /**

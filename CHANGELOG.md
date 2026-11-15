@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.4.1 — 2026-11-14
+
+### Corregido
+- **«Generar» ya no aparece cuando el servidor tiene contraseña.** Antes se podía generar una contraseña nueva que no coincidía con la del equipo («Esta contraseña no coincide…»). La app ahora consulta al servidor:
+  - si ya tiene contraseña, pide la del equipo;
+  - si no tiene, muestra «Generar» (primera configuración).
+- Mensaje de contraseña incorrecta más claro, con qué hacer.
+
+### Cambiado
+- **Todos los avisos y confirmaciones usan diálogos propios de la app**, con icono, título y botones claros; ya no usan los del navegador. Las acciones destructivas se confirman con botón rojo.
+- Si el navegador no permite copiar la nota, se muestra el texto seleccionado para copiarlo a mano.
+- Test que impide volver a usar `alert`/`confirm`/`prompt`.
+
 ## 2.4.0 — 2026-11-14
 
 ### Nuevo

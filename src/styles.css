@@ -415,3 +415,26 @@ dialog#dlg::backdrop { background: rgba(16, 24, 40, .35); backdrop-filter: blur(
 dialog#dlg h3 { margin: 0 0 6px; font-size: 16px; }
 dialog#dlg .l:first-child { margin-top: 8px; }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* ------------------------------------------------- avisos y confirmaciones */
+dialog.msgdlg {
+  width: min(440px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 16px; padding: 20px 20px 16px;
+  background: var(--surface); color: var(--ink); box-shadow: var(--shadow-lg);
+}
+dialog.msgdlg[open] { animation: pop .14s ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+dialog.msgdlg::backdrop { background: rgba(16, 24, 40, .38); backdrop-filter: blur(2px); }
+.msghead { display: flex; align-items: center; gap: 12px; }
+.msghead h3 { margin: 0; font-size: 16px; line-height: 1.3; }
+.msgicon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--acc-soft); color: var(--acc-text); }
+.msgicon svg { width: 19px; height: 19px; stroke-width: 2; }
+.msgdlg.ok .msgicon { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.msgdlg.warn .msgicon { background: var(--warn-soft); color: var(--warn); }
+.msgdlg.danger .msgicon { background: var(--bad-soft); color: var(--bad); }
+.msgtext { margin: 12px 0 0 48px; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+.msgtext b { color: var(--ink); }
+.msgtext code { font-size: 12px; }
+#msgCopy { margin-top: 12px; font: 12.5px/1.5 var(--mono); }
+.btn.dangerfill { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.dangerfill:hover { background: color-mix(in srgb, var(--bad) 88%, #000); }
+@media (max-width: 460px) { .msgtext { margin-left: 0; } }

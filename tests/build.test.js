@@ -25,6 +25,12 @@ test('cada id que usa la interfaz existe en el HTML', () => {
   assert.deepEqual(missing, []);
 });
 
+test('la interfaz no usa alert/confirm/prompt del navegador (usa ui/modal.js)', () => {
+  const dir = new URL('../src/ui/', import.meta.url);
+  const offenders = readdirSync(dir).filter((f) => /(^|[^\w.])(window\.)?(alert|confirm|prompt)\(/.test(readFileSync(new URL(f, dir), 'utf8')));
+  assert.deepEqual(offenders, []);
+});
+
 test('buildSite escribe el sitio para Netlify con service worker versionado', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'oft-site-'));
   const { buildId } = await buildSite(dir);

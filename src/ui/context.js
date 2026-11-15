@@ -19,12 +19,17 @@ import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
 import { renderExportView } from './exportView.js';
 import { renderSettings } from './settingsView.js';
+import { uiConfirm, uiCopy } from './modal.js';
 import { renderCatalogSelects, renderCatalogSettings } from './catalogView.js';
 import { seedCatalogs, upsert, byName } from '../core/catalog.js';
 
 /**
  * @typedef {ReturnType<typeof createContext>} AppContext
  */
+
+/** Pregunta antes de descartar cambios sin guardar. */
+const confirmDiscard = (what) =>
+  uiConfirm({ title: 'Cambios sin guardar', message: `La atención actual tiene cambios sin guardar. ¿Descartarlos y ${what}?`, tone: 'warn', okLabel: 'Descartar' });
 
 /**
  * @param {ReturnType<import('../storage/store.js').createStore>} store
@@ -76,7 +81,7 @@ export function createContext(store, templateB64) {
       } else syncAttentionView(ctx);
     },
 
-    save() {
+    async save() {
       const v = validateRecord(ctx.rec);
       if (v.errors.length) {
         showValidation(ctx, { showErrors: true });
@@ -84,7 +89,15 @@ export function createContext(store, templateB64) {
         return false;
       }
       const dup = findDuplicate(ctx.rec, ctx.records);
-      if (dup && !confirm(`Ya existe una atención de ${dup.f.paciente_nombre || dup.f.paciente_rut} el ${fmtDate(dup.f.fecha_atencion)}. ¿Guardar otra atención igual?`)) {
+      if (
+        dup &&
+        !(await uiConfirm({
+          title: 'Posible atención duplicada',
+          message: `Ya existe una atención de ${dup.f.paciente_nombre || dup.f.paciente_rut} el ${fmtDate(dup.f.fecha_atencion)}. ¿Guardar otra igual?`,
+          tone: 'warn',
+          okLabel: 'Guardar otra',
+        }))
+      ) {
         return false;
       }
       const now = Date.now();
@@ -110,8 +123,8 @@ export function createContext(store, templateB64) {
       return true;
     },
 
-    newAttention() {
-      if (ctx.dirty && !confirm('Hay cambios sin guardar. ¿Empezar una atención nueva igual?')) return;
+    async newAttention() {
+      if (ctx.dirty && !(await confirmDiscard('empezar una atención nueva'))) return;
       ctx.rec = blankRecord(store.loadMedico());
       ctx.dirty = false;
       ctx.persist(() => store.saveDraft(ctx.rec));
@@ -120,10 +133,10 @@ export function createContext(store, templateB64) {
       scrollTo(0, 0);
     },
 
-    openRecord(id) {
+    async openRecord(id) {
       const r = ctx.records.find((x) => x.id === id);
       if (!r) return;
-      if (ctx.dirty && !confirm('Hay cambios sin guardar. ¿Abrir otra atención igual?')) return;
+      if (ctx.dirty && ctx.rec.id !== id && !(await confirmDiscard('abrir otra atención'))) return;
       ctx.loadIntoForm(r);
       ctx.showTab('t-at');
       scrollTo(0, 0);
@@ -136,15 +149,22 @@ export function createContext(store, templateB64) {
       syncAttentionView(ctx);
     },
 
-    deleteRecord(id) {
+    async deleteRecord(id) {
       const r = ctx.records.find((x) => x.id === id);
-      if (!r || !confirm(`¿Eliminar la atención de ${r.f.paciente_nombre || r.f.paciente_rut} (${fmtDate(r.f.fecha_atencion)})? No se puede deshacer.`)) return;
-      const ok = ctx.persist(() => {
+      if (!r) return;
+      const ok = await uiConfirm({
+        title: 'Eliminar atención',
+        message: `Se eliminará la atención de ${r.f.paciente_nombre || r.f.paciente_rut} (${fmtDate(r.f.fecha_atencion)})${ctx.sync?.enabled ? ' en todos los equipos' : ''}. No se puede deshacer.`,
+        tone: 'danger',
+        okLabel: 'Eliminar',
+      });
+      if (!ok) return;
+      const done = ctx.persist(() => {
         ctx.records = store.deleteRecord(id);
         // La "lápida" permite propagar la eliminación a los otros equipos.
         store.addTombstone(id, Math.max(Date.now(), (r.updated || 0) + 1));
       });
-      if (!ok) return;
+      if (!done) return;
       ctx.sync?.schedule();
       if (ctx.rec.id === id) {
         ctx.rec.id = null;
@@ -165,7 +185,7 @@ export function createContext(store, templateB64) {
     async copyNote(rec) {
       const text = ctx.note(rec);
       if (await copyText(text)) toast('Nota para Eloísa copiada');
-      else window.prompt('No se pudo copiar automáticamente. Copia el texto (Ctrl/⌘ + C):', text);
+      else uiCopy({ title: 'Copiar nota', message: 'El navegador no permitió copiar automáticamente. El texto ya está seleccionado: cópialo con Ctrl/⌘ + C.', copyText: text });
     },
 
     setProcs(procs) {
