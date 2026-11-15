@@ -70,6 +70,8 @@ describe('record', () => {
     assert.deepEqual(r.checks, {});
     assert.equal(v1.f.paciente_edad, 70, 'no muta el original');
     assert.equal(normalizeRecord(null).id, null);
+    assert.equal(normalizeRecord({ id: '<script>' }).id, null, 'id con caracteres inseguros se anula');
+    assert.equal(normalizeRecord({ id: 'amhz3k2a9x1' }).id, 'amhz3k2a9x1');
   });
 
   test('validateRecord: errores bloquean, advertencias no', () => {

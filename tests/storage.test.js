@@ -62,6 +62,11 @@ test('backup: ida y vuelta, compatibilidad v1 y unión sin duplicar', () => {
   assert.equal(m.records.find((r) => r.id === 'a').f.paciente_nombre, 'más nuevo');
   assert.ok(m.procs.some((p) => p.id === 'nuevo'));
 
+  // Respaldo manipulado: ids con HTML se descartan; procedimientos se sanean.
+  const evil = parseBackup(JSON.stringify({ atenciones: [{ id: 'x" onmouseover="alert(1)', f: {} }, { id: 'ok_1', f: {} }], procs: [{ id: '"><img>', n: 'Malo' }, { id: 'p1', n: ' Bueno ', pio: 'sí', extra: '<b>' }] }));
+  assert.deepEqual(evil.records.map((r) => r.id), ['ok_1']);
+  assert.deepEqual(evil.procs, [{ id: 'p1', n: 'Bueno', pio: 1 }]);
+
   assert.throws(() => parseBackup('nada'), /JSON/);
   assert.throws(() => parseBackup('{"x":1}'), /respaldo/);
   assert.throws(() => parseBackup('{"app":"otra","atenciones":[]}'), /otra aplicación/);

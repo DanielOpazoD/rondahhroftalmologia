@@ -49,10 +49,10 @@ export function renderRegistry(ctx) {
           const n = Object.keys(r.proc || {}).length;
           const meta = [f.paciente_rut, fmtDate(f.fecha_atencion), f.paciente_edad && f.paciente_edad + ' a', `${n} proc.`, f.operativo].filter(Boolean).map(escapeHtml).join(' · ');
           return `<div class="it"><div class="t"><b>${escapeHtml(f.paciente_nombre || '(sin nombre)')}</b><span class="muted">${meta}</span></div>
-          <button type="button" class="btn sm" data-a="open" data-id="${r.id}">Abrir</button>
-          <button type="button" class="btn sm" data-a="pdf" data-id="${r.id}">PDF</button>
-          <button type="button" class="btn sm" data-a="copy" data-id="${r.id}">Nota</button>
-          <button type="button" class="btn d sm" data-a="del" data-id="${r.id}" aria-label="Eliminar atención">✕</button></div>`;
+          <button type="button" class="btn sm" data-a="open" data-id="${escapeHtml(r.id)}">Abrir</button>
+          <button type="button" class="btn sm" data-a="pdf" data-id="${escapeHtml(r.id)}">PDF</button>
+          <button type="button" class="btn sm" data-a="copy" data-id="${escapeHtml(r.id)}">Nota</button>
+          <button type="button" class="btn d sm" data-a="del" data-id="${escapeHtml(r.id)}" aria-label="Eliminar atención">✕</button></div>`;
         })
         .join('')
     : `<p class="muted">${ctx.records.length ? 'Sin resultados para esta búsqueda.' : 'Aún no hay atenciones guardadas.'}</p>`;

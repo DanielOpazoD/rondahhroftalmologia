@@ -3,7 +3,7 @@
  * Compatible con respaldos de la versión 1 (`{app, v:1, procs, atenciones}`).
  */
 import { APP } from '../config/catalogs.js';
-import { normalizeRecord, sortRecords } from './record.js';
+import { normalizeRecord, sortRecords, isValidId } from './record.js';
 
 /** Crea el objeto de respaldo. */
 export function buildBackup({ records, procs, anonSecret }, now = new Date()) {
@@ -33,8 +33,13 @@ export function parseBackup(text) {
   if (!data || !Array.isArray(data.atenciones)) throw new Error('El archivo no es un respaldo de esta aplicación');
   if (data.app && data.app !== APP.id) throw new Error(`El respaldo es de otra aplicación (${data.app})`);
   return {
-    records: data.atenciones.filter((r) => r && typeof r === 'object' && r.id).map(normalizeRecord),
-    procs: Array.isArray(data.procs) ? data.procs.filter((p) => p && p.id && p.n) : [],
+    // normalizeRecord anula ids inválidos; esos registros se descartan.
+    records: data.atenciones.filter((r) => r && typeof r === 'object').map(normalizeRecord).filter((r) => r.id),
+    procs: Array.isArray(data.procs)
+      ? data.procs
+          .filter((p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())
+          .map((p) => ({ id: p.id, n: p.n.trim(), pio: p.pio ? 1 : 0 }))
+      : [],
     anonSecret: typeof data.anonSecret === 'string' && /^[0-9a-f]{64}$/.test(data.anonSecret) ? data.anonSecret : null,
   };
 }

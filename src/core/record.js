@@ -43,7 +43,8 @@ export function blankRecord(medico = {}, now = new Date()) {
 export function normalizeRecord(raw) {
   const r = raw && typeof raw === 'object' ? structuredCloneSafe(raw) : {};
   r.v = SCHEMA_VERSION;
-  r.id = typeof r.id === 'string' && r.id ? r.id : null;
+  // Los ids vienen también de respaldos importados: solo se aceptan caracteres seguros.
+  r.id = isValidId(r.id) ? r.id : null;
   r.f = r.f && typeof r.f === 'object' ? r.f : {};
   r.checks = r.checks && typeof r.checks === 'object' ? r.checks : {};
   r.proc = r.proc && typeof r.proc === 'object' ? r.proc : {};
@@ -56,6 +57,11 @@ export function normalizeRecord(raw) {
     else if (typeof v !== 'string') r.f[k] = String(v);
   }
   return r;
+}
+
+/** Id seguro para atenciones y procedimientos: letras, números, "_" o "-" (1–64). */
+export function isValidId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 }
 
 /** Genera un id único para una atención. */
