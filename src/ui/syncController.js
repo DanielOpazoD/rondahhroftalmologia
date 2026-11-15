@@ -154,6 +154,8 @@ export function createSyncController(ctx) {
       const resP = await syncOnce({
         ...common,
         api: createSyncApi({ token: st.config.token, esp: PATIENTS_SPACE }),
+        // El id de una ficha es la huella del RUT: el servidor ve solo un id opaco.
+        opaqueIds: true,
         readLocal: readPatients,
         writeLocal: writePatients,
       });

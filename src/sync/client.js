@@ -67,17 +67,22 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
  *   encKey?: string,
  *   fingerprint?: (kind: string, data: object) => string,
  *   batchSize?: number,
+ *   opaqueIds?: boolean,
  * }} deps
  *   `encKey`: clave del equipo (base64), para la huella de contenido de cada versión;
- *   `fingerprint`: representación canónica del contenido (ver core/merge.js).
+ *   `fingerprint`: representación canónica del contenido (ver core/merge.js);
+ *   `opaqueIds`: el servidor ve un id opaco (`serverId`) en vez del id local.
+ *   Necesario cuando el id local se deriva de datos personales (fichas de
+ *   pacientes: id = huella del RUT, que se podría adivinar probando RUTs).
  * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
  */
 export async function syncOnce(deps) {
   // Si al bajar se fusionó algo que el servidor aún no tiene, una segunda
   // pasada lo sube de inmediato (así los otros equipos lo reciben antes).
   const total = { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false };
+  const pass0 = deps.opaqueIds ? withOpaqueIds(deps) : { ...deps, lids: null };
   for (let pass = 0; pass < 3; pass++) {
-    const r = await syncPass(deps);
+    const r = await syncPass(pass0);
     for (const k of ['pushed', 'skipped', 'merged', 'added', 'updated', 'deleted']) total[k] += r[k];
     total.needsPush = r.needsPush;
     if (!r.needsPush) break;
@@ -104,8 +109,55 @@ export function contentHash(encKey, id, u, kind, fingerprint) {
   return toHex(hmacSha256(fingerprintKey(encKey), `${id}\n${u}\n${kind}\n${fingerprint}`)).slice(0, 16);
 }
 
-/** @param {Parameters<typeof syncOnce>[0]} deps */
-async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100 }) {
+const idKeys = new Map();
+/**
+ * Id que ve el servidor para un id local: `h_` + HMAC (subclave propia de la
+ * clave del equipo). Es el mismo en todos los equipos del equipo, pero sin la
+ * contraseña no se puede revertir ni adivinar a partir de un RUT.
+ */
+export function serverId(encKey, localId) {
+  if (!idKeys.has(encKey)) idKeys.set(encKey, hmacSha256(b64ToBytes(encKey), 'hhr-id-opaco-v1'));
+  return 'h_' + toHex(hmacSha256(idKeys.get(encKey), localId)).slice(0, 32);
+}
+
+/**
+ * Envuelve lectura y escritura locales para que la sincronización trabaje con
+ * ids opacos. El id local viaja solo dentro del contenido cifrado (`lid`).
+ */
+function withOpaqueIds(deps) {
+  if (!deps.encKey) throw new Error('opaqueIds requiere encKey');
+  /** id del servidor → id local */
+  const lids = new Map();
+  const toServer = (lid) => {
+    const sid = serverId(deps.encKey, lid);
+    lids.set(sid, lid);
+    return sid;
+  };
+  const mapKeys = (obj, fn) => Object.fromEntries(Object.entries(obj || {}).map(([k, v]) => [fn(k), v]));
+  return {
+    ...deps,
+    lids,
+    readLocal() {
+      const { items, tombstones } = deps.readLocal();
+      return { items: items.map((i) => ({ ...i, id: toServer(i.id) })), tombstones: mapKeys(tombstones, toServer) };
+    },
+    writeLocal(items, tombstones) {
+      const back = items
+        .filter((i) => lids.has(i.id))
+        .map((i) => {
+          const lid = lids.get(i.id);
+          return { ...i, id: lid, data: { ...i.data, id: lid } };
+        });
+      deps.writeLocal(
+        back,
+        mapKeys(Object.fromEntries(Object.entries(tombstones || {}).filter(([k]) => lids.has(k))), (k) => lids.get(k)),
+      );
+    },
+  };
+}
+
+/** @param {Parameters<typeof syncOnce>[0] & {lids: Map<string, string> | null}} deps */
+async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100, lids }) {
   const { items } = await api.list();
   const remote = remoteVersions(items || []);
   const local0 = readLocal();
@@ -137,6 +189,11 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
       for (const it of res.items || []) {
         if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
         const content = await decryptPayload(key, it.id, it.u, it);
+        if (lids) {
+          // Id opaco: el id local viene dentro del contenido cifrado y debe corresponder.
+          if (typeof content.lid !== 'string' || serverId(encKey, content.lid) !== it.id) continue;
+          lids.set(it.id, content.lid);
+        }
         // `record` = formato de la v2.1 (solo atenciones)
         out.push({
           id: it.id,
@@ -212,6 +269,7 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
         const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
+        if (lids) content.lid = lids.get(id);
         const h =
           encKey && fingerprint
             ? content.deleted

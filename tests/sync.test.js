@@ -13,10 +13,10 @@ import {
 } from '../src/sync/crypto.js';
 import { localVersions, remoteVersions, planSync, applyPulled } from '../src/sync/protocol.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
-import { createSyncApi, syncOnce, SyncHttpError } from '../src/sync/client.js';
+import { createSyncApi, syncOnce, SyncHttpError, serverId } from '../src/sync/client.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
 import { patientFromRecord, normalizePatient } from '../src/core/patient.js';
-import { syncMerge, stampChanges } from '../src/core/merge.js';
+import { syncMerge, syncFingerprint, stampChanges } from '../src/core/merge.js';
 
 const PASS = 'K7QM3-XRT9P-ZAWD4-N8F2C';
 
@@ -365,6 +365,9 @@ describe('fichas de pacientes (espacio común)', () => {
           syncOnce({
             api: createSyncApi({ token: keys.token, fetchFn, esp: 'pacientes' }),
             key,
+            encKey: keys.encKey,
+            fingerprint: syncFingerprint,
+            opaqueIds: true,
             readLocal: () => ({
               items: state.patients.map((p) => ({ id: p.id, updated: p.updated, kind: 'paciente', data: structuredClone(p) })),
               tombstones: {},
@@ -388,8 +391,37 @@ describe('fichas de pacientes (espacio común)', () => {
     }
     assert.deepEqual(admision.state.patients, box.state.patients);
     const keysOnServer = [...store._map.keys()];
-    assert.ok(keysOnServer.length && keysOnServer.every((k) => k.startsWith('pacientes/r/p_')), 'solo en el espacio común');
+    assert.equal(keysOnServer.length, 1);
+    assert.match(keysOnServer[0], /^pacientes\/r\/h_[0-9a-f]{32}\//, 'solo en el espacio común, con id opaco');
+    // El id local (huella del RUT, adivinable probando RUTs) nunca llega al servidor.
+    assert.ok(!keysOnServer[0].includes(base.id), 'el servidor no ve el id derivado del RUT');
+    assert.equal(keysOnServer[0].split('/')[2], serverId(keys.encKey, base.id));
     const raw = JSON.stringify([...store._map.values()]);
     assert.ok(!raw.includes('Rosa') && !raw.includes('12.345.678'), 'el servidor no ve nombre ni RUT');
+  });
+
+  test('id opaco: se ignoran elementos cuyo id no corresponde a su contenido', async () => {
+    const { keys, fetchFn } = await setup();
+    const key = await importEncKey(keys.encKey);
+    const api = createSyncApi({ token: keys.token, fetchFn, esp: 'pacientes' });
+    const ana = patientFromRecord(minimalRecord('a', { paciente_rut: '12.345.678-5', paciente_nombre: 'Ana' }), 1000);
+    const luis = patientFromRecord(minimalRecord('b', { paciente_nombre: 'Luis' }), 1000);
+    const put = async (id, lid, data) =>
+      api.put([{ id, u: 1000, ...(await encryptPayload(key, id, 1000, { kind: 'paciente', data, lid })) }]);
+    await put(serverId(keys.encKey, luis.id), ana.id, ana); // reubicado: el id opaco es de otro paciente
+    await put(ana.id, ana.id, ana); // id en claro (no opaco)
+    await put('h_' + 'f'.repeat(32), undefined, luis); // sin id local
+    const state = { patients: [] };
+    await syncOnce({
+      api,
+      key,
+      encKey: keys.encKey,
+      fingerprint: syncFingerprint,
+      opaqueIds: true,
+      mergeFn: syncMerge,
+      readLocal: () => ({ items: [], tombstones: {} }),
+      writeLocal: (items) => (state.patients = items),
+    });
+    assert.deepEqual(state.patients, []);
   });
 });

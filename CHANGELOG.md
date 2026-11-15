@@ -1,5 +1,10 @@
 # Cambios
 
+## 2.9.1 — 2026-11-15
+
+### Seguridad
+- **Las fichas de pacientes se sincronizan con un id opaco.** En la 2.9.0, el id de la ficha (una huella del RUT, sin clave) quedaba visible en el servidor y permitía recuperar el RUT probando todos los posibles. Ahora el servidor ve solo un HMAC con una subclave de la contraseña del equipo, y cada equipo verifica que el contenido cifrado corresponda a su id. No había fichas en el servidor de producción, así que no se expuso ningún dato.
+
 ## 2.9.0 — 2026-11-15
 
 ### Nuevo

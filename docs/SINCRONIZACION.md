@@ -126,7 +126,9 @@ Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<v
 | `bitacora` | historial de cambios de una atención; dos PC se fusionan por unión de entradas |
 | `paciente` | ficha del paciente (datos demográficos); se fusiona campo a campo |
 
-**Separación por especialidad:** las solicitudes llevan `?esp=oftalmologia`, y cada especialidad tiene su propio espacio en el servidor. Las **fichas de pacientes** van en un espacio común, `?esp=pacientes`, porque un mismo paciente puede atenderse en varias especialidades. Cada sincronización hace primero las fichas y después el espacio de la especialidad. Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
+**Separación por especialidad:** las solicitudes llevan `?esp=oftalmologia`, y cada especialidad tiene su propio espacio en el servidor. Las **fichas de pacientes** van en un espacio común, `?esp=pacientes`, porque un mismo paciente puede atenderse en varias especialidades. Cada sincronización hace primero las fichas y después el espacio de la especialidad.
+
+**Ids opacos en el espacio de pacientes.** El id local de una ficha es una huella del RUT, y como hay pocos RUT posibles, se podría adivinar probándolos todos. Por eso el servidor nunca lo ve: recibe `h_` + HMAC del id local, con una subclave de la clave del equipo. Todos los equipos calculan el mismo id opaco, pero sin la contraseña no se puede revertir. El id local viaja solo dentro del contenido cifrado, y cada equipo verifica que corresponda al id opaco antes de aceptarlo (`serverId` en `src/sync/client.js`). Para dar a una especialidad su propia contraseña, define `SYNC_TOKEN_SHA256_<ESPECIALIDAD>` (por ejemplo `SYNC_TOKEN_SHA256_OFTALMOLOGIA`). Si no existe, se usa `SYNC_TOKEN_SHA256`.
 
 API (todas con `Authorization: Bearer <token>`):
 
