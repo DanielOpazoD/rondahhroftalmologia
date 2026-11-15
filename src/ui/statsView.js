@@ -38,7 +38,7 @@ const bars = (entries, total) => {
   const max = Math.max(1, ...entries.map((e) => e[1]));
   const rowsHtml = entries.map(
     ([k, v]) =>
-      html`<tr><td>${k}</td><td class="bar"><div class="hb" style="width:${(v / max) * 100}%"></div></td><td>${v}</td><td class="pct">${total ? Math.round((v / total) * 100) : 0}%</td></tr>`,
+      html`<tr><td>${k}</td><td class="bar"><div class="hb" data-w="${(v / max) * 100}"></div></td><td>${v}</td><td class="pct">${total ? Math.round((v / total) * 100) : 0}%</td></tr>`,
   );
   return html`<table class="st bars">${rowsHtml}</table>`;
 };
@@ -101,4 +101,10 @@ export function renderStats(ctx) {
   </div>
   ${S.porDia.length > 1 ? card('Por día', dayTable) : ''}`,
   );
+  applyBarWidths($('#stOut'));
+}
+
+/** Ancho de las barras por CSSOM (la CSP no permite atributos style en el HTML). */
+function applyBarWidths(root) {
+  for (const el of root.querySelectorAll('.hb[data-w]')) el.style.width = `${Math.max(0, Math.min(100, Number(el.dataset.w) || 0))}%`;
 }
