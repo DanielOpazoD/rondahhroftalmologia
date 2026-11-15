@@ -56,8 +56,12 @@ export function createAccountsApi({ baseUrl = '/api/cuentas', fetchFn = globalTh
     salir: (token, motivo) => call('salir', { token, body: { motivo } }),
     /** @param {string} token @param {object[]} eventos */
     eventos: (token, eventos) => call('eventos', { token, body: { eventos } }),
-    /** @param {string} token sesión de administrador o contraseña del equipo (antes de activar) @param {string} id */
-    preparar: (token, id) => call('preparar', { token, body: { id } }),
+    /**
+     * @param {string} token sesión de administrador o contraseña del equipo (antes de activar)
+     * @param {string} id
+     * @param {boolean} [existente] para restablecer la clave de una cuenta que ya existe
+     */
+    preparar: (token, id, existente = false) => call('preparar', { token, body: { id, ...(existente ? { existente: true } : {}) } }),
     /** @param {string} teamToken @param {object} usuario */
     activar: (teamToken, usuario) => call('activar', { token: teamToken, body: { usuario } }),
     /** @param {string} token */

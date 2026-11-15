@@ -112,3 +112,80 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await syncNow(C);
   await Promise.all([ca.close(), cb.close(), cc.close()]);
 });
+
+/** PC con las cuentas activadas y el administrador ya con su clave. */
+async function adminReady(page) {
+  await openApp(page);
+  await activateSync(page);
+  await activateAccounts(page);
+  await login(page, RUT, '17752753');
+  await page.locator('#pwNew').fill('Ojo2026');
+  await page.locator('#pwNew2').fill('Ojo2026');
+  await page.locator('#pwGo').click();
+  await expect(page.locator('#loginDlg')).toBeHidden();
+}
+
+test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre queda un administrador', async ({ browser }) => {
+  const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
+  const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
+  await adminReady(A);
+  await tab(A, 'Ajustes');
+  const card = A.locator('#usersCard');
+  await expect(card).toBeVisible();
+  await expect(card.locator('#usersList')).toContainText(NOMBRE);
+  // Alta de una administrativa.
+  await A.locator('#usersAdd').click();
+  await A.locator('#dlg_rut').fill('11.111.111-1');
+  await A.locator('#dlg_nombre').fill('Ana Admisión');
+  await A.locator('#dlg_rol').selectOption('administrativo');
+  await A.locator('#dlgOk').click();
+  await expect(A.locator('#msgTitle')).toHaveText('Cuenta creada', { timeout: 20_000 });
+  await expect(A.locator('#msgDlg')).toContainText('11111111');
+  await A.locator('#msgDlg').getByRole('button').first().click();
+  await expect(card.locator('#usersList')).toContainText('Ana Admisión');
+  await expect(card.locator('#usersList')).toContainText('Clave inicial');
+  // RUT repetido.
+  await A.locator('#usersAdd').click();
+  await A.locator('#dlg_rut').fill('11111111-1');
+  await A.locator('#dlg_nombre').fill('Otra Persona');
+  await A.locator('#dlgOk').click();
+  await expect(A.locator('#dlgErr')).toHaveText('Ya existe una cuenta con ese RUT.');
+  await A.locator('#dlg').getByRole('button', { name: 'Cancelar' }).click();
+
+  // Ana entra en otro PC y crea su clave; no ve la administración de usuarios.
+  await B.goto('/');
+  await login(B, '11.111.111-1', '11111111');
+  await B.locator('#pwNew').fill('Admis1');
+  await B.locator('#pwNew2').fill('Admis1');
+  await B.locator('#pwGo').click();
+  await expect(B.locator('#loginDlg')).toBeHidden();
+  await expect(B.locator('#userChip')).toContainText('Ana Admisión');
+  await tab(B, 'Ajustes');
+  await expect(B.locator('#usersCard')).toBeHidden();
+
+  // El administrador no puede quitarse el rol siendo el único.
+  const me = card.locator('.prow', { hasText: NOMBRE });
+  await me.getByRole('button', { name: /Editar/ }).click();
+  await A.locator('#dlg_admin').selectOption('no');
+  await A.locator('#dlgOk').click();
+  await expect(A.locator('#msgDlg')).toContainText('al menos un administrador', { timeout: 20_000 });
+  await A.locator('#msgDlg').getByRole('button').first().click();
+
+  // Desactivar a Ana: su sesión se corta y ya no puede entrar.
+  const ana = card.locator('.prow', { hasText: 'Ana Admisión' });
+  await ana.getByRole('button', { name: 'Desactivar' }).click();
+  await A.locator('#msgDlg').getByRole('button', { name: 'Desactivar' }).click();
+  await expect(ana).toContainText('Desactivada', { timeout: 20_000 });
+  await B.locator('#syncNowBtn').click();
+  await expect(B.locator('#loginDlg')).toBeVisible({ timeout: 20_000 });
+  await expect(B.locator('#loginErr')).toContainText('desactivada');
+  // Reactivar y restablecer: vuelve a entrar con la clave inicial.
+  await ana.getByRole('button', { name: 'Reactivar' }).click();
+  await expect(ana).not.toContainText('Desactivada', { timeout: 20_000 });
+  await ana.getByRole('button', { name: /Restablecer/ }).click();
+  await A.locator('#msgDlg').getByRole('button', { name: 'Restablecer' }).click();
+  await expect(ana).toContainText('Clave inicial', { timeout: 20_000 });
+  await login(B, '11.111.111-1', '11111111');
+  await expect(B.locator('#pwForm')).toBeVisible();
+  await Promise.all([ca.close(), cb.close()]);
+});

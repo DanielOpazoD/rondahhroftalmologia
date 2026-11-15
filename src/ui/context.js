@@ -192,6 +192,7 @@ export function createContext(store, templateB64) {
         b.tabIndex = b.dataset.tab === id ? 0 : -1;
       });
       $$('.tab').forEach((t) => t.classList.toggle('on', t.id === id));
+      ctx.emit('tab:' + id);
       if (id === 't-reg') renderRegistry(ctx);
       if (id === 't-ing') renderIntake(ctx);
       if (id === 't-est' || id === 't-exp') {
