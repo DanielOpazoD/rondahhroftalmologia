@@ -2,7 +2,7 @@
  * Tarjeta «Adjuntos» de la atención: lista (miniatura o ícono, nombre,
  * tamaño), adjuntar con el botón o arrastrando archivos, abrir y eliminar.
  */
-import { ACCEPT, kindOf, fmtSize } from '../core/attachments.js';
+import { ACCEPT, kindOf, fmtSize, isInlineType, cleanType } from '../core/attachments.js';
 import { $ } from './dom.js';
 import { html, setHtml } from './html.js';
 
@@ -60,10 +60,10 @@ export async function renderAttachments(ctx) {
   for (const a of list) {
     const kind = kindOf(a.tipo, a.nombre);
     let preview = html`<span class="attico">${ICON(kind === 'pdf' ? 'pdf' : 'file')}</span>`;
-    if (kind.startsWith('imagen') && have.has(a.id)) {
+    if (kind.startsWith('imagen') && isInlineType(a.tipo) && have.has(a.id)) {
       const data = await store.loadAttachmentData(a.id);
       if (data) {
-        const url = URL.createObjectURL(new Blob([data.bytes], { type: a.tipo }));
+        const url = URL.createObjectURL(new Blob([data.bytes], { type: cleanType(a.tipo) }));
         thumbs.push(url);
         preview = html`<img class="attthumb" src="${url}" alt="">`;
       }
