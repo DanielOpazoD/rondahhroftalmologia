@@ -184,6 +184,12 @@ export function createStore(storage, repo) {
       return { fails: Number(f?.fails) || 0, until: Number(f?.until) || 0 };
     },
     saveLockFails: (f) => write(K.lockFails, f),
+    /** Registro local de errores (ver core/errlog.js). */
+    loadErrors: () => {
+      const l = read(K.errors, []);
+      return Array.isArray(l) ? l.filter((e) => e && Number.isFinite(e.at) && typeof e.msg === 'string') : [];
+    },
+    saveErrors: (l) => write(K.errors, l),
     saveLockSignal: (t) => write(K.lockSignal, t),
     /** Clave del aviso entre pestañas (el evento "storage" trae la clave real). */
     lockSignalKey: K.lockSignal,

@@ -203,6 +203,7 @@ Al abrir la app por primera vez con esta versión, los catálogos se completan c
 | `oft_ultimo_respaldo_v1` | Último respaldo descargado en este equipo. |
 | `oft_bloqueo_v1` | Bloqueo con PIN: `{v, iter, salt, hash, rsalt, rhash, minutes}`. Solo derivaciones PBKDF2-HMAC-SHA256 (20.000 iteraciones) del PIN y del código de recuperación; nunca el PIN. |
 | `oft_bloqueo_intentos_v1` | Intentos fallidos de desbloqueo: `{fails, until}`. |
+| `oft_errores_v1` | Registro local de errores (últimos 50: fecha, dónde, mensaje y pila acotados). No sale del equipo. |
 
 **Modo práctica:** usa la base IndexedDB `hhr-rondas-oftalmologia-practica` y las mismas claves con el prefijo `practica:` (por ejemplo, `practica:oft_medicos_v1`). Así nunca toca los datos reales. Sus datos de ejemplo salen de `core/demo.js`, con los casos clínicos que aporta la especialidad (`casosDeEjemplo`).
 

@@ -209,3 +209,14 @@ test('aviso de versión nueva: aparece al volver a la pestaña si hay una public
   await page.locator('#updateLater').click();
   await expect(page.locator('#updateBar')).toBeHidden();
 });
+
+test('registro de errores: un error inesperado queda registrado en Ajustes', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => setTimeout(() => Promise.reject(new Error('Falla de prueba'))));
+  await tab(page, 'Ajustes');
+  await expect(page.locator('#errCount')).toHaveText('1');
+  await page.locator('#errCard summary').click();
+  await expect(page.locator('#errText')).toContainText('Falla de prueba');
+  await page.locator('#errClear').click();
+  await expect(page.locator('#errCount')).toHaveText('0');
+});
