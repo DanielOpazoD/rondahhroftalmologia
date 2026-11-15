@@ -7,7 +7,8 @@
  */
 import { sortRecords } from '../core/record.js';
 import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
-import { syncMerge } from '../core/merge.js';
+import { syncMerge, syncFingerprint } from '../core/merge.js';
+import { clock } from '../core/clock.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
 import { fmtDateTime } from '../core/format.js';
 import {
@@ -48,6 +49,22 @@ export function createSyncController(ctx) {
     return st.key;
   }
 
+  /**
+   * Compara la hora del PC con la del servidor. Un reloj desajustado no rompe
+   * la sincronización (ver core/clock.js), pero puede decidir mal qué edición
+   * simultánea es la más reciente: se avisa para corregirlo.
+   */
+  function checkClock(serverDate) {
+    const server = Date.parse(serverDate || '');
+    if (!Number.isFinite(server)) return;
+    const skew = Date.now() - server;
+    st.skewMin = Math.abs(skew) > 3 * 60 * 1000 ? Math.round(skew / 60000) : 0;
+    if (st.skewMin && !st.skewWarned) {
+      st.skewWarned = true;
+      toast(`La hora de este equipo está ${Math.abs(st.skewMin)} min ${st.skewMin > 0 ? 'adelantada' : 'atrasada'}. Ajústala en el sistema.`, 6000);
+    }
+  }
+
   /** Todo lo que se sincroniza: atenciones, perfiles de médico y operativos. */
   function readLocal() {
     const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated, kind, data: x });
@@ -68,6 +85,8 @@ export function createSyncController(ctx) {
     store.saveMedicos(byName(of('medico').map((m) => makeMedico(m)).filter(Boolean)));
     store.saveOperativos(byName(of('operativo').map((o) => makeOperativo(o)).filter(Boolean)));
     store.saveTombstones(tombstones);
+    // Reloj lógico: las ediciones siguientes quedarán después de todo lo recibido.
+    for (const i of items) clock.observe(i.updated);
     ctx.reloadCatalogs();
     ctx.records = store.loadRecords();
     // Atención abierta en el formulario: incorporar lo que otro equipo grabó en ella
@@ -89,13 +108,17 @@ export function createSyncController(ctx) {
     st.running = true;
     setStatus('syncing');
     try {
+      const api = createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id });
       const res = await syncOnce({
-        api: createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id }),
+        api,
         key: await getKey(),
         readLocal,
         writeLocal,
         mergeFn: syncMerge,
+        fingerprint: syncFingerprint,
+        encKey: st.config.encKey,
       });
+      checkClock(api.serverDate);
       st.config = { ...st.config, lastSync: Date.now() };
       store.saveSyncConfig(st.config);
       setStatus('idle');
@@ -255,7 +278,8 @@ export function createSyncController(ctx) {
     if (on) {
       $('#syncInfo').textContent =
         (st.config.lastSync ? `Última sincronización: ${fmtDateTime(new Date(st.config.lastSync))}.` : 'Aún no se ha sincronizado.') +
-        (st.message ? ' ' + st.message : '');
+        (st.message ? ' ' + st.message : '') +
+        (st.skewMin ? ` Atención: la hora de este equipo difiere ${Math.abs(st.skewMin)} min de la del servidor; ajústala.` : '');
       $('#syncHash').textContent = st.config.hash;
     }
   }

@@ -11,7 +11,7 @@ export const APP = Object.freeze({
   id: 'oftalmo-operativos',
   nombre: 'Atención Oftalmológica · Rondas y Operativos',
   establecimiento: 'Hospital Hanga Roa',
-  version: '2.5.0',
+  version: '2.5.1',
 });
 
 /**
@@ -43,6 +43,7 @@ export const STORAGE_KEYS = Object.freeze({
   sync: `${P}sync_v1`,
   medicos: `${P}medicos_v1`,
   operativos: `${P}operativos_v1`,
+  clock: `${P}reloj_v1`,
 });
 
 /** @typedef {{key: string, label: string}} CheckDef */

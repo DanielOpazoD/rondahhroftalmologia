@@ -39,6 +39,15 @@ Cada atención guarda la fecha en que se editó **cada campo**: cada texto, cada
 
 La fusión ocurre dentro de cada PC, antes de cifrar: el servidor sigue sin poder leer nada.
 
+#### Garantías y cómo se aseguran
+
+- **Convergencia.** Todos los PC terminan con los mismos datos, aunque sincronicen a la vez.
+  - Cada versión subida lleva una **huella de su contenido**: un HMAC con la clave del equipo, que el servidor no puede calcular.
+  - Si dos PC fusionan al mismo tiempo y producen el mismo número de versión con distinto contenido, la huella lo revela. Bajan, fusionan y suben una versión nueva.
+  - Lo prueba `tests/convergence.test.js`: varios PC sincronizan en paralelo en órdenes aleatorios reproducibles. `SEMILLAS=200 npm test` corre 200 escenarios.
+- **Causalidad.** Una edición hecha *después* de recibir otra siempre gana, aunque el reloj del PC esté atrasado. La hora de cada edición sale de un reloj lógico (`src/core/clock.js`): la hora del PC, pero nunca anterior a la última recibida de otros equipos.
+- **Reloj desajustado.** Si la hora del PC difiere más de 3 minutos de la del servidor, la app avisa para corregirla. Solo importa al desempatar ediciones *simultáneas* del mismo campo.
+
 ### Sin conexión
 - **Sin internet:** cada PC sigue guardando localmente. Al volver la conexión, sube y baja lo pendiente.
 - **Uso sin conexión desde la web:** una vez abierta la app desde la dirección de Netlify, el navegador la guarda en caché (*service worker*) y se puede abrir sin internet. En Chrome o Edge también se puede **instalar como app** (icono ⊕ en la barra de direcciones).
@@ -105,7 +114,7 @@ Abre `http://localhost:8787` y `http://127.0.0.1:8787`: son dos orígenes distin
 | Interfaz | `src/ui/syncController.js` |
 | Tests (4 PC convergen; el servidor no ve datos) | `tests/sync.test.js` |
 
-Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<versión>` → `{iv, ct}`. Al escribir una versión nueva se borran las anteriores.
+Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<versión>.<huella>` → `{iv, ct}`. La huella es un HMAC de 16 hex del contenido; las versiones antiguas no la tienen. Al escribir una versión nueva se borran las anteriores.
 
 **Qué se sincroniza:** todo viaja cifrado y el servidor no distingue un tipo de otro. Cada elemento lleva su tipo dentro del contenido cifrado:
 

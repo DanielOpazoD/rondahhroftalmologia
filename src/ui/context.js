@@ -21,6 +21,7 @@ import { renderExportView } from './exportView.js';
 import { renderSettings } from './settingsView.js';
 import { uiConfirm, uiCopy, uiChoose } from './modal.js';
 import { stampChanges, mergeRecords } from '../core/merge.js';
+import { clock } from '../core/clock.js';
 import { renderCatalogSelects, renderCatalogSettings } from './catalogView.js';
 import { seedCatalogs, upsert, byName } from '../core/catalog.js';
 
@@ -77,7 +78,7 @@ export function createContext(store, templateB64) {
     /** Llamar tras modificar `ctx.rec`. `silent`: no re-dibujar el formulario (escritura en curso). */
     changed({ silent = false } = {}) {
       // Marca con la hora actual los campos que acaban de cambiar (fusión entre equipos).
-      stampChanges(ctx.rec, ctx.snap || {}, Date.now());
+      stampChanges(ctx.rec, ctx.snap || {}, clock.tick());
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = true;
       ctx.persist(() => store.saveDraft(ctx.rec));
@@ -108,7 +109,7 @@ export function createContext(store, templateB64) {
         if (!choice) return false;
         if (choice === 'ok') ctx.joinExisting(dup.id, { silent: true });
       }
-      const now = Date.now();
+      const now = clock.tick();
       let rec = normalizeRecord(ctx.rec);
       if (!rec.id) {
         rec.id = newRecordId(now);
@@ -206,7 +207,7 @@ export function createContext(store, templateB64) {
       const done = ctx.persist(() => {
         ctx.records = store.deleteRecord(id);
         // La "lápida" permite propagar la eliminación a los otros equipos.
-        store.addTombstone(id, Math.max(Date.now(), (r.updated || 0) + 1));
+        store.addTombstone(id, Math.max(clock.tick(), (r.updated || 0) + 1));
       });
       if (!done) return;
       ctx.sync?.schedule();
@@ -309,7 +310,7 @@ export function createContext(store, templateB64) {
       ctx.persist(() => {
         if (kind === 'medico') store.saveMedicos(list);
         else store.saveOperativos(list);
-        store.addTombstone(id, Math.max(Date.now(), (item?.updated || 0) + 1));
+        store.addTombstone(id, Math.max(clock.tick(), (item?.updated || 0) + 1));
       });
       ctx.reloadCatalogs();
       ctx.sync?.schedule();

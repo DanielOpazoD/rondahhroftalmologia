@@ -7,6 +7,7 @@ import { escapeHtml, isValidRut } from '../core/format.js';
 import { makeMedico, makeOperativo, findMedico } from '../core/catalog.js';
 import { $ } from './dom.js';
 import { openDialog } from './dialog.js';
+import { clock } from '../core/clock.js';
 import { uiConfirm } from './modal.js';
 
 const NEW = '__nuevo';
@@ -74,7 +75,7 @@ function editMedico(ctx, m = null, done) {
     onSave: ({ nombre, rut }) => {
       if (!nombre) return 'Escribe el nombre';
       if (rut && !isValidRut(rut)) return 'RUT con dígito verificador inválido';
-      const item = makeMedico({ ...m, nombre, rut, updated: Date.now() });
+      const item = makeMedico({ ...m, nombre, rut, updated: clock.tick() });
       result = ctx.saveCatalog('medico', item);
       return null;
     },
@@ -91,7 +92,7 @@ function editOperativo(ctx, o = null, done) {
       if (!nombre) return 'Escribe el nombre';
       const dup = ctx.operativos.find((x) => x.nombre.toLowerCase() === nombre.toLowerCase() && x.id !== o?.id);
       if (dup) return 'Ya existe un operativo con ese nombre';
-      result = ctx.saveCatalog('operativo', makeOperativo({ ...o, nombre, updated: Date.now() }));
+      result = ctx.saveCatalog('operativo', makeOperativo({ ...o, nombre, updated: clock.tick() }));
       return null;
     },
     onClose: () => done?.(result),

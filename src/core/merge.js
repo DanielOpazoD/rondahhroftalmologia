@@ -154,3 +154,16 @@ export function syncMerge(kind, local, remote) {
   const data = mergeRecords(normalizeRecord(local), normalizeRecord(remote));
   return { data, sameAsRemote: sameContent(data, remote) };
 }
+
+/**
+ * Representación canónica del CONTENIDO de un elemento sincronizado (sin
+ * fechas de edición): dos versiones con igual huella tienen los mismos datos.
+ * La sincronización la usa para detectar versiones con el mismo número pero
+ * distinto contenido (dos equipos que fusionaron a la vez).
+ */
+export function syncFingerprint(kind, data) {
+  if (kind === 'atencion') return JSON.stringify([...flatten(data)].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
+  if (kind === 'medico') return JSON.stringify([data?.nombre || '', data?.rut || '']);
+  if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
+  return JSON.stringify(data ?? null);
+}

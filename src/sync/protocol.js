@@ -24,23 +24,38 @@ export function localVersions(records, tombstones = {}) {
   return map;
 }
 
-/** Lista remota [{id, u}] -> Map id -> u (máximo). */
+/** Lista remota [{id, u, h}] -> Map id -> {u, h} (la versión más nueva; a igual número, mayor huella). */
 export function remoteVersions(items) {
   const map = new Map();
-  for (const { id, u } of items) if (!map.has(id) || map.get(id) < u) map.set(id, u);
+  for (const { id, u, h } of items) {
+    const cur = map.get(id);
+    if (!cur || u > cur.u || (u === cur.u && (h || '') > (cur.h || ''))) map.set(id, { u, h });
+  }
   return map;
 }
 
 /**
- * Qué subir y qué bajar.
- * @returns {{push: string[], pull: {id: string, u: number}[]}}
+ * Qué subir, qué bajar y qué revisar.
+ * - push: lo local es más nuevo (o no existe en el servidor);
+ * - pull: el servidor tiene una versión más nueva;
+ * - conflicts: mismo número de versión pero distinta huella de contenido
+ *   (dos equipos fusionaron a la vez): hay que bajar y fusionar.
+ * @param {Map<string, {u: number}>} local
+ * @param {Map<string, {u: number, h?: string}>} remote
+ * @param {(id: string) => string} [localHash] huella del contenido local (solo se calcula si hace falta)
+ * @returns {{push: string[], pull: {id: string, u: number, h?: string}[], conflicts: {id: string, u: number, h: string}[]}}
  */
-export function planSync(local, remote) {
+export function planSync(local, remote, localHash) {
   const push = [];
   const pull = [];
-  for (const [id, { u }] of local) if (!remote.has(id) || remote.get(id) < u) push.push(id);
-  for (const [id, u] of remote) if (!local.has(id) || local.get(id).u < u) pull.push({ id, u });
-  return { push, pull };
+  const conflicts = [];
+  for (const [id, { u }] of local) if (!remote.has(id) || remote.get(id).u < u) push.push(id);
+  for (const [id, r] of remote) {
+    const l = local.get(id);
+    if (!l || l.u < r.u) pull.push(r.h ? { id, u: r.u, h: r.h } : { id, u: r.u });
+    else if (l.u === r.u && r.h && localHash && localHash(id) !== r.h) conflicts.push({ id, u: r.u, h: r.h });
+  }
+  return { push, pull, conflicts };
 }
 
 /**
@@ -63,7 +78,8 @@ export function applyPulled(items, tombstones, pulled, mergeFn) {
     if (!isValidId(item.id)) continue;
     const cur = byId.get(item.id);
     const localU = Math.max(cur?.updated || 0, tomb[item.id] || 0);
-    if (item.u <= localU) continue; // lo local es igual o más nuevo
+    // `adopt`: versión del servidor con el mismo número que la local tras resolver un conflicto.
+    if (item.u <= localU && !item.adopt) continue; // lo local es igual o más nuevo
     if (item.deleted) {
       if (cur) {
         byId.delete(item.id);

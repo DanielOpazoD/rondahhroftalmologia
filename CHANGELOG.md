@@ -1,5 +1,23 @@
 # Cambios
 
+## 2.5.1 — 2026-11-14
+
+### Corregido (crítico)
+- **Pérdida de ediciones con 3 o más PC sincronizando a la vez.** Dos PC que fusionaban a la vez podían quedar con el mismo número de versión y distinto contenido, y ninguno lo detectaba. Ahora:
+  - cada versión lleva una huella HMAC de su contenido (clave `…/<versión>.<huella>` en el servidor);
+  - si el número coincide y la huella no, el PC baja, fusiona y sube una versión nueva;
+  - la versión rechazada por el servidor provoca otra pasada inmediata.
+
+### Nuevo
+- **Reloj lógico** (`core/clock.js`): una edición posterior a otra recibida siempre queda con fecha posterior, aunque el reloj del PC esté atrasado.
+- **Aviso de hora desajustada** (más de 3 minutos respecto del servidor).
+- **Pruebas de convergencia** (`tests/convergence.test.js`):
+  - el caso reproducido de 3 PC;
+  - 8 escenarios aleatorios de 4 PC sincronizando en paralelo;
+  - 4 escenarios de conflictos en los mismos campos;
+  - modo estrés `SEMILLAS=200`, con 200 de 200 escenarios correctos.
+- Tests del reloj lógico. 102 pruebas en total.
+
 ## 2.5.0 — 2026-11-14
 
 ### Nuevo

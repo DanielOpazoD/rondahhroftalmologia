@@ -12,6 +12,7 @@ import { initFilter } from './ui/statsView.js';
 import { initExportView, exportStatsXlsx } from './ui/exportView.js';
 import { initSettingsView, renderSettings } from './ui/settingsView.js';
 import { createSyncController } from './ui/syncController.js';
+import { createClock, setClock } from './core/clock.js';
 import { initCatalogView, renderCatalogSettings } from './ui/catalogView.js';
 
 function getStorage() {
@@ -27,7 +28,10 @@ function getStorage() {
 
 function main() {
   const { storage, persistent } = getStorage();
-  const ctx = createContext(createStore(storage), TEMPLATE_PDF_B64);
+  const store = createStore(storage);
+  // Reloj lógico persistente: una edición posterior a otra recibida siempre queda con fecha posterior.
+  setClock(createClock({ load: () => store.loadClock(), save: (t) => ctx.persist(() => store.saveClock(t)) }));
+  const ctx = createContext(store, TEMPLATE_PDF_B64);
   $('#appVersion').textContent = 'v' + ctx.version;
 
   initAttentionView(ctx);

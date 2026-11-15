@@ -7,6 +7,7 @@
  *   3. baja y descifra las más nuevas del servidor y las aplica localmente.
  */
 import { encryptPayload, decryptPayload } from './crypto.js';
+import { hmacSha256, toHex } from '../lib/sha256.js';
 import { localVersions, remoteVersions, planSync, applyPulled, chunks } from './protocol.js';
 
 export class SyncHttpError extends Error {
@@ -34,15 +35,19 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
     } catch {
       throw new SyncHttpError(0, 'Sin conexión con el servidor');
     }
+    api.serverDate = res.headers.get('date') || api.serverDate;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`);
     return data;
   };
-  return {
+  const api = {
+    /** Cabecera Date de la última respuesta (para detectar relojes desajustados). */
+    serverDate: null,
     list: () => call('list'),
     get: (items) => call('get', { items }),
     put: (items) => call('put', { items }),
   };
+  return api;
 }
 
 /**
@@ -59,6 +64,8 @@ export function createSyncApi({ baseUrl = '/api/sync', token, esp, fetchFn = glo
  *   readLocal: () => {items: {id: string, updated: number, kind: string, data: object}[], tombstones: Record<string, number>},
  *   writeLocal: (items: object[], tombstones: Record<string, number>) => void,
  *   mergeFn?: import('./protocol.js').MergeFn,
+ *   encKey?: string,       clave del equipo (base64): calcula la huella de contenido de cada versión
+ *   fingerprint?: (kind: string, data: object) => string,  representación canónica del contenido
  *   batchSize?: number,
  * }} deps
  * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
@@ -76,13 +83,32 @@ export async function syncOnce(deps) {
   return total;
 }
 
-async function syncPass({ api, key, readLocal, writeLocal, mergeFn, batchSize = 100 }) {
+/** Huella de contenido (16 hex) con HMAC: solo quien tiene la clave del equipo puede calcularla. */
+export function contentHash(encKey, kind, fingerprint) {
+  return toHex(hmacSha256('hhr-huella|' + encKey, kind + '\n' + fingerprint)).slice(0, 16);
+}
+
+async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100 }) {
   const { items } = await api.list();
   const remote = remoteVersions(items || []);
   const local0 = readLocal();
-  const plan = planSync(localVersions(local0.items, local0.tombstones), remote);
   const byId = new Map(local0.items.map((r) => [r.id, r]));
+  const local = localVersions(local0.items, local0.tombstones);
+
+  /**
+   * Huella del contenido local de un id. Se calcula en cada pasada (solo para
+   * ids con el mismo número de versión que el servidor): una caché entre
+   * pasadas podría quedar obsoleta al adoptar la versión del servidor.
+   */
+  const hashOf = (id) => {
+    const v = local.get(id);
+    const rec = byId.get(id);
+    return v.deleted || !rec ? contentHash(encKey, 'eliminado', '') : contentHash(encKey, rec.kind, fingerprint(rec.kind, rec.data));
+  };
+  const plan = planSync(local, remote, encKey && fingerprint ? hashOf : undefined);
   const pulled = [];
+  const extraPush = [];
+  const tombBumps = {};
 
   /** Baja y descifra versiones del servidor. */
   const fetchItems = async (list) => {
@@ -99,34 +125,68 @@ async function syncPass({ api, key, readLocal, writeLocal, mergeFn, batchSize = 
     return out;
   };
 
-  // 1. Fusionar antes de subir lo que también cambió en el servidor.
+  // 1. Fusionar antes de subir lo que también cambió en el servidor, y resolver
+  //    conflictos (mismo número de versión, distinto contenido).
   let merged = 0;
   if (mergeFn) {
-    const both = plan.push.filter((id) => remote.has(id) && byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated));
-    for (const r of await fetchItems(both.map((id) => ({ id, u: remote.get(id) })))) {
-      const local = byId.get(r.id);
-      if (r.deleted || r.kind !== local.kind) continue;
-      const m = mergeFn(r.kind, local.data, { ...r.data, id: r.id, updated: r.u });
-      if (!m) continue;
-      const u = Math.max(local.updated, r.u) + 1;
+    const isLiveLocal = (id) => byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated);
+    const both = plan.push.filter((id) => remote.has(id) && isLiveLocal(id)).map((id) => ({ id, u: remote.get(id).u, h: remote.get(id).h }));
+    const conflictIds = new Set(plan.conflicts.map((c) => c.id));
+    for (const r of await fetchItems([...both, ...plan.conflicts])) {
+      const localItem = byId.get(r.id);
+      const isConflict = conflictIds.has(r.id);
+      if (!localItem || !isLiveLocal(r.id) || r.deleted || r.kind !== localItem.kind) {
+        // Conflicto con una eliminación (o tipos distintos): se resuelve subiendo una versión nueva de lo local.
+        if (isConflict) bump(r.id, r.u);
+        continue;
+      }
+      const m = mergeFn(r.kind, localItem.data, { ...r.data, id: r.id, updated: r.u });
+      if (!m) {
+        if (isConflict) bump(r.id, r.u); // sin fusión posible: gana lo local con versión nueva
+        continue;
+      }
+      if (isConflict && m.sameAsRemote) {
+        // Lo local no aporta nada: se adopta la versión del servidor tal cual.
+        pulled.push({ id: r.id, u: r.u, kind: r.kind, data: { ...r.data, id: r.id, updated: r.u }, adopt: true });
+        continue;
+      }
+      const u = Math.max(localItem.updated, r.u) + 1;
       const data = { ...m.data, id: r.id, updated: u };
-      byId.set(r.id, { ...local, updated: u, data });
+      byId.set(r.id, { ...localItem, updated: u, data });
       pulled.push({ id: r.id, u, kind: r.kind, data });
+      if (isConflict) extraPush.push(r.id);
       merged++;
     }
+  }
+
+  /** Sube lo local con una versión mayor que `remoteU` (desempate de conflictos). */
+  function bump(id, remoteU) {
+    const it = byId.get(id);
+    const tomb = local0.tombstones[id];
+    if (it && !(tomb >= it.updated)) {
+      const u = Math.max(it.updated, remoteU) + 1;
+      const data = { ...it.data, updated: u };
+      byId.set(id, { ...it, updated: u, data });
+      pulled.push({ id, u, kind: it.kind, data });
+    } else {
+      local0.tombstones[id] = Math.max(tomb || 0, remoteU) + 1;
+      tombBumps[id] = local0.tombstones[id];
+    }
+    extraPush.push(id);
   }
 
   // 2. Subir
   let pushed = 0;
   let skipped = 0;
-  for (const ids of chunks(plan.push, batchSize)) {
+  for (const ids of chunks([...new Set([...plan.push, ...extraPush])], batchSize)) {
     const payload = await Promise.all(
       ids.map(async (id) => {
         const rec = byId.get(id);
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
         const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
-        return { id, u, ...(await encryptPayload(key, id, u, content)) };
+        const h = encKey && fingerprint ? (content.deleted ? contentHash(encKey, 'eliminado', '') : contentHash(encKey, rec.kind, fingerprint(rec.kind, rec.data))) : undefined;
+        return { id, u, ...(h ? { h } : {}), ...(await encryptPayload(key, id, u, content)) };
       }),
     );
     const res = await api.put(payload);
@@ -139,11 +199,19 @@ async function syncPass({ api, key, readLocal, writeLocal, mergeFn, batchSize = 
 
   // 4. Aplicar sobre el estado local ACTUAL (pudo cambiar mientras se esperaba la red).
   let result = { added: 0, updated: 0, deleted: 0, needsPush: false };
-  if (pulled.length) {
+  if (pulled.length || Object.keys(tombBumps).length) {
     const cur = readLocal();
-    const applied = applyPulled(cur.items, cur.tombstones, pulled, mergeFn);
+    const applied = applyPulled(cur.items, { ...cur.tombstones, ...tombBumps }, pulled, mergeFn);
     writeLocal(applied.items, applied.tombstones);
     result = applied;
   }
-  return { pushed, skipped, merged, added: result.added, updated: result.updated, deleted: result.deleted, needsPush: result.needsPush || skipped > 0 };
+  return {
+    pushed,
+    skipped,
+    merged,
+    added: result.added,
+    updated: result.updated,
+    deleted: result.deleted,
+    needsPush: result.needsPush || skipped > 0 || plan.conflicts.length > 0,
+  };
 }

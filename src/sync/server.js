@@ -10,9 +10,10 @@
  *
  * API (todas requieren `Authorization: Bearer <token>` y `?esp=<especialidad>`,
  * por omisión `oftalmologia`):
- *   GET  /api/sync/list   -> { items: [{id, u}] }
- *   POST /api/sync/get    { items: [{id, u}] }            -> { items: [{id, u, iv, ct} | {id, u, missing}] }
- *   POST /api/sync/put    { items: [{id, u, iv, ct}] }    -> { saved: [id], skipped: [id] }
+ *   GET  /api/sync/list   -> { items: [{id, u, h}] }
+ *   POST /api/sync/get    { items: [{id, u, h}] }            -> { items: [{id, u, h, iv, ct} | {id, u, missing}] }
+ *   POST /api/sync/put    { items: [{id, u, h, iv, ct}] }    -> { saved: [id], skipped: [id] }
+ * `h` = huella de 16 hex del contenido (opcional por compatibilidad).
  *
  * Se escribe contra una interfaz mínima de "store" (list/get/setJSON/delete)
  * para poder probarla en Node con un almacenamiento en memoria.
@@ -26,8 +27,18 @@ const ESP_RE = /^[a-z][a-z0-9-]{1,39}$/;
 export const DEFAULT_ESP = 'oftalmologia';
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
-const keyOf = (esp, id, u) => `${esp}/r/${id}/${u}`;
-const keyRe = (esp) => new RegExp(`^${esp}/r/([A-Za-z0-9_-]{1,64})/(\\d{1,16})$`);
+const H_RE = /^[0-9a-f]{16}$/;
+/**
+ * Clave de una versión: `<esp>/r/<id>/<versión>.<huella>`. La huella (HMAC
+ * del contenido, calculada por el cliente con su clave) permite a los equipos
+ * detectar dos versiones con el mismo número y distinto contenido. Sin huella
+ * (versiones antiguas) la clave es `<esp>/r/<id>/<versión>`.
+ */
+const keyOf = (esp, id, u, h) => `${esp}/r/${id}/${u}${h ? '.' + h : ''}`;
+const keyRe = (esp) => new RegExp(`^${esp}/r/([A-Za-z0-9_-]{1,64})/(\\d{1,16})(?:\\.([0-9a-f]{16}))?$`);
+
+/** Orden de versiones: número y, a igual número, huella (desempate determinista). */
+const newer = (a, b) => a.u > b.u || (a.u === b.u && (a.h || '') > (b.h || ''));
 
 /** Comparación en tiempo constante de dos strings hex. */
 function safeEqual(a, b) {
@@ -57,21 +68,22 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
-/** Versiones existentes de un id (ordenadas de mayor a menor). */
+/** Versiones existentes de un id, de la más nueva a la más antigua: [{u, h, key}]. */
 async function versionsOf(store, esp, id) {
   const { blobs } = await store.list({ prefix: `${esp}/r/${id}/` });
   const re = keyRe(esp);
   return blobs
-    .map((b) => re.exec(b.key))
-    .filter((m) => m && m[1] === id)
-    .map((m) => Number(m[2]))
-    .sort((a, b) => b - a);
+    .map((b) => [b.key, re.exec(b.key)])
+    .filter(([, m]) => m && m[1] === id)
+    .map(([key, m]) => ({ key, u: Number(m[2]), h: m[3] }))
+    .sort((a, b) => (newer(a, b) ? -1 : newer(b, a) ? 1 : 0));
 }
 
 function validItem(it, now, withPayload) {
   if (!it || typeof it !== 'object') return false;
   if (!ID_RE.test(it.id)) return false;
   if (!Number.isSafeInteger(it.u) || it.u <= 0 || it.u > now + LIMITS.futureSkewMs) return false;
+  if (it.h !== undefined && !H_RE.test(it.h)) return false;
   if (!withPayload) return true;
   return (
     typeof it.iv === 'string' && B64_RE.test(it.iv) && it.iv.length === 16 &&
@@ -111,10 +123,10 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
         for (const b of blobs) {
           const m = re.exec(b.key);
           if (!m) continue;
-          const u = Number(m[2]);
-          if (!latest.has(m[1]) || latest.get(m[1]) < u) latest.set(m[1], u);
+          const v = { u: Number(m[2]), h: m[3] };
+          if (!latest.has(m[1]) || newer(v, latest.get(m[1]))) latest.set(m[1], v);
         }
-        return json(200, { items: [...latest].map(([id, u]) => ({ id, u })) });
+        return json(200, { items: [...latest].map(([id, { u, h }]) => (h ? { id, u, h } : { id, u })) });
       }
 
       if (req.method === 'POST' && (action === 'get' || action === 'put')) {
@@ -132,9 +144,9 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
         if (!items.every((it) => validItem(it, t, action === 'put'))) return json(400, { error: 'Elemento inválido' });
 
         if (action === 'get') {
-          const out = await mapLimit(items, 16, async ({ id, u }) => {
-            const v = await store.get(keyOf(esp, id, u), { type: 'json' });
-            return v && v.iv && v.ct ? { id, u, iv: v.iv, ct: v.ct } : { id, u, missing: true };
+          const out = await mapLimit(items, 16, async ({ id, u, h }) => {
+            const v = await store.get(keyOf(esp, id, u, h), { type: 'json' });
+            return v && v.iv && v.ct ? { id, u, ...(h ? { h } : {}), iv: v.iv, ct: v.ct } : { id, u, missing: true };
           });
           return json(200, { items: out });
         }
@@ -142,14 +154,16 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
         // put
         const saved = [];
         const skipped = [];
-        await mapLimit(items, 8, async ({ id, u, iv, ct }) => {
+        await mapLimit(items, 8, async ({ id, u, h, iv, ct }) => {
           const existing = await versionsOf(store, esp, id);
-          if (existing.length && existing[0] >= u) {
-            skipped.push(id); // el servidor ya tiene esta versión o una más nueva
+          if (existing.length && existing[0].u >= u) {
+            // El servidor ya tiene este número de versión o uno mayor. El equipo
+            // lo detectará (por número o por huella distinta) y fusionará.
+            skipped.push(id);
             return;
           }
-          await store.setJSON(keyOf(esp, id, u), { iv, ct });
-          await Promise.all(existing.map((old) => store.delete(keyOf(esp, id, old))));
+          await store.setJSON(keyOf(esp, id, u, h), { iv, ct });
+          await Promise.all(existing.map((old) => store.delete(old.key)));
           saved.push(id);
         });
         return json(200, { saved, skipped });

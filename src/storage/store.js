@@ -134,6 +134,14 @@ export function createStore(storage) {
       write(K.operativos, l);
     },
 
+    /** Última hora del reloj lógico (ver core/clock.js). */
+    loadClock() {
+      return Number(read(K.clock, 0)) || 0;
+    },
+    saveClock(t) {
+      write(K.clock, t);
+    },
+
     /** Configuración de sincronización de este equipo, o null si está desactivada. */
     loadSyncConfig() {
       const c = read(K.sync, null);
