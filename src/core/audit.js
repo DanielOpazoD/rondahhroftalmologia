@@ -170,3 +170,15 @@ export function shortValue(v, max = 40) {
   const s = String(v).replace(/\s+/g, ' ');
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
 }
+
+/**
+ * Resumen breve de los cambios que llegaron de otro equipo a la atención
+ * abierta (para el aviso): «Plan: vacío → Lentes · PIO OD: 15 → 18 y 2 más».
+ * @param {import('../domain').AuditChange[]} cambios
+ * @param {{id: string, n: string}[]} [procs]
+ */
+export function changesSummary(cambios, procs = [], max = 3) {
+  const shown = cambios.slice(0, max).map((c) => `${auditLabel(c.c, procs)}: ${shortValue(c.a, 24)} → ${shortValue(c.d, 24)}`);
+  const more = cambios.length > max ? ` y ${cambios.length - max} más` : '';
+  return shown.join(' · ') + more;
+}
