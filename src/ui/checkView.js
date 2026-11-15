@@ -9,6 +9,7 @@ import { APP } from '../config/catalogs.js';
 import { fmtDateTime } from '../core/format.js';
 import { onlyDoctors } from '../core/catalog.js';
 import { $ } from './dom.js';
+import { fetchPublishedVersion } from './version.js';
 import { html, setHtml } from './html.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -225,26 +226,24 @@ export async function collectChecks(ctx) {
 /** ¿Este equipo tiene la versión publicada? */
 async function checkVersion() {
   const title = 'Versión de la app';
-  if (location.protocol === 'file:') {
+  const r = await fetchPublishedVersion();
+  if (r.state === 'file') {
     return { state: 'info', title, text: `${APP.version}. Abierta como archivo: no se puede comparar con la publicada.` };
   }
-  try {
-    const res = await fetch('version.json', { cache: 'no-store' });
-    if (!res.ok) return { state: 'warn', title, text: `${APP.version}. No se pudo leer la versión publicada (error ${res.status}).` };
-    const pub = await res.json();
-    if (APP.build.startsWith('__') || !pub.build || pub.build === APP.build) {
-      return { state: 'ok', title, text: `Al día (${APP.version}).` };
-    }
+  if (r.state === 'offline') return { state: 'warn', title, text: `${APP.version}. Sin conexión: no se pudo comparar con la publicada.` };
+  if (r.state === 'error') {
+    return { state: 'warn', title, text: `${APP.version}. No se pudo leer la versión publicada (error ${r.status}).` };
+  }
+  if (r.state === 'newer') {
     return {
       state: 'bad',
       title,
-      text: `Hay una versión más nueva (${pub.version}). Actualiza para que todos los PC trabajen con la misma.`,
+      text: `Hay una versión más nueva (${r.version}). Actualiza para que todos los PC trabajen con la misma.`,
       action: 'reload',
       actionLabel: 'Actualizar',
     };
-  } catch {
-    return { state: 'warn', title, text: `${APP.version}. Sin conexión: no se pudo comparar con la publicada.` };
   }
+  return { state: 'ok', title, text: `Al día (${APP.version}).` };
 }
 
 /** Almacenamiento: IndexedDB y protección contra el borrado automático del navegador. */
