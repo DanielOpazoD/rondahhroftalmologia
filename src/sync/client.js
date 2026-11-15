@@ -6,7 +6,7 @@
  *   2. sube (cifradas) las atenciones y eliminaciones locales más nuevas;
  *   3. baja y descifra las más nuevas del servidor y las aplica localmente.
  */
-import { encryptPayload, decryptPayload } from './crypto.js';
+import { encryptPayload, decryptPayload, b64ToBytes } from './crypto.js';
 import { hmacSha256, toHex } from '../lib/sha256.js';
 import { localVersions, remoteVersions, planSync, applyPulled, chunks } from './protocol.js';
 
@@ -83,9 +83,23 @@ export async function syncOnce(deps) {
   return total;
 }
 
-/** Huella de contenido (16 hex) con HMAC: solo quien tiene la clave del equipo puede calcularla. */
-export function contentHash(encKey, kind, fingerprint) {
-  return toHex(hmacSha256('hhr-huella|' + encKey, kind + '\n' + fingerprint)).slice(0, 16);
+const subkeys = new Map();
+/** Subclave propia para huellas, derivada de la clave del equipo (no se reutiliza la clave AES). */
+function fingerprintKey(encKey) {
+  if (!subkeys.has(encKey)) subkeys.set(encKey, hmacSha256(b64ToBytes(encKey), 'hhr-huella-v2'));
+  return subkeys.get(encKey);
+}
+
+/**
+ * Huella de contenido (16 hex): HMAC con una subclave del equipo sobre
+ * id + versión + tipo + contenido. Atarla al id y a la versión impide que el
+ * servidor compare huellas entre atenciones distintas o entre versiones de la
+ * misma (no puede saber si dos registros son iguales, si uno volvió a un
+ * contenido anterior ni cuáles son eliminaciones). Solo se compara la huella
+ * local con la del servidor para el MISMO id y la MISMA versión.
+ */
+export function contentHash(encKey, id, u, kind, fingerprint) {
+  return toHex(hmacSha256(fingerprintKey(encKey), `${id}\n${u}\n${kind}\n${fingerprint}`)).slice(0, 16);
 }
 
 async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fingerprint, batchSize = 100 }) {
@@ -103,7 +117,7 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
   const hashOf = (id) => {
     const v = local.get(id);
     const rec = byId.get(id);
-    return v.deleted || !rec ? contentHash(encKey, 'eliminado', '') : contentHash(encKey, rec.kind, fingerprint(rec.kind, rec.data));
+    return v.deleted || !rec ? contentHash(encKey, id, v.u, 'eliminado', '') : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
   };
   const plan = planSync(local, remote, encKey && fingerprint ? hashOf : undefined);
   const pulled = [];
@@ -185,7 +199,7 @@ async function syncPass({ api, key, encKey, readLocal, writeLocal, mergeFn, fing
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
         const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
-        const h = encKey && fingerprint ? (content.deleted ? contentHash(encKey, 'eliminado', '') : contentHash(encKey, rec.kind, fingerprint(rec.kind, rec.data))) : undefined;
+        const h = encKey && fingerprint ? (content.deleted ? contentHash(encKey, id, u, 'eliminado', '') : contentHash(encKey, id, u, rec.kind, fingerprint(rec.kind, rec.data))) : undefined;
         return { id, u, ...(h ? { h } : {}), ...(await encryptPayload(key, id, u, content)) };
       }),
     );

@@ -4,7 +4,7 @@
 
 ### Corregido (crítico)
 - **Pérdida de ediciones con 3 o más PC sincronizando a la vez.** Dos PC que fusionaban a la vez podían quedar con el mismo número de versión y distinto contenido, y ninguno lo detectaba. Ahora:
-  - cada versión lleva una huella HMAC de su contenido (clave `…/<versión>.<huella>` en el servidor);
+  - cada versión lleva una huella HMAC de su contenido (clave `…/<versión>.<huella>` en el servidor), atada al id y a la versión y con una subclave propia: el servidor no puede comparar registros ni distinguir eliminaciones;
   - si el número coincide y la huella no, el PC baja, fusiona y sube una versión nueva;
   - la versión rechazada por el servidor provoca otra pasada inmediata.
 

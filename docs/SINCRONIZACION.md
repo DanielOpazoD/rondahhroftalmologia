@@ -114,7 +114,7 @@ Abre `http://localhost:8787` y `http://127.0.0.1:8787`: son dos orígenes distin
 | Interfaz | `src/ui/syncController.js` |
 | Tests (4 PC convergen; el servidor no ve datos) | `tests/sync.test.js` |
 
-Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<versión>.<huella>` → `{iv, ct}`. La huella es un HMAC de 16 hex del contenido; las versiones antiguas no la tienen. Al escribir una versión nueva se borran las anteriores.
+Almacenamiento (Netlify Blobs, almacén `hhr-rondas`): `<especialidad>/r/<id>/<versión>.<huella>` → `{iv, ct}`. La huella es un HMAC de 16 hex de id + versión + contenido, con una subclave derivada de la clave del equipo; no permite comparar registros ni versiones entre sí. Las versiones antiguas no la tienen. Al escribir una versión nueva se borran las anteriores.
 
 **Qué se sincroniza:** todo viaja cifrado y el servidor no distingue un tipo de otro. Cada elemento lleva su tipo dentro del contenido cifrado:
 

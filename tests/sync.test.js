@@ -284,3 +284,19 @@ describe('mismo paciente editado en dos PC a la vez', () => {
     for (const p of [pc1, pc2]) assert.equal(p.state.records.find((x) => x.id === 'pac2').f.od_pio, '21');
   });
 });
+
+describe('huella de contenido', () => {
+  test('atada al id y a la versión: el servidor no puede comparar registros ni versiones', async () => {
+    const { contentHash } = await import('../src/sync/client.js');
+    const { encKey } = await deriveTeamKeys(PASS, 1000);
+    const same = 'mismo contenido';
+    const h = contentHash(encKey, 'a', 10, 'atencion', same);
+    assert.match(h, /^[0-9a-f]{16}$/);
+    assert.equal(contentHash(encKey, 'a', 10, 'atencion', same), h, 'determinista para el mismo id y versión');
+    assert.notEqual(contentHash(encKey, 'b', 10, 'atencion', same), h, 'otro registro, mismo contenido → otra huella');
+    assert.notEqual(contentHash(encKey, 'a', 11, 'atencion', same), h, 'otra versión, mismo contenido → otra huella');
+    assert.notEqual(contentHash(encKey, 'x', 1, 'eliminado', ''), contentHash(encKey, 'y', 1, 'eliminado', ''), 'eliminaciones no reconocibles');
+    const other = (await deriveTeamKeys('Q2W3E-R4T5Y-6Y7U8-P9Q0Z', 1000)).encKey;
+    assert.notEqual(contentHash(other, 'a', 10, 'atencion', same), h, 'depende de la clave del equipo');
+  });
+});
