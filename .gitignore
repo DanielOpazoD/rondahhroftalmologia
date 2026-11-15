@@ -12,3 +12,4 @@ Oftalmo_*.pdf
 atenciones_oftalmo*.csv
 *.xlsx
 .playwright-mcp/
+.netlify/

@@ -172,7 +172,7 @@ export function createSyncController(ctx) {
     const badge = $('#syncBadge');
     badge.hidden = !on || !available();
     badge.className = 'syncBadge ' + st.status;
-    badge.textContent = st.status === 'idle' ? '● Sincronizado' : '● ' + LABELS[st.status];
+    badge.textContent = st.status === 'idle' ? 'Sincronizado' : LABELS[st.status];
     badge.title = st.message || (st.config?.lastSync ? 'Última sincronización: ' + fmtDateTime(new Date(st.config.lastSync)) : '');
     if (on) {
       $('#syncInfo').textContent =

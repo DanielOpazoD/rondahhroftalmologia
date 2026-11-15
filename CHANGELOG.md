@@ -1,5 +1,20 @@
 # Cambios
 
+## 2.2.0 — 2026-11-14
+
+### Cambiado
+- **Interfaz rediseñada**, más limpia y minimalista:
+  - superficies neutras, un solo color de acento y tipografía más sobria;
+  - navegación con iconos (barra inferior en el celular);
+  - controles segmentados y casillas con estado claro;
+  - barra de acciones flotante;
+  - modo oscuro automático.
+- Las salidas (PDF, Excel, nota, exportaciones) no cambian.
+
+### Despliegue
+- Sitio en producción: https://hhr-rondas.netlify.app, con despliegue automático desde `main`.
+- Variable `SYNC_TOKEN_SHA256` configurada en Netlify.
+
 ## 2.1.0 — 2026-11-14
 
 ### Nuevo
