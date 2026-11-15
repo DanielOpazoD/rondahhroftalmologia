@@ -12,9 +12,9 @@ import { resolvePatientId, patientFields, PATIENT_FIELDS } from '../core/patient
  * Atención lista para guardar: normalizada, fusionada con la versión guardada
  * (si otro equipo la cambió mientras se editaba), vinculada a su paciente y
  * con la versión nueva.
- * @param {{rec: object, stored?: object | null, patients: object[] | Map<string, object>, procs: {id: string, n: string}[], now: number}} o
+ * @param {{rec: import('../domain').Atencion, stored?: import('../domain').Atencion | null, patients: import('../domain').Paciente[] | Map<string, import('../domain').Paciente>, procs: {id: string, n: string}[], now: number}} o
  *   `rec`: la atención en edición; `stored`: la guardada con el mismo id (si hay).
- * @returns {object} la atención a guardar
+ * @returns {import('../domain').Atencion} la atención a guardar
  */
 export function prepareSave({ rec: draft, stored = null, patients, procs, now }) {
   let rec = normalizeRecord(draft);
