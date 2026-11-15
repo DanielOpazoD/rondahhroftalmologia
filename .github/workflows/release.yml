@@ -1,0 +1,42 @@
+# Versiones etiquetadas: cuando main tiene una versión nueva en package.json,
+# se crea la etiqueta vX.Y.Z y una release con las notas de su sección del CHANGELOG.
+name: Versión
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  etiquetar:
+    name: Etiqueta y release de la versión
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: ¿Versión nueva?
+        id: v
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          PREV=$(git show HEAD~1:package.json 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).version)}catch{console.log('')}})")
+          # Solo cuando ESTE commit cambia la versión y aún no existe su etiqueta.
+          if [ "$VERSION" != "$PREV" ] && ! git rev-parse "v$VERSION" >/dev/null 2>&1; then echo "nueva=si" >> "$GITHUB_OUTPUT"; else echo "nueva=no" >> "$GITHUB_OUTPUT"; fi
+      - name: Crear etiqueta y release
+        if: steps.v.outputs.nueva == 'si'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/release-notes.mjs "${{ steps.v.outputs.version }}" > notas.md
+          gh release create "v${{ steps.v.outputs.version }}" --target "$GITHUB_SHA" --title "Versión ${{ steps.v.outputs.version }}" --notes-file notas.md

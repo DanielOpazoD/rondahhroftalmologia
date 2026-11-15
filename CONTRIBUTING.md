@@ -66,6 +66,9 @@ Un cambio que contradiga una decisión de [docs/adr](docs/adr/README.md) necesit
 
 ## Versiones y publicación
 
+- `main` está **protegida**: los cambios entran solo por pull request, con la CI en verde (lint, tipos, pruebas, build y pruebas en navegador) y la rama al día con `main`.
+- Al mergear un cambio que **sube la versión** en `package.json`, el workflow `Versión` crea la etiqueta `vX.Y.Z` y una release de GitHub con las notas de su sección del CHANGELOG (`scripts/release-notes.mjs`). Una prueba verifica que la versión actual tenga su sección.
+
 1. Sube `version` en `package.json` siguiendo semver:
    - corrección: 2.6.**1**;
    - función nueva: 2.**7**.0;
