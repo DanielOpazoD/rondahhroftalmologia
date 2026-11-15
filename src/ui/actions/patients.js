@@ -54,7 +54,7 @@ export function patientActions(ctx, store) {
         if (entry) store.addAuditEntry(saved.id, entry);
       });
       if (!ok) return { ok: false };
-      ctx.refreshLists();
+      ctx.emit('datos');
       ctx.sync?.schedule();
       toast(`${saved.f.paciente_nombre || saved.f.paciente_rut} agregado a la lista`);
       return { ok: true, id: saved.id };
@@ -168,7 +168,7 @@ export function patientActions(ctx, store) {
         }
       });
       if (!done) return false;
-      ctx.refreshLists();
+      ctx.emit('datos');
       ctx.sync?.schedule();
       toast('Fichas unidas');
       return true;
@@ -179,7 +179,7 @@ export function patientActions(ctx, store) {
       const set = store.loadNotDuplicates();
       set.add([aId, bId].sort().join('|'));
       ctx.persist(() => store.saveNotDuplicates(set));
-      ctx.refreshLists();
+      ctx.emit('datos');
     },
   };
 }
