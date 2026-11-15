@@ -1,5 +1,39 @@
 # Cambios
 
+## 2.13.0 — 2026-11-16
+
+### Nuevo
+- **Guardado automático** (#27):
+  - cada cambio se guarda solo tras una pausa al escribir (1,2 s), y también al ocultar o cerrar la página;
+  - la barra dice «Guardando…» y «Guardada», o por qué aún no se puede guardar;
+  - nunca duplica una atención del mismo paciente ese día;
+  - «¿Quién registra?» se pregunta al abrir la app, para no interrumpir la escritura;
+  - el historial junta en una entrada las ediciones seguidas de la misma persona.
+- **Cabecera sin superposiciones y diseño más compacto** (#24):
+  - con poco espacio, la cabecera se compacta por pasos (solo el logo, luego pestañas con ícono);
+  - tarjetas, filas y áreas de texto más compactas;
+  - Ajustes con los procedimientos en columnas.
+- **Respaldos diarios del servidor** (#28):
+  - automáticos y cifrados, con 30 días disponibles;
+  - script de restauración con modo de prueba;
+  - guía en `docs/OPERACION.md`.
+- **Límite de intentos fallidos de contraseña** por red (#29). La contraseña correcta nunca se bloquea.
+
+### Accesibilidad
+- Probado como lo anuncia un **lector de pantalla** (#30):
+  - los íconos ya no se leen como «imagen»;
+  - el sexo se lee con su nombre completo;
+  - el estado del guardado se anuncia.
+- `docs/ACCESIBILIDAD.md` trae una guía de prueba manual con VoiceOver o NVDA.
+
+### Arquitectura e ingeniería
+- **Segunda especialidad piloto (otorrinolaringología)**, construida en la CI. Demuestra que la plataforma admite otras especialidades y lista lo que aún asume de oftalmología (#25).
+- **Tipos completos** (`noImplicitAny`) en las capas puras: de 435 avisos a 0 (#26).
+- **Rama `main` protegida** (solo por PR con la CI en verde) y **versiones etiquetadas**: cada versión crea su etiqueta y release desde el CHANGELOG (#31).
+
+### Sin cambios
+- PDF, Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
+
 ## 2.12.1 — 2026-11-16
 
 ### Interfaz
