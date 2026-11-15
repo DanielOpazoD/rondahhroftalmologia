@@ -2112,3 +2112,21 @@ html.locked body > *:not(#lockDlg) {
 .u-mono {
   font-family: var(--mono);
 }
+
+/* ------------------------------------------------ cambios sin guardar en el equipo */
+.saveBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  background: var(--bad-soft);
+  color: var(--bad);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+}
+.saveBar span {
+  flex: 1;
+  min-width: 180px;
+}

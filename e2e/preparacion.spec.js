@@ -220,3 +220,33 @@ test('registro de errores: un error inesperado queda registrado en Ajustes', asy
   await page.locator('#errClear').click();
   await expect(page.locator('#errCount')).toHaveText('0');
 });
+
+test('almacenamiento: si una escritura falla, se avisa y se guarda al reintentar', async ({ page }) => {
+  await openApp(page);
+  // Simula un disco lleno: las escrituras de IndexedDB fallan hasta que se «libera espacio».
+  await page.evaluate(() => {
+    const w = /** @type {any} */ (window);
+    w.__fail = true;
+    const orig = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...a) {
+      if (w.__fail) throw new DOMException('Sin espacio', 'QuotaExceededError');
+      return orig.apply(this, a);
+    };
+  });
+  await page.locator('#paciente_nombre').fill('Paciente Sin Disco');
+  await page.locator('#bSave').click();
+  await expect(page.locator('#saveBar')).toBeVisible();
+  await expect(page.locator('#saveText')).toHaveText(/no se pudieron? guardar en este equipo/);
+  // Chequeo del equipo: lo marca como problema.
+  await tab(page, 'Ajustes');
+  await page.locator('#checkOpen').click();
+  await expect(page.locator('#checkDlg li', { hasText: 'Almacenamiento' })).toHaveClass(/bad/);
+  await page.locator('#checkClose').click();
+  // Se libera espacio y se reintenta: queda guardado y la barra desaparece.
+  await page.evaluate(() => /** @type {any} */ (window.__fail = false));
+  await page.locator('#saveRetry').click();
+  await expect(page.locator('#saveBar')).toBeHidden();
+  await page.reload();
+  await tab(page, 'Pacientes');
+  await expect(page.locator('#regList .prow', { hasText: 'Paciente Sin Disco' })).toHaveCount(1);
+});

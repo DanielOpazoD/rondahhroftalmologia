@@ -46,6 +46,7 @@ async function openRepo(storage, practice) {
   const onError = (e) => {
     toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
     logError('almacenamiento', e);
+    window.dispatchEvent(new Event('hhr:storage-error'));
   };
   try {
     const repo = createRepo(await idbBackend(dbName(practice)), { onError });
@@ -101,7 +102,20 @@ async function main() {
   // Pide al navegador no borrar los datos si le falta espacio (sin preguntar al usuario).
   if (!practice) void navigator.storage?.persist?.().catch(() => {});
   // Escrituras que fallaron (p. ej. disco lleno un momento): se reintentan cada minuto.
-  setInterval(() => repo.retryFailed?.(), 60_000);
+  const saveBar = () => {
+    const n = repo.failedCount?.() || 0;
+    $('#saveBar').hidden = !n;
+    $('#saveText').textContent =
+      `${n} ${n === 1 ? 'cambio no se pudo' : 'cambios no se pudieron'} guardar en este equipo (¿almacenamiento lleno?). Se reintenta solo; no cierres la app.`;
+  };
+  ctx.storageHealth = () => ({ pending: repo.failedCount?.() || 0 });
+  setInterval(() => {
+    repo.retryFailed?.();
+    repo.flush().then(saveBar);
+  }, 60_000);
+  $('#saveRetry').addEventListener('click', () => repo.flush().then(saveBar));
+  // Tras cada escritura que falla (aviso del repositorio), se muestra la barra.
+  window.addEventListener('hhr:storage-error', () => setTimeout(saveBar, 0));
   initErrorLog(ctx);
   // Bloqueo con PIN: antes de mostrar datos.
   ctx.lock = createLock(ctx);
