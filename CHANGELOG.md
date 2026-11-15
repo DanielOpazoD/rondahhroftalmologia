@@ -1,5 +1,50 @@
 # Cambios
 
+## 2.12.0 — 2026-11-16
+
+Versión de calidad: arquitectura, sincronización e ingeniería, en 14 PR revisados por la CI (#5 a #18). No cambian las salidas (PDF, Excel, nota ni exportación seudonimizada) ni la forma de usar la app.
+
+### Datos y sincronización
+- **Lector tolerante entre versiones** (#6, ADR 0012):
+  - ningún PC borra los campos que agregue una versión más nueva;
+  - un rol de perfil desconocido ya no se convierte en «médico».
+- **Red poco confiable** (#8):
+  - tiempo máximo de 20 s por solicitud;
+  - reintentos con retroceso exponencial solo ante errores transitorios.
+- **Versión de protocolo** entre cliente y servidor (#9):
+  - el servidor puede exigir una mínima (`426`, «recarga la página»);
+  - la app avisa si el servidor es más nuevo.
+- **Motor de sincronización en etapas** con estado explícito (#17), sin cambio de comportamiento.
+- **Almacenamiento resiliente** (#16):
+  - corregido: una escritura que fallaba en IndexedDB quedaba marcada como guardada y el dato podía perderse al cerrar;
+  - ahora se reintenta y queda pendiente hasta guardarse;
+  - se pide al navegador almacenamiento persistente.
+
+### Servidor
+- Límite de tamaño por solicitud (`413`), `405` con cabecera `Allow`, errores con código estable.
+- `x-request-id` y registro estructurado sin datos (#15).
+- La marca del índice de cambios se fecha al escribirla (#14).
+
+### Interfaz
+- **Aviso de versión nueva** mientras la app está abierta, con «Recargar» (#10).
+- **Registro local de errores** en Ajustes, para enviar a soporte (#11).
+- **Bus de eventos:** las acciones anuncian qué cambió y las listas se re-dibujan una sola vez (#12).
+
+### Seguridad
+- **CSP sin `'unsafe-inline'` en estilos:** solo la hoja de la app, por su hash; el HTML no tiene atributos `style` (#18).
+
+### Arquitectura e ingeniería
+- **Registro de decisiones de arquitectura** (`docs/adr/`, 12 ADR) (#5).
+- **Capa de aplicación pura** (`src/app/`): las reglas de guardar, preingresar y re-vincular se prueban sin navegador (#7).
+- **Tipos estrictos** en las capas puras y modelo de dominio tipado (`src/domain.d.ts`) (#13).
+- **Pruebas:**
+  - cada prueba en navegador empieza con el servidor vacío;
+  - cobertura mínima exigida en la CI (líneas 95 %, ramas 85 %, funciones 87 %);
+  - `npm audit` de dependencias de producción (#14).
+
+### Al actualizar
+- Recarga la app en todos los PC. A partir de esta versión, los PC se avisan solos cuando hay una versión nueva.
+
 ## 2.11.0 — 2026-11-15
 
 ### Nuevo
