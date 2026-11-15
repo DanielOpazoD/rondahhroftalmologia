@@ -117,14 +117,14 @@ export function createSyncController(ctx) {
    * Contenido de los adjuntos (espacio `<especialidad>-adjuntos`): solo si hay
    * algo que subir, bajar o borrar. Ver sync/attachments.js.
    */
-  async function syncAttachments(key) {
+  async function syncAttachments(key, token) {
     if (!store.supportsAttachments()) return;
     const metas = store.loadAttachments();
     const purges = store.loadAttachmentPurges();
     const uploaded = store.loadAttachmentsUploaded();
     if (!attachmentsPending(metas, await store.attachmentDataIds(), (id) => uploaded.has(id), purges)) return;
     const r = await syncAttachmentContent({
-      api: createSyncApi({ token: st.config.token, esp: `${ESPECIALIDAD.id}-adjuntos` }),
+      api: createSyncApi({ token, esp: `${ESPECIALIDAD.id}-adjuntos` }),
       key,
       metas,
       purges,
@@ -144,10 +144,26 @@ export function createSyncController(ctx) {
     if (r.bajados) ctx.emit('adjuntos');
   }
 
+  /**
+   * Permiso para el servidor: la sesión de la cuenta (con cuentas de usuario,
+   * ADR 0014) o la contraseña del equipo. null si no hay con qué sincronizar.
+   */
+  async function authToken() {
+    if (!ctx.accounts?.active) return st.config?.token || null;
+    if (!ctx.accounts.user) return null;
+    return ctx.accounts.token() || (await ctx.accounts.ensureToken());
+  }
+
   async function syncNow({ quiet = true } = {}) {
     if (!st.config || !available()) return;
     if (st.running) {
       st.again = true;
+      return;
+    }
+    const token = await authToken();
+    if (!token) {
+      // Con cuentas: aún sin sesión, o entró sin conexión y la conexión no ha vuelto.
+      if (ctx.accounts?.user) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
       return;
     }
     st.running = true;
@@ -158,7 +174,7 @@ export function createSyncController(ctx) {
       // 1) Fichas de pacientes: espacio COMÚN a todas las especialidades.
       const resP = await syncOnce({
         ...common,
-        api: createSyncApi({ token: st.config.token, esp: PATIENTS_SPACE }),
+        api: createSyncApi({ token, esp: PATIENTS_SPACE }),
         // El id de una ficha es la huella del RUT: el servidor ve solo un id opaco.
         opaqueIds: true,
         cache: st.caches.pacientes,
@@ -166,7 +182,7 @@ export function createSyncController(ctx) {
         writeLocal: writePatients,
       });
       // 2) Atenciones, catálogos y bitácora: espacio de la especialidad.
-      const api = createSyncApi({ token: st.config.token, esp: ESPECIALIDAD.id });
+      const api = createSyncApi({ token, esp: ESPECIALIDAD.id });
       // El id de un perfil de médico es la huella de su RUT: el servidor ve un id opaco.
       const resE = await syncOnce({
         ...common,
@@ -178,7 +194,8 @@ export function createSyncController(ctx) {
       });
       const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
       ctx.ensurePatients();
-      await syncAttachments(key);
+      await syncAttachments(key, token);
+      void ctx.accounts?.flushEvents();
       checkClock(api.serverDate);
       // El servidor habla una versión de protocolo más nueva: hay una app más nueva publicada.
       if (api.serverProtocol > PROTOCOL_VERSION && !st.newerWarned) {
@@ -198,6 +215,13 @@ export function createSyncController(ctx) {
         );
       }
     } catch (e) {
+      const authCodes = ['sesion_invalida', 'cuenta_desactivada', 'debe_cambiar_clave'];
+      if (e instanceof SyncHttpError && authCodes.includes(e.code)) {
+        // La sesión ya no sirve, o (con la contraseña del equipo) las cuentas se activaron: hay que entrar.
+        setStatus('off', e.message);
+        ctx.accounts?.onAuthError(e.code);
+        return;
+      }
       if (e instanceof SyncHttpError && e.status === 0) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
       else if (e instanceof SyncHttpError && e.status === 426) {
         setStatus('error', 'Esta versión de la app es antigua para el servidor: recarga la página para actualizarla.');
@@ -226,6 +250,13 @@ export function createSyncController(ctx) {
   }
 
   function start() {
+    // La configuración puede haber cambiado al entrar con una cuenta (clave del equipo de la cuenta).
+    const fresh = store.loadSyncConfig();
+    if (fresh?.encKey !== st.config?.encKey) {
+      st.key = null;
+      resetCaches();
+    }
+    st.config = fresh;
     clearInterval(st.interval);
     if (!st.config || !available()) {
       setStatus('off');
@@ -341,7 +372,12 @@ export function createSyncController(ctx) {
     $('#syncUnavailable').textContent = ctx.practice
       ? 'En el modo práctica no hay sincronización: los datos de ejemplo quedan solo en este equipo.'
       : 'La sincronización solo funciona al abrir la app desde su dirección web (https). Con el archivo abierto con doble clic, usa el respaldo.';
-    $('#syncSetup').hidden = on || !available();
+    const acc = Boolean(ctx.accounts?.active);
+    // Con cuentas de usuario, la sincronización va con la sesión: no hay contraseña del equipo que configurar.
+    $('#syncSetup').hidden = on || !available() || acc;
+    $('#syncOff').hidden = acc;
+    $('#syncActive details.setup').hidden = acc;
+    ctx.accounts?.render(); // «Activar cuentas» depende de que haya contraseña del equipo
     // «Generar» solo en la primera configuración: si el servidor ya tiene
     // contraseña, generar otra solo produce una que no coincide.
     const firstSetup = st.server === 'unconfigured';

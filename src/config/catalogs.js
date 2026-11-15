@@ -61,6 +61,14 @@ export const STORAGE_KEYS = Object.freeze({
   attachmentPurges: `${P}adjuntos_por_borrar_v1`,
   /** Registro local de errores (últimos 50). */
   errors: `${P}errores_v1`,
+  /** Este PC sabe que las cuentas de usuario están activadas (ADR 0014). */
+  accountsOn: `${P}cuentas_activas_v1`,
+  /** Cuentas que entraron en este PC, para entrar sin conexión: sal y huella del valor `local`, nunca la clave. */
+  localAccounts: `${P}cuentas_locales_v1`,
+  /** Eventos del registro de accesos pendientes de enviar (sin conexión). */
+  accountEvents: `${P}cuentas_eventos_v1`,
+  /** Minutos sin uso para bloquear la sesión (con cuentas). */
+  sessionLock: `${P}cuentas_bloqueo_v1`,
 });
 
 /**

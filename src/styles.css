@@ -2090,13 +2090,27 @@ main:focus {
 }
 
 /* Bloqueado: nada fuera de la pantalla de bloqueo se ve ni se imprime. */
-html.locked body > *:not(#lockDlg) {
+html.locked body > *:not(#lockDlg):not(#loginDlg) {
   visibility: hidden !important;
 }
 @media print {
-  html.locked body > *:not(#lockDlg) {
+  html.locked body > *:not(#lockDlg):not(#loginDlg) {
     display: none !important;
   }
+}
+/* Pantalla de ingreso: etiquetas a la izquierda, como en los formularios. */
+.loginbox form {
+  text-align: left;
+}
+.loginbox form .btn {
+  margin-top: 6px;
+}
+.loginbox .hint {
+  margin: 0;
+}
+.lockbox .msg {
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* ------------------------------------------------ aviso de versión nueva */

@@ -19,10 +19,12 @@ export class SyncHttpError extends Error {
   /**
    * @param {number} status
    * @param {string} message
+   * @param {string} [code] código estable del servidor (p. ej. `sesion_invalida`)
    */
-  constructor(status, message) {
+  constructor(status, message, code = '') {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -91,7 +93,7 @@ export function createSyncApi({
       api.serverDate = res.headers.get('date') || api.serverDate;
       api.serverProtocol = Number(res.headers.get(PROTOCOL_HEADER)) || api.serverProtocol;
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`);
+      if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`, data.code || '');
       return data;
     } catch (e) {
       if (e instanceof SyncHttpError) throw e;
