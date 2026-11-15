@@ -15,3 +15,6 @@ atenciones_oftalmo*.csv
 .netlify/
 playwright-report/
 test-results/
+
+# Copias de trabajo de agentes / herramientas locales
+.claude/

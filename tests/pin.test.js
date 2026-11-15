@@ -32,7 +32,14 @@ test('PIN: valida, verifica, y el código de recuperación desbloquea', () => {
   const { lock, recoveryCode } = createLockConfig('4821', 15, 1000);
   assert.ok(isLockConfig(lock));
   assert.equal(lock.minutes, 15);
-  assert.ok(!JSON.stringify(lock).includes('4821'), 'el PIN no se guarda');
+  // El PIN no se guarda: ningún campo lo contiene en claro. (No se busca la
+  // subcadena en todo el JSON: la sal y la huella son hexadecimales al azar y
+  // pueden contener «4821» por casualidad, lo que hacía la prueba intermitente.)
+  assert.deepEqual(Object.keys(lock).sort(), ['hash', 'iter', 'minutes', 'rhash', 'rsalt', 'salt', 'v']);
+  assert.ok(
+    Object.values(lock).every((v) => v !== '4821' && v !== 4821),
+    'el PIN no se guarda',
+  );
   assert.ok(verifyPin(lock, '4821'));
   assert.ok(!verifyPin(lock, '4822'));
   assert.match(recoveryCode, /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);

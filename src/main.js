@@ -26,6 +26,7 @@ import { initCheckView, autoCheck } from './ui/checkView.js';
 import { createLock } from './ui/lock.js';
 import { startUpdateWatcher } from './ui/updateNotice.js';
 import { initErrorLog, logError } from './ui/errorLog.js';
+import { initHeaderFit } from './ui/headerFit.js';
 
 function getStorage() {
   try {
@@ -134,6 +135,7 @@ async function main() {
   initUserView(ctx);
   initCheckView(ctx);
   initRutMarks();
+  initHeaderFit();
   ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
