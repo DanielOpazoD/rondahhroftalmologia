@@ -38,7 +38,7 @@ Se guarda en `localStorage["oft_atenciones_v1"]` como un arreglo. La clave conse
 
 - `proc[id].od / .oi` son la PIO en mmHg y solo existen en procedimientos con `pio: 1`.
 - `procNames` guarda el nombre del procedimiento al momento de guardar. Así, si después se quita de la lista en Ajustes, la estadística sigue mostrando su nombre.
-- `normalizeRecord()` acepta registros v1 o incompletos y los lleva a v2 sin perder datos: convierte números a texto y descarta lateralidades inválidas.
+- `normalizeRecord()` acepta registros v1, v2 o incompletos y los lleva a v3 sin perder datos (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
 
 ### Especialidades
 
