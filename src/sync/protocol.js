@@ -10,6 +10,22 @@
 import { isValidId } from '../core/record.js';
 
 /**
+ * Versión del PROTOCOLO de sincronización (formato de lo que viaja), distinta
+ * de la versión de la app. Historia:
+ *   1 — cifrado AES-GCM por elemento, versión = fecha de modificación (2.1)
+ *   2 — huellas de contenido para conflictos con igual versión (2.6)
+ *   3 — ids opacos, `list?since=` incremental y `purge` (2.10)
+ * Un cambio INCOMPATIBLE sube PROTOCOL_VERSION y, en el servidor,
+ * MIN_CLIENT_PROTOCOL: los equipos con una app más antigua reciben 426 y el
+ * aviso de recargar, en vez de sincronizar datos que no entienden.
+ */
+export const PROTOCOL_VERSION = 3;
+/** Versión mínima de cliente que acepta el servidor (si el cliente la declara). */
+export const MIN_CLIENT_PROTOCOL = 3;
+/** Cabecera HTTP en la que cliente y servidor declaran su versión de protocolo. */
+export const PROTOCOL_HEADER = 'x-hhr-protocol';
+
+/**
  * Versión local de cada id (atención o lápida).
  * @param {{id: string, updated: number}[]} records elementos locales (atenciones, médicos, operativos)
  * @param {Record<string, number>} tombstones id -> fecha de eliminación (ms)

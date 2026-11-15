@@ -21,6 +21,7 @@ import {
   DecryptError,
 } from '../sync/crypto.js';
 import { createSyncApi, syncOnce, SyncHttpError, createSyncCache } from '../sync/client.js';
+import { PROTOCOL_VERSION } from '../sync/protocol.js';
 import { $, toast, copyText } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { html } from './html.js';
@@ -181,6 +182,11 @@ export function createSyncController(ctx) {
       const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
       ctx.ensurePatients();
       checkClock(api.serverDate);
+      // El servidor habla una versión de protocolo más nueva: hay una app más nueva publicada.
+      if (api.serverProtocol > PROTOCOL_VERSION && !st.newerWarned) {
+        st.newerWarned = true;
+        toast('Hay una versión más nueva de la app. Recarga la página para actualizarla.', 6000);
+      }
       st.config = { ...st.config, lastSync: Date.now() };
       store.saveSyncConfig(st.config);
       setStatus('idle');
@@ -193,7 +199,9 @@ export function createSyncController(ctx) {
       }
     } catch (e) {
       if (e instanceof SyncHttpError && e.status === 0) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
-      else if (e instanceof DecryptError) {
+      else if (e instanceof SyncHttpError && e.status === 426) {
+        setStatus('error', 'Esta versión de la app es antigua para el servidor: recarga la página para actualizarla.');
+      } else if (e instanceof DecryptError) {
         setStatus(
           'error',
           'Hay datos en el servidor que no se pueden descifrar con esta contraseña. Revisa que sea la misma en todos los PC.',

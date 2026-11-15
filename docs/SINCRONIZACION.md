@@ -57,6 +57,14 @@ La fusión ocurre dentro de cada PC, antes de cifrar: el servidor sigue sin pode
 - **Causalidad.** Una edición hecha *después* de recibir otra siempre gana, aunque el reloj del PC esté atrasado. La hora de cada edición sale de un reloj lógico (`src/core/clock.js`): la hora del PC, pero nunca anterior a la última recibida de otros equipos.
 - **Reloj desajustado.** Si la hora del PC difiere más de 3 minutos de la del servidor, la app avisa para corregirla. Solo importa al desempatar ediciones *simultáneas* del mismo campo.
 
+### Versión de protocolo
+
+Cliente y servidor declaran su versión del **protocolo** de sincronización en la cabecera `x-hhr-protocol` (hoy es la 3; la historia está en `src/sync/protocol.js`).
+
+- Si un cambio futuro es incompatible, se sube `MIN_CLIENT_PROTOCOL`. Los PC con una app más antigua reciben `426` y el aviso «recarga la página», en vez de sincronizar datos que no entienden.
+- Si el servidor declara una versión mayor que la del PC, la app avisa que hay una versión más nueva.
+- Los clientes anteriores a la 2.12 no envían la cabecera y se siguen aceptando.
+
 ### Red poco confiable
 
 Cada solicitud tiene un tiempo máximo de 20 s. Los errores transitorios (sin conexión, tiempo agotado, 429, 502, 504) se reintentan hasta 2 veces con retroceso exponencial y variación aleatoria (0,5 s, 1 s…), para que varios PC que fallaron a la vez no reintenten en el mismo instante. Reintentar es seguro porque todas las operaciones son idempotentes. Los errores definitivos, como la contraseña incorrecta (401), no se reintentan. Probado con un servidor que falla 1 de cada 3 solicitudes: los equipos convergen igual.
