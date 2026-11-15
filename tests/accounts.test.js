@@ -345,3 +345,27 @@ describe('servidor de cuentas', () => {
     assert.equal((await env.call(`cuentas/auditoria?desde=2026-01-01&hasta=${day}`, { method: 'GET', token: tok })).status, 400);
   });
 });
+
+test('recuperar un administrador con la contraseña del equipo (script de operación)', async () => {
+  const env = await activated();
+  const accounts = createAccounts({ store: env.store, secret: tokenHash(env.keys.token), now: () => env.clock.t });
+  const creds = (rut) => (uid, complemento) =>
+    credentialsFor({ password: initialPassword(rut), teamKeyB64: env.keys.encKey, uid, complemento, iterations: ITER });
+  // La cuenta existente vuelve a la clave inicial, como administradora activa.
+  assert.equal((await env.login(ADMIN_RUT, 'Olvidada1')).status, 401);
+  const r = await accounts.recoverAdmin({ rut: ADMIN_RUT, credentials: creds(ADMIN_RUT) });
+  assert.deepEqual(r, { uid: env.adminId, creada: false });
+  const back = await env.login(ADMIN_RUT, '17752753');
+  assert.equal(back.status, 200);
+  assert.equal(back.body.usuario.debeCambiar, true);
+  assert.equal(back.body.usuario.admin, true);
+  // Un RUT sin cuenta: se crea (con nombre) como administrador.
+  await assert.rejects(accounts.recoverAdmin({ rut: '11.111.111-1', credentials: creds('11.111.111-1') }), /nombre/);
+  const n = await accounts.recoverAdmin({
+    rut: '11.111.111-1',
+    credentials: creds('11.111.111-1'),
+    perfil: (uid) => encryptProfile(env.teamKey, uid, { nombre: 'Nuevo Admin', rut: '11111111-1', rol: 'medico' }),
+  });
+  assert.equal(n.creada, true);
+  assert.equal((await env.login('11.111.111-1', '11111111')).body.usuario.admin, true);
+});

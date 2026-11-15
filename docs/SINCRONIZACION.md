@@ -146,6 +146,13 @@ Por ejemplo, si se filtró:
 3. En Netlify → *Blobs*, borra el almacén `hhr-rondas` (o solo las claves `oftalmologia/…`).
 4. Reactiva la sincronización en cada PC con la contraseña nueva. Cada PC vuelve a subir lo que tiene.
 
+## Con cuentas de usuario (desde la 2.16)
+
+Una vez activadas las cuentas ([ADR 0014](adr/0014.md); cómo activarlas en [OPERACION.md](OPERACION.md)):
+- se sincroniza con la **sesión de la persona** (token firmado de 12 h), y el servidor rechaza la contraseña del equipo;
+- la **misma clave de cifrado** del equipo sigue cifrando los datos. Cada cuenta guarda en el servidor su copia de esa clave, **envuelta** con su clave personal, y el PC la abre al entrar;
+- cada escritura queda en el registro de accesos, atribuida por el servidor a la persona y la sesión.
+
 ## Seguridad: lo que conviene saber
 
 - **Contraseña perdida:** si se pierde, nadie (tampoco Netlify) puede descifrar el servidor. Los datos de cada PC siguen ahí.

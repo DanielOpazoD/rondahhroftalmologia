@@ -1,5 +1,42 @@
 # Cambios
 
+## 2.16.0 — 2026-11-15
+
+### Nuevo: cuentas de usuario ([ADR 0014](docs/adr/0014.md))
+- **Cada persona entra con su RUT y su clave** (#45, #46).
+  - La clave inicial es el RUT sin dígito verificador: sirve solo para el primer ingreso, que obliga a crear una clave personal (6 o más caracteres, una mayúscula y un número), y vence a los 7 días.
+  - 5 intentos fallidos bloquean la cuenta 15 minutos.
+  - Se puede entrar **sin conexión** en un PC donde la persona ya entró.
+  - El bloqueo por inactividad pide la clave de la persona.
+- **Sistema propio**, sin servicios externos: se mantiene el **cifrado de extremo a extremo**.
+  - El servidor no guarda RUT, nombres ni claves en claro.
+  - La clave del equipo va **envuelta** por cuenta.
+- **Roles** (#48):
+  - administradores (puede haber varios; siempre queda al menos uno activo);
+  - clínicos, que editan las atenciones;
+  - **administrativos**, que **ven las atenciones sin editarlas**, hacen el ingreso y editan los datos del paciente.
+  - Solo los administradores cambian los ajustes del sistema.
+- **Administración de usuarios** (#47, Ajustes → Usuarios): crear, también desde los perfiles existentes; editar; restablecer clave; desactivar y reactivar.
+- **Registro de accesos** (#49, Ajustes, solo administradores):
+  - quién entró y cuánto tiempo;
+  - qué fichas y atenciones abrió, qué descargó o exportó, qué guardó;
+  - la administración de cuentas.
+  - Lo escribe el servidor con su hora y no se puede editar. Filtros y descarga a Excel.
+- **Identidad verificada** en el historial de cambios: el autor es la persona que entró, y no se pregunta «¿Quién registra?».
+
+### Cómo empezar
+- **Nada cambia hasta que un administrador active las cuentas**: Ajustes → Cuentas de usuario → Activar, desde un PC que ya sincroniza.
+- Desde ese momento, todos los PC piden RUT y clave, y la contraseña del equipo deja de servir para sincronizar.
+- **Guarda la contraseña del equipo:** sigue siendo la llave de respaldo y permite recuperar un administrador (`scripts/recover-admin.mjs`).
+
+### Respaldo
+- Las cuentas van en el respaldo diario del servidor, y el registro de accesos en el respaldo incremental.
+- Restaurar repone lo que falte sin pisar cuentas vigentes.
+
+### A tener en cuenta
+- Los permisos de lectura y de edición clínica se aplican en la app y en el servidor donde este puede verlos: todos comparten la clave de cifrado del equipo. Lo disuade el registro de accesos.
+- Desactivar a alguien corta su acceso al servidor; lo que ya tiene en su PC sigue allí.
+
 ## 2.15.0 — 2026-11-15
 
 ### Nuevo

@@ -11,7 +11,7 @@
  * cifrados (el script nunca ve contenido legible).
  */
 import { getStore } from '@netlify/blobs';
-import { listBackups, restoreBackup, restoreAttachments } from '../src/sync/backup.js';
+import { listBackups, restoreBackup, restoreAttachments, restoreAuditLog } from '../src/sync/backup.js';
 
 const siteID = process.env.NETLIFY_SITE_ID;
 const token = process.env.NETLIFY_AUTH_TOKEN;
@@ -41,5 +41,12 @@ if (!args.length || args.includes('--list')) {
     dryRun
       ? `Prueba: se restaurarían ${a.partes} partes de adjuntos.`
       : `Restauradas ${a.escritas} partes de adjuntos. Recarga la app en los PC.`,
+  );
+  // Registro de accesos que falte (ADR 0014).
+  const g = await restoreAuditLog({ source: respaldos, target: sync, dryRun });
+  console.log(
+    dryRun
+      ? `Prueba: se restaurarían ${g.eventos} eventos del registro de accesos.`
+      : `Restaurados ${g.escritos} eventos del registro de accesos.`,
   );
 }

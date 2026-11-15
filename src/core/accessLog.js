@@ -31,6 +31,7 @@ export const EVENT_INFO = Object.freeze({
   'usuario.editar': { label: 'Editó una cuenta', group: 'administracion' },
   'usuario.restablecer': { label: 'Restableció una clave', group: 'administracion' },
   'cuentas.activar': { label: 'Activó las cuentas de usuario', group: 'administracion' },
+  'usuario.recuperar': { label: 'Recuperó una cuenta de administrador (con la contraseña del equipo)', group: 'administracion' },
   'auditoria.ver': { label: 'Consultó el registro de accesos', group: 'administracion' },
 });
 
