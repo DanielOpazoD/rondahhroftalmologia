@@ -1,11 +1,37 @@
 # Cambios
 
-## 2.14.1 — 2026-11-16
+## 2.15.0 — 2026-11-15
+
+### Nuevo
+- **Los adjuntos entran en los respaldos**:
+  - **Servidor** (#38): una función cada hora copia el contenido (cifrado) de los adjuntos, de forma incremental: cada parte una sola vez.
+    - El contenido de un adjunto eliminado se conserva 30 días.
+    - `scripts/restore-backup.mjs` también lo repone.
+  - **«Descargar respaldo»** (#39): con adjuntos, se descarga un **ZIP** con las atenciones y el contenido de cada adjunto.
+    - Al importarlo, el contenido se acepta solo si coincide con su huella SHA-256.
+    - Sin adjuntos, sigue siendo el JSON de siempre. Los respaldos anteriores se siguen importando.
+- **Eliminar fichas creadas por error** (#40): en Pacientes, «Fichas sin atenciones» lista las fichas que sobran y permite eliminarlas.
+  - Desaparecen en todos los equipos.
+  - Si una atención vuelve a usar la ficha, reaparece sola.
+  - Los datos no se borran, porque la ficha es común a todas las especialidades.
+- **Aviso de cambios de otro equipo** (#41): si otro PC cambia la atención que tienes abierta, un aviso dice quién y qué cambió (por ejemplo, «Plan: vacío → Control en 3 meses»). Los campos cambiados se resaltan un momento.
+- **Miniaturas** (#42): al adjuntar una imagen se guarda una miniatura pequeña con sus datos.
+  - Se ve en los otros PC antes de que llegue la foto.
+  - A las imágenes anteriores se les crea al abrirlas.
+
+### A tener en cuenta
+- El respaldo ZIP de «Descargar respaldo» **no está cifrado**, igual que el JSON: guárdalo como cualquier documento clínico.
+- El primer respaldo de adjuntos en el servidor puede tardar algunas horas si hay muchos: cada hora copia lo que alcanza.
+
+### Sin cambios
+- PDF, Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
+
+## 2.14.1 — 2026-11-15
 
 ### Seguridad
 - **Adjuntos: solo se abren en el navegador tipos pasivos** (JPEG, PNG, GIF, WebP y PDF), y sin miniatura para el resto. Cualquier otro tipo, en particular SVG o HTML, que pueden llevar scripts, se **descarga** como binario genérico: un adjunto nunca se interpreta dentro de la app. El tipo de los metadatos se normaliza. Lo detectó una revisión de seguridad automática; se agregó una prueba unitaria y una en navegador (un SVG con script se descarga y no se abre).
 
-## 2.14.0 — 2026-11-16
+## 2.14.0 — 2026-11-15
 
 ### Nuevo
 - **Archivos adjuntos en cada atención** (#33, #34): imágenes, PDF, Word…
@@ -26,7 +52,7 @@
 ### Sin cambios
 - El PDF «Solo la hoja», Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
 
-## 2.13.0 — 2026-11-16
+## 2.13.0 — 2026-11-15
 
 ### Nuevo
 - **Guardado automático** (#27):
@@ -60,7 +86,7 @@
 ### Sin cambios
 - PDF, Excel, nota y exportación seudonimizada: idénticos (pruebas de referencia).
 
-## 2.12.1 — 2026-11-16
+## 2.12.1 — 2026-11-15
 
 ### Interfaz
 - **Aviso de cambios sin guardar en el equipo** (#20). Si el almacenamiento falla (p. ej. disco lleno):
@@ -72,7 +98,7 @@
 - La correspondencia entre datos locales y elementos sincronizados pasa a la capa de aplicación (`app/syncData.js`), con pruebas de ida y vuelta (#21).
 - Diagramas de capas, de una pasada de sincronización y de dos PC editando el mismo paciente. Se corrige ARQUITECTURA, que aún decía «last-write-wins» (#22).
 
-## 2.12.0 — 2026-11-16
+## 2.12.0 — 2026-11-15
 
 Versión de calidad: arquitectura, sincronización e ingeniería, en 14 PR revisados por la CI (#5 a #18). No cambian las salidas (PDF, Excel, nota ni exportación seudonimizada) ni la forma de usar la app.
 
