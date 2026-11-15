@@ -249,6 +249,16 @@ async function checkVersion() {
 /** Almacenamiento: IndexedDB y protección contra el borrado automático del navegador. */
 async function checkStorage(ctx) {
   const title = 'Almacenamiento';
+  const { pending } = ctx.storageHealth();
+  if (pending) {
+    return {
+      state: 'bad',
+      title,
+      text: `${pending} ${pending === 1 ? 'cambio no se pudo' : 'cambios no se pudieron'} guardar en este equipo. Libera espacio o descarga un respaldo; se reintenta solo.`,
+      action: 'backup',
+      actionLabel: 'Descargar respaldo',
+    };
+  }
   if (ctx.storageKind !== 'indexeddb') {
     return { state: 'warn', title, text: 'Limitado (este navegador no permite IndexedDB). Descarga respaldos con frecuencia.' };
   }

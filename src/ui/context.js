@@ -68,6 +68,8 @@ export function createContext(store, templateB64) {
     practice: false,
     /** Dónde se guardan los datos clínicos: 'indexeddb' o 'localstorage' (lo asigna main.js). */
     storageKind: 'indexeddb',
+    /** Escrituras pendientes por fallos (lo asigna main.js). */
+    storageHealth: () => ({ pending: 0 }),
     /** Bloqueo con PIN (lo asigna lock.js). */
     lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
       null
