@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sin conexiones de red: los datos de pacientes nunca salen del equipo. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="theme-color" content="#0e4a6b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Atención Oftalmológica · Hospital Hanga Roa</title>
+<!-- @STYLES -->
+</head>
+<body>
+<header>
+  <div class="hbar">
+    <h1>Atención Oftalmológica<small>Rondas y operativos · Hospital Hanga Roa · funciona sin conexión</small></h1>
+    <span class="ver" id="appVersion"></span>
+  </div>
+  <nav role="tablist" aria-label="Secciones">
+    <button type="button" role="tab" data-tab="t-at" class="on">Atención</button>
+    <button type="button" role="tab" data-tab="t-nota">Nota</button>
+    <button type="button" role="tab" data-tab="t-reg">Registro</button>
+    <button type="button" role="tab" data-tab="t-est">Estadística</button>
+    <button type="button" role="tab" data-tab="t-exp">Exportar</button>
+    <button type="button" role="tab" data-tab="t-aj">Ajustes</button>
+  </nav>
+</header>
+
+<main>
+<!-- ================= ATENCIÓN ================= -->
+<section id="t-at" class="tab on" role="tabpanel" aria-label="Atención">
+  <div class="banner warn" id="editing" hidden>Editando una atención ya guardada. «Guardar» la actualiza.</div>
+
+  <div class="card">
+    <h2>Operativo</h2>
+    <div class="grid">
+      <div><label class="l" for="operativo">Nombre del operativo / ronda</label><input id="operativo" list="opsList" placeholder="Ej: Operativo Oftalmología Nov 2026"><datalist id="opsList"></datalist></div>
+      <div><label class="l" for="fecha_atencion">Fecha atención</label><input id="fecha_atencion" type="date"><small class="msg" data-msg="fecha_atencion"></small></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Paciente</h2>
+    <label class="l" for="paciente_nombre">Nombre y apellidos</label><input id="paciente_nombre" autocomplete="off"><small class="msg" data-msg="paciente_nombre"></small>
+    <div class="grid">
+      <div><label class="l" for="paciente_rut">RUT</label><input id="paciente_rut" autocomplete="off" placeholder="12.345.678-9"><small class="msg" data-msg="paciente_rut"></small></div>
+      <div><label class="l" for="paciente_edad">Edad (años)</label><input id="paciente_edad" inputmode="numeric"><small class="msg" data-msg="paciente_edad"></small></div>
+      <div><label class="l" for="paciente_fono">Fono</label><input id="paciente_fono" inputmode="tel"></div>
+    </div>
+    <span class="l">Sexo</span>
+    <div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div>
+  </div>
+
+  <div class="card">
+    <h2>Antecedentes</h2>
+    <div class="chips" id="antChips"></div>
+    <div id="cxBox" hidden><label class="l" for="antecedente_cirugia_detalle">Cirugía: ¿cuál?</label><input id="antecedente_cirugia_detalle"></div>
+    <label class="l" for="antecedentes_otros">Otros</label><input id="antecedentes_otros">
+  </div>
+
+  <div class="card">
+    <h2>Motivo de consulta</h2>
+    <textarea id="motivo_consulta" aria-label="Motivo de consulta" placeholder="Motivo de consulta"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>Examen físico</h2>
+    <div class="grid2">
+      <div class="eye"><h3>OD</h3>
+        <div class="grid"><div><label class="l" for="od_av">AV</label><input id="od_av"></div><div><label class="l" for="od_pio">PIO (mmHg)</label><input id="od_pio" inputmode="decimal"><small class="msg" data-msg="od_pio"></small></div></div>
+        <div class="grid"><div><label class="l" for="od_otro_examen">Otro examen (sigla)</label><input id="od_otro_examen" maxlength="5" placeholder="Ej: AE"></div><div><label class="l" for="od_otro_resultado">Resultado</label><input id="od_otro_resultado"></div></div>
+        <label class="l" for="od_hallazgos">Hallazgos</label><textarea id="od_hallazgos"></textarea>
+      </div>
+      <div class="eye"><h3>OI</h3>
+        <div class="grid"><div><label class="l" for="oi_av">AV</label><input id="oi_av"></div><div><label class="l" for="oi_pio">PIO (mmHg)</label><input id="oi_pio" inputmode="decimal"><small class="msg" data-msg="oi_pio"></small></div></div>
+        <div class="grid"><div><label class="l" for="oi_otro_examen">Otro examen (sigla)</label><input id="oi_otro_examen" maxlength="5" placeholder="Ej: AE"></div><div><label class="l" for="oi_otro_resultado">Resultado</label><input id="oi_otro_resultado"></div></div>
+        <label class="l" for="oi_hallazgos">Hallazgos</label><textarea id="oi_hallazgos"></textarea>
+      </div>
+    </div>
+    <label class="l" for="examen_obs">Observaciones del examen</label><input id="examen_obs">
+  </div>
+
+  <div class="card">
+    <h2>Procedimientos realizados <span class="badge" id="procBadge">0</span></h2>
+    <p class="muted">Toca el ojo en que se hizo (vuelve a tocar para quitarlo). Alimenta la estadística y queda escrito en la hoja.</p>
+    <div id="procList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Procedimientos solicitados</h2>
+    <div class="chips" id="solChips"></div>
+    <div id="schBox" hidden><label class="l" for="test_schirmer_detalle">Test Schirmer: detalle</label><input id="test_schirmer_detalle" maxlength="8"></div>
+    <label class="l" for="procedimientos_otros">Otros</label><input id="procedimientos_otros">
+  </div>
+
+  <div class="card">
+    <h2>Diagnósticos</h2>
+    <div class="chips" id="dxChips"></div>
+    <div id="catBox" hidden class="row" style="margin-top:10px"><span class="muted">Catarata:</span> <div class="seg" id="catSeg" role="group" aria-label="Ojo con catarata"></div><small class="msg" data-msg="catSeg"></small></div>
+    <label class="l" for="diagnosticos_otros">Otros diagnósticos</label><input id="diagnosticos_otros">
+    <div class="grid">
+      <div><label class="l" for="ges">GES</label><input id="ges"></div>
+      <div><label class="l" for="interconsulta">IC</label><input id="interconsulta"></div>
+      <div><label class="l" for="receta">Receta</label><input id="receta"></div>
+      <div><label class="l" for="diagnosticos_acciones_otros">Otros</label><input id="diagnosticos_acciones_otros"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Plan e indicaciones</h2>
+    <textarea id="plan" aria-label="Plan e indicaciones" style="min-height:110px"></textarea>
+    <div class="grid">
+      <div><label class="l" for="seguimiento">Seguimiento</label><input id="seguimiento"></div>
+      <div><label class="l" for="alta">Alta</label><input id="alta"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Médico</h2>
+    <div class="grid">
+      <div><label class="l" for="medico_nombre">Nombre</label><input id="medico_nombre"></div>
+      <div><label class="l" for="medico_rut">RUT</label><input id="medico_rut"><small class="msg" data-msg="medico_rut"></small></div>
+    </div>
+    <p class="muted">Nombre, RUT y operativo quedan recordados para la siguiente atención. La firma va a mano en la hoja impresa.</p>
+  </div>
+</section>
+
+<!-- ================= NOTA ================= -->
+<section id="t-nota" class="tab" role="tabpanel" aria-label="Nota">
+  <div class="card">
+    <h2>Nota para Eloísa <button type="button" class="btn p sm" id="copyNote2">Copiar</button></h2>
+    <pre class="note" id="notePre"></pre>
+  </div>
+</section>
+
+<!-- ================= REGISTRO ================= -->
+<section id="t-reg" class="tab" role="tabpanel" aria-label="Registro">
+  <div class="card">
+    <h2>Atenciones guardadas <span class="badge" id="regCount">0</span></h2>
+    <div class="grid">
+      <div><input id="regSearch" type="search" aria-label="Buscar" placeholder="Buscar nombre o RUT"></div>
+      <div><select id="regOp" aria-label="Operativo"></select></div>
+    </div>
+    <div class="list" id="regList" style="margin-top:6px"></div>
+  </div>
+</section>
+
+<!-- ================= ESTADÍSTICA ================= -->
+<section id="t-est" class="tab" role="tabpanel" aria-label="Estadística">
+  <div class="filterSlot"></div>
+  <div class="row noprint" style="margin:0 0 4px">
+    <button type="button" class="btn sm" id="stXlsx">Excel estadística (.xlsx)</button>
+    <button type="button" class="btn sm" id="printSt">Imprimir</button>
+  </div>
+  <div id="stOut"></div>
+</section>
+
+<!-- ================= EXPORTAR ================= -->
+<section id="t-exp" class="tab" role="tabpanel" aria-label="Exportar">
+  <div class="filterSlot"></div>
+
+  <div class="card">
+    <h2>1 · PDF de atenciones</h2>
+    <p class="muted">Un PDF por atención sobre la hoja oficial, nombrado <code>Oftalmo_fecha_RUT_nombre.pdf</code>, listo para subir a la ficha de cada paciente. Si algo no cabe en la hoja, se agrega una hoja complementaria.</p>
+    <div class="row">
+      <button type="button" class="btn p sm" id="expPdfZip">Descargar ZIP con PDFs</button>
+      <span class="muted" id="expPdfProg" aria-live="polite"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Estadística (Excel)</h2>
+    <p class="muted">Libro .xlsx con hojas: <b>Resumen</b> (indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, sexo, operativo y médico), <b>Atenciones</b> (una fila por atención), <b>Prestaciones</b> (una fila por procedimiento realizado), <b>Por día</b> y <b>Edad y sexo</b>.</p>
+    <button type="button" class="btn p sm" id="expXlsx">Descargar Excel (.xlsx)</button>
+  </div>
+
+  <div class="card">
+    <h2>3 · Datos seudonimizados (análisis / IA)</h2>
+    <p class="muted">Sin nombre, RUT, teléfono ni médico. Cada paciente recibe un código estable (<code>P-XXXXXXXX</code>): el mismo paciente tiene el mismo código en todas sus atenciones y exportaciones de este equipo. Los textos libres se limpian de RUT, teléfonos, correos, fechas y nombres.</p>
+    <div class="grid">
+      <div><label class="l" for="anFechas">Fechas</label><select id="anFechas"></select></div>
+      <div><label class="l" for="anEdad">Edad</label><select id="anEdad"></select></div>
+      <div><label class="l" for="anTexto">Textos libres</label><select id="anTexto"></select></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="btn sm" id="anPreview">Vista previa</button>
+      <button type="button" class="btn p sm" id="anXlsx">Excel seudonimizado</button>
+      <button type="button" class="btn p sm" id="anJson">JSON para IA</button>
+    </div>
+    <div id="anCheck" class="banner" hidden></div>
+    <pre class="note" id="anPre" hidden></pre>
+    <details class="conf">
+      <summary>Tabla de correspondencia (confidencial)</summary>
+      <p class="muted">Relaciona cada código con el nombre y RUT. Sirve para volver a identificar a un paciente si el análisis lo requiere. <b>Guárdala separada de los datos y no la subas a servicios externos.</b></p>
+      <p class="muted">Huella de la clave de este equipo: <code id="anFp">—</code></p>
+      <button type="button" class="btn d sm" id="anKey">Descargar tabla de correspondencia</button>
+    </details>
+  </div>
+</section>
+
+<!-- ================= AJUSTES ================= -->
+<section id="t-aj" class="tab" role="tabpanel" aria-label="Ajustes">
+  <div class="card">
+    <h2>Lista de procedimientos realizados</h2>
+    <p class="muted">Agrega, ordena o quita procedimientos. Marca «PIO» en los que piden valor por cada ojo (tonometrías). Las atenciones ya guardadas conservan sus procedimientos.</p>
+    <div class="list" id="ajList"></div>
+    <div class="row" style="margin-top:10px">
+      <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" style="flex:1;min-width:160px">
+      <label class="row muted" style="gap:4px"><input type="checkbox" id="ajPio" style="width:auto"> PIO</label>
+      <button type="button" class="btn p sm" id="ajAdd">Agregar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>PDF y nota</h2>
+    <label class="check"><input type="checkbox" id="setFlatten"> PDF no editable (aplanado). Recomendado para subir a la ficha.</label>
+    <label class="check"><input type="checkbox" id="setFooter"> Pie de página con ID de atención y fecha de emisión.</label>
+    <label class="l" for="setPie">Línea final de la nota (vacío = sin línea)</label>
+    <input id="setPie">
+  </div>
+
+  <div class="card">
+    <h2>Respaldo y unión de equipos</h2>
+    <p class="muted">Los datos quedan solo en este dispositivo y navegador. Descarga un respaldo al terminar cada jornada. Para juntar la estadística de varios equipos, importa los respaldos en uno solo: se suman sin duplicar.</p>
+    <div class="row">
+      <button type="button" class="btn p sm" id="bkExp">Descargar respaldo</button>
+      <button type="button" class="btn sm" id="bkImpBtn">Importar respaldo</button>
+      <input type="file" id="bkImp" accept=".json,application/json" hidden>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Zona de cuidado</h2>
+    <div class="row">
+      <button type="button" class="btn d sm" id="anRegen">Generar nueva clave de seudonimización</button>
+      <button type="button" class="btn d sm" id="wipe">Borrar todas las atenciones de este equipo</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- Filtro compartido entre Estadística y Exportar (se mueve entre pestañas). -->
+<div class="card noprint" id="filterCard">
+  <h2>Filtro <span class="badge" id="fCount">0</span></h2>
+  <div class="grid">
+    <div><label class="l" for="fOp">Operativo</label><select id="fOp"></select></div>
+    <div><label class="l" for="fFrom">Desde</label><input type="date" id="fFrom"></div>
+    <div><label class="l" for="fTo">Hasta</label><input type="date" id="fTo"></div>
+  </div>
+</div>
+
+<div class="bar" id="bar"><div class="in">
+  <button type="button" class="btn" id="bNew">Nueva</button>
+  <button type="button" class="btn" id="bCopy">Copiar nota</button>
+  <button type="button" class="btn" id="bPdf">PDF</button>
+  <button type="button" class="btn p" id="bSave">Guardar</button>
+</div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<!-- @SCRIPT -->
+</body>
+</html>
