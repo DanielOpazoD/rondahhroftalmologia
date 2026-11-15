@@ -78,7 +78,7 @@ export async function renderAttachments(ctx) {
       <button type="button" class="attmain" data-a="open" data-id="${a.id}" title="Abrir ${a.nombre}">
         ${preview}<span class="attname">${a.nombre}</span><span class="muted">${status}</span>
       </button>
-      <button type="button" class="ib sm danger" data-a="del" data-id="${a.id}" title="Eliminar" aria-label="Eliminar ${a.nombre}">${ICON('trash')}</button>
+      <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${a.id}" title="Eliminar" aria-label="Eliminar ${a.nombre}">${ICON('trash')}</button>
     </li>`);
   }
   // Solo si la atención sigue siendo la misma al terminar de leer.

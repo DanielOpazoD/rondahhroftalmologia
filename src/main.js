@@ -30,6 +30,7 @@ import { initHeaderFit } from './ui/headerFit.js';
 import { initAttachmentsView } from './ui/attachmentsView.js';
 import { createAccountsController } from './ui/accounts.js';
 import { initUsersView } from './ui/usersView.js';
+import { applyPermissions, guardActions } from './ui/permissionsView.js';
 
 function getStorage() {
   try {
@@ -150,6 +151,9 @@ async function main() {
   initHeaderFit();
   initAttachmentsView(ctx);
   initUsersView(ctx);
+  guardActions(ctx);
+  ctx.applyPermissions = () => applyPermissions(ctx);
+  ctx.on('cuenta', () => applyPermissions(ctx));
   ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
@@ -195,6 +199,7 @@ async function main() {
   syncAttentionView(ctx);
   ctx.refreshLists();
   ctx.showTab('t-at');
+  applyPermissions(ctx);
   ctx.sync.start();
   registerServiceWorker();
   if (location.protocol !== 'file:') startUpdateWatcher(ctx);

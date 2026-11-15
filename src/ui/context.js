@@ -76,6 +76,8 @@ export function createContext(store, templateB64) {
     storageKind: 'indexeddb',
     /** Escrituras pendientes por fallos (lo asigna main.js). */
     storageHealth: () => ({ pending: 0 }),
+    /** Aplica los permisos de la sesión a la interfaz (lo asigna main.js; ver permissionsView.js). */
+    applyPermissions: /** @type {() => void} */ (() => {}),
     /** Bloqueo con PIN (lo asigna lock.js). */
     lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
       null

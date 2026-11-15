@@ -136,8 +136,8 @@ export function renderCatalogSelects(ctx) {
 /** Listas de perfiles y operativos en Ajustes. */
 export function renderCatalogSettings(ctx) {
   const row = (x, sub) => html`<div class="it"><div class="t"><b>${x.nombre}</b>${sub ? html`<span class="muted">${sub}</span>` : ''}</div>
-    <button type="button" class="ib sm" data-a="edit" data-id="${x.id}" title="Editar" aria-label="Editar">${ICON('edit')}</button>
-    <button type="button" class="ib sm danger" data-a="del" data-id="${x.id}" title="Eliminar" aria-label="Eliminar">${ICON('trash')}</button></div>`;
+    <button type="button" class="ib sm" data-perm="ajustes" data-a="edit" data-id="${x.id}" title="Editar" aria-label="Editar">${ICON('edit')}</button>
+    <button type="button" class="ib sm danger" data-perm="ajustes" data-a="del" data-id="${x.id}" title="Eliminar" aria-label="Eliminar">${ICON('trash')}</button></div>`;
   setHtml(
     $('#medList'),
     ctx.medicos.length
