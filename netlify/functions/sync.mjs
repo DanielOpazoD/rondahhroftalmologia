@@ -9,14 +9,18 @@
  */
 import { getStore } from '@netlify/blobs';
 import { createSyncHandler } from '../../src/sync/server.js';
+import { createAccounts } from '../../src/sync/accounts.js';
 
 const hashFor = (esp) =>
   (process.env[`SYNC_TOKEN_SHA256_${esp.toUpperCase().replace(/-/g, '_')}`] || process.env.SYNC_TOKEN_SHA256 || '').trim().toLowerCase();
 
 export default async (req) => {
+  const store = getStore({ name: 'hhr-rondas', consistency: 'strong' });
   const handler = createSyncHandler({
-    store: getStore({ name: 'hhr-rondas', consistency: 'strong' }),
+    store,
     tokenHash: hashFor,
+    // Cuentas de usuario (ADR 0014): una vez activadas, se exige sesión en vez de la contraseña del equipo.
+    accounts: createAccounts({ store, secret: (process.env.SYNC_TOKEN_SHA256 || '').trim().toLowerCase() }),
     // Una línea JSON por solicitud (sin token ni datos): acción, especialidad, estado, duración, código.
     log: (entry) => console.log(JSON.stringify({ fn: 'sync', ...entry })),
   });

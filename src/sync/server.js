@@ -236,11 +236,14 @@ function validItem(it, now, withPayload) {
  *   now?: () => number,
  *   log?: (entry: {reqId: string, action: string, esp: string, status: number, ms: number, code?: string}) => void,
  *   authLimit?: {maxFails: number, windowMs: number, blockMs: number} | false,
+ *   accounts?: ReturnType<typeof import('./accounts.js').createAccounts>,
  * }} deps  `tokenHash` puede depender de la especialidad (contraseña distinta por ronda).
  *   `log`: registro estructurado de cada solicitud (sin token ni datos; la función de Netlify lo escribe en sus logs).
+ *   `accounts`: cuentas de usuario (ADR 0014). Una vez activadas, se exige sesión de usuario en vez de la
+ *   contraseña del equipo, y cada escritura queda en el registro de accesos.
  * @returns {(req: Request) => Promise<Response>}
  */
-export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now, log = () => {}, authLimit = AUTH_LIMIT }) {
+export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now, log = () => {}, authLimit = AUTH_LIMIT, accounts }) {
   /**
    * Toda respuesta declara la versión de protocolo del servidor. Un cliente
    * que declara una versión menor a la mínima recibe 426 con el aviso de
@@ -313,6 +316,29 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     const url = new URL(req.url);
     const esp = url.searchParams.get('esp') || DEFAULT_ESP;
     if (!ESP_RE.test(esp)) return fail(400, 'especialidad_invalida', 'Especialidad inválida');
+    /** Sesión de usuario de la solicitud (con cuentas activadas). @type {import('./accounts.js').Autenticado | null} */
+    let session = null;
+    if (accounts && (await accounts.active())) {
+      // Con cuentas activadas, la contraseña del equipo ya no sirve para sincronizar.
+      const a = await accounts.authenticate(req);
+      if ('response' in a) return a.response;
+      if (a.mustChange) return fail(403, 'debe_cambiar_clave', 'Primero cambia tu clave inicial.');
+      session = a;
+    } else {
+      const denied = await checkTeamToken(req, esp);
+      if (denied) return denied;
+    }
+    return route(req, url, esp, session, reqId);
+  }
+
+  /**
+   * Contraseña del equipo (antes de activar las cuentas). Devuelve la respuesta
+   * de error, o null si es correcta.
+   * @param {Request} req
+   * @param {string} esp
+   * @returns {Promise<Response | null>}
+   */
+  async function checkTeamToken(req, esp) {
     const tokenHash = typeof tokenHashOpt === 'function' ? tokenHashOpt(esp) : tokenHashOpt;
     if (!tokenHash || !/^[0-9a-f]{64}$/.test(tokenHash)) {
       return fail(503, 'no_configurado', 'Sincronización no configurada en el servidor (falta SYNC_TOKEN_SHA256).');
@@ -330,7 +356,18 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
       }
       return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta para este servidor.');
     }
+    return null;
+  }
 
+  /**
+   * @param {Request} req
+   * @param {URL} url
+   * @param {string} esp
+   * @param {import('./accounts.js').Autenticado | null} session
+   * @param {string} reqId
+   * @returns {Promise<Response>}
+   */
+  async function route(req, url, esp, session, reqId) {
     const action = url.pathname.split('/').filter(Boolean).pop() || '';
     if (!Object.hasOwn(ROUTES, action)) return fail(404, 'ruta', 'Ruta no encontrada');
     if (req.method !== ROUTES[action]) {
@@ -416,6 +453,10 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
           await Promise.all(existing.map((old) => store.delete(old.key)));
           saved.push(id);
         });
+        // Registro de accesos: quién escribió, cuántos elementos y dónde (el servidor no ve qué).
+        if (session && saved.length) {
+          await accounts?.audit({ ev: 'sync.escribir', u: session.user.id, s: session.sid, n: saved.length, esp });
+        }
         return json(200, { saved, skipped });
       }
 
