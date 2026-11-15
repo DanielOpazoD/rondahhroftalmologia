@@ -83,6 +83,11 @@ export function safeFileName(name) {
 }
 
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+/** Miniatura de una imagen: JPEG pequeño en base64, guardado con los metadatos. */
+export const THUMB_MAX_CHARS = 16_000;
+const THUMB_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
+/** ¿Es una miniatura válida? (un dato recibido no puede traer otra cosa a un `src`) @param {unknown} v */
+export const isThumbnail = (v) => typeof v === 'string' && v.length <= THUMB_MAX_CHARS && THUMB_RE.test(v);
 const SHA_RE = /^[0-9a-f]{64}$/;
 
 /**
@@ -96,7 +101,7 @@ export function normalizeAttachment(raw) {
   const tamano = Number(raw.tamano);
   if (!Number.isSafeInteger(tamano) || tamano < 0 || tamano > ATTACHMENT_LIMITS.fileBytes) return null;
   return {
-    ...unknownFields(raw, ['id', 'atencionId', 'nombre', 'tipo', 'tamano', 'sha256', 'partes', 'created', 'updated']),
+    ...unknownFields(raw, ['id', 'atencionId', 'nombre', 'tipo', 'tamano', 'sha256', 'partes', 'created', 'updated', 'miniatura']),
     id: raw.id,
     atencionId: raw.atencionId,
     nombre: safeFileName(raw.nombre),
@@ -106,6 +111,8 @@ export function normalizeAttachment(raw) {
     partes: chunkCount(tamano),
     created: Number(raw.created) || 0,
     updated: Number(raw.updated) || Number(raw.created) || 0,
+    // Miniatura (desde la 2.15.0): se ve en todos los equipos antes de que llegue el contenido.
+    ...(isThumbnail(raw.miniatura) ? { miniatura: raw.miniatura } : {}),
   };
 }
 

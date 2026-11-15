@@ -186,3 +186,20 @@ test('seguridad: solo se abren en el navegador tipos pasivos; SVG y HTML se desc
   });
   assert.equal(meta.tipo, 'image/svg+xml');
 });
+
+test('miniatura: se conserva si es un JPEG pequeño en base64; cualquier otra cosa se descarta', async () => {
+  const { isThumbnail, THUMB_MAX_CHARS } = await import('../src/core/attachments.js');
+  const base = { id: 'j1', atencionId: 'a1', nombre: 'f.jpg', tipo: 'image/jpeg', tamano: 3, sha256: 'a'.repeat(64), created: 1 };
+  const ok = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+  assert.equal(normalizeAttachment({ ...base, miniatura: ok }).miniatura, ok);
+  for (const bad of [
+    'data:image/svg+xml;base64,PHN2Zz4=',
+    'javascript:alert(1)',
+    'data:image/jpeg;base64,AAA" onerror="x',
+    'data:image/jpeg;base64,' + 'A'.repeat(THUMB_MAX_CHARS),
+    42,
+  ]) {
+    assert.equal(isThumbnail(bad), false);
+    assert.equal('miniatura' in normalizeAttachment({ ...base, miniatura: bad }), false);
+  }
+});

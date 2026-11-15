@@ -175,3 +175,33 @@ test('respaldo con adjuntos: se descarga como ZIP y al importarlo en otro equipo
   await expect(B.locator('#attList')).not.toContainText('llega al sincronizar');
   await Promise.all([ca.close(), cb.close()]);
 });
+
+test('miniaturas: se guardan al adjuntar y se ven en otro equipo antes de que llegue el contenido', async ({ browser }) => {
+  const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
+  const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
+  for (const P of [A, B]) {
+    await openApp(P);
+    await activateSync(P);
+  }
+  await tab(A, 'Atención');
+  await A.locator('#paciente_nombre').fill('Paciente Miniatura');
+  await expect(A.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
+  await attach(A, [{ name: 'retina.png', mimeType: 'image/png', buffer: PNG }]);
+  await expect(A.locator('#attList .attthumb')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
+  await syncNow(A);
+  // B recibe los metadatos (con la miniatura), pero se le impide bajar el contenido.
+  await B.route(
+    (url) => url.search.includes('-adjuntos'),
+    (route) => route.abort(),
+  );
+  // (sin el contenido, la pasada termina con error: se espera a que lleguen las atenciones)
+  await tab(B, 'Ajustes');
+  await B.locator('#syncNowBtn').click();
+  await tab(B, 'Pacientes');
+  await expect(B.locator('#regList')).toContainText('Paciente Miniatura', { timeout: 20_000 });
+  await showPatientRecord(B, 'Paciente Miniatura');
+  await B.locator('#patAttentions .pmain').first().click();
+  await expect(B.locator('#attList')).toContainText('llega al sincronizar');
+  await expect(B.locator('#attList .attthumb')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
+  await Promise.all([ca.close(), cb.close()]);
+});
