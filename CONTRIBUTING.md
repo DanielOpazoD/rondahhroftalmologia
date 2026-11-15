@@ -25,7 +25,7 @@ npm run check
 
 1. ESLint, para detectar errores de lógica y reglas de capas;
 2. Prettier, para el formato;
-3. `tsc --checkJs`, que revisa los tipos declarados en JSDoc;
+3. `tsc --checkJs`, que revisa los tipos declarados en JSDoc. Las capas puras (`core`, `sync`, `lib`, `app`) se revisan además en **modo estricto** (`jsconfig.strict.json`: nulos, `this`, firmas de funciones). El modelo de dominio tipado está en `src/domain.d.ts`;
 4. las pruebas;
 5. el build.
 

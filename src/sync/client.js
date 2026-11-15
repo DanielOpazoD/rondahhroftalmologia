@@ -91,7 +91,7 @@ export function createSyncApi({
       try {
         return await once(path, body, extra);
       } catch (e) {
-        if (attempt >= retries || !RETRYABLE_STATUS.has(e.status)) throw e;
+        if (attempt >= retries || !(e instanceof SyncHttpError) || !RETRYABLE_STATUS.has(e.status)) throw e;
         await sleep(backoffMs(attempt));
       }
     }
