@@ -150,16 +150,16 @@ test('procedimientos: «PIO» solo en los que la piden; uno quitado de la lista 
   await ajustes(page, 'Listas');
   await page.locator('#ajNew').fill('vvv');
   await page.locator('#ajAdd').click();
-  const pio = page.locator('#ajList .piotg');
+  const pio = page.locator('#ajList .piotg[data-a="pio"]');
   // Solo T. Aplanática, T. Neumática y Curva de tensión piden PIO (y siguen así tras usar la atención).
-  await expect(page.locator('#ajList .piotg.on')).toHaveCount(3);
+  await expect(page.locator('#ajList .piotg[data-a="pio"].on')).toHaveCount(3);
   await expect(pio.filter({ hasText: /^PIO$/ })).toHaveCount(3);
   await tab(page, 'Atención');
   await page.locator('#procList .proc', { hasText: 'vvv' }).getByRole('button', { name: 'OI' }).click();
   await save(page);
   await expect(page.locator('#procBadge')).toHaveText('1');
   await ajustes(page, 'Listas');
-  await expect(page.locator('#ajList .piotg.on')).toHaveCount(3);
+  await expect(page.locator('#ajList .piotg[data-a="pio"].on')).toHaveCount(3);
   // Se quita «vvv» de la lista: deja de contarse en la atención y en la estadística.
   await page.locator('#ajList .it', { hasText: 'vvv' }).getByRole('button', { name: 'Quitar' }).click();
   await page.locator('#msgDlg').getByRole('button', { name: 'Quitar' }).click();
@@ -167,4 +167,45 @@ test('procedimientos: «PIO» solo en los que la piden; uno quitado de la lista 
   await expect(page.locator('#procBadge')).toHaveText('0');
   await tab(page, 'Estadística');
   await expect(page.locator('#t-est')).not.toContainText('vvv');
+});
+
+test('examen: AVcc por ojo y descripción del fondo de ojo y la BMC; el PDF los muestra («FO: …», «BMC: …»)', async ({ page }) => {
+  const { PDFDocument } = await import('pdf-lib');
+  const { readFile } = await import('node:fs/promises');
+  await fillPatient(page, { nombre: 'Paciente Examen Nuevo' });
+  // Ya no están «Otro» ni «Result.»; AVcc va después de AV.
+  await expect(page.locator('#od_otro_examen, #od_otro_resultado')).toHaveCount(0);
+  await page.locator('#od_av').fill('20/60');
+  await page.locator('#od_avcc').fill('20/30');
+  await page.locator('#oi_avcc').fill('20/25');
+  await page.locator('#od_hallazgos').fill('Catarata');
+  // FO en ambos ojos, BMC solo OD, cada uno con su descripción.
+  const fo = page.locator('#procList .proc[data-id="fo"]');
+  await expect(fo.locator('.pdesc')).toBeHidden(); // aparece al marcarlo
+  await fo.getByRole('button', { name: 'AO' }).click();
+  // Con AO hay una descripción por ojo (no una común).
+  await expect(fo.locator('.pdesc input:visible')).toHaveCount(2);
+  await fo.getByLabel('Descripción OD de Fondo de ojo (FO)').fill('Papila normal');
+  await fo.getByLabel('Descripción OI de Fondo de ojo (FO)').fill('Excavación 0,5');
+  const bmc = page.locator('#procList .proc[data-id="bmc"]');
+  await bmc.getByRole('button', { name: 'OD' }).click();
+  // Solo OD: solo la descripción del OD.
+  await expect(bmc.locator('.pdesc input:visible')).toHaveCount(1);
+  await bmc.getByLabel('Descripción OD de BMC').fill('Cámara formada');
+  await save(page);
+  // PDF editable (sin aplanar) para poder leer sus campos.
+  await ajustes(page, 'Este equipo');
+  await page.locator('#setFlatten').uncheck();
+  await tab(page, 'Atención');
+  await page.locator('#bPdf').click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
+  const pdf = await PDFDocument.load(await readFile(await dl.path()));
+  const form = pdf.getForm();
+  const text = (n) => form.getTextField(n).getText() || '';
+  expect(text('od_av')).toBe('20/60');
+  expect(text('od_avcc')).toBe('20/30');
+  expect(text('oi_avcc')).toBe('20/25');
+  expect(text('od_hallazgos')).toBe('Catarata\nFO: Papila normal\nBMC: Cámara formada');
+  expect(text('oi_hallazgos')).toBe('FO: Excavación 0,5');
+  expect(form.getFields().some((f) => /_otro_(examen|resultado)$/.test(f.getName()))).toBe(false);
 });

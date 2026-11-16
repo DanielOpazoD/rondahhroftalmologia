@@ -67,9 +67,8 @@ export function anonymizeRecords(records, procs, options) {
     const eye = (e) =>
       compact({
         av: (f[`${e}_av`] || '').trim() || undefined,
+        avcc: (f[`${e}_avcc`] || '').trim() || undefined,
         pio: pioFor(r, e, procs) || undefined,
-        otro_examen: (f[`${e}_otro_examen`] || '').trim() || undefined,
-        otro_resultado: txt(f[`${e}_otro_resultado`]),
         hallazgos: txt(f[`${e}_hallazgos`]),
       });
 
@@ -86,7 +85,14 @@ export function anonymizeRecords(records, procs, options) {
       motivo_consulta: txt(f.motivo_consulta),
       examen: compact({ od: eye('od'), oi: eye('oi'), observaciones: txt(f.examen_obs) }),
       procedimientos_realizados: proceduresDone(r, procs).map((p) =>
-        compact({ procedimiento: p.nombre, ojo: p.ojo, pio_od: p.pioOd || undefined, pio_oi: p.pioOi || undefined }),
+        compact({
+          procedimiento: p.nombre,
+          ojo: p.ojo,
+          pio_od: p.pioOd || undefined,
+          pio_oi: p.pioOi || undefined,
+          descripcion_od: txt(p.descOd),
+          descripcion_oi: txt(p.descOi),
+        }),
       ),
       procedimientos_solicitados: SOLICITADOS.filter((d) => r.checks?.[d.key]).map((d) => d.label),
       test_schirmer_detalle: (f.test_schirmer_detalle || '').trim() || undefined,
@@ -137,7 +143,10 @@ export const DICCIONARIO = [
   ['sexo', 'Femenino / Masculino / Otro o no informa.'],
   ['antecedentes', `Lista marcada de: ${ANTECEDENTES.map((d) => d.label).join(', ')}.`],
   ['motivo_consulta', 'Texto libre limpio de identificadores.'],
-  ['examen.od / examen.oi', 'Por ojo: av (agudeza visual), pio (mmHg; "Apl"/"Neu" = tonómetro), otro_examen, otro_resultado, hallazgos.'],
+  [
+    'examen.od / examen.oi',
+    'Por ojo: av (agudeza visual), avcc (agudeza visual con corrección), pio (mmHg; "Apl"/"Neu" = tonómetro), hallazgos.',
+  ],
   ['procedimientos_realizados', 'Lista de {procedimiento, ojo (OD/OI/AO), pio_od, pio_oi}.'],
   ['procedimientos_solicitados', `Lista marcada de: ${SOLICITADOS.map((d) => d.label).join(', ')}.`],
   ['diagnosticos', `Lista marcada de: ${DIAGNOSTICOS.map((d) => d.label).join(', ')}.`],
@@ -185,8 +194,10 @@ export function anonymizedSheets(result, procs, now = new Date()) {
     ...ANTECEDENTES.map((d) => 'Ant ' + d.label),
     ...(withText ? ['Motivo de consulta'] : []),
     'AV OD',
+    'AVcc OD',
     'PIO OD',
     'AV OI',
+    'AVcc OI',
     'PIO OI',
     ...(withText ? ['Hallazgos OD', 'Hallazgos OI'] : []),
     ...procNames,
@@ -208,8 +219,10 @@ export function anonymizedSheets(result, procs, now = new Date()) {
     ...ANTECEDENTES.map((d) => flag(r.antecedentes, d.label)),
     ...(withText ? [r.motivo_consulta || ''] : []),
     r.examen?.od?.av || '',
+    r.examen?.od?.avcc || '',
     r.examen?.od?.pio || '',
     r.examen?.oi?.av || '',
+    r.examen?.oi?.avcc || '',
     r.examen?.oi?.pio || '',
     ...(withText ? [r.examen?.od?.hallazgos || '', r.examen?.oi?.hallazgos || ''] : []),
     ...procNames.map((n) => r.procedimientos_realizados.find((p) => p.procedimiento === n)?.ojo || ''),

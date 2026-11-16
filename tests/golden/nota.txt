@@ -8,15 +8,16 @@ MOTIVO DE CONSULTA:
 Disminución de agudeza visual progresiva OD de 6 meses. Hija Ana Tepano acompaña, contacto 987654321.
 
 EXAMEN FÍSICO:
-OD: AV 20/80 | PIO 14 Apl mmHg | Catarata nuclear N3
-OI: AV 20/30 | PIO 16 Apl mmHg | Pseudofaquia
+OD: AV 20/80 | AVcc 20/60 | PIO 14 Apl mmHg | Catarata nuclear N3
+OI: AV 20/30 | AVcc 20/25 | PIO 16 Apl mmHg | Pseudofaquia
 Obs: Paciente colaboradora
 
 PROCEDIMIENTOS REALIZADOS:
 - Autorrefractometría AO
 - T. Aplanática AO (OD 14 / OI 16 mmHg)
 - T. Neumática OD (OD 18 mmHg)
-- Fondo de ojo (FO) AO
+- Fondo de ojo (FO) AO: OD Papila 0,3, mácula sin brillo foveal; OI Papila 0,5
+- BMC OD: Catarata nuclear N3
 - OCT OI
 
 PROCEDIMIENTOS SOLICITADOS: OCT, Test Schirmer

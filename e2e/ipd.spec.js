@@ -109,7 +109,8 @@ test('Imprimir abre el PDF local visible y solicita la impresión de ese documen
         const frame = event.target;
         if (!(frame instanceof HTMLIFrameElement) || !frame.src.startsWith('blob:')) return;
         try {
-          frame.contentWindow.addEventListener('beforeprint', () => window.__pdfPrints.push(frame.src));
+          // Playwright no expone el diálogo nativo: intercepta print del iframe real, como recomienda su documentación.
+          frame.contentWindow.print = () => window.__pdfPrints.push(frame.src);
         } catch (e) {
           window.__pdfPrintError = e.message;
         }
@@ -134,6 +135,7 @@ test('Imprimir abre el PDF local visible y solicita la impresión de ese documen
   expect(pdfInfo.type).toBe('application/pdf');
   expect(pdfInfo.head).toBe('%PDF-');
   expect(pdfInfo.size).toBeGreaterThan(10000);
+  await expect.poll(() => page.frames().some((f) => f.url().startsWith('chrome-extension://'))).toBe(true);
   await page.screenshot({ path: 'test-results/ipd-preview.png' });
   expect(await page.evaluate(() => window.__pdfPrintError)).toBe('');
   await expect.poll(() => page.evaluate(() => window.__pdfPrints.length)).toBeGreaterThanOrEqual(1);
@@ -146,5 +148,10 @@ test('Imprimir abre el PDF local visible y solicita la impresión de ese documen
   await preview.getByRole('button', { name: 'Volver al formulario' }).click();
   await expect(preview).toHaveCount(0);
   await expect(dlg).toBeVisible();
+  await dlg.getByRole('button', { name: 'Imprimir', exact: true }).click();
+  await expect(preview).toBeVisible();
+  await page.evaluate(() => document.documentElement.classList.add('locked'));
+  await expect(preview).toHaveCount(0);
+  await expect(dlg).toHaveCount(0);
   expect(errors).toEqual([]);
 });

@@ -131,7 +131,18 @@ export function createStore(storage, repo) {
 
     loadProcs() {
       const p = read(K.procs, null);
-      return Array.isArray(p) && p.length ? p : structuredClone(DEFAULT_PROCS);
+      if (!Array.isArray(p) || !p.length) return structuredClone(DEFAULT_PROCS);
+      // Opciones agregadas en versiones nuevas (p. ej. descripción del FO y la BMC):
+      // los procedimientos de la lista por defecto las toman si aún no las tienen.
+      return p.map((x) => {
+        const d = DEFAULT_PROCS.find((y) => y.id === x?.id);
+        if (!d) return x;
+        return {
+          ...x,
+          ...(x.desc === undefined && d.desc ? { desc: d.desc } : {}),
+          ...(x.abrev === undefined && d.abrev ? { abrev: d.abrev } : {}),
+        };
+      });
     },
     saveProcs(procs) {
       write(K.procs, procs);

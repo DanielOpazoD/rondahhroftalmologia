@@ -22,6 +22,7 @@ import {
   proceduresDone,
   pioFor,
   procLabel,
+  procDescriptions,
   diagnosesList,
   requestedList,
   antecedentsList,
@@ -163,7 +164,7 @@ describe('clinical', () => {
     const done = proceduresDone(fullRecord(), PROCS);
     assert.deepEqual(
       done.map((p) => p.id),
-      ['autorref', 't_aplan', 't_neum', 'fo', 'oct'],
+      ['autorref', 't_aplan', 't_neum', 'fo', 'bmc', 'oct'],
     );
     const neum = done.find((p) => p.id === 't_neum');
     assert.equal(neum.pioOd, '18');
@@ -171,9 +172,31 @@ describe('clinical', () => {
     assert.equal(procLabel(done[1]), 'T. Aplanática AO (OD 14 / OI 16 mmHg)');
     assert.equal(
       done.reduce((a, p) => a + p.ojos, 0),
-      2 + 2 + 1 + 2 + 1,
+      2 + 2 + 1 + 2 + 1 + 1,
     );
     assert.equal(eyeCount('XX'), 0);
+  });
+
+  test('descripción de procedimientos POR OJO (FO, BMC): cada una en el recuadro de su ojo', () => {
+    const r = fullRecord();
+    const fo = proceduresDone(r, PROCS).find((p) => p.id === 'fo');
+    assert.equal(procLabel(fo), 'Fondo de ojo (FO) AO: OD Papila 0,3, mácula sin brillo foveal; OI Papila 0,5');
+    assert.equal(procLabel(fo, { desc: false }), 'Fondo de ojo (FO) AO');
+    const bmc = proceduresDone(r, PROCS).find((p) => p.id === 'bmc');
+    assert.equal(procLabel(bmc), 'BMC OD: Catarata nuclear N3');
+    // FO en AO: la del OD en el OD y la del OI en el OI. BMC solo OD.
+    assert.deepEqual(procDescriptions(r, 'od', PROCS), ['FO: Papila 0,3, mácula sin brillo foveal', 'BMC: Catarata nuclear N3']);
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS), ['FO: Papila 0,5']);
+    // Una descripción de un ojo que no está marcado no se muestra.
+    r.proc.bmc.desc_oi = 'no corresponde';
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS), ['FO: Papila 0,5']);
+    // Atención de la 2.18.0 con una sola descripción: vale para cada ojo cubierto.
+    r.proc.fo = { eye: 'OI', desc: 'Retina aplicada' };
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS).slice(0, 1), ['FO: Retina aplicada']);
+    assert.equal(
+      procDescriptions(r, 'od', PROCS).some((d) => d.startsWith('FO')),
+      false,
+    );
   });
 
   test('procedimiento que se quitó de la lista: no se muestra ni se cuenta; al restaurarlo, vuelve', () => {
@@ -207,7 +230,7 @@ describe('clinical', () => {
       'Femenino',
       'ANTECEDENTES: DM2',
       'EXAMEN FÍSICO:',
-      'OD: AV 20/80 | PIO 14 Apl',
+      'OD: AV 20/80 | AVcc 20/60 | PIO 14 Apl',
       'PROCEDIMIENTOS REALIZADOS:',
       '- T. Neumática OD (OD 18 mmHg)',
       'DIAGNÓSTICOS:',

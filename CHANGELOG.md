@@ -1,6 +1,6 @@
 # Cambios
 
-## 2.18.0 — 2026-11-15
+## 2.19.0 — 2026-11-15
 
 ### Nuevo
 - **Constancia GES** desde el menú PDF de una atención de oftalmología: autocompleta paciente, teléfono y profesional, con los datos del Hospital Hanga Roa.
@@ -11,6 +11,33 @@
 - **Impresión GES e IPD**: PDF visible y solicitud del diálogo de impresión del navegador, conservando la descarga. Revisión GES compacta, sin desplazamiento vertical en 1024 × 768.
 - **IPD** autocompletado y editable sobre el formulario original: datos fijos del hospital, 90 problemas GES por área, subgrupos oftalmológicos documentados, clínica libre y X en Sí. La fecha y hora de Rapa Nui se distribuyen dígito por casilla; administrativos opcionales vacíos.
 - **Apellidos y nombres separados** para pacientes, perfiles y cuentas. Las listas y formularios usan apellido paterno, apellido materno y nombres. Migración v5 conserva el texto y la ficha anteriores sin inferir apellidos.
+
+## 2.18.1 — 2026-11-15
+
+### Descripción por ojo (FO y BMC)
+- La descripción del **fondo de ojo** y de la **BMC** es ahora **por ojo**:
+  - OD u OI: una descripción, la de ese ojo;
+  - AO: dos, una por ojo, y no hay descripción común.
+- En el PDF, la del OD va en el recuadro del OD y la del OI en el del OI («FO: …», «BMC: …»).
+- En la nota: «Fondo de ojo (FO) AO: OD …; OI …».
+- En el seudonimizado van `descripcion_od` y `descripcion_oi`.
+- Una atención guardada con la 2.18.0 (una sola descripción) se sigue mostrando en cada ojo marcado; al editarla, pasa a quedar por ojo.
+
+## 2.18.0 — 2026-11-15
+
+### Examen físico y procedimientos
+- **AVcc** (agudeza visual con corrección) por ojo, después de AV.
+- Se quitan **«Otro» y «Result.»** del examen físico. Si una atención antigua los tiene, se conservan en los datos y en el historial, pero ya no se muestran.
+- **Fondo de ojo (FO) y BMC con descripción** (texto opcional), que aparece al marcar el procedimiento.
+  - En Ajustes → Listas, el botón «Texto» permite agregar descripción a cualquier otro procedimiento, igual que «PIO».
+
+### PDF
+- La plantilla tiene ahora, por ojo, **AV · AVcc · PIO**.
+- Las descripciones van en el **recuadro del examen físico** del ojo, con la abreviatura: «FO: …», «BMC: …». Si el procedimiento es AO, van en ambos ojos.
+- También aparecen en la nota («Fondo de ojo (FO) AO: …»), en el Excel (columnas AVcc OD y AVcc OI) y en la exportación seudonimizada, donde la descripción pasa por el mismo filtro de identificadores que el resto del texto libre.
+
+### A tener en cuenta
+- Recarga la app en todos los PC: una versión anterior no conoce la descripción de los procedimientos y podría perderla al editar esa atención.
 
 ## 2.17.0 — 2026-11-15
 

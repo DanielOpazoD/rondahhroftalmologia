@@ -74,6 +74,11 @@ export type ProcRealizado = {
   eye: 'OD' | 'OI' | 'AO';
   od?: string;
   oi?: string;
+  /** Descripción en texto por ojo (procedimientos que la admiten, p. ej. FO y BMC). */
+  desc_od?: string;
+  desc_oi?: string;
+  /** Descripción única de la 2.18.0 (se lee como la de cada ojo cubierto). */
+  desc?: string;
 };
 
 /** Parte clínica de una atención de ejemplo para el modo práctica (la aporta la especialidad). */
