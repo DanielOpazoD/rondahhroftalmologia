@@ -8,10 +8,19 @@ import { STYLE } from '../../lib/xlsx.js';
 import { computeStats, sortedEntries, ageOf, ageGroup, describeFilter } from './estadistica.js';
 import { proceduresDone, antecedentsList, requestedList, diagnosesList } from './clinica.js';
 
+/** @import { Atencion } from '../../domain' */
+/** @import { RecordFilter } from '../../core/estadistica.js' */
+/** @import { Hoja } from '../../lib/xlsx.js' */
+/** @import { ProcDef } from './config.js' */
+/** @import { Estadistica } from './estadistica.js' */
+
+/** Celda en negrita. @param {unknown} v */
 const b = (v) => ({ v, s: STYLE.bold });
+/** Porcentaje con un decimal (0 si no hay total). @param {number} n @param {number} d */
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+/** @param {string} k */
 const sexLabel = (k) => SEXOS.find((s) => s.key === k)?.label || '';
-/** Número si el texto es numérico (para que Excel sume), si no el texto. */
+/** Número si el texto es numérico (para que Excel sume), si no el texto. @param {string | undefined} v */
 const num = (v) => {
   const n = Number(String(v ?? '').replace(',', '.'));
   return v?.trim() && Number.isFinite(n) ? n : v || '';
@@ -20,7 +29,12 @@ const num = (v) => {
 /** Título de los reportes: especialidad y establecimiento (APP.nombre es el de oftalmología). */
 export const TITULO = `${ESPECIALIDAD.nombre} · Rondas y operativos — ${APP.establecimiento}`;
 
-/** Hoja "Atenciones": una fila por atención. */
+/**
+ * Hoja "Atenciones": una fila por atención.
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ * @returns {Hoja}
+ */
 export function atencionesSheet(records, procs) {
   const header = [
     'ID atención',
@@ -90,8 +104,14 @@ export function atencionesSheet(records, procs) {
   return { name: 'Atenciones', header: true, rows: [header, ...rows] };
 }
 
-/** Hoja "Prestaciones": una fila por procedimiento realizado. */
+/**
+ * Hoja "Prestaciones": una fila por procedimiento realizado.
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ * @returns {Hoja}
+ */
 export function prestacionesSheet(records, procs) {
+  /** @type {unknown[][]} */
   const rows = [['Fecha', 'Operativo', 'ID atención', 'Nombre', 'RUT', 'Edad', 'Sexo', 'Procedimiento', 'Oído', 'N° oídos', 'Médico']];
   for (const r of records) {
     const f = r.f || {};
@@ -114,10 +134,18 @@ export function prestacionesSheet(records, procs) {
   return { name: 'Prestaciones', header: true, rows };
 }
 
-/** Hoja "Resumen": indicadores y tablas agregadas. */
+/**
+ * Hoja "Resumen": indicadores y tablas agregadas.
+ * @param {Estadistica} S
+ * @param {string} filterText
+ * @returns {Hoja}
+ */
 export function resumenSheet(S, filterText, now = new Date()) {
+  /** @type {unknown[][]} */
   const rows = [[b(TITULO)], ['Filtro', filterText], ['Generado', fmtDateTime(now)]];
+  /** @param {string} title @param {string[]} head @param {unknown[][]} body */
   const table = (title, head, body) => rows.push([], [b(title)], head.map(b), ...body);
+  /** @param {Record<string, number>} obj */
   const counts = (obj) => sortedEntries(obj).map(([k, v]) => [k, v, pct(v, S.n)]);
 
   rows.push([], [b('Indicador'), b('Valor')]);
@@ -157,7 +185,10 @@ export function resumenSheet(S, filterText, now = new Date()) {
 
 /**
  * Libro completo de estadística ORL.
- * @returns {{name: string, rows: any[][], header?: boolean, widths?: number[]}[]}
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ * @param {RecordFilter} [filter]
+ * @returns {Hoja[]}
  */
 export function statsWorkbook(records, procs, filter = {}, now = new Date()) {
   const S = computeStats(records, procs);

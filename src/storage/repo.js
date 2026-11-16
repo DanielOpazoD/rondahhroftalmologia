@@ -18,10 +18,25 @@ import { isFutureVersion } from '../core/migrations.js';
 import { normalizePatient, patientLabel } from '../core/patient.js';
 import { compareEs } from '../core/format.js';
 
+/** @typedef {import('./backends.js').Backend} Backend */
+/** @typedef {import('./backends.js').Documento} Documento */
+/** @typedef {import('./backends.js').DocumentoLeido} DocumentoLeido */
+/** @typedef {import('../domain').AtencionGuardada} AtencionGuardada */
+/** @typedef {import('../domain').AtencionFutura} AtencionFutura */
+/** @typedef {import('../domain').Paciente} Paciente */
+/** @typedef {import('../domain').Adjunto} Adjunto */
+/** @typedef {import('../domain').AuditDoc} AuditDoc */
+/** @typedef {import('../domain').AuditEntry} AuditEntry */
 /**
- * @typedef {{getAll: Function, put: Function, putMany: Function, delete: Function, clear: Function, name: string,
- *   get: Function, keys: Function, binary?: boolean}} Backend
- * @typedef {{id: string, atencionId: string, updated: number, entries: object[]}} AuditDoc
+ * Atención recibida para guardar (del formulario, de otro equipo, de un respaldo o
+ * de versiones anteriores): se valida aquí antes de aceptarla.
+ * @typedef {{id?: unknown} | null | undefined} AtencionEntrante
+ */
+/** Ficha recibida para guardar (sin validar; ver normalizePatient). @typedef {Parameters<typeof normalizePatient>[0]} FichaEntrante */
+/**
+ * Escritura que falló tras los reintentos: `{col, doc}` (documento por guardar)
+ * o `{col, id, del: true}` (documento por borrar).
+ * @typedef {{col: string, doc: Documento} | {col: string, id: string, del: true}} EscrituraFallida
  */
 
 /**
@@ -35,33 +50,44 @@ export function createRepo(
   backend,
   { onError = (e) => console.error(e), retries = 2, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {},
 ) {
-  /** @type {Map<string, object>} */
+  /** @type {Map<string, AtencionGuardada>} */
   const records = new Map();
-  /** Atenciones de una versión más nueva de la app: se conservan sin tocar. */
+  /** Atenciones de una versión más nueva de la app: se conservan sin tocar. @type {Map<string, AtencionFutura>} */
   const future = new Map();
   /** @type {Map<string, number>} id -> fecha de eliminación */
   const tombs = new Map();
   /** @type {Map<string, AuditDoc>} */
   const audit = new Map();
-  /** Fichas de pacientes (comunes a todas las especialidades). */
+  /** Fichas de pacientes (comunes a todas las especialidades). @type {Map<string, Paciente>} */
   const patients = new Map();
-  /** Fichas ordenadas por nombre (se recalcula solo si cambió alguna). @type {any[] | null} */
+  /** Fichas ordenadas por nombre (se recalcula solo si cambió alguna). @type {Paciente[] | null} */
   let patientsSorted = null;
-  /** Metadatos de adjuntos (los bytes se leen de a uno: ver loadAttachmentData). */
+  /** Metadatos de adjuntos (los bytes se leen de a uno: ver loadAttachmentData). @type {Map<string, Adjunto>} */
   const attachments = new Map();
-  /** Última versión persistida de cada documento (para escribir solo lo que cambió). */
+  /** Última versión persistida de cada documento (JSON), para escribir solo lo que cambió. @type {Map<string, string>} */
   const persisted = new Map();
+  /** @type {Set<Promise<unknown>>} */
   const pending = new Set();
+  /** @type {AtencionGuardada[] | null} */
   let sortedCache = null;
 
-  /** Escritura en segundo plano; los errores se informan, nunca se pierden en silencio. */
+  /**
+   * Escritura en segundo plano; los errores se informan, nunca se pierden en silencio.
+   * @param {Promise<unknown>} p
+   */
   const run = (p) => {
+    /** @type {Promise<unknown>} */
     const tracked = p.catch(onError).finally(() => pending.delete(tracked));
     pending.add(tracked);
     return tracked;
   };
+  /** @param {string} col @param {string} id */
   const keyOf = (col, id) => `${col}:${id}`;
-  /** Marca el documento como persistido; devuelve true si cambió respecto de lo guardado. */
+  /**
+   * Marca el documento como persistido; devuelve true si cambió respecto de lo guardado.
+   * @param {string} col
+   * @param {Documento} doc
+   */
   const markChanged = (col, doc) => {
     const json = JSON.stringify(doc);
     if (persisted.get(keyOf(col, doc.id)) === json) return false;
@@ -72,10 +98,16 @@ export function createRepo(
    * Escrituras que fallaron tras los reintentos: clave -> {col, doc} (o {col, id, del}).
    * Se vuelven a intentar en flush()/retryFailed(); mientras tanto los datos
    * siguen en memoria y NO se marcan como guardados.
+   * @type {Map<string, EscrituraFallida>}
    */
   const failed = new Map();
 
-  /** Ejecuta `op` con reintentos inmediatos (retroceso corto) ante fallos. */
+  /**
+   * Ejecuta `op` con reintentos inmediatos (retroceso corto) ante fallos.
+   * @template T
+   * @param {() => Promise<T>} op
+   * @returns {Promise<T>}
+   */
   const withRetries = async (op) => {
     for (let i = 0; ; i++) {
       try {
@@ -88,7 +120,11 @@ export function createRepo(
     }
   };
 
-  /** Escribe documentos; si falla, los desmarca y los deja pendientes. */
+  /**
+   * Escribe documentos; si falla, los desmarca y los deja pendientes.
+   * @param {string} col
+   * @param {Documento[]} docs
+   */
   const write = (col, docs) =>
     run(
       withRetries(() => (docs.length === 1 ? backend.put(col, docs[0]) : backend.putMany(col, docs))).then(
@@ -105,14 +141,24 @@ export function createRepo(
       ),
     );
 
+  /**
+   * @template {Documento} D
+   * @param {string} col
+   * @param {D} doc
+   */
   const putIfChanged = (col, doc) => {
     if (markChanged(col, doc)) write(col, [doc]);
   };
-  /** Escribe en UNA transacción todos los documentos que cambiaron (sincronización, importación). */
+  /**
+   * Escribe en UNA transacción todos los documentos que cambiaron (sincronización, importación).
+   * @param {string} col
+   * @param {Documento[]} docs
+   */
   const putManyIfChanged = (col, docs) => {
     const changed = docs.filter((d) => markChanged(col, d));
     if (changed.length) write(col, changed);
   };
+  /** @param {string} col @param {string} id */
   const remove = (col, id) => {
     persisted.delete(keyOf(col, id));
     failed.delete(keyOf(col, id));
@@ -128,14 +174,16 @@ export function createRepo(
   const retryFailed = () => {
     const items = [...failed.values()];
     failed.clear();
+    /** @type {Map<string, Documento[]>} */
     const byCol = new Map();
     for (const it of items) {
-      if (it.del) {
+      if ('del' in it) {
         remove(it.col, it.id);
         continue;
       }
-      if (!byCol.has(it.col)) byCol.set(it.col, []);
-      byCol.get(it.col).push(it.doc);
+      const docs = byCol.get(it.col);
+      if (docs) docs.push(it.doc);
+      else byCol.set(it.col, [it.doc]);
     }
     for (const [col, docs] of byCol) {
       for (const d of docs) persisted.set(keyOf(col, d.id), JSON.stringify(d));
@@ -144,16 +192,23 @@ export function createRepo(
     return items.length;
   };
 
-  /** Guarda una atención en memoria (separando las de versiones futuras). */
+  /**
+   * Guarda una atención en memoria (separando las de versiones futuras).
+   * @param {AtencionEntrante} raw
+   * @returns {AtencionGuardada | AtencionFutura | null} null si no tiene un id válido
+   */
   function setRecord(raw) {
     if (!raw || !isValidId(raw.id)) return null;
     sortedCache = null;
     if (isFutureVersion(raw)) {
-      future.set(raw.id, raw);
+      // Se conserva tal cual (con su `v` de una versión más nueva).
+      const fut = /** @type {AtencionFutura} */ (raw);
+      future.set(raw.id, fut);
       records.delete(raw.id);
-      return raw;
+      return fut;
     }
-    const r = normalizeRecord(raw);
+    // El id ya es válido y normalizeRecord lo conserva.
+    const r = /** @type {AtencionGuardada} */ (normalizeRecord(raw));
     records.set(r.id, r);
     future.delete(r.id);
     return r;
@@ -173,7 +228,7 @@ export function createRepo(
         backend.getAll('eliminadas'),
         backend.getAll('bitacora'),
         backend.getAll('pacientes'),
-        backend.getAll('adjuntos').catch(() => []),
+        backend.getAll('adjuntos').catch(/** @returns {DocumentoLeido[]} */ () => []),
       ]);
       for (const raw of atts) {
         const a = normalizeAttachment(raw);
@@ -193,11 +248,13 @@ export function createRepo(
         if (saved) persisted.set(keyOf('atenciones', r.id), JSON.stringify(r));
       }
       for (const d of dels) {
-        tombs.set(d.id, d.t);
+        // Las lápidas ({id, t}) solo las escribe este repositorio.
+        tombs.set(d.id, /** @type {number} */ (d.t));
         persisted.set(keyOf('eliminadas', d.id), JSON.stringify(d));
       }
       for (const d of docs) {
-        audit.set(d.id, d);
+        // La bitácora solo la escribe este repositorio (addAuditEntry, y saveAuditDocs tras validarla).
+        audit.set(d.id, /** @type {AuditDoc} */ (/** @type {unknown} */ (d)));
         persisted.set(keyOf('bitacora', d.id), JSON.stringify(d));
       }
       const empty = !recs.length && !dels.length;
@@ -237,14 +294,17 @@ export function createRepo(
     },
     /** Atenciones de versiones futuras (para sincronizarlas sin modificarlas). */
     loadFutureRecords: () => [...future.values()],
+    /** @param {string} id */
     getRecord: (id) => records.get(id),
 
+    /** @param {AtencionEntrante} rec */
     upsertRecord(rec) {
       const saved = setRecord(rec);
       if (saved) putIfChanged('atenciones', saved);
       return repo.loadRecords();
     },
 
+    /** @param {string} id */
     deleteRecord(id) {
       sortedCache = null;
       records.delete(id);
@@ -256,9 +316,12 @@ export function createRepo(
     /**
      * Reemplaza el conjunto completo (sincronización, importación, borrado
      * masivo): escribe solo lo que cambió y elimina lo que ya no está.
+     * @param {AtencionEntrante[]} list
      */
     saveRecords(list) {
+      /** @type {Set<string>} */
       const ids = new Set();
+      /** @type {(AtencionGuardada | AtencionFutura)[]} */
       const docs = [];
       for (const raw of list) {
         const saved = setRecord(raw);
@@ -280,6 +343,7 @@ export function createRepo(
     /* ----------------------------------------------------- eliminaciones */
 
     loadTombstones: () => Object.fromEntries(tombs),
+    /** @param {Record<string, number>} obj id -> fecha de eliminación */
     saveTombstones(obj) {
       for (const [id, t] of Object.entries(obj)) tombs.set(id, t);
       putManyIfChanged(
@@ -293,6 +357,7 @@ export function createRepo(
         }
       }
     },
+    /** @param {string} id @param {number} t */
     addTombstone(id, t) {
       tombs.set(id, t);
       putIfChanged('eliminadas', { id, t });
@@ -308,7 +373,9 @@ export function createRepo(
       }
       return [...patientsSorted];
     },
+    /** @param {string} id */
     getPatient: (id) => patients.get(id),
+    /** @param {FichaEntrante} raw */
     upsertPatient(raw) {
       const p = normalizePatient(raw);
       if (!p) return null;
@@ -317,9 +384,13 @@ export function createRepo(
       putIfChanged('pacientes', p);
       return p;
     },
-    /** Reemplaza/agrega fichas (sincronización, migración) en una sola escritura. */
+    /**
+     * Reemplaza/agrega fichas (sincronización, migración) en una sola escritura.
+     * @param {FichaEntrante[]} list
+     */
     savePatients(list) {
-      const valid = list.map(normalizePatient).filter(Boolean);
+      // Las fichas no válidas (normalizePatient → null) se descartan.
+      const valid = list.map(normalizePatient).filter((p) => p !== null);
       for (const p of valid) patients.set(p.id, p);
       patientsSorted = null;
       putManyIfChanged('pacientes', valid);
@@ -329,59 +400,89 @@ export function createRepo(
 
     /** ¿Este almacenamiento puede guardar archivos? (localStorage no). */
     supportsAttachments: () => backend.binary !== false,
-    /** Metadatos de todos los adjuntos, o los de una atención (por fecha de creación). */
+    /**
+     * Metadatos de todos los adjuntos, o los de una atención (por fecha de creación).
+     * @param {string} [atencionId]
+     * @returns {Adjunto[]}
+     */
     loadAttachments: (atencionId) =>
       [...attachments.values()]
         .filter((a) => !atencionId || a.atencionId === atencionId)
         .sort((a, b) => a.created - b.created || (a.id < b.id ? -1 : 1)),
+    /** @param {string} id */
     getAttachment: (id) => attachments.get(id),
-    /** Reemplaza/agrega metadatos (al adjuntar o al recibir de otro equipo). */
+    /**
+     * Reemplaza/agrega metadatos (al adjuntar o al recibir de otro equipo).
+     * @param {unknown[]} list metadatos sin validar (ver normalizeAttachment)
+     * @returns {Adjunto[]} los válidos
+     */
     saveAttachments(list) {
-      const valid = list.map(normalizeAttachment).filter(Boolean);
+      const valid = list.map(normalizeAttachment).filter((a) => a !== null);
       for (const a of valid) attachments.set(a.id, a);
       putManyIfChanged('adjuntos', valid);
       return valid;
     },
-    /** Quita los metadatos (la lápida la agrega quien elimina). */
+    /** Quita los metadatos (la lápida la agrega quien elimina). @param {string} id */
     removeAttachment(id) {
       if (!attachments.delete(id)) return;
       remove('adjuntos', id);
     },
-    /** Contenido de un adjunto (o undefined si este equipo aún no lo tiene). */
+    /**
+     * Contenido de un adjunto (o undefined si este equipo aún no lo tiene).
+     * @param {string} id
+     * @returns {Promise<{bytes: Uint8Array} | undefined>}
+     */
     async loadAttachmentData(id) {
       const doc = await backend.get('adjuntos_datos', id);
       return doc ? { bytes: /** @type {Uint8Array} */ (doc.bytes) } : undefined;
     },
-    /** Guarda el contenido (en una transacción propia; se espera a que quede escrito). */
+    /**
+     * Guarda el contenido (en una transacción propia; se espera a que quede escrito).
+     * @param {string} id
+     * @param {Uint8Array} bytes
+     */
     async saveAttachmentData(id, bytes) {
       if (backend.binary === false) throw new Error('Este navegador no permite guardar adjuntos (sin IndexedDB).');
       await backend.put('adjuntos_datos', { id, bytes });
     },
+    /** @param {string} id */
     async deleteAttachmentData(id) {
       await backend.delete('adjuntos_datos', id);
     },
     /** Ids de los adjuntos cuyo contenido está en este equipo. */
-    attachmentDataIds: async () => /** @type {string[]} */ (await backend.keys('adjuntos_datos')),
+    attachmentDataIds: async () => backend.keys('adjuntos_datos'),
 
     /* ----------------------------------------------------------- bitácora */
 
     /** Documentos de bitácora (uno por atención). */
     loadAuditDocs: () => [...audit.values()],
-    /** Entradas de la bitácora de una atención, de la más reciente a la más antigua. */
+    /**
+     * Entradas de la bitácora de una atención, de la más reciente a la más antigua.
+     * @param {string} atencionId
+     */
     auditFor: (atencionId) => [...(audit.get('b_' + atencionId)?.entries || [])].sort((a, b) => b.at - a.at),
-    /** Agrega una entrada a la bitácora de una atención. */
+    /**
+     * Agrega una entrada a la bitácora de una atención.
+     * @param {string} atencionId
+     * @param {AuditEntry} entry
+     * @returns {AuditDoc}
+     */
     addAuditEntry(atencionId, entry) {
       const id = 'b_' + atencionId;
       const cur = audit.get(id);
       const doc = { id, atencionId, updated: entry.at, entries: appendAuditEntry(cur?.entries || [], entry) };
-      if (cur?.updated >= doc.updated) doc.updated = cur.updated + 1;
+      // Nunca retrocede la versión del documento (p. ej. con el reloj del equipo atrasado).
+      if (cur && cur.updated >= doc.updated) doc.updated = cur.updated + 1;
       audit.set(id, doc);
       putIfChanged('bitacora', doc);
       return doc;
     },
-    /** Reemplaza/combina documentos de bitácora (sincronización, importación). */
+    /**
+     * Reemplaza/combina documentos de bitácora (sincronización, importación).
+     * @param {(Partial<AuditDoc> | null | undefined)[]} docs
+     */
     saveAuditDocs(docs) {
-      const valid = docs.filter((d) => d && isValidId(d.id) && Array.isArray(d.entries));
+      const valid = docs.filter(/** @returns {d is AuditDoc} */ (d) => !!d && isValidId(d.id) && Array.isArray(d.entries));
       for (const d of valid) audit.set(d.id, d);
       putManyIfChanged('bitacora', valid);
     },

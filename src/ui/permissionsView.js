@@ -19,10 +19,10 @@ import { $, toast } from './dom.js';
 /** Zonas de la atención que siguen activas en solo lectura (abrir adjuntos, historial, atenciones anteriores). */
 const READ_ONLY_KEEP = ['#attCard', '#histCard', '#patPrev', '.toolbar'];
 
-/** @param {any} ctx */
+/** @param {import('./context.js').AppContext} ctx */
 const user = (ctx) => ctx.accounts?.user || null;
 
-/** Aplica los permisos de la persona en la sesión a la interfaz. @param {any} ctx */
+/** Aplica los permisos de la persona en la sesión a la interfaz. @param {import('./context.js').AppContext} ctx */
 export function applyPermissions(ctx) {
   const u = user(ctx);
   const edit = can(u, PERMISSIONS.EDITAR_CLINICO);
@@ -49,11 +49,12 @@ export function applyPermissions(ctx) {
  * @param {any} ctx
  */
 export function guardActions(ctx) {
+  /** @returns {undefined} */
   const deny = () => {
     toast('Tu perfil puede ver las atenciones, no editarlas.', 4000);
     return undefined;
   };
-  const allowed = (perm) => can(user(ctx), perm);
+  const allowed = (/** @type {string} */ perm) => can(user(ctx), perm);
   /** @param {string} name @param {string} perm @param {(...a: any[]) => boolean} [when] permitido también si… */
   const wrap = (name, perm, when) => {
     const fn = ctx[name];

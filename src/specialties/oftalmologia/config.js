@@ -95,7 +95,7 @@ export const DEFAULT_PROCS = [
   { id: 'ecografia', n: 'Ecografía ocular' },
 ];
 
-/** Abreviatura que acompaña a la PIO según el tonómetro usado. */
+/** Abreviatura que acompaña a la PIO según el tonómetro usado (por id de procedimiento). @type {Record<string, string>} */
 export const PIO_SUFFIX = { t_aplan: 'Apl', t_neum: 'Neu' };
 
 /**

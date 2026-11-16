@@ -7,23 +7,50 @@
  */
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, PIO_SUFFIX } from './config.js';
 
-/** N.º de ojos que cubre una lateralidad. */
+/** @import { Atencion, ProcRealizado } from '../../domain' */
+/** @import { ProcDef } from './config.js' */
+
+/**
+ * Procedimiento realizado ya resuelto contra la lista configurada (lo que muestran
+ * la nota, el PDF y los reportes).
+ * @typedef {{id: string, nombre: string, abrev: string, descOd: string, descOi: string, ojo: 'OD' | 'OI' | 'AO', ojos: number, pioOd: string, pioOi: string}} ProcHecho
+ */
+
+/**
+ * N.º de ojos que cubre una lateralidad.
+ * @param {string | undefined} eye 'OD' | 'OI' | 'AO'
+ */
 export function eyeCount(eye) {
   return eye === 'AO' ? 2 : eye === 'OD' || eye === 'OI' ? 1 : 0;
 }
 
-/** ¿La lateralidad incluye el ojo dado ('od' | 'oi')? */
+/**
+ * ¿La lateralidad incluye el ojo dado?
+ * @param {string | undefined} eye 'OD' | 'OI' | 'AO' (puede faltar en datos incompletos)
+ * @param {string | undefined} e 'od' | 'oi'
+ */
 export function coversEye(eye, e) {
   return eye === 'AO' || (eye || '').toLowerCase() === e;
 }
 
-/** Nombre de un procedimiento: el de la lista actual o el guardado con la atención. */
+/**
+ * Nombre de un procedimiento: el de la lista actual o el guardado con la atención.
+ * @param {string} id
+ * @param {Partial<Pick<Atencion, 'proc' | 'procNames'>> | undefined} rec
+ * @param {ProcDef[]} procs
+ */
 export function procName(id, rec, procs) {
   const p = procs.find((x) => x.id === id);
-  return p ? p.n : rec?.procNames?.[id] || rec?.proc?.[id]?.n || id;
+  // Lector tolerante: un procedimiento de otra versión puede traer su nombre en `n`.
+  return p ? p.n : rec?.procNames?.[id] || /** @type {(ProcRealizado & {n?: string}) | undefined} */ (rec?.proc?.[id])?.n || id;
 }
 
-/** ¿El procedimiento registra PIO? (si ya no está en la lista, se infiere por los valores). */
+/**
+ * ¿El procedimiento registra PIO? (si ya no está en la lista, se infiere por los valores).
+ * @param {string} id
+ * @param {Atencion} rec
+ * @param {ProcDef[]} procs
+ */
 function procHasPio(id, rec, procs) {
   const p = procs.find((x) => x.id === id);
   if (p) return !!p.pio;
@@ -45,7 +72,9 @@ export function descFor(v, e) {
 /**
  * Procedimientos realizados como datos estructurados, en el orden de la lista
  * configurada (los que ya no están en ella no se incluyen).
- * @returns {{id: string, nombre: string, abrev: string, descOd: string, descOi: string, ojo: string, ojos: number, pioOd: string, pioOi: string}[]}
+ * @param {Atencion} rec
+ * @param {ProcDef[]} procs
+ * @returns {ProcHecho[]}
  */
 export function proceduresDone(rec, procs) {
   // Solo los procedimientos de la lista configurada: uno que se quitó de la
@@ -89,7 +118,7 @@ export function procLabel(p, { desc = true } = {}) {
 /**
  * Descripciones de procedimientos que van en el recuadro del examen de un ojo
  * («FO: …», «BMC: …»): la de ese ojo de cada procedimiento.
- * @param {any} rec @param {string} e @param {import('./config.js').ProcDef[]} procs
+ * @param {Atencion} rec @param {'od' | 'oi'} e @param {ProcDef[]} procs
  */
 export function procDescriptions(rec, e, procs) {
   return proceduresDone(rec, procs)
@@ -101,6 +130,9 @@ export function procDescriptions(rec, e, procs) {
 /**
  * PIO a mostrar para un ojo: la del examen físico o, si falta, la primera
  * tonometría registrada (con sufijo Apl/Neu según el tonómetro).
+ * @param {Atencion} rec
+ * @param {'od' | 'oi'} e
+ * @param {ProcDef[]} procs
  */
 export function pioFor(rec, e, procs) {
   const own = (rec.f?.[`${e}_pio`] || '').trim();
@@ -114,7 +146,10 @@ export function pioFor(rec, e, procs) {
   return '';
 }
 
-/** Antecedentes legibles: ["DM2", "Cx: facoemulsificación OD", "otros…"]. */
+/**
+ * Antecedentes legibles: ["DM2", "Cx: facoemulsificación OD", "otros…"].
+ * @param {Atencion} rec
+ */
 export function antecedentsList(rec) {
   const f = rec.f || {};
   const out = ANTECEDENTES.filter((d) => rec.checks?.[d.key]).map((d) =>
@@ -124,7 +159,11 @@ export function antecedentsList(rec) {
   return out;
 }
 
-/** Procedimientos solicitados legibles (incluye detalle Schirmer y "otros"). */
+/**
+ * Procedimientos solicitados legibles (incluye detalle Schirmer y "otros").
+ * @param {Atencion} rec
+ * @param {{withOthers?: boolean}} [o]
+ */
 export function requestedList(rec, { withOthers = true } = {}) {
   const f = rec.f || {};
   const out = SOLICITADOS.filter((d) => rec.checks?.[d.key]).map((d) =>
@@ -134,7 +173,11 @@ export function requestedList(rec, { withOthers = true } = {}) {
   return out;
 }
 
-/** Diagnósticos legibles (incluye lateralidad de catarata y "otros"). */
+/**
+ * Diagnósticos legibles (incluye lateralidad de catarata y "otros").
+ * @param {Atencion} rec
+ * @param {{withOthers?: boolean}} [o]
+ */
 export function diagnosesList(rec, { withOthers = true } = {}) {
   const f = rec.f || {};
   const out = DIAGNOSTICOS.filter((d) => rec.checks?.[d.key]).map((d) =>
@@ -144,7 +187,12 @@ export function diagnosesList(rec, { withOthers = true } = {}) {
   return out;
 }
 
-/** Resumen de un ojo para la nota: "AV 20/40 | AVcc 20/25 | PIO 14 mmHg | hallazgos". */
+/**
+ * Resumen de un ojo para la nota: "AV 20/40 | AVcc 20/25 | PIO 14 mmHg | hallazgos".
+ * @param {Atencion} rec
+ * @param {'od' | 'oi'} e
+ * @param {ProcDef[]} procs
+ */
 export function eyeSummary(rec, e, procs) {
   const f = rec.f || {};
   const parts = [];
@@ -158,7 +206,10 @@ export function eyeSummary(rec, e, procs) {
   return parts.join(' | ');
 }
 
-/** Acciones administrativas: "GES: … | IC: … | Receta: … | Otros: …". */
+/**
+ * Acciones administrativas: "GES: … | IC: … | Receta: … | Otros: …".
+ * @param {Atencion} rec
+ */
 export function actionsList(rec) {
   const f = rec.f || {};
   return [

@@ -54,7 +54,7 @@ export function openDialog({ title, fields, okLabel = 'Guardar', onSave, onClose
   };
   $('#dlgOk').onclick = submit;
   $('#dlgCancel').onclick = finish;
-  $('#dlgBody').onkeydown = (e) => {
+  $('#dlgBody').onkeydown = (/** @type {KeyboardEvent} */ e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       submit();

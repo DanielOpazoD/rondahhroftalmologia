@@ -6,7 +6,16 @@ import { SEXOS } from '../config/catalogs.js';
 import { NAME_PARTS, hasNameParts } from '../core/names.js';
 import { html, setHtml } from './html.js';
 
-/** Campos explícitos para perfiles y cuentas; el nombre anterior queda visible al organizarlo. */
+/**
+ * Nombre de una persona (perfil o cuenta): las partes explícitas o, en datos
+ * antiguos, solo `nombre`.
+ * @typedef {{nombre?: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string}} NombrePersona
+ */
+
+/**
+ * Campos explícitos para perfiles y cuentas; el nombre anterior queda visible al organizarlo.
+ * @param {NombrePersona} [person]
+ */
 export function profileNameFields(person = {}) {
   return [
     ...(!hasNameParts(person) && person.nombre
@@ -16,14 +25,23 @@ export function profileNameFields(person = {}) {
   ];
 }
 
-/** Campos de perfil para guardar; editar otro dato no reparte un nombre antiguo. */
+/**
+ * Campos de perfil para guardar; editar otro dato no reparte un nombre antiguo.
+ * @param {Record<string, string | undefined>} values valores del formulario
+ * @param {NombrePersona} [previous]
+ * @returns {Record<string, string>}
+ */
 export function profileNameValues(values, previous = {}) {
   return hasNameParts(previous) || NAME_PARTS.some((k) => values[k]?.trim())
     ? Object.fromEntries(NAME_PARTS.map((k) => [k, values[k]?.trim() || '']))
     : { nombre: values.nombre || previous.nombre || '' };
 }
 
-/** Conserva visible el texto antiguo, sin asignarlo a un apellido ni a los nombres. */
+/**
+ * Conserva visible el texto antiguo, sin asignarlo a un apellido ni a los nombres.
+ * @param {string} prefix prefijo de los campos del formulario ('paciente_', 'ing_')
+ * @param {Record<string, string>} fields campos paciente_*
+ */
 export function renderLegacyName(prefix, fields) {
   const hint = document.querySelector(`[data-legacy-name="${prefix}"]`);
   if (!(hint instanceof HTMLElement)) return;

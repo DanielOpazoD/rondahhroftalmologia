@@ -39,7 +39,14 @@ async function annexFrom(m, bytes) {
 }
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * Atención guardada o la que está en edición (`ctx.rec`, que el contexto declara
+ * con la forma de una atención en blanco; ver core/record.js).
+ * @typedef {import('../../domain').Atencion | import('../../core/record.js').AtencionEnBlanco} AtencionDeSalida
+ */
+
+/**
+ * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
+ *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function outputActions(ctx, store) {
@@ -47,8 +54,13 @@ export function outputActions(ctx, store) {
     /**
      * Descarga el PDF de la atención: un menú junto al botón ofrece «PDF»
      * (la hoja) o «PDF + adjuntos» (en el mismo documento, ver core/pdfAnexos.js).
+     * @param {AtencionDeSalida} atencion
+     * @param {HTMLButtonElement} button
+     * @returns {Promise<void>}
      */
-    async downloadPdf(rec, button) {
+    async downloadPdf(atencion, button) {
+      // La atención en edición tiene la misma forma; solo se declara distinto (ver AtencionDeSalida).
+      const rec = /** @type {import('../../domain').Atencion} */ (atencion);
       const metas = rec.id ? store.loadAttachments(rec.id) : [];
       const n = metas.length;
       const choice = await openMenu(
@@ -122,6 +134,7 @@ export function outputActions(ctx, store) {
       });
     },
 
+    /** @param {AtencionDeSalida} rec */
     async copyNote(rec) {
       const text = ctx.note(rec);
       if (rec.id) ctx.accounts?.event('atencion.nota', rec.id);
@@ -137,11 +150,10 @@ export function outputActions(ctx, store) {
 
     /** Clave de seudonimización del equipo (se crea si no existe). */
     ensureSecret() {
-      let s = store.loadSecret();
-      if (!s) {
-        s = createSecret();
-        ctx.persist(() => store.saveSecret(s));
-      }
+      const saved = store.loadSecret();
+      if (saved) return saved;
+      const s = createSecret();
+      ctx.persist(() => store.saveSecret(s));
       return s;
     },
   };

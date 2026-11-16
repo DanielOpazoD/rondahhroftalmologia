@@ -129,7 +129,7 @@ export const AGE_GROUPS = [0, 5, 15, 45, 65];
 /** Umbral auditivo plausible (promedio tonal puro, dB HL). */
 export const LIMITES_CLINICOS = Object.freeze({ dbMin: -10, dbMax: 120 });
 
-/** Medidas por lado de un procedimiento: ninguna (la audiometría va en el examen). */
+/** Medidas por lado de un procedimiento: ninguna (la audiometría va en el examen). @type {string[]} */
 export const MEDIDAS_PROC = [];
 
 /** Nombres legibles de los campos (historial de cambios). */
@@ -172,5 +172,5 @@ export const ETIQUETAS = {
 
 /** Etiqueta de cada parte de un procedimiento realizado (solo el lado). */
 export const ETIQUETAS_PROC = { eye: '(oído)' };
-/** Sin catálogo GES configurado para esta especialidad piloto. */
+/** Sin catálogo GES configurado para esta especialidad piloto. @type {readonly string[]} */
 export const GES_PATOLOGIAS = Object.freeze([]);

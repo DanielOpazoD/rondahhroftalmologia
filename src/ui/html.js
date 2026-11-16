@@ -21,10 +21,13 @@ export class SafeHtml {
   }
 }
 
-/** Marca como seguro un texto con HTML escrito en el código (nunca datos del usuario). */
+/** Marca como seguro un texto con HTML escrito en el código (nunca datos del usuario). @param {unknown} s */
 export const raw = (s) => new SafeHtml(String(s));
 
-/** @returns {string} */
+/**
+ * @param {unknown} v valor interpolado (SafeHtml, arreglo o texto a escapar)
+ * @returns {string}
+ */
 function render(v) {
   if (v instanceof SafeHtml) return v.value;
   if (Array.isArray(v)) return v.map(render).join('');
@@ -44,7 +47,11 @@ export function html(strings, ...values) {
   return new SafeHtml(out);
 }
 
-/** Une fragmentos seguros con un separador (texto, se escapa). */
+/**
+ * Une fragmentos seguros con un separador (texto, se escapa).
+ * @param {unknown[]} parts
+ * @param {string} [sep]
+ */
 export const join = (parts, sep = '') => raw(parts.map(render).join(escapeHtml(sep)));
 
 /**

@@ -17,7 +17,7 @@ export function initFilter(ctx) {
   ['#fOp', '#fFrom', '#fTo'].forEach((s) => $(s).addEventListener('change', update));
 }
 
-/** Rellena el selector de operativos y el contador del filtro. */
+/** Rellena el selector de operativos y el contador del filtro. @param {import('./context.js').AppContext} ctx */
 export function renderFilter(ctx) {
   const sel = $('#fOp');
   const ops = operativosOf(ctx.records);
@@ -29,12 +29,17 @@ export function renderFilter(ctx) {
   $('#fCount').textContent = `${n} ${n === 1 ? 'atención' : 'atenciones'}`;
 }
 
-/** Mueve la tarjeta de filtro a la pestaña visible. */
+/** Mueve la tarjeta de filtro a la pestaña visible. @param {string} tabId */
 export function placeFilter(tabId) {
   const slot = document.querySelector(`#${tabId} .filterSlot`);
   if (slot) slot.appendChild($('#filterCard'));
 }
 
+/**
+ * Barras horizontales con conteo y porcentaje.
+ * @param {[string, number][]} entries pares [etiqueta, cantidad]
+ * @param {number} total base del porcentaje
+ */
 const bars = (entries, total) => {
   if (!entries.length) return html`<p class="hint">Sin datos.</p>`;
   const max = Math.max(1, ...entries.map((e) => e[1]));
@@ -44,9 +49,12 @@ const bars = (entries, total) => {
   );
   return html`<table class="st bars">${rowsHtml}</table>`;
 };
+/** @param {number | string} v @param {string} label */
 const kpi = (v, label) => html`<div class="kpi"><b>${v}</b><span>${label}</span></div>`;
+/** @param {string} title @param {import('./html.js').SafeHtml} body */
 const card = (title, body) => html`<div class="card"><h2>${title}</h2>${body}</div>`;
 
+/** @param {import('./context.js').AppContext} ctx */
 export function renderStats(ctx) {
   const list = ctx.filtered();
   const S = computeStats(list, ctx.procs);
@@ -58,10 +66,13 @@ export function renderStats(ctx) {
   const tot = rows.reduce((a, [, o]) => ({ od: a.od + o.od, oi: a.oi + o.oi }), { od: 0, oi: 0 });
   const groups = ageGroupLabels();
   // F y M siempre; «Otro» y «Sin dato» solo si hay casos.
-  const sexKeys = ['F', 'M', 'O', 'Sin dato'].filter((k) => k === 'F' || k === 'M' || S.sexo[k]);
+  const sexKeys = /** @type {('F' | 'M' | 'O' | 'Sin dato')[]} */ (['F', 'M', 'O', 'Sin dato']).filter(
+    (k) => k === 'F' || k === 'M' || S.sexo[k],
+  );
   const sexLabel = { F: 'F', M: 'M', O: 'Otro', 'Sin dato': 'S/d' };
   // Decimales con coma (es-CL): «68,4».
-  const fmt1 = (x) => (x === null ? '—' : (Math.round(x * 10) / 10).toLocaleString('es-CL', { maximumFractionDigits: 1 }));
+  const fmt1 = (/** @type {number | null} */ x) =>
+    x === null ? '—' : (Math.round(x * 10) / 10).toLocaleString('es-CL', { maximumFractionDigits: 1 });
   const gest = [
     ['GES', S.gest.ges],
     ['Interconsulta', S.gest.ic],
@@ -111,7 +122,9 @@ export function renderStats(ctx) {
   applyBarWidths($('#stOut'));
 }
 
-/** Ancho de las barras por CSSOM (la CSP no permite atributos style en el HTML). */
+/** Ancho de las barras por CSSOM (la CSP no permite atributos style en el HTML). @param {ParentNode} root */
 function applyBarWidths(root) {
-  for (const el of root.querySelectorAll('.hb[data-w]')) el.style.width = `${Math.max(0, Math.min(100, Number(el.dataset.w) || 0))}%`;
+  for (const el of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll('.hb[data-w]'))) {
+    el.style.width = `${Math.max(0, Math.min(100, Number(el.dataset.w) || 0))}%`;
+  }
 }

@@ -42,6 +42,10 @@ export const EXTERNAL = Object.freeze({
     donde: 'Solo en el servidor (funciones de Netlify) y en los scripts de operación.',
   },
   esbuild: { uso: 'Empaquetar la app en un solo archivo HTML.', donde: 'Solo al construir (scripts/build.mjs).' },
+  eslint: {
+    uso: 'Revisión del código (npm run lint) e informe de calidad (npm run calidad).',
+    donde: 'Solo en desarrollo y en la integración continua; nunca va dentro de la app.',
+  },
   '@playwright/test': {
     uso: 'Pruebas de punta a punta (e2e/) y medir la app en un navegador real (npm run perf).',
     donde: 'Solo en desarrollo y en la integración continua; nunca va dentro de la app.',

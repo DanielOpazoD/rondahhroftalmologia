@@ -191,7 +191,7 @@ export function createAccounts({
   async function allUsers() {
     const { blobs } = await store.list({ prefix: '_cuentas/u/' });
     const out = await Promise.all(blobs.map((b) => /** @type {Promise<Cuenta | null>} */ (store.get(b.key, { type: 'json' }))));
-    return /** @type {Cuenta[]} */ (out.filter(Boolean));
+    return out.filter((u) => u !== null);
   }
   const isActive = async () => {
     const c = /** @type {{activas?: boolean} | null} */ (await store.get(K.config, { type: 'json' }));
@@ -359,22 +359,309 @@ export function createAccounts({
 
   /* -------------------------------------------------------- handler */
 
-  /** Rutas: método y si requiere sesión de administrador. */
-  const ROUTES = /** @type {const} */ ({
-    estado: 'GET',
-    sal: 'POST',
-    entrar: 'POST',
-    clave: 'POST',
-    salir: 'POST',
-    eventos: 'POST',
-    preparar: 'POST',
-    activar: 'POST',
-    usuarios: 'GET',
-    crear: 'POST',
-    editar: 'POST',
-    restablecer: 'POST',
-    auditoria: 'GET',
-  });
+  /**
+   * Una solicitud ya validada (ruta, método, cuerpo JSON).
+   * @typedef {{req: Request, url: URL, b: any, t: number}} Peticion
+   *   `b`: cuerpo JSON de un POST (lo valida cada acción campo a campo); null en GET.
+   * @typedef {Peticion & {a: Autenticado, me: Cuenta}} PeticionConSesion
+   * @typedef {'publica' | 'sesion' | 'usuario' | 'admin'} Acceso
+   *   publica: sin sesión (cada acción verifica lo suyo, p. ej. la contraseña del equipo);
+   *   sesion: con sesión, aunque aún deba cambiar la clave inicial;
+   *   usuario: con sesión y clave ya cambiada; admin: además, administrador.
+   */
+
+  /** @param {Peticion} p */
+  async function sal({ b }) {
+    if (!accountRut(b.rut)) return fail(400, 'rut_invalido', 'RUT inválido');
+    const u = await userByRut(b.rut);
+    // Para un RUT sin cuenta, una sal ficticia estable: no revela si existe.
+    const s = u ? u.sal : bytesToB64(hmacSha256(/** @type {string} */ (secret), 'sal-ficticia:' + rutHashOf(b.rut)).slice(0, 16));
+    return json(200, { sal: s, iter: u ? u.iter : 310_000 });
+  }
+
+  /** Respuesta a un intento fallido: cuenta fallos y bloquea la cuenta al llegar al máximo. @param {Request} req @param {Cuenta | null} u @param {number} t */
+  async function loginFailed(req, u, t) {
+    await ipFailure(req);
+    if (u) {
+      const fallos = (u.fallos || 0) + 1;
+      const lock = fallos >= ACCOUNT_LOCK.maxFails;
+      await putUser({ ...u, fallos: lock ? 0 : fallos, bloqueadaHasta: lock ? t + ACCOUNT_LOCK.lockMs : u.bloqueadaHasta || 0 });
+      await audit({ ev: lock ? 'sesion.bloqueada' : 'sesion.fallida', u: u.id });
+    } else await audit({ ev: 'sesion.fallida' });
+    return fail(401, 'credenciales', 'RUT o clave incorrectos.');
+  }
+
+  /** @param {Peticion} p */
+  async function entrar({ req, b, t }) {
+    const blocked = await ipBlocked(req);
+    if (blocked) {
+      const r = fail(429, 'demasiados_intentos', 'Demasiados intentos desde esta red. Espera unos minutos.');
+      r.headers.set('retry-after', String(Math.ceil(blocked / 1000)));
+      return r;
+    }
+    if (!(await isActive())) return fail(409, 'cuentas_inactivas', 'Las cuentas de usuario aún no están activadas.');
+    if (!accountRut(b.rut) || typeof b.acceso !== 'string' || !HEX64.test(b.acceso)) return fail(400, 'datos_invalidos', 'Datos inválidos');
+    const u = await userByRut(b.rut);
+    if (u && loginState(u, t) === 'bloqueada') {
+      const min = Math.ceil((u.bloqueadaHasta - t) / 60_000);
+      return fail(
+        423,
+        'cuenta_bloqueada',
+        `Cuenta bloqueada por intentos fallidos. Espera ${min} min o pide a un administrador que restablezca tu clave.`,
+      );
+    }
+    if (!u || !safeEqual(verifierOf(b.acceso), u.verificador)) return loginFailed(req, u, t);
+    const state = loginState(u, t);
+    if (state === 'desactivada') return fail(403, 'cuenta_desactivada', 'Tu cuenta está desactivada. Habla con un administrador.');
+    if (state === 'clave_inicial_vencida') {
+      return fail(403, 'clave_inicial_vencida', 'Tu clave inicial venció. Pide a un administrador que la restablezca.');
+    }
+    const sid = dayOf(t) + randId(16);
+    const exp = t + SESSION_MS;
+    await store.setJSON(K.session(sid), { uid: u.id, inicio: t, ultimo: t, exp });
+    await putUser({ ...u, fallos: 0, bloqueadaHasta: 0, ultimoIngreso: t });
+    await audit({ ev: 'sesion.inicio', u: u.id, s: sid });
+    const { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta } = u;
+    return json(200, {
+      token: signToken({ u: u.id, s: sid, e: exp, c: u.debeCambiar }),
+      exp,
+      sesion: sid,
+      usuario: { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta, complemento: complementOf(u.id) },
+    });
+  }
+
+  /** Primer administrador: con la contraseña del equipo, antes de activar las cuentas. @param {Peticion} p */
+  async function activar({ req, b, t }) {
+    if (!isTeamToken(req)) return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta.');
+    if (await isActive()) return fail(409, 'ya_activas', 'Las cuentas ya están activadas.');
+    const problem = accountProblem(b.usuario);
+    if (problem) return fail(400, 'datos_invalidos', problem);
+    const acc = newAccount({ ...b.usuario, admin: true }, null);
+    if (!(await insertAccount(acc))) return fail(409, 'rut_existe', 'Ya existe una cuenta con ese RUT.');
+    await store.setJSON(K.config, { activas: true, creado: t });
+    await audit({ ev: 'cuentas.activar', obj: acc.id });
+    await audit({ ev: 'usuario.crear', obj: acc.id, det: { rol: acc.rol, admin: true } });
+    return json(200, { ok: true });
+  }
+
+  /**
+   * Complemento del servidor para las credenciales de una cuenta. Antes de
+   * activar (primer administrador): con la contraseña del equipo y para un id
+   * nuevo. Después: solo un administrador, para una cuenta nueva o para
+   * restablecer una existente (`existente: true`).
+   * @param {Peticion} p
+   */
+  async function prepararPrimero({ req, b }) {
+    if (!isTeamToken(req)) return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta.');
+    if (!USER_ID_RE.test(b.id) || (await getUser(b.id))) return fail(400, 'id_invalido', 'Id de cuenta inválido');
+    return json(200, { complemento: complementOf(b.id) });
+  }
+  /** @param {PeticionConSesion} p */
+  async function preparar({ b }) {
+    const exists = USER_ID_RE.test(b.id) && Boolean(await getUser(b.id));
+    if (!USER_ID_RE.test(b.id) || exists !== (b.existente === true)) return fail(400, 'id_invalido', 'Id de cuenta inválido');
+    return json(200, { complemento: complementOf(b.id) });
+  }
+
+  /** @param {PeticionConSesion} p */
+  async function salir({ b, t, a, me }) {
+    const key = K.session(a.sid);
+    const ses = /** @type {Sesion | null} */ (await store.get(key, { type: 'json' }));
+    const motivo = ['salir', 'inactividad', 'cierre'].includes(b.motivo) ? b.motivo : 'salir';
+    if (ses && !ses.fin) await store.setJSON(key, { ...ses, fin: t, motivo });
+    await audit({ ev: 'sesion.fin', u: me.id, s: a.sid, det: { motivo } });
+    return json(200, { ok: true });
+  }
+
+  /** @param {PeticionConSesion} p */
+  async function clave({ b, t, a, me }) {
+    if (!validCredentials(b)) return fail(400, 'datos_invalidos', 'Datos inválidos');
+    // Fuera del primer ingreso, cambiar la clave exige la actual.
+    if (!me.debeCambiar && !(typeof b.accesoActual === 'string' && safeEqual(verifierOf(b.accesoActual), me.verificador))) {
+      return fail(401, 'credenciales', 'La clave actual no es correcta.');
+    }
+    if (safeEqual(verifierOf(b.acceso), me.verificador)) return fail(400, 'clave_igual', 'La clave nueva debe ser distinta de la actual.');
+    await putUser({
+      ...me,
+      sal: b.sal,
+      iter: b.iter,
+      verificador: verifierOf(b.acceso),
+      envuelta: b.envuelta,
+      debeCambiar: false,
+      tempExpira: null,
+      claveCambiada: t,
+      actualizado: t,
+    });
+    await audit({ ev: 'sesion.clave', u: me.id, s: a.sid });
+    const ses = /** @type {Sesion} */ (await store.get(K.session(a.sid), { type: 'json' }));
+    return json(200, { token: signToken({ u: me.id, s: a.sid, e: ses.exp, c: false }), exp: ses.exp });
+  }
+
+  /** Eventos de lectura que informa la app (fichas vistas, PDF, exportaciones…). @param {PeticionConSesion} p */
+  async function eventos({ b, t, a, me }) {
+    const list = Array.isArray(b.eventos) ? b.eventos : null;
+    if (!list || list.length > MAX_EVENTS) return fail(400, 'lote_invalido', `Se esperan hasta ${MAX_EVENTS} eventos`);
+    let n = 0;
+    for (const e of list) {
+      if (!e || !CLIENT_EVENTS.includes(e.ev)) continue;
+      if (e.obj !== undefined && !(typeof e.obj === 'string' && ID_RE.test(e.obj))) continue;
+      await audit({
+        ev: e.ev,
+        u: me.id,
+        s: a.sid,
+        obj: e.obj,
+        n: Number.isSafeInteger(e.n) && e.n >= 0 && e.n < 1e6 ? e.n : undefined,
+        at: Number.isSafeInteger(e.at) && Math.abs(e.at - t) < 90 * DAY_MS ? e.at : undefined,
+        off: e.off === true ? true : undefined,
+      });
+      n++;
+    }
+    return json(200, { registrados: n });
+  }
+
+  /** @param {PeticionConSesion} p */
+  async function crear({ b, a, me }) {
+    const problem = accountProblem(b);
+    if (problem) return fail(400, 'datos_invalidos', problem);
+    const acc = newAccount(b, me.id);
+    if (!(await insertAccount(acc))) return fail(409, 'rut_existe', 'Ya existe una cuenta con ese RUT.');
+    await audit({ ev: 'usuario.crear', u: me.id, s: a.sid, obj: acc.id, det: { rol: acc.rol, admin: acc.admin } });
+    return json(200, { usuario: publicUser(acc) });
+  }
+
+  /** Nueva clave inicial para una cuenta (el administrador la entrega en persona). @param {PeticionConSesion} p */
+  async function restablecer({ b, t, a, me }) {
+    const u = await getUser(b.id);
+    if (!u) return fail(404, 'no_existe', 'La cuenta no existe.');
+    if (!validCredentials(b)) return fail(400, 'datos_invalidos', 'Credenciales inválidas');
+    await putUser({
+      ...u,
+      sal: b.sal,
+      iter: b.iter,
+      verificador: verifierOf(b.acceso),
+      envuelta: b.envuelta,
+      debeCambiar: true,
+      tempExpira: t + INITIAL_PASSWORD_DAYS * DAY_MS,
+      fallos: 0,
+      bloqueadaHasta: 0,
+      actualizado: t,
+    });
+    await closeSessionsOf(u.id, 'clave_restablecida');
+    await audit({ ev: 'usuario.restablecer', u: me.id, s: a.sid, obj: u.id });
+    return json(200, { ok: true });
+  }
+
+  /**
+   * Cambios pedidos a una cuenta (profesión, administrador, estado, perfil), validados.
+   * @param {any} b
+   * @returns {{changes: Partial<Cuenta>} | {error: string}}
+   */
+  function accountChanges(b) {
+    /** @type {Partial<Cuenta>} */
+    const changes = {};
+    if (b.rol !== undefined) {
+      if (!ROLE_KEYS.includes(b.rol)) return { error: 'Profesión inválida' };
+      changes.rol = b.rol;
+    }
+    if (b.admin !== undefined) changes.admin = b.admin === true;
+    if (b.estado !== undefined) {
+      if (!['activo', 'desactivado'].includes(b.estado)) return { error: 'Estado inválido' };
+      changes.estado = b.estado;
+    }
+    if (b.perfil !== undefined) {
+      if (!validSealed(b.perfil)) return { error: 'Perfil inválido' };
+      changes.perfil = b.perfil;
+    }
+    return { changes };
+  }
+
+  /** @param {PeticionConSesion} p */
+  async function editar({ b, t, a, me }) {
+    const u = await getUser(b.id);
+    if (!u) return fail(404, 'no_existe', 'La cuenta no existe.');
+    const r = accountChanges(b);
+    if ('error' in r) return fail(400, 'datos_invalidos', r.error);
+    const { changes } = r;
+    const next = { ...u, ...changes, actualizado: t };
+    // Siempre debe quedar al menos un administrador activo.
+    const users = (await allUsers()).map((x) => (x.id === u.id ? next : x));
+    if (!activeAdmins(users).length) return fail(409, 'ultimo_admin', 'Debe quedar al menos un administrador activo.');
+    await putUser(next);
+    if (changes.estado === 'desactivado' && u.estado !== 'desactivado') await closeSessionsOf(u.id, 'cuenta_desactivada');
+    const campos = Object.keys(changes).filter(
+      (k) => JSON.stringify(changes[/** @type {keyof Cuenta} */ (k)]) !== JSON.stringify(u[/** @type {keyof Cuenta} */ (k)]),
+    );
+    await audit({
+      ev: 'usuario.editar',
+      u: me.id,
+      s: a.sid,
+      obj: u.id,
+      det: { campos, ...(changes.estado ? { estado: changes.estado } : {}) },
+    });
+    return json(200, { usuario: publicUser(next) });
+  }
+
+  /**
+   * Rango pedido para la auditoría, en ms. Acepta ms (inicio y fin del día
+   * LOCAL del PC: el servidor guarda por día UTC y en Rapa Nui, de tarde, ya es
+   * el día siguiente en UTC) o AAAA-MM-DD (días UTC completos).
+   * @param {URLSearchParams} q @param {number} t
+   * @returns {{desde: number, hasta: number} | null}
+   */
+  function auditRange(q, t) {
+    /** @param {string | null} v @param {boolean} end */
+    const when = (v, end) => (/^\d{10,16}$/.test(v || '') ? Number(v) : Date.parse(v || '') + (end ? DAY_MS - 1 : 0));
+    const desde = when(q.get('desde'), false);
+    const hasta = q.get('hasta') ? when(q.get('hasta'), true) : t;
+    const ok = Number.isFinite(desde) && Number.isFinite(hasta) && hasta >= desde && (hasta - desde) / DAY_MS <= MAX_AUDIT_DAYS;
+    return ok ? { desde, hasta } : null;
+  }
+
+  /** @param {PeticionConSesion} p */
+  async function auditoria({ url, t, a, me }) {
+    const range = auditRange(url.searchParams, t);
+    if (!range) return fail(400, 'rango_invalido', `Elige un rango de hasta ${MAX_AUDIT_DAYS} días.`);
+    const { desde, hasta } = range;
+    /** @type {{t: number}[]} */
+    const evs = [];
+    const sesiones = [];
+    const inRange = (/** @type {number} */ x) => x >= desde && x <= hasta;
+    for (let d = desde - (desde % DAY_MS); d <= hasta; d += DAY_MS) {
+      const day = dayOf(d);
+      const [ev, ses] = await Promise.all([store.list({ prefix: `_auditoria/${day}/` }), store.list({ prefix: `_cuentas/s/${day}/` })]);
+      for (const x of ev.blobs) {
+        const e = /** @type {{t: number} | null} */ (await store.get(x.key, { type: 'json' }));
+        if (e && inRange(e.t)) evs.push(e);
+      }
+      for (const x of ses.blobs) {
+        const s = /** @type {Sesion | null} */ (await store.get(x.key, { type: 'json' }));
+        if (s && inRange(s.inicio)) sesiones.push({ id: x.key.split('/').pop(), ...s });
+      }
+    }
+    await audit({ ev: 'auditoria.ver', u: me.id, s: a.sid });
+    return json(200, { eventos: evs.sort((x, y) => x.t - y.t), sesiones });
+  }
+
+  /**
+   * Rutas: método, quién puede usarlas (ver `Acceso`) y la acción. Toda ruta
+   * está aquí: lo que no figura responde 404.
+   * @type {Record<string, {method: 'GET' | 'POST'} & ({acceso: 'publica', run: (p: Peticion) => Promise<Response>} | {acceso: Exclude<Acceso, 'publica'>, run: (p: PeticionConSesion) => Promise<Response>})>}
+   */
+  const ROUTES = {
+    estado: { method: 'GET', acceso: 'publica', run: async () => json(200, { activas: await isActive() }) },
+    sal: { method: 'POST', acceso: 'publica', run: sal },
+    entrar: { method: 'POST', acceso: 'publica', run: entrar },
+    activar: { method: 'POST', acceso: 'publica', run: activar },
+    salir: { method: 'POST', acceso: 'sesion', run: salir },
+    clave: { method: 'POST', acceso: 'sesion', run: clave },
+    eventos: { method: 'POST', acceso: 'usuario', run: eventos },
+    preparar: { method: 'POST', acceso: 'admin', run: preparar },
+    usuarios: { method: 'GET', acceso: 'admin', run: async () => json(200, { usuarios: (await allUsers()).map(publicUser) }) },
+    crear: { method: 'POST', acceso: 'admin', run: crear },
+    editar: { method: 'POST', acceso: 'admin', run: editar },
+    restablecer: { method: 'POST', acceso: 'admin', run: restablecer },
+    auditoria: { method: 'GET', acceso: 'admin', run: auditoria },
+  };
 
   /** ¿Es la contraseña del equipo? (activar y preparar el primer administrador) @param {Request} req */
   const isTeamToken = (req) => {
@@ -383,277 +670,30 @@ export function createAccounts({
   };
 
   /**
+   * Valida ruta, método, cuerpo y acceso, y delega en la acción.
    * @param {Request} req
    * @returns {Promise<Response>}
    */
   async function handle(req) {
     const url = new URL(req.url);
-    const action = /** @type {keyof typeof ROUTES} */ (url.pathname.split('/').filter(Boolean).pop() || '');
-    if (!Object.hasOwn(ROUTES, action)) return fail(404, 'ruta', 'Ruta no encontrada');
-    if (req.method !== ROUTES[action]) return fail(405, 'metodo', `Usa ${ROUTES[action]} para ${action}`);
+    const action = url.pathname.split('/').filter(Boolean).pop() || '';
+    const route = Object.hasOwn(ROUTES, action) ? ROUTES[action] : null;
+    if (!route) return fail(404, 'ruta', 'Ruta no encontrada');
+    if (req.method !== route.method) return fail(405, 'metodo', `Usa ${route.method} para ${action}`);
     if (!ready) return fail(503, 'no_configurado', 'Cuentas no configuradas en el servidor (falta SYNC_TOKEN_SHA256).');
-    const t = now();
-
-    if (action === 'estado') return json(200, { activas: await isActive() });
-
     const b = req.method === 'POST' ? await readBody(req) : null;
     if (req.method === 'POST' && (!b || typeof b !== 'object')) return fail(400, 'json_invalido', 'JSON inválido');
+    /** @type {Peticion} */
+    const p = { req, url, b, t: now() };
+    if (route.acceso === 'publica') return route.run(p);
+    // Antes de activar las cuentas no hay sesiones: el primer administrador se prepara con la contraseña del equipo.
+    if (action === 'preparar' && !(await isActive())) return prepararPrimero(p);
 
-    if (action === 'sal') {
-      if (!accountRut(b.rut)) return fail(400, 'rut_invalido', 'RUT inválido');
-      const u = await userByRut(b.rut);
-      // Para un RUT sin cuenta, una sal ficticia estable: no revela si existe.
-      const sal = u ? u.sal : bytesToB64(hmacSha256(/** @type {string} */ (secret), 'sal-ficticia:' + rutHashOf(b.rut)).slice(0, 16));
-      return json(200, { sal, iter: u ? u.iter : 310_000 });
-    }
-
-    if (action === 'entrar') {
-      const blocked = await ipBlocked(req);
-      if (blocked) {
-        const r = fail(429, 'demasiados_intentos', 'Demasiados intentos desde esta red. Espera unos minutos.');
-        r.headers.set('retry-after', String(Math.ceil(blocked / 1000)));
-        return r;
-      }
-      if (!(await isActive())) return fail(409, 'cuentas_inactivas', 'Las cuentas de usuario aún no están activadas.');
-      if (!accountRut(b.rut) || typeof b.acceso !== 'string' || !HEX64.test(b.acceso)) {
-        return fail(400, 'datos_invalidos', 'Datos inválidos');
-      }
-      const u = await userByRut(b.rut);
-      if (u && loginState(u, t) === 'bloqueada') {
-        const min = Math.ceil((u.bloqueadaHasta - t) / 60_000);
-        return fail(
-          423,
-          'cuenta_bloqueada',
-          `Cuenta bloqueada por intentos fallidos. Espera ${min} min o pide a un administrador que restablezca tu clave.`,
-        );
-      }
-      if (!u || !safeEqual(verifierOf(b.acceso), u.verificador)) {
-        await ipFailure(req);
-        if (u) {
-          const fallos = (u.fallos || 0) + 1;
-          const lock = fallos >= ACCOUNT_LOCK.maxFails;
-          await putUser({ ...u, fallos: lock ? 0 : fallos, bloqueadaHasta: lock ? t + ACCOUNT_LOCK.lockMs : u.bloqueadaHasta || 0 });
-          await audit({ ev: lock ? 'sesion.bloqueada' : 'sesion.fallida', u: u.id });
-        } else await audit({ ev: 'sesion.fallida' });
-        return fail(401, 'credenciales', 'RUT o clave incorrectos.');
-      }
-      const state = loginState(u, t);
-      if (state === 'desactivada') return fail(403, 'cuenta_desactivada', 'Tu cuenta está desactivada. Habla con un administrador.');
-      if (state === 'clave_inicial_vencida') {
-        return fail(403, 'clave_inicial_vencida', 'Tu clave inicial venció. Pide a un administrador que la restablezca.');
-      }
-      const sid = dayOf(t) + randId(16);
-      const exp = t + SESSION_MS;
-      await store.setJSON(K.session(sid), { uid: u.id, inicio: t, ultimo: t, exp });
-      await putUser({ ...u, fallos: 0, bloqueadaHasta: 0, ultimoIngreso: t });
-      await audit({ ev: 'sesion.inicio', u: u.id, s: sid });
-      return json(200, {
-        token: signToken({ u: u.id, s: sid, e: exp, c: u.debeCambiar }),
-        exp,
-        sesion: sid,
-        usuario: {
-          id: u.id,
-          rol: u.rol,
-          admin: u.admin,
-          debeCambiar: u.debeCambiar,
-          tempExpira: u.tempExpira,
-          perfil: u.perfil,
-          envuelta: u.envuelta,
-          complemento: complementOf(u.id),
-        },
-      });
-    }
-
-    if (action === 'activar') {
-      if (!isTeamToken(req)) return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta.');
-      if (await isActive()) return fail(409, 'ya_activas', 'Las cuentas ya están activadas.');
-      const u = b.usuario;
-      const problem = accountProblem(u);
-      if (problem) return fail(400, 'datos_invalidos', problem);
-      const acc = newAccount({ ...u, admin: true }, null);
-      if (!(await insertAccount(acc))) return fail(409, 'rut_existe', 'Ya existe una cuenta con ese RUT.');
-      await store.setJSON(K.config, { activas: true, creado: t });
-      await audit({ ev: 'cuentas.activar', obj: acc.id });
-      await audit({ ev: 'usuario.crear', obj: acc.id, det: { rol: acc.rol, admin: true } });
-      return json(200, { ok: true });
-    }
-
-    if (action === 'preparar' && !(await isActive())) {
-      if (!isTeamToken(req)) return fail(401, 'token_invalido', 'Contraseña del equipo incorrecta.');
-      if (!USER_ID_RE.test(b.id) || (await getUser(b.id))) return fail(400, 'id_invalido', 'Id de cuenta inválido');
-      return json(200, { complemento: complementOf(b.id) });
-    }
-
-    // Desde aquí, todo requiere sesión.
     const a = await authenticate(req);
     if ('response' in a) return a.response;
-    const me = a.user;
-
-    if (action === 'salir') {
-      const key = K.session(a.sid);
-      const ses = /** @type {Sesion | null} */ (await store.get(key, { type: 'json' }));
-      const motivo = ['salir', 'inactividad', 'cierre'].includes(b.motivo) ? b.motivo : 'salir';
-      if (ses && !ses.fin) await store.setJSON(key, { ...ses, fin: t, motivo });
-      await audit({ ev: 'sesion.fin', u: me.id, s: a.sid, det: { motivo } });
-      return json(200, { ok: true });
-    }
-
-    if (action === 'clave') {
-      if (!validCredentials(b)) return fail(400, 'datos_invalidos', 'Datos inválidos');
-      // Fuera del primer ingreso, cambiar la clave exige la actual.
-      if (!me.debeCambiar && !(typeof b.accesoActual === 'string' && safeEqual(verifierOf(b.accesoActual), me.verificador))) {
-        return fail(401, 'credenciales', 'La clave actual no es correcta.');
-      }
-      if (safeEqual(verifierOf(b.acceso), me.verificador)) {
-        return fail(400, 'clave_igual', 'La clave nueva debe ser distinta de la actual.');
-      }
-      await putUser({
-        ...me,
-        sal: b.sal,
-        iter: b.iter,
-        verificador: verifierOf(b.acceso),
-        envuelta: b.envuelta,
-        debeCambiar: false,
-        tempExpira: null,
-        claveCambiada: t,
-        actualizado: t,
-      });
-      await audit({ ev: 'sesion.clave', u: me.id, s: a.sid });
-      const ses = /** @type {Sesion} */ (await store.get(K.session(a.sid), { type: 'json' }));
-      return json(200, { token: signToken({ u: me.id, s: a.sid, e: ses.exp, c: false }), exp: ses.exp });
-    }
-
-    if (a.mustChange) return fail(403, 'debe_cambiar_clave', 'Primero cambia tu clave inicial.');
-
-    if (action === 'eventos') {
-      const list = Array.isArray(b.eventos) ? b.eventos : null;
-      if (!list || list.length > MAX_EVENTS) return fail(400, 'lote_invalido', `Se esperan hasta ${MAX_EVENTS} eventos`);
-      let n = 0;
-      for (const e of list) {
-        if (!e || !CLIENT_EVENTS.includes(e.ev)) continue;
-        if (e.obj !== undefined && !(typeof e.obj === 'string' && ID_RE.test(e.obj))) continue;
-        await audit({
-          ev: e.ev,
-          u: me.id,
-          s: a.sid,
-          obj: e.obj,
-          n: Number.isSafeInteger(e.n) && e.n >= 0 && e.n < 1e6 ? e.n : undefined,
-          at: Number.isSafeInteger(e.at) && Math.abs(e.at - t) < 90 * DAY_MS ? e.at : undefined,
-          off: e.off === true ? true : undefined,
-        });
-        n++;
-      }
-      return json(200, { registrados: n });
-    }
-
-    if (!me.admin) return fail(403, 'sin_permiso', 'Solo un administrador puede hacer esto.');
-
-    if (action === 'preparar') {
-      // Para restablecer la clave de una cuenta existente (`existente: true`) o para una cuenta nueva.
-      const exists = USER_ID_RE.test(b.id) && Boolean(await getUser(b.id));
-      if (!USER_ID_RE.test(b.id) || exists !== (b.existente === true)) return fail(400, 'id_invalido', 'Id de cuenta inválido');
-      return json(200, { complemento: complementOf(b.id) });
-    }
-
-    if (action === 'usuarios') return json(200, { usuarios: (await allUsers()).map(publicUser) });
-
-    if (action === 'crear') {
-      const problem = accountProblem(b);
-      if (problem) return fail(400, 'datos_invalidos', problem);
-      const acc = newAccount(b, me.id);
-      if (!(await insertAccount(acc))) return fail(409, 'rut_existe', 'Ya existe una cuenta con ese RUT.');
-      await audit({ ev: 'usuario.crear', u: me.id, s: a.sid, obj: acc.id, det: { rol: acc.rol, admin: acc.admin } });
-      return json(200, { usuario: publicUser(acc) });
-    }
-
-    if (action === 'editar' || action === 'restablecer') {
-      const u = await getUser(b.id);
-      if (!u) return fail(404, 'no_existe', 'La cuenta no existe.');
-      if (action === 'restablecer') {
-        if (!validCredentials(b)) return fail(400, 'datos_invalidos', 'Credenciales inválidas');
-        await putUser({
-          ...u,
-          sal: b.sal,
-          iter: b.iter,
-          verificador: verifierOf(b.acceso),
-          envuelta: b.envuelta,
-          debeCambiar: true,
-          tempExpira: t + INITIAL_PASSWORD_DAYS * DAY_MS,
-          fallos: 0,
-          bloqueadaHasta: 0,
-          actualizado: t,
-        });
-        await closeSessionsOf(u.id, 'clave_restablecida');
-        await audit({ ev: 'usuario.restablecer', u: me.id, s: a.sid, obj: u.id });
-        return json(200, { ok: true });
-      }
-      /** @type {Partial<Cuenta>} */
-      const changes = {};
-      if (b.rol !== undefined) {
-        if (!ROLE_KEYS.includes(b.rol)) return fail(400, 'datos_invalidos', 'Profesión inválida');
-        changes.rol = b.rol;
-      }
-      if (b.admin !== undefined) changes.admin = b.admin === true;
-      if (b.estado !== undefined) {
-        if (!['activo', 'desactivado'].includes(b.estado)) return fail(400, 'datos_invalidos', 'Estado inválido');
-        changes.estado = b.estado;
-      }
-      if (b.perfil !== undefined) {
-        if (!validSealed(b.perfil)) return fail(400, 'datos_invalidos', 'Perfil inválido');
-        changes.perfil = b.perfil;
-      }
-      const next = { ...u, ...changes, actualizado: t };
-      // Siempre debe quedar al menos un administrador activo.
-      const users = (await allUsers()).map((x) => (x.id === u.id ? next : x));
-      if (!activeAdmins(users).length) return fail(409, 'ultimo_admin', 'Debe quedar al menos un administrador activo.');
-      await putUser(next);
-      if (changes.estado === 'desactivado' && u.estado !== 'desactivado') await closeSessionsOf(u.id, 'cuenta_desactivada');
-      const campos = Object.keys(changes).filter(
-        (k) => JSON.stringify(changes[/** @type {keyof Cuenta} */ (k)]) !== JSON.stringify(u[/** @type {keyof Cuenta} */ (k)]),
-      );
-      await audit({
-        ev: 'usuario.editar',
-        u: me.id,
-        s: a.sid,
-        obj: u.id,
-        det: { campos, ...(changes.estado ? { estado: changes.estado } : {}) },
-      });
-      return json(200, { usuario: publicUser(next) });
-    }
-
-    if (action === 'auditoria') {
-      // Rango en ms (inicio y fin del día LOCAL del PC: el servidor guarda por día UTC y en
-      // Rapa Nui, de tarde, ya es el día siguiente en UTC). También acepta AAAA-MM-DD (días UTC completos).
-      /** @param {string | null} v @param {boolean} end */
-      const when = (v, end) => (/^\d{10,16}$/.test(v || '') ? Number(v) : Date.parse(v || '') + (end ? DAY_MS - 1 : 0));
-      const desde = when(url.searchParams.get('desde'), false);
-      const hasta = url.searchParams.get('hasta') ? when(url.searchParams.get('hasta'), true) : t;
-      if (!Number.isFinite(desde) || !Number.isFinite(hasta) || hasta < desde || (hasta - desde) / DAY_MS > MAX_AUDIT_DAYS) {
-        return fail(400, 'rango_invalido', `Elige un rango de hasta ${MAX_AUDIT_DAYS} días.`);
-      }
-      const eventos = [];
-      const sesiones = [];
-      const inRange = (/** @type {number} */ x) => x >= desde && x <= hasta;
-      for (let d = desde - (desde % DAY_MS); d <= hasta; d += DAY_MS) {
-        const day = dayOf(d);
-        const [ev, ses] = await Promise.all([store.list({ prefix: `_auditoria/${day}/` }), store.list({ prefix: `_cuentas/s/${day}/` })]);
-        for (const x of ev.blobs) {
-          const e = /** @type {{t: number} | null} */ (await store.get(x.key, { type: 'json' }));
-          if (e && inRange(e.t)) eventos.push(e);
-        }
-        for (const x of ses.blobs) {
-          const s = /** @type {Sesion | null} */ (await store.get(x.key, { type: 'json' }));
-          if (s && inRange(s.inicio)) sesiones.push({ id: x.key.split('/').pop(), ...s });
-        }
-      }
-      await audit({ ev: 'auditoria.ver', u: me.id, s: a.sid });
-      return json(200, {
-        eventos: eventos.filter(Boolean).sort((x, y) => /** @type {any} */ (x).t - /** @type {any} */ (y).t),
-        sesiones,
-      });
-    }
-
-    return fail(404, 'ruta', 'Ruta no encontrada');
+    if (route.acceso !== 'sesion' && a.mustChange) return fail(403, 'debe_cambiar_clave', 'Primero cambia tu clave inicial.');
+    if (route.acceso === 'admin' && !a.user.admin) return fail(403, 'sin_permiso', 'Solo un administrador puede hacer esto.');
+    return route.run({ ...p, a, me: a.user });
   }
 
   /**

@@ -40,7 +40,7 @@ flowchart TD
   specialties -->|21| core
   specialties -->|4| lib
   storage -->|1| config
-  storage -->|6| core
+  storage -->|7| core
   storage -->|1| specialties
   sync -->|1| config
   sync -->|6| core
@@ -63,9 +63,10 @@ Pocos y con versión fija en `package.json` (sin `^` ni `~`). Dependabot propone
 | `@netlify/blobs` | 11.1.9 | servidor | Almacén del servidor: sincronización, cuentas, registro de accesos y respaldos. | Solo en el servidor (funciones de Netlify) y en los scripts de operación. |
 | `@playwright/test` | 1.65.1 | desarrollo y build | Pruebas de punta a punta (e2e/) y medir la app en un navegador real (npm run perf). | Solo en desarrollo y en la integración continua; nunca va dentro de la app. |
 | `esbuild` | 0.25.10 | desarrollo y build | Empaquetar la app en un solo archivo HTML. | Solo al construir (scripts/build.mjs). |
+| `eslint` | 10.15.0 | desarrollo y build | Revisión del código (npm run lint) e informe de calidad (npm run calidad). | Solo en desarrollo y en la integración continua; nunca va dentro de la app. |
 | `pdf-lib` | 1.17.1 | desarrollo y build | Llenar la plantilla PDF de la atención y armar el PDF con anexos. | Va dentro de la app (el build la incluye en el HTML). |
 
-Herramientas de desarrollo que no se importan desde el código: `@axe-core/playwright` 4.14.0, `@eslint/js` 10.0.1, `eslint` 10.15.0, `fake-indexeddb` 6.2.8, `globals` 17.14.0, `prettier` 3.10.1, `typescript` 5.9.3.
+Herramientas de desarrollo que no se importan desde el código: `@axe-core/playwright` 4.14.0, `@eslint/js` 10.0.1, `fake-indexeddb` 6.2.8, `globals` 17.14.0, `prettier` 3.10.1, `typescript` 5.9.3.
 
 ## Módulos por capa
 
@@ -89,7 +90,7 @@ Para cada módulo: cuántos módulos usa (→) y cuántos lo usan (←).
 
 ### core/ (26)
 
-`core/accessLog.js` →0 ←1 · `core/accounts.js` →1 ←4 · `core/attachments.js` →2 ←7 · `core/audit.js` →2 ←7 · `core/backup.js` →9 ←1 · `core/catalog.js` →6 ←9 · `core/clock.js` →0 ←9 · `core/compat.js` →0 ←3 · `core/demo.js` →4 ←1 · `core/errlog.js` →0 ←1 · `core/estadistica.js` →1 ←3 · `core/fields.js` →1 ←2 · `core/format.js` →0 ←42 · `core/ges.js` →3 ←3 · `core/ipd.js` →5 ←1 · `core/merge.js` →5 ←5 · `core/migrations.js` →2 ←4 · `core/names.js` →0 ←19 · `core/patient.js` →4 ←12 · `core/pdfAnexos.js` →1 ←1 · `core/pdfTexto.js` →1 ←2 · `core/permissions.js` →0 ←3 · `core/pin.js` →1 ←1 · `core/pseudonym.js` →3 ←5 · `core/receta.js` →3 ←1 · `core/record.js` →6 ←18
+`core/accessLog.js` →0 ←1 · `core/accounts.js` →1 ←4 · `core/attachments.js` →2 ←7 · `core/audit.js` →2 ←7 · `core/backup.js` →9 ←1 · `core/catalog.js` →6 ←9 · `core/clock.js` →0 ←9 · `core/compat.js` →0 ←3 · `core/demo.js` →4 ←1 · `core/errlog.js` →0 ←1 · `core/estadistica.js` →1 ←3 · `core/fields.js` →1 ←2 · `core/format.js` →0 ←43 · `core/ges.js` →3 ←3 · `core/ipd.js` →5 ←1 · `core/merge.js` →5 ←5 · `core/migrations.js` →2 ←4 · `core/names.js` →0 ←19 · `core/patient.js` →4 ←12 · `core/pdfAnexos.js` →1 ←1 · `core/pdfTexto.js` →1 ←2 · `core/permissions.js` →0 ←3 · `core/pin.js` →1 ←1 · `core/pseudonym.js` →3 ←5 · `core/receta.js` →3 ←1 · `core/record.js` →6 ←18
 
 ### app/ (2)
 
@@ -97,7 +98,7 @@ Para cada módulo: cuántos módulos usa (→) y cuántos lo usan (←).
 
 ### storage/ (3)
 
-`storage/backends.js` →0 ←1 · `storage/repo.js` →5 ←1 · `storage/store.js` →3 ←2
+`storage/backends.js` →0 ←1 · `storage/repo.js` →6 ←1 · `storage/store.js` →3 ←2
 
 ### sync/ (10)
 

@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.23.0 — 2026-11-16
+
+### Correcciones (encontradas al revisar los tipos)
+- Ingresar un paciente con un RUT incompleto y sin nombre ya no guarda una atención sin ficha: pide el nombre o un RUT completo.
+- Desactivar la sincronización mientras sincroniza ya no la reactiva al terminar.
+- Dos sincronizaciones que se cruzan ya no pueden tomar una lista parcial del servidor como completa.
+
+### Cimientos (docs/CALIDAD.md)
+- **Tipos estrictos en todo el código** (120 de 120 módulos, antes 41): sin `any` implícito y con revisión de nulos. Una prueba impide desactivarlos o silenciarlos con `@ts-ignore`.
+- **Funciones simples**: la más compleja bajó de 108 a 25 (servidor de cuentas, sincronización, respaldo, PDF, nota, seudonimización, chequeo del equipo…). ESLint ahora pone tope a la complejidad y al anidamiento.
+- `npm run calidad`: informe de tipos, complejidad, capas y manejo de errores.
+- Salidas idénticas: PDF, nota y Excel verificados con las pruebas «golden».
+
 ## 2.22.0 — 2026-11-16
 
 ### Rendimiento (medido: `npm run perf`, detalle en docs/RENDIMIENTO.md)

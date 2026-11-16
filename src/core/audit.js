@@ -157,7 +157,14 @@ export function mergeAuditDocs(a, b) {
     if (!cur || (e.hasta || e.at) >= (cur.hasta || cur.at)) byId.set(e.id, e);
   }
   const entries = [...byId.values()].sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1));
-  return { id: a?.id || b?.id, atencionId: a?.atencionId || b?.atencionId, updated: Math.max(a?.updated || 0, b?.updated || 0), entries };
+  // Los dos documentos son de la misma atención; si a ninguno le llega el id (dato dañado),
+  // queda vacío: un id inválido que la sincronización y el respaldo descartan.
+  return {
+    id: a?.id || b?.id || '',
+    atencionId: a?.atencionId || b?.atencionId || '',
+    updated: Math.max(a?.updated || 0, b?.updated || 0),
+    entries,
+  };
 }
 
 /**

@@ -44,18 +44,23 @@ export function ipdDefaults(rec, now = new Date()) {
 
 /** @typedef {ReturnType<typeof ipdDefaults>} DatosIpd */
 
+/**
+ * Problema con los datos de una persona del IPD (paciente o profesional), o null.
+ * @param {DatosIpd} data @param {'paciente_' | 'profesional_'} p
+ */
+function personProblem(data, p) {
+  const quien = p === 'paciente_' ? 'del paciente' : 'del profesional';
+  if (!data[`${p}apellido_paterno`]?.trim() || !data[`${p}nombres`]?.trim()) return `Completa apellido paterno y nombres ${quien}.`;
+  const rut = data[`${p}rut`];
+  if (!/^(?:\d{1,9}|\d{1,3}(?:\.\d{3}){1,2})-?[\dkK]$/.test(rut.trim()) || !isValidRut(rut)) return `Revisa el RUT ${quien}.`;
+  if (cleanRut(rut).length > 9) return 'El RUT no cabe en las casillas del formulario IPD.';
+  return null;
+}
+
 /** @param {DatosIpd} data @returns {string | null} */
 export function validateIpd(data) {
-  for (const p of /** @type {const} */ (['paciente_', 'profesional_'])) {
-    if (!data[`${p}apellido_paterno`]?.trim() || !data[`${p}nombres`]?.trim()) {
-      return `Completa apellido paterno y nombres ${p === 'paciente_' ? 'del paciente' : 'del profesional'}.`;
-    }
-    const rut = data[`${p}rut`];
-    if (!/^(?:\d{1,9}|\d{1,3}(?:\.\d{3}){1,2})-?[\dkK]$/.test(rut.trim()) || !isValidRut(rut)) {
-      return `Revisa el RUT ${p === 'paciente_' ? 'del paciente' : 'del profesional'}.`;
-    }
-    if (cleanRut(rut).length > 9) return 'El RUT no cabe en las casillas del formulario IPD.';
-  }
+  const person = personProblem(data, 'paciente_') || personProblem(data, 'profesional_');
+  if (person) return person;
   if (!GES_PROBLEMAS.some((p) => p.id === data.problema)) return 'Selecciona el problema de salud GES.';
   if (!fmtDate(data.fecha) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.hora)) return 'Revisa la fecha y hora del informe.';
   if (data.paciente_fnac && (!isIsoDate(data.paciente_fnac) || data.paciente_fnac > data.fecha)) return 'Revisa la fecha de nacimiento.';
@@ -169,6 +174,8 @@ export async function buildIpdPdf(template, data, { flatten = true, now = new Da
   page.drawText('SI', { x: left + 1123 * scale, y: page.getHeight() - top - 517 * scale, size: 6, font });
   text('confirmacion_ges_si', 'X', 1138, 500, 18, 22, 8);
   const problem = GES_PROBLEMAS.find((p) => p.id === data.problema);
+  // validateIpd ya lo exigió al comienzo; se vuelve a comprobar aquí, donde se usa.
+  if (!problem) throw new Error('Selecciona el problema de salud GES.');
   /** @param {string} key @param {string} value @param {string} label @param {number} y @param {number} height */
   const clinical = (key, value, label, y, height) => {
     const size = 10;

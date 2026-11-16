@@ -21,7 +21,16 @@ import {
   PROTOCOL_HEADER,
 } from '../src/sync/protocol.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
-import { createSyncApi, syncOnce, SyncHttpError, serverId, createSyncCache, CURSOR_MARGIN_MS } from '../src/sync/client.js';
+import {
+  createSyncApi,
+  syncOnce,
+  SyncHttpError,
+  serverId,
+  createSyncCache,
+  CURSOR_MARGIN_MS,
+  resolveLocalId,
+  listRemote,
+} from '../src/sync/client.js';
 import { CHANGE_LOG_DAYS, AUTH_LIMIT } from '../src/sync/server.js';
 import { fullRecord, minimalRecord } from './fixtures.js';
 import { patientFromRecord, normalizePatient } from '../src/core/patient.js';
@@ -798,4 +807,48 @@ describe('límite de intentos fallidos', () => {
       assert.equal(r.status, 401);
     }
   });
+});
+
+test('resolveLocalId: el id local debe corresponder al id del servidor (no se puede reubicar)', () => {
+  const wire = (/** @type {string} */ lid) => 'w_' + lid;
+  // Normal: el contenido trae su id local y corresponde al del servidor.
+  assert.deepEqual(resolveLocalId({ lid: 'a1' }, 'w_a1', wire, false), { id: 'w_a1', lid: 'a1' });
+  // Contenido de otro elemento (id del servidor distinto): se descarta.
+  assert.equal(resolveLocalId({ lid: 'a1' }, 'w_b2', wire, false), null);
+  // id local que no es texto: se descarta.
+  assert.equal(resolveLocalId({ lid: 7 }, 'w_a1', wire, false), null);
+  // Migración desde ids en claro: sin `lid` en el contenido; el id nuevo se deriva.
+  assert.deepEqual(resolveLocalId({}, 'a1', wire, true), { id: 'w_a1', lid: 'a1' });
+  assert.equal(resolveLocalId({ lid: 'a1' }, 'a1', wire, true), null);
+});
+
+test('listRemote: si la copia local desaparece mientras se pide lo cambiado, pide la lista completa', async () => {
+  const cache = createSyncCache();
+  const full = {
+    items: [
+      { id: 'a', u: 1 },
+      { id: 'b', u: 1 },
+    ],
+    now: 1000,
+    full: true,
+  };
+  // 1. Primera vez: lista completa.
+  const api1 = { list: async () => full };
+  assert.equal((await listRemote(/** @type {any} */ (api1), cache, 2000)).size, 2);
+  // 2. Incremental, pero otra sincronización descarta la copia mientras se espera la respuesta.
+  /** @type {(number | undefined)[]} */
+  const asked = [];
+  const api2 = {
+    list: async (/** @type {number | undefined} */ since) => {
+      asked.push(since);
+      if (since === undefined) return { ...full, now: 3000 };
+      cache.snapshot = null;
+      return { items: [{ id: 'b', u: 2 }], now: 3000, full: false };
+    },
+  };
+  const got = await listRemote(/** @type {any} */ (api2), cache, 2500);
+  // Sin el arreglo, la respuesta parcial (solo «b») quedaba como si fuera todo lo del servidor.
+  assert.equal(asked.length, 2);
+  assert.equal(asked[1], undefined);
+  assert.deepEqual([...got.keys()].sort(), ['a', 'b']);
 });

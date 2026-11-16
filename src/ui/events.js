@@ -20,6 +20,7 @@ export const TOPICS = Object.freeze({
 export function createBus({ schedule = queueMicrotask } = {}) {
   /** @type {Map<string, Set<(topics: string[]) => void>>} */
   const subs = new Map();
+  /** @type {Set<string>} */
   const pending = new Set();
   let scheduled = false;
 
@@ -28,6 +29,7 @@ export function createBus({ schedule = queueMicrotask } = {}) {
     const topics = [...pending];
     pending.clear();
     // Cada suscriptor una sola vez, aunque escuche varios temas que cambiaron.
+    /** @type {Set<(topics: string[]) => void>} */
     const fns = new Set();
     for (const t of topics) for (const fn of subs.get(t) || []) fns.add(fn);
     for (const fn of fns) {
@@ -42,13 +44,19 @@ export function createBus({ schedule = queueMicrotask } = {}) {
   }
 
   return {
-    /** Se suscribe a un tema; devuelve la función para desuscribirse. */
+    /**
+     * Se suscribe a un tema; devuelve la función para desuscribirse.
+     * @param {string} topic
+     * @param {(topics: string[]) => void} fn recibe los temas que cambiaron
+     * @returns {() => void}
+     */
     on(topic, fn) {
-      if (!subs.has(topic)) subs.set(topic, new Set());
-      subs.get(topic).add(fn);
+      let set = subs.get(topic);
+      if (!set) subs.set(topic, (set = new Set()));
+      set.add(fn);
       return () => subs.get(topic)?.delete(fn);
     },
-    /** Anuncia un cambio; la entrega se agrupa con los demás avisos del momento. */
+    /** Anuncia un cambio; la entrega se agrupa con los demás avisos del momento. @param {string} topic */
     emit(topic) {
       pending.add(topic);
       if (!scheduled) {

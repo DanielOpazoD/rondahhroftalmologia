@@ -73,9 +73,12 @@ export const chunkCount = (size) => Math.max(1, Math.ceil(size / CHUNK_BYTES));
 
 /** Nombre de archivo legible y seguro (sin rutas ni caracteres de control). @param {unknown} name */
 export function safeFileName(name) {
-  const base = String(name ?? '')
-    .split(/[\\/]/)
-    .pop()
+  // `split` siempre devuelve al menos un trozo: el `?? ''` solo satisface al tipo de `pop`.
+  const base = (
+    String(name ?? '')
+      .split(/[\\/]/)
+      .pop() ?? ''
+  )
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f<>:"|?*]/g, '')
     .trim();

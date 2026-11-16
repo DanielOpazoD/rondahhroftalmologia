@@ -15,33 +15,51 @@ import { proceduresDone } from './clinica.js';
 
 export { filterRecords, describeFilter, operativosOf, ageOf, sortedEntries } from '../../core/estadistica.js';
 
-/** Etiqueta del grupo etario con los grupos de ORL. */
+/** @import { Atencion } from '../../domain' */
+
+/** Conteo de un procedimiento realizado: atenciones (`pac`), por oído y oídos en total (`ojos`). @typedef {{pac: number, od: number, oi: number, ojos: number}} ConteoProc */
+
+/** Atenciones con al menos una gestión de cada tipo. @typedef {{ges: number, ic: number, receta: number, seguimiento: number, alta: number}} Gestiones */
+
+/** Agregados de computeStats() (misma forma que en oftalmología). @typedef {ReturnType<typeof computeStats>} Estadistica */
+
+/**
+ * Etiqueta del grupo etario con los grupos de ORL.
+ * @param {number | null | undefined} age
+ * @param {number[]} [groups]
+ */
 export const ageGroup = (age, groups = AGE_GROUPS) => base.ageGroup(age, groups);
 
-/** Todas las etiquetas de grupo etario de ORL, en orden. */
+/** Todas las etiquetas de grupo etario de ORL, en orden. @param {number[]} [groups] */
 export const ageGroupLabels = (groups = AGE_GROUPS) => base.ageGroupLabels(groups);
 
+/** Contador por sexo: F, M, O y 'Sin dato'. @returns {Record<string, number>} */
 const sexos = () => ({ F: 0, M: 0, O: 0, 'Sin dato': 0 });
 
 /**
  * Agregados de un conjunto de atenciones.
- * @param {object[]} records
+ * @param {Atencion[]} records
  * @param {import('./config.js').ProcDef[]} procs
  */
 export function computeStats(records, procs) {
   const { inc } = base;
+  /** @type {Record<string, ConteoProc>} */
   const proc = {}; // nombre -> {pac, od, oi, ojos (= oídos)}
   /** @type {Record<string, number>} */ const dx = {};
   /** @type {Record<string, number>} */ const sol = {};
   /** @type {Record<string, number>} */ const ant = {};
   const sexo = sexos();
   const edadSexo = Object.fromEntries(ageGroupLabels().map((g) => [g, sexos()]));
+  /** @type {Record<string, {atenciones: number, pacientes: Set<string>, procedimientos: number, ojos: number}>} */
   const porDia = {};
   /** @type {Record<string, number>} */ const porMedico = {};
   /** @type {Record<string, number>} */ const porOperativo = {};
+  /** @type {Set<string>} */
   const pats = new Set();
+  /** @type {number[]} */
   const ages = [];
   let oidos = 0;
+  /** @type {Gestiones} */
   const gest = { ges: 0, ic: 0, receta: 0, seguimiento: 0, alta: 0 };
 
   for (const r of records) {
@@ -69,7 +87,7 @@ export function computeStats(records, procs) {
     SOLICITADOS.forEach((d) => r.checks?.[d.key] && inc(sol, d.label));
     if (f.procedimientos_otros?.trim()) inc(sol, 'Otros');
     ANTECEDENTES.forEach((d) => r.checks?.[d.key] && inc(ant, d.label));
-    for (const k of Object.keys(gest)) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
+    for (const k of /** @type {(keyof Gestiones)[]} */ (Object.keys(gest))) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
 
     const day = (porDia[f.fecha_atencion || 'Sin fecha'] ||= { atenciones: 0, pacientes: new Set(), procedimientos: 0, ojos: 0 });
     day.atenciones++;

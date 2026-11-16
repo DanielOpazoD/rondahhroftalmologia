@@ -6,18 +6,24 @@
 import { fmtDateTime } from '../core/format.js';
 import { generatePassphrase } from '../sync/crypto.js';
 import { STATUS_LABELS } from './syncController.js';
-import { $, toast, copyText } from './dom.js';
+import { $, toast, copyText, required } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { html } from './html.js';
 
-/** @param {any} ctx contexto de la aplicación */
+/**
+ * El motor de sincronización: main.js lo asigna antes de iniciar esta vista.
+ * @param {import('./context.js').AppContext} ctx
+ */
+const syncOf = (ctx) => required(ctx.sync, 'ctx.sync (main.js lo asigna antes de iniciar la vista)');
+
+/** @param {import('./context.js').AppContext} ctx */
 export function initSyncView(ctx) {
   $('#syncGen').addEventListener('click', () => {
     $('#syncPass').value = generatePassphrase();
     $('#syncPass').type = 'text';
   });
   $('#syncShow').addEventListener('click', () => ($('#syncPass').type = $('#syncPass').type === 'password' ? 'text' : 'password'));
-  $('#syncOn').addEventListener('click', () => void activate(ctx));
+  $('#syncOn').addEventListener('click', /** @returns {undefined} */ () => void activate(ctx));
   $('#syncOff').addEventListener('click', async () => {
     const ok = await uiConfirm({
       title: 'Desactivar sincronización',
@@ -25,10 +31,10 @@ export function initSyncView(ctx) {
       tone: 'warn',
       okLabel: 'Desactivar',
     });
-    if (ok) ctx.sync.deactivate();
+    if (ok) syncOf(ctx).deactivate();
   });
   $('#syncNowBtn').addEventListener('click', async () => {
-    const r = await ctx.sync.syncNow();
+    const r = await syncOf(ctx).syncNow();
     if (!r) return;
     if ('error' in r) return toast(r.error, 4000);
     toast(
@@ -37,14 +43,14 @@ export function initSyncView(ctx) {
     );
   });
   $('#syncCopyHash').addEventListener('click', async () =>
-    toast((await copyText(ctx.sync.state.hash)) ? 'Valor copiado' : 'No se pudo copiar'),
+    toast((await copyText(syncOf(ctx).state.hash)) ? 'Valor copiado' : 'No se pudo copiar'),
   );
   $('#syncBadge').addEventListener('click', () => ctx.showSettings('#syncCard'));
 }
 
-/** @param {any} ctx */
+/** Activa la sincronización con la contraseña escrita. @param {import('./context.js').AppContext} ctx */
 async function activate(ctx) {
-  const r = await ctx.sync.activate($('#syncPass').value);
+  const r = await syncOf(ctx).activate($('#syncPass').value);
   if (!r) return;
   if (r.status === 'invalid' || r.status === 'error') return toast(r.message, 4000);
   if (r.status === 'wrong') {
@@ -67,10 +73,12 @@ async function activate(ctx) {
   toast('Sincronización activada en este PC');
 }
 
-/** Dibuja el estado de la sincronización. @param {any} ctx */
+/** Dibuja el estado de la sincronización. @param {import('./context.js').AppContext} ctx */
 export function renderSyncView(ctx) {
   const s = ctx.sync?.state;
   if (!s) return;
+  // El controlador solo usa estos estados (ver STATUS_LABELS en syncController.js).
+  const label = STATUS_LABELS[/** @type {keyof typeof STATUS_LABELS} */ (s.status)];
   const on = s.configured;
   $('#syncUnavailable').hidden = s.available;
   $('#syncUnavailable').textContent = ctx.practice
@@ -91,11 +99,11 @@ export function renderSyncView(ctx) {
     ? 'Primera configuración: genera la contraseña del equipo, anótala en un lugar seguro y actívala. Luego se usa la misma en todos los PC.'
     : 'Escribe la contraseña del equipo, la misma de los otros PC (formato XXXXX-XXXXX-XXXXX-XXXXX). Si se pierde, los datos del servidor no se pueden descifrar.';
   $('#syncActive').hidden = !on || !s.available;
-  $('#syncState').textContent = STATUS_LABELS[s.status];
+  $('#syncState').textContent = label;
   const badge = $('#syncBadge');
   badge.hidden = !on || !s.available;
   badge.className = 'syncBadge ' + s.status;
-  badge.textContent = s.status === 'idle' ? 'Sincronizado' : STATUS_LABELS[s.status];
+  badge.textContent = s.status === 'idle' ? 'Sincronizado' : label;
   badge.title = s.message || (s.lastSync ? 'Última sincronización: ' + fmtDateTime(new Date(s.lastSync)) : '');
   if (on) {
     $('#syncInfo').textContent =

@@ -19,12 +19,21 @@ import { toast } from '../dom.js';
 import { uiConfirm, uiAlert } from '../modal.js';
 import { prepareImage, makeThumbnail } from '../images.js';
 
+/** @typedef {import('../../domain').Adjunto} Adjunto */
+
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
+ *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function attachmentActions(ctx, store) {
-  /** Anota en la bitácora de la atención (agregado o eliminado). */
+  /**
+   * Anota en la bitácora de la atención (agregado o eliminado).
+   * @param {string} atencionId
+   * @param {string} id del adjunto
+   * @param {string} nombre del archivo
+   * @param {boolean} added true: agregado; false: eliminado
+   */
   const audit = (atencionId, id, nombre, added) => {
     const entry = attachmentAuditEntry({ id, nombre, added, at: clock.tick(), ...ctx.author() });
     store.addAuditEntry(atencionId, entry);
@@ -94,11 +103,11 @@ export function attachmentActions(ctx, store) {
     /**
      * Adjuntos de antes de la 2.15.0: si su contenido está en este equipo, se
      * les crea la miniatura (una vez) y se sincroniza.
-     * @param {any[]} metas
+     * @param {Adjunto[]} metas
      */
     async addMissingThumbnails(metas) {
       const have = new Set(await store.attachmentDataIds());
-      /** @type {any[]} */
+      /** @type {Adjunto[]} */
       const done = [];
       for (const a of metas) {
         if (a.miniatura || !have.has(a.id) || !kindOf(a.tipo, a.nombre).startsWith('imagen')) continue;
@@ -112,7 +121,10 @@ export function attachmentActions(ctx, store) {
       return done.length;
     },
 
-    /** Abre (o descarga) un adjunto. */
+    /**
+     * Abre (o descarga) un adjunto.
+     * @param {string} id
+     */
     async openAttachment(id) {
       const meta = store.getAttachment(id);
       const data = meta && (await store.loadAttachmentData(id));
@@ -138,7 +150,10 @@ export function attachmentActions(ctx, store) {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     },
 
-    /** Elimina un adjunto (en todos los equipos, si hay sincronización). */
+    /**
+     * Elimina un adjunto (en todos los equipos, si hay sincronización).
+     * @param {string} id
+     */
     async deleteAttachment(id) {
       const meta = store.getAttachment(id);
       if (!meta) return;
@@ -154,7 +169,10 @@ export function attachmentActions(ctx, store) {
       toast('Adjunto eliminado');
     },
 
-    /** Quita adjuntos (al eliminarlos o al eliminar su atención): lápida, contenido y borrado en el servidor. */
+    /**
+     * Quita adjuntos (al eliminarlos o al eliminar su atención): lápida, contenido y borrado en el servidor.
+     * @param {Adjunto[]} metas
+     */
     removeAttachmentsOf(metas) {
       if (!metas.length) return;
       ctx.persist(() => {

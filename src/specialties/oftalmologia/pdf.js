@@ -25,9 +25,19 @@ const MIN_BOX_PT = 6.5; // tamaño mínimo en recuadros multilínea
 const MAX_PT = 10;
 const GREY = rgb(0.38, 0.42, 0.46);
 
+/** @import { PDFFont, PDFTextField } from 'pdf-lib' */
+/** @import { Atencion } from '../../domain' */
+/** @import { ProcDef } from './config.js' */
+/** @import { ProcHecho } from './clinica.js' */
+
 /**
  * Divide un texto en líneas que caben en `width` con la fuente y tamaño dados.
  * Respeta saltos de línea y corta palabras demasiado largas.
+ * @param {string} text
+ * @param {import('../../core/pdfTexto.js').MedidorTexto} font
+ * @param {number} size
+ * @param {number} width
+ * @returns {string[]}
  */
 export function wrapText(text, font, size, width) {
   const out = [];
@@ -54,7 +64,10 @@ export function wrapText(text, font, size, width) {
   return out;
 }
 
-/** Nombre de archivo: Oftalmo_2026-11-14_12345678-9_Nombre_Apellido.pdf */
+/**
+ * Nombre de archivo: Oftalmo_2026-11-14_12345678-9_Nombre_Apellido.pdf
+ * @param {Atencion} rec
+ */
 export function pdfFileName(rec) {
   const f = rec.f || {};
   const rut = rutKey(f.paciente_rut);
@@ -64,25 +77,14 @@ export function pdfFileName(rec) {
 }
 
 /**
- * Rellena la plantilla con una atención.
- * @param {Uint8Array} templateBytes bytes de la plantilla PDF
- * @param {object} rec registro de atención
- * @param {import('./config.js').ProcDef[]} procs
- * @param {{flatten?: boolean, footer?: boolean, now?: Date}} [opts]
- * @returns {Promise<{bytes: Uint8Array, pages: number, overflow: string[]}>}
- *   `overflow`: secciones que se completaron en la hoja complementaria.
+ * Funciones para llenar los campos de la plantilla, con la regla común: si un
+ * texto no cabe con letra legible, se escribe lo que cabe y el texto completo
+ * va a `annex` (hoja complementaria).
+ * @param {import('pdf-lib').PDFForm} form @param {PDFFont} font
+ * @param {[string, string][]} annex secciones para la hoja complementaria: [título, texto]
  */
-export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
-  const { flatten = true, footer = true, now = new Date() } = opts;
-  const f = rec.f || {};
-  const doc = await PDFDocument.load(templateBytes);
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const form = doc.getForm();
-  /** Secciones cuyo texto completo va a la hoja complementaria: [título, texto]. */
-  const annex = [];
-
-  /* ---- helpers de campos ---- */
+function createFiller(form, font, annex) {
+  /** @param {string} name @returns {PDFTextField | null} */
   const field = (name) => {
     try {
       return form.getTextField(name);
@@ -90,11 +92,15 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
       return null; // la plantilla no tiene ese campo: se ignora
     }
   };
+  /** @param {PDFTextField} fl */
   const rect = (fl) => fl.acroField.getWidgets()[0].getRectangle();
+  /** @param {PDFTextField} fl @param {number} size */
   const setSize = (fl, size) => fl.acroField.setDefaultAppearance(`0 g /Helv ${Math.round(size * 2) / 2} Tf`);
 
-  /** Campo de una línea: reduce la letra hasta que quepa; si no cabe, recorta. */
-  /** @param {string} name @param {string} value @param {{max?: number, title?: string}} [opts] */
+  /**
+   * Campo de una línea: reduce la letra hasta que quepa; si no cabe, recorta.
+   * @param {string} name @param {string} value @param {{max?: number, title?: string}} [opts]
+   */
   const setSingle = (name, value, { max = MAX_PT, title } = {}) => {
     const fl = field(name);
     const s = toWinAnsi(value).replace(/\n+/g, ' ').trim();
@@ -113,10 +119,15 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
     setSize(fl, size);
   };
 
-  /** Texto repartido en varios campos de una línea (motivo, plan, observaciones). */
-  /** @returns {{fits: boolean, lines: string[], size?: number}} */
+  /**
+   * Texto repartido en varios campos de una línea (motivo, plan, observaciones).
+   * Si no cabe, `size` es siempre el mínimo legible.
+   * @param {string[]} names @param {string | undefined} value
+   * @returns {{fits: true, lines: string[], size?: number} | {fits: false, lines: string[], size: number}}
+   */
   const fitLines = (names, value) => {
-    const fls = names.map(field).filter(Boolean);
+    // Los campos ausentes de la plantilla se omiten.
+    const fls = names.map(field).filter((fl) => fl !== null);
     if (!fls.length || !value?.trim()) return { fits: true, lines: [] };
     const w = rect(fls[0]).width;
     for (let size = MAX_PT; size >= MIN_LINE_PT; size -= 0.5) {
@@ -133,23 +144,28 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
       setSize(fl, size || MAX_PT);
     });
   };
+  /** @param {string[]} names @param {string | undefined} value @param {string} title */
   const setLines = (names, value, title) => {
     const r = fitLines(names, value);
     if (!r.lines.length) return;
     if (!r.fits) {
       const tail = ' ... (cont. hoja 2)';
       const kept = r.lines.slice(0, names.length);
-      const w = rect(field(names[0])).width - 4;
+      // Se asume que la plantilla tiene el primer campo de la lista (la oficial los tiene todos).
+      const w = rect(/** @type {PDFTextField} */ (field(names[0]))).width - 4;
       let last = kept[kept.length - 1];
       while (last.length > 1 && font.widthOfTextAtSize(last + tail, r.size) > w) last = last.slice(0, -1);
       kept[kept.length - 1] = last.trimEnd() + tail;
       r.lines = kept;
-      annex.push([title, value]);
+      annex.push([title, /** @type {string} */ (value)]); // hay líneas: `value` tiene texto
     }
     writeLines(names, r);
   };
 
-  /** Recuadro multilínea (hallazgos, otros diagnósticos). */
+  /**
+   * Recuadro multilínea (hallazgos, otros diagnósticos).
+   * @param {string} name @param {string | undefined} value @param {string} title
+   */
   const setBox = (name, value, title) => {
     const fl = field(name);
     if (!fl || !value?.trim()) return;
@@ -157,6 +173,7 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
     const r = rect(fl);
     let size = MAX_PT;
     let lines = wrapText(value, font, size, r.width);
+    /** @param {number} sz @param {string[]} ls */
     const fitsAt = (sz, ls) => ls.length * sz * 1.15 <= r.height - 2;
     while (size > MIN_BOX_PT && !fitsAt(size, lines)) {
       size -= 0.5;
@@ -171,8 +188,13 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
     fl.setText(lines.join('\n'));
     setSize(fl, size);
   };
+  return { setSingle, fitLines, writeLines, setLines, setBox };
+}
 
-  /* ---- datos del paciente ---- */
+/** @typedef {ReturnType<typeof createFiller>} Filler */
+
+/** Paciente, médico, fecha, antecedentes y motivo de consulta. @param {Filler} fill @param {Record<string, string>} f */
+function fillHeader(fill, f) {
   for (const k of [
     'paciente_nombre',
     'paciente_rut',
@@ -182,70 +204,73 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
     'medico_rut',
     'test_schirmer_detalle',
   ]) {
-    setSingle(k, f[k]);
+    fill.setSingle(k, f[k]);
   }
-  setSingle('fecha_atencion', fmtDate(f.fecha_atencion));
-  setSingle('antecedente_cirugia_detalle', f.antecedente_cirugia_detalle, { title: 'Antecedente quirúrgico' });
-  setSingle('antecedentes_otros', f.antecedentes_otros, { title: 'Otros antecedentes' });
-  setLines(['motivo_consulta_1', 'motivo_consulta_2', 'motivo_consulta_3', 'motivo_consulta_4'], f.motivo_consulta, 'Motivo de consulta');
+  fill.setSingle('fecha_atencion', fmtDate(f.fecha_atencion));
+  fill.setSingle('antecedente_cirugia_detalle', f.antecedente_cirugia_detalle, { title: 'Antecedente quirúrgico' });
+  fill.setSingle('antecedentes_otros', f.antecedentes_otros, { title: 'Otros antecedentes' });
+  fill.setLines(
+    ['motivo_consulta_1', 'motivo_consulta_2', 'motivo_consulta_3', 'motivo_consulta_4'],
+    f.motivo_consulta,
+    'Motivo de consulta',
+  );
+}
 
-  /* ---- examen físico ---- */
-  for (const e of ['od', 'oi']) {
+/** Examen físico de cada ojo (AV, AVcc, PIO y su recuadro). @param {Filler} fill @param {Atencion} rec @param {ProcDef[]} procs */
+function fillExam(fill, rec, procs) {
+  const f = rec.f || {};
+  for (const e of /** @type {const} */ (['od', 'oi'])) {
     const E = e.toUpperCase();
-    setSingle(`${e}_av`, f[`${e}_av`], { title: `AV ${E}` });
-    setSingle(`${e}_avcc`, f[`${e}_avcc`], { title: `AVcc ${E}` });
-    setSingle(`${e}_pio`, pioFor(rec, e, procs), { title: `PIO ${E}` });
+    fill.setSingle(`${e}_av`, f[`${e}_av`], { title: `AV ${E}` });
+    fill.setSingle(`${e}_avcc`, f[`${e}_avcc`], { title: `AVcc ${E}` });
+    fill.setSingle(`${e}_pio`, pioFor(rec, e, procs), { title: `PIO ${E}` });
     // Recuadro del ojo: hallazgos y, debajo, las descripciones de procedimientos («FO: …», «BMC: …»).
     const box = [(f[`${e}_hallazgos`] || '').trim(), ...procDescriptions(rec, e, procs)].filter(Boolean).join('\n');
-    setBox(`${e}_hallazgos`, box, `Examen ${E}`);
+    fill.setBox(`${e}_hallazgos`, box, `Examen ${E}`);
   }
+}
 
-  /* ---- observaciones + procedimientos realizados ---- */
-  const done = proceduresDone(rec, procs);
+/**
+ * Observaciones del examen y procedimientos realizados (comparten dos líneas).
+ * Si no caben, los procedimientos se resumen y van en tabla a la hoja complementaria.
+ * @param {Filler} fill @param {Record<string, string>} f @param {ProcHecho[]} done
+ * @returns {boolean} si los procedimientos van a la hoja complementaria
+ */
+function fillObservations(fill, f, done) {
   const obsNames = ['examen_observaciones_1', 'examen_observaciones_2'];
   const obs = (f.examen_obs || '').trim();
   const procText = done.length ? `Proc. realizados: ${done.map((p) => procLabel(p, { desc: false })).join('; ')}.` : '';
   const full = [obs, procText].filter(Boolean).join(' | ');
-  let procsInAnnex = false;
-  if (full) {
-    const r = fitLines(obsNames, full);
-    if (r.fits) {
-      writeLines(obsNames, r);
-    } else {
-      procsInAnnex = done.length > 0;
-      const short = [obs, done.length ? `Proc. realizados (${done.length}): ver detalle en hoja complementaria.` : '']
-        .filter(Boolean)
-        .join(' | ');
-      setLines(obsNames, short, 'Observaciones del examen');
-      // si `short` tampoco cabe, setLines ya agregó las observaciones completas al anexo
-    }
+  if (!full) return false;
+  const r = fill.fitLines(obsNames, full);
+  if (r.fits) {
+    fill.writeLines(obsNames, r);
+    return false;
   }
+  const short = [obs, done.length ? `Proc. realizados (${done.length}): ver detalle en hoja complementaria.` : '']
+    .filter(Boolean)
+    .join(' | ');
+  // Si `short` tampoco cabe, setLines agrega las observaciones completas al anexo.
+  fill.setLines(obsNames, short, 'Observaciones del examen');
+  return done.length > 0;
+}
 
-  /* ---- solicitados, diagnósticos, acciones ---- */
-  setSingle('procedimientos_otros', f.procedimientos_otros, { title: 'Otros procedimientos solicitados' });
-  setBox('diagnosticos_otros', f.diagnosticos_otros, 'Otros diagnósticos');
-  setSingle('ges', f.ges, { title: 'GES' });
-  setSingle('interconsulta', f.interconsulta, { title: 'Interconsulta' });
-  setSingle('receta', f.receta, { title: 'Receta' });
-  setSingle('diagnosticos_acciones_otros', f.diagnosticos_acciones_otros, { title: 'Otras acciones' });
+/** Solicitados, diagnósticos, acciones y plan. @param {Filler} fill @param {Record<string, string>} f */
+function fillPlan(fill, f) {
+  fill.setSingle('procedimientos_otros', f.procedimientos_otros, { title: 'Otros procedimientos solicitados' });
+  fill.setBox('diagnosticos_otros', f.diagnosticos_otros, 'Otros diagnósticos');
+  fill.setSingle('ges', f.ges, { title: 'GES' });
+  fill.setSingle('interconsulta', f.interconsulta, { title: 'Interconsulta' });
+  fill.setSingle('receta', f.receta, { title: 'Receta' });
+  fill.setSingle('diagnosticos_acciones_otros', f.diagnosticos_acciones_otros, { title: 'Otras acciones' });
+  const planNames = [1, 2, 3, 4, 5, 6].map((n) => `plan_indicaciones_${n}`);
+  fill.setLines(planNames, f.plan, 'Plan e indicaciones');
+  fill.setSingle('seguimiento', f.seguimiento, { title: 'Seguimiento' });
+  fill.setSingle('alta', f.alta, { title: 'Alta' });
+}
 
-  /* ---- plan ---- */
-  setLines(
-    [
-      'plan_indicaciones_1',
-      'plan_indicaciones_2',
-      'plan_indicaciones_3',
-      'plan_indicaciones_4',
-      'plan_indicaciones_5',
-      'plan_indicaciones_6',
-    ],
-    f.plan,
-    'Plan e indicaciones',
-  );
-  setSingle('seguimiento', f.seguimiento, { title: 'Seguimiento' });
-  setSingle('alta', f.alta, { title: 'Alta' });
-
-  /* ---- casillas ---- */
+/** Casillas: antecedentes, solicitados, diagnósticos y ojo de la catarata. @param {import('pdf-lib').PDFForm} form @param {Atencion} rec */
+function fillChecks(form, rec) {
   for (const { key } of [...ANTECEDENTES, ...SOLICITADOS, ...DIAGNOSTICOS]) {
     try {
       const c = form.getCheckBox(key);
@@ -254,27 +279,19 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
       /* casilla ausente en la plantilla */
     }
   }
+  const cat = rec.checks?.diagnostico_catarata ? rec.cat : '';
   try {
-    const cat = rec.checks?.diagnostico_catarata;
     const od = form.getCheckBox('diagnostico_catarata_od');
     const oi = form.getCheckBox('diagnostico_catarata_oi');
-    cat && (rec.cat === 'OD' || rec.cat === 'AO') ? od.check() : od.uncheck();
-    cat && (rec.cat === 'OI' || rec.cat === 'AO') ? oi.check() : oi.uncheck();
+    cat === 'OD' || cat === 'AO' ? od.check() : od.uncheck();
+    cat === 'OI' || cat === 'AO' ? oi.check() : oi.uncheck();
   } catch {
     /* casillas ausentes */
   }
+}
 
-  form.updateFieldAppearances(font);
-  if (flatten) form.flatten();
-
-  // La página 2 de la plantilla está en blanco: se reemplaza por la hoja complementaria si hace falta.
-  while (doc.getPageCount() > 1) doc.removePage(doc.getPageCount() - 1);
-  if (annex.length || procsInAnnex) {
-    drawAnnex(doc, { font, bold }, rec, procs, annex, procsInAnnex ? done : []);
-  }
-
-  if (footer) drawFooters(doc, font, rec, now);
-
+/** Metadatos del documento (título, autor, fechas). @param {PDFDocument} doc @param {Record<string, string>} f @param {Date} now */
+function setMetadata(doc, f, now) {
   doc.setTitle(toWinAnsi(`Atención oftalmológica - ${f.paciente_nombre || f.paciente_rut || ''} - ${fmtDate(f.fecha_atencion)}`));
   doc.setSubject('Hoja de atención oftalmológica - rondas y operativos');
   doc.setAuthor(toWinAnsi(f.medico_nombre || APP.establecimiento));
@@ -282,6 +299,42 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   doc.setKeywords([APP.establecimiento, f.operativo || ''].filter(Boolean).map(toWinAnsi));
   doc.setCreationDate(now);
   doc.setModificationDate(now);
+}
+
+/**
+ * Rellena la plantilla con una atención.
+ * @param {Uint8Array} templateBytes bytes de la plantilla PDF
+ * @param {Atencion} rec registro de atención
+ * @param {ProcDef[]} procs
+ * @param {{flatten?: boolean, footer?: boolean, now?: Date}} [opts]
+ * @returns {Promise<{bytes: Uint8Array, pages: number, overflow: string[]}>}
+ *   `overflow`: secciones que se completaron en la hoja complementaria.
+ */
+export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
+  const { flatten = true, footer = true, now = new Date() } = opts;
+  const f = rec.f || {};
+  const doc = await PDFDocument.load(templateBytes);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const form = doc.getForm();
+  /** Secciones cuyo texto completo va a la hoja complementaria: [título, texto]. @type {[string, string][]} */
+  const annex = [];
+  const fill = createFiller(form, font, annex);
+  const done = proceduresDone(rec, procs);
+
+  fillHeader(fill, f);
+  fillExam(fill, rec, procs);
+  const procsInAnnex = fillObservations(fill, f, done);
+  fillPlan(fill, f);
+  fillChecks(form, rec);
+  form.updateFieldAppearances(font);
+  if (flatten) form.flatten();
+
+  // La página 2 de la plantilla está en blanco: se reemplaza por la hoja complementaria si hace falta.
+  while (doc.getPageCount() > 1) doc.removePage(doc.getPageCount() - 1);
+  if (annex.length || procsInAnnex) drawAnnex(doc, { font, bold }, rec, procs, annex, procsInAnnex ? done : []);
+  if (footer) drawFooters(doc, font, rec, now);
+  setMetadata(doc, f, now);
 
   const bytes = await doc.save();
   return {
@@ -293,37 +346,49 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
 
 /* --------------------------------------------------- hoja complementaria */
 
+/**
+ * @param {PDFDocument} doc
+ * @param {{font: PDFFont, bold: PDFFont}} fonts
+ * @param {Atencion} rec
+ * @param {ProcDef[]} procs
+ * @param {[string, string][]} sections [título, texto completo]
+ * @param {ProcHecho[]} done procedimientos a listar en la tabla (vacío = sin tabla)
+ */
 function drawAnnex(doc, fonts, rec, procs, sections, done) {
   const { font, bold } = fonts;
   const { width, height } = doc.getPage(0).getSize();
   const M = 54; // margen
   const W = width - 2 * M;
   const f = rec.f || {};
-  /** @type {import('pdf-lib').PDFPage} */
-  let page;
   let y = 0;
 
-  const newPage = () => {
-    page = doc.addPage([width, height]);
+  /** Agrega una hoja con su encabezado (deja `y` bajo él). */
+  const addPage = () => {
+    const p = doc.addPage([width, height]);
     y = height - M;
-    page.drawText('HOJA COMPLEMENTARIA - ATENCIÓN OFTALMOLÓGICA', { x: M, y, size: 12, font: bold });
+    p.drawText('HOJA COMPLEMENTARIA - ATENCIÓN OFTALMOLÓGICA', { x: M, y, size: 12, font: bold });
     y -= 16;
     const id = [f.paciente_nombre, f.paciente_rut && 'RUT ' + f.paciente_rut, f.fecha_atencion && 'Fecha ' + fmtDate(f.fecha_atencion)]
       .filter(Boolean)
       .join('   |   ');
-    page.drawText(toWinAnsi(id), { x: M, y, size: 9.5, font });
+    p.drawText(toWinAnsi(id), { x: M, y, size: 9.5, font });
     y -= 8;
-    page.drawLine({ start: { x: M, y }, end: { x: width - M, y }, thickness: 0.8, color: GREY });
+    p.drawLine({ start: { x: M, y }, end: { x: width - M, y }, thickness: 0.8, color: GREY });
     y -= 20;
+    return p;
   };
+  let page = addPage();
+  /** @param {number} h */
   const ensure = (h) => {
-    if (y - h < M + 20) newPage();
+    if (y - h < M + 20) page = addPage();
   };
+  /** @param {string} t */
   const heading = (t) => {
     ensure(30);
     page.drawText(toWinAnsi(t.toUpperCase()), { x: M, y, size: 10, font: bold });
     y -= 14;
   };
+  /** @param {string} t */
   const paragraph = (t, size = 9.5) => {
     for (const line of wrapText(t, font, size, W)) {
       ensure(size * 1.35);
@@ -332,8 +397,6 @@ function drawAnnex(doc, fonts, rec, procs, sections, done) {
     }
     y -= 8;
   };
-
-  newPage();
 
   if (done.length) {
     heading('Procedimientos realizados');
@@ -344,6 +407,7 @@ function drawAnnex(doc, fonts, rec, procs, sections, done) {
       { t: 'PIO OI (mmHg)', w: W * 0.17 },
     ];
     const rowH = 15;
+    /** @param {unknown[]} cells @param {PDFFont} fnt */
     const row = (cells, fnt) => {
       ensure(rowH);
       let x = M;
@@ -377,6 +441,12 @@ function drawAnnex(doc, fonts, rec, procs, sections, done) {
   page.drawText(firma, { x: width - M - 200, y, size: 9, font });
 }
 
+/**
+ * @param {PDFDocument} doc
+ * @param {PDFFont} font
+ * @param {Atencion} rec
+ * @param {Date} now
+ */
 function drawFooters(doc, font, rec, now) {
   const pages = doc.getPages();
   const left = toWinAnsi(`${APP.establecimiento} - ID atención ${rec.id || 'sin guardar'} - emitido ${fmtDateTime(now)}`);
