@@ -1656,6 +1656,16 @@ dialog.clinical-form {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px 10px;
 }
+.receta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: 6px 10px;
+}
+@media (max-width: 720px) {
+  .receta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .clinical-names {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
