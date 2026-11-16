@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, tab } from './helpers.js';
+import { openApp, ajustes } from './helpers.js';
 
 /** Rectángulos de la marca, cada pestaña y la zona derecha de la cabecera. */
 const headerBoxes = (page) =>
@@ -19,7 +19,7 @@ const headerBoxes = (page) =>
 
 test('cabecera: nada se superpone ni se sale, en cualquier ancho y con un nombre de perfil largo', async ({ page }) => {
   await openApp(page);
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
   await page.locator('#dlg_nombre').fill('Dra. María Fernanda de los Ángeles Pakarati Tuki');
   await page.locator('#dlg').getByRole('button', { name: 'Guardar' }).click();

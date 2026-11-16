@@ -13,6 +13,12 @@ export async function tab(page, name) {
   await page.getByRole('tab', { name }).click();
 }
 
+/** Va a una sección de Ajustes: «Este equipo», «Listas», «Datos» o «Administración». */
+export async function ajustes(page, seccion) {
+  await tab(page, 'Ajustes');
+  await page.locator('.ajnav').getByRole('tab', { name: seccion }).click();
+}
+
 /** Completa lo mínimo de una atención. */
 export async function fillPatient(page, { nombre, rut, fecha = '2026-11-14' }) {
   await page.locator('#fecha_atencion').fill(fecha);
@@ -26,7 +32,7 @@ export async function save(page) {
 
 /** Activa la sincronización con la contraseña de prueba. */
 export async function activateSync(page) {
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#syncPass').fill(TEST_PASS);
   await page.locator('#syncOn').click();
   await expect(page.locator('#syncState')).toHaveText(/Activa|Sincronizando/, { timeout: 20_000 });
@@ -34,7 +40,7 @@ export async function activateSync(page) {
 }
 
 export async function syncNow(page) {
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#syncNowBtn').click();
   await expect(page.locator('#syncBadge')).toHaveText('Sincronizado', { timeout: 20_000 });
 }

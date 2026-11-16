@@ -369,3 +369,26 @@ test('recuperar un administrador con la contraseña del equipo (script de operac
   assert.equal(n.creada, true);
   assert.equal((await env.login('11.111.111-1', '11111111')).body.usuario.admin, true);
 });
+
+test('registro de accesos: el rango es de hora local (de tarde en Rapa Nui ya es otro día UTC)', async () => {
+  const env = await activated();
+  // 19:30 en Rapa Nui (UTC-5) = 00:30 del día siguiente en UTC.
+  env.clock.t = Date.UTC(2026, 10, 17, 0, 30);
+  const token = (await env.login(ADMIN_RUT, 'Ojo2026')).body.token;
+  await env.call('cuentas/eventos', { token, body: { eventos: [{ ev: 'ficha.ver', obj: 'p_tarde' }] } });
+  // El PC pide su día local: 16-11 de 00:00 a 23:59:59 en UTC-5.
+  const from = Date.UTC(2026, 10, 16, 5);
+  const to = Date.UTC(2026, 10, 17, 4, 59, 59, 999);
+  const r = await env.call(`cuentas/auditoria?desde=${from}&hasta=${to}`, { method: 'GET', token });
+  assert.equal(r.status, 200);
+  assert.ok(
+    r.body.eventos.some((e) => e.obj === 'p_tarde'),
+    'el evento de la tarde aparece en su día local',
+  );
+  // Y no aparece en el día local siguiente.
+  const next = await env.call(`cuentas/auditoria?desde=${to + 1}&hasta=${to + 24 * 3600_000}`, { method: 'GET', token });
+  assert.equal(
+    next.body.eventos.some((e) => e.obj === 'p_tarde'),
+    false,
+  );
+});

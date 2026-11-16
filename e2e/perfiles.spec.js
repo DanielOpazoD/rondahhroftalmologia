@@ -1,9 +1,9 @@
 import { test, expect } from './fixtures.js';
-import { openApp, tab, fillPatient, save, showPatientRecord } from './helpers.js';
+import { openApp, tab, fillPatient, save, showPatientRecord, ajustes } from './helpers.js';
 
 /** Crea un perfil desde Ajustes. */
 async function addProfile(page, { nombre, rol, rut = '' }) {
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
   const dlg = page.locator('#dlg');
   await dlg.locator('#dlg_nombre').fill(nombre);

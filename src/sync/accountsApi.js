@@ -72,7 +72,7 @@ export function createAccountsApi({ baseUrl = '/api/cuentas', fetchFn = globalTh
     editar: (token, body) => call('editar', { token, body }),
     /** @param {string} token @param {object} body */
     restablecer: (token, body) => call('restablecer', { token, body }),
-    /** @param {string} token @param {string} desde AAAA-MM-DD @param {string} hasta */
-    auditoria: (token, desde, hasta) => call('auditoria', { token, query: `desde=${desde}&hasta=${hasta}` }),
+    /** @param {string} token @param {number} desde ms @param {number} hasta ms (inicio y fin del rango, hora local del PC) */
+    auditoria: (token, desde, hasta) => call('auditoria', { token, query: `desde=${Math.floor(desde)}&hasta=${Math.floor(hasta)}` }),
   };
 }

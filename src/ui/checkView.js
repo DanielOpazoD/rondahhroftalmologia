@@ -20,11 +20,10 @@ export const AUTO_CHECK_DAYS = 7;
 
 const ICONS = { ok: '✓', warn: '!', bad: '✗', info: 'i' };
 
-/** Lleva a una tarjeta de Ajustes. */
+/** Lleva a una tarjeta de Ajustes (abre su sección). */
 const goTo = (ctx, sel) => () => {
   $('#checkDlg').close();
-  ctx.showTab('t-aj');
-  const el = $(sel);
+  const el = ctx.showSettings(sel);
   el?.scrollIntoView({ block: 'center' });
   (el?.matches('input, button, select') ? el : el?.querySelector('input, button, select'))?.focus();
 };

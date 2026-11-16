@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, tab, fillPatient, save, openPatient, showPatientRecord } from './helpers.js';
+import { openApp, tab, fillPatient, save, openPatient, showPatientRecord, ajustes } from './helpers.js';
 
 test.beforeEach(async ({ page }) => openApp(page));
 
@@ -147,7 +147,7 @@ test('ficha creada por error: aparece en «sin atenciones» y se elimina; volver
 test('procedimientos: «PIO» solo en los que la piden; uno quitado de la lista no se muestra ni se cuenta', async ({ page }) => {
   await fillPatient(page, { nombre: 'Paciente Procedimiento' });
   // Marca un procedimiento nuevo (agregado en Ajustes) y guarda.
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Listas');
   await page.locator('#ajNew').fill('vvv');
   await page.locator('#ajAdd').click();
   const pio = page.locator('#ajList .piotg');
@@ -158,7 +158,7 @@ test('procedimientos: «PIO» solo en los que la piden; uno quitado de la lista 
   await page.locator('#procList .proc', { hasText: 'vvv' }).getByRole('button', { name: 'OI' }).click();
   await save(page);
   await expect(page.locator('#procBadge')).toHaveText('1');
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Listas');
   await expect(page.locator('#ajList .piotg.on')).toHaveCount(3);
   // Se quita «vvv» de la lista: deja de contarse en la atención y en la estadística.
   await page.locator('#ajList .it', { hasText: 'vvv' }).getByRole('button', { name: 'Quitar' }).click();

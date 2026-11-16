@@ -123,7 +123,10 @@ export function initAuditView(ctx) {
       try {
         const t = ctx.accounts.token() || (await ctx.accounts.ensureToken());
         if (!t) throw new Error('Necesitas conexión para consultar el registro.');
-        const [res, users] = await Promise.all([api.auditoria(t, desde, hasta), ctx.loadAccountUsers()]);
+        // Días LOCALES completos (desde las 00:00 del primero hasta las 23:59 del último).
+        const from = new Date(`${desde}T00:00:00`).getTime();
+        const to = new Date(`${hasta}T23:59:59.999`).getTime();
+        const [res, users] = await Promise.all([api.auditoria(t, from, to), ctx.loadAccountUsers()]);
         names = new Map(users.map((/** @type {any} */ u) => [u.id, u.nombre]));
         data = res;
         setHtml(

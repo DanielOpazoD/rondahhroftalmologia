@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures.js';
 import AxeBuilder from '@axe-core/playwright';
-import { openApp, tab, fillPatient, save } from './helpers.js';
+import { openApp, tab, fillPatient, save, ajustes } from './helpers.js';
 
 /** Revisión automática WCAG 2.1 A/AA de lo que se ve en pantalla. */
 async function audit(page, where) {
@@ -22,9 +22,15 @@ test('accesibilidad: pestañas, diálogos, bloqueo y modo práctica sin infracci
     await tab(page, t);
     all.push(...(await audit(page, t)));
   }
+  for (const sec of ['Listas', 'Datos']) {
+    await ajustes(page, sec);
+    all.push(...(await audit(page, `Ajustes · ${sec}`)));
+  }
+  await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
   all.push(...(await audit(page, 'diálogo de perfil')));
   await page.locator('#dlgCancel').click();
+  await ajustes(page, 'Este equipo');
   await page.locator('#checkOpen').click();
   await expect(page.locator('#checkSum')).not.toHaveText('Revisando…');
   all.push(...(await audit(page, 'chequeo')));

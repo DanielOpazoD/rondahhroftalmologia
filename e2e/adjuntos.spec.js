@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures.js';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { openApp, tab, activateSync, syncNow, showPatientRecord } from './helpers.js';
+import { openApp, tab, activateSync, syncNow, showPatientRecord, ajustes } from './helpers.js';
 
 /** PNG de 1×1 píxel. */
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
@@ -160,13 +160,13 @@ test('respaldo con adjuntos: se descarga como ZIP y al importarlo en otro equipo
   await expect(A.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   await attach(A, [{ name: 'retina.png', mimeType: 'image/png', buffer: PNG }]);
   await expect(A.locator('#attCount')).toHaveText('1');
-  await tab(A, 'Ajustes');
+  await ajustes(A, 'Datos');
   const [dl] = await Promise.all([A.waitForEvent('download'), A.locator('#bkExp').click()]);
   expect(dl.suggestedFilename()).toMatch(/^respaldo_oftalmo_.*\.zip$/);
   await expect(A.locator('#toast')).toContainText('con 1 adjunto');
   // Otro equipo, sin sincronización: importa el ZIP.
   await openApp(B);
-  await tab(B, 'Ajustes');
+  await ajustes(B, 'Datos');
   await B.locator('#bkImp').setInputFiles(await dl.path());
   await expect(B.locator('#msgDlg')).toContainText('1 adjunto(s) nuevo(s)');
   await B.locator('#msgDlg').getByRole('button').first().click();
@@ -197,7 +197,7 @@ test('miniaturas: se guardan al adjuntar y se ven en otro equipo antes de que ll
     (route) => route.abort(),
   );
   // (sin el contenido, la pasada termina con error: se espera a que lleguen las atenciones)
-  await tab(B, 'Ajustes');
+  await ajustes(B, 'Este equipo');
   await B.locator('#syncNowBtn').click();
   await tab(B, 'Pacientes');
   await expect(B.locator('#regList')).toContainText('Paciente Miniatura', { timeout: 20_000 });
