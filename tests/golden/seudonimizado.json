@@ -20,7 +20,7 @@
   "sexo": "Femenino / Masculino / Otro o no informa.",
   "antecedentes": "Lista marcada de: DM2, DM2 IR, HTA, TBQ, Cirugía.",
   "motivo_consulta": "Texto libre limpio de identificadores.",
-  "examen.od / examen.oi": "Por ojo: av (agudeza visual), pio (mmHg; \"Apl\"/\"Neu\" = tonómetro), otro_examen, otro_resultado, hallazgos.",
+  "examen.od / examen.oi": "Por ojo: av (agudeza visual), avcc (agudeza visual con corrección), pio (mmHg; \"Apl\"/\"Neu\" = tonómetro), hallazgos.",
   "procedimientos_realizados": "Lista de {procedimiento, ojo (OD/OI/AO), pio_od, pio_oi}.",
   "procedimientos_solicitados": "Lista marcada de: Tonometría, Curva tensión, FO, Biometría, OCT, Campimetría, Láser, Autoref, Topografía corneal, Test Schirmer.",
   "diagnosticos": "Lista marcada de: RDP, RDNP, Glaucoma, DDR, DMRE, Uveítis, Catarata, Presbicia, Miopía, Astigmatismo, Hipermetropía, Ojo seco, Estrabismo.",
@@ -49,11 +49,13 @@
    "examen": {
     "od": {
      "av": "20/80",
+     "avcc": "20/60",
      "pio": "14 Apl",
      "hallazgos": "Catarata nuclear N3"
     },
     "oi": {
      "av": "20/30",
+     "avcc": "20/25",
      "pio": "16 Apl",
      "hallazgos": "Pseudofaquia"
     },
@@ -77,7 +79,13 @@
     },
     {
      "procedimiento": "Fondo de ojo (FO)",
-     "ojo": "AO"
+     "ojo": "AO",
+     "descripcion": "Papila 0,3, mácula sin brillo foveal"
+    },
+    {
+     "procedimiento": "BMC",
+     "ojo": "OD",
+     "descripcion": "Catarata nuclear N3"
     },
     {
      "procedimiento": "OCT",

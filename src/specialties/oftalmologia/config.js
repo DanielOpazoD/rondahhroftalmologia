@@ -58,8 +58,10 @@ export const DIAGNOSTICOS = [
 export const OJOS = ['OD', 'OI', 'AO'];
 
 /**
- * @typedef {{id: string, n: string, pio?: 0|1}} ProcDef
+ * @typedef {{id: string, n: string, pio?: 0|1, desc?: 0|1, abrev?: string}} ProcDef
  * `pio: 1` = el procedimiento registra presión intraocular por ojo.
+ * `desc: 1` = admite una descripción en texto; en el PDF va en el recuadro del
+ * examen físico del ojo, con su abreviatura (`abrev`, p. ej. «FO: …»).
  */
 
 /** Lista por defecto de procedimientos realizados (editable en Ajustes). @type {ProcDef[]} */
@@ -68,9 +70,9 @@ export const DEFAULT_PROCS = [
   { id: 't_aplan', n: 'T. Aplanática', pio: 1 },
   { id: 't_neum', n: 'T. Neumática', pio: 1 },
   { id: 'c_tension', n: 'Curva de tensión', pio: 1 },
-  { id: 'fo', n: 'Fondo de ojo (FO)' },
+  { id: 'fo', n: 'Fondo de ojo (FO)', desc: 1, abrev: 'FO' },
   { id: 'av', n: 'Agudeza visual (AV)' },
-  { id: 'bmc', n: 'BMC' },
+  { id: 'bmc', n: 'BMC', desc: 1, abrev: 'BMC' },
   { id: 'biometria', n: 'Biometría' },
   { id: 'laser', n: 'Láser' },
   { id: 'oct', n: 'OCT' },
@@ -101,14 +103,12 @@ export const TEXT_FIELDS = [
   'antecedentes_otros',
   'motivo_consulta',
   'od_av',
+  'od_avcc',
   'od_pio',
-  'od_otro_examen',
-  'od_otro_resultado',
   'od_hallazgos',
   'oi_av',
+  'oi_avcc',
   'oi_pio',
-  'oi_otro_examen',
-  'oi_otro_resultado',
   'oi_hallazgos',
   'examen_obs',
   'test_schirmer_detalle',
@@ -132,8 +132,6 @@ export const FREE_TEXT_FIELDS = [
   'motivo_consulta',
   'od_hallazgos',
   'oi_hallazgos',
-  'od_otro_resultado',
-  'oi_otro_resultado',
   'examen_obs',
   'procedimientos_otros',
   'diagnosticos_otros',
@@ -169,11 +167,14 @@ export const ETIQUETAS = {
   antecedentes_otros: 'Otros antecedentes',
   motivo_consulta: 'Motivo de consulta',
   od_av: 'AV OD',
+  od_avcc: 'AVcc OD',
   od_pio: 'PIO OD',
+  // Campos de versiones anteriores (ya no están en el formulario; se conservan en el historial).
   od_otro_examen: 'Otro examen OD',
   od_otro_resultado: 'Resultado OD',
   od_hallazgos: 'Hallazgos OD',
   oi_av: 'AV OI',
+  oi_avcc: 'AVcc OI',
   oi_pio: 'PIO OI',
   oi_otro_examen: 'Otro examen OI',
   oi_otro_resultado: 'Resultado OI',
@@ -194,4 +195,4 @@ export const ETIQUETAS = {
 };
 
 /** Etiqueta de cada parte de un procedimiento realizado: lado y medidas. */
-export const ETIQUETAS_PROC = { eye: '(ojo)', od: 'PIO OD', oi: 'PIO OI' };
+export const ETIQUETAS_PROC = { eye: '(ojo)', od: 'PIO OD', oi: 'PIO OI', desc: 'descripción' };

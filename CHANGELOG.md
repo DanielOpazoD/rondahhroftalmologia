@@ -1,5 +1,21 @@
 # Cambios
 
+## 2.18.0 — 2026-11-15
+
+### Examen físico y procedimientos
+- **AVcc** (agudeza visual con corrección) por ojo, después de AV.
+- Se quitan **«Otro» y «Result.»** del examen físico. Si una atención antigua los tiene, se conservan en los datos y en el historial, pero ya no se muestran.
+- **Fondo de ojo (FO) y BMC con descripción** (texto opcional), que aparece al marcar el procedimiento.
+  - En Ajustes → Listas, el botón «Texto» permite agregar descripción a cualquier otro procedimiento, igual que «PIO».
+
+### PDF
+- La plantilla tiene ahora, por ojo, **AV · AVcc · PIO**.
+- Las descripciones van en el **recuadro del examen físico** del ojo, con la abreviatura: «FO: …», «BMC: …». Si el procedimiento es AO, van en ambos ojos.
+- También aparecen en la nota («Fondo de ojo (FO) AO: …»), en el Excel (columnas AVcc OD y AVcc OI) y en la exportación seudonimizada, donde la descripción pasa por el mismo filtro de identificadores que el resto del texto libre.
+
+### A tener en cuenta
+- Recarga la app en todos los PC: una versión anterior no conoce la descripción de los procedimientos y podría perderla al editar esa atención.
+
 ## 2.17.0 — 2026-11-15
 
 ### Más limpio y compacto (#52)

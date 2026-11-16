@@ -22,6 +22,7 @@ import {
   proceduresDone,
   pioFor,
   procLabel,
+  procDescriptions,
   diagnosesList,
   requestedList,
   antecedentsList,
@@ -163,7 +164,7 @@ describe('clinical', () => {
     const done = proceduresDone(fullRecord(), PROCS);
     assert.deepEqual(
       done.map((p) => p.id),
-      ['autorref', 't_aplan', 't_neum', 'fo', 'oct'],
+      ['autorref', 't_aplan', 't_neum', 'fo', 'bmc', 'oct'],
     );
     const neum = done.find((p) => p.id === 't_neum');
     assert.equal(neum.pioOd, '18');
@@ -171,9 +172,22 @@ describe('clinical', () => {
     assert.equal(procLabel(done[1]), 'T. Aplanática AO (OD 14 / OI 16 mmHg)');
     assert.equal(
       done.reduce((a, p) => a + p.ojos, 0),
-      2 + 2 + 1 + 2 + 1,
+      2 + 2 + 1 + 2 + 1 + 1,
     );
     assert.equal(eyeCount('XX'), 0);
+  });
+
+  test('descripción de procedimientos (FO, BMC): en la nota completa; en el PDF, en el recuadro del ojo con su abreviatura', () => {
+    const r = fullRecord();
+    const fo = proceduresDone(r, PROCS).find((p) => p.id === 'fo');
+    assert.equal(procLabel(fo), 'Fondo de ojo (FO) AO: Papila 0,3, mácula sin brillo foveal');
+    assert.equal(procLabel(fo, { desc: false }), 'Fondo de ojo (FO) AO');
+    // FO en AO va en ambos ojos; BMC (solo OD), solo en el OD.
+    assert.deepEqual(procDescriptions(r, 'od', PROCS), ['FO: Papila 0,3, mácula sin brillo foveal', 'BMC: Catarata nuclear N3']);
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS), ['FO: Papila 0,3, mácula sin brillo foveal']);
+    // Sin descripción, nada.
+    delete r.proc.fo.desc;
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS), []);
   });
 
   test('procedimiento que se quitó de la lista: no se muestra ni se cuenta; al restaurarlo, vuelve', () => {
@@ -207,7 +221,7 @@ describe('clinical', () => {
       'Femenino',
       'ANTECEDENTES: DM2',
       'EXAMEN FÍSICO:',
-      'OD: AV 20/80 | PIO 14 Apl',
+      'OD: AV 20/80 | AVcc 20/60 | PIO 14 Apl',
       'PROCEDIMIENTOS REALIZADOS:',
       '- T. Neumática OD (OD 18 mmHg)',
       'DIAGNÓSTICOS:',

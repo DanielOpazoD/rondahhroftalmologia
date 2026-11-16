@@ -67,8 +67,8 @@ test('computeStats: pacientes distintos, procedimientos por ojo, dx, sexo, edad'
   assert.equal(S.pacientes, 3, 'mismo RUT con y sin puntos cuenta una vez');
   assert.deepEqual(S.proc['Fondo de ojo (FO)'], { pac: 2, od: 2, oi: 1, ojos: 3 });
   assert.deepEqual(S.proc['T. Neumática'], { pac: 1, od: 1, oi: 0, ojos: 1 });
-  assert.equal(S.procTotal, 6);
-  assert.equal(S.ojos, 9);
+  assert.equal(S.procTotal, 7); // incluye la BMC del registro completo
+  assert.equal(S.ojos, 10);
   assert.equal(S.dx.Catarata, 1);
   assert.equal(S.dx['Otros diagnósticos'], 1);
   assert.deepEqual(S.sexo, { F: 2, M: 1, O: 0, 'Sin dato': 1 });
@@ -100,7 +100,8 @@ test('statsWorkbook arma las 5 hojas y produce un .xlsx válido', () => {
   assert.equal(row[head.indexOf('PIO OD')], '14 Apl');
   assert.equal(row[head.indexOf('Dx Catarata')], 1);
   assert.equal(row[head.indexOf('Catarata ojo')], 'OD');
-  assert.equal(sheets[2].rows.length, 1 + 6, 'una fila por procedimiento');
+  assert.equal(sheets[2].rows.length, 1 + 7, 'una fila por procedimiento');
+  assert.equal(row[head.indexOf('AVcc OD')], '20/60');
 
   const files = readZipWithPython(buildXlsx(sheets));
   const resumen = sheetCells(files['xl/worksheets/sheet1.xml']);

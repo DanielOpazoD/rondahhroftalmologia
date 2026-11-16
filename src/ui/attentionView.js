@@ -67,6 +67,15 @@ export function initAttentionView(ctx) {
     ctx.changed();
   });
   list.addEventListener('input', (e) => {
+    const d = e.target.closest('.pdesc input');
+    if (d) {
+      const id = d.closest('.proc').dataset.id;
+      if (!ctx.rec.proc[id]) return;
+      if (d.value.trim()) ctx.rec.proc[id].desc = d.value;
+      else delete ctx.rec.proc[id].desc;
+      ctx.changed({ silent: true });
+      return;
+    }
     const i = e.target.closest('.pio input');
     if (!i) return;
     const id = i.closest('.proc').dataset.id;
@@ -108,7 +117,8 @@ export function renderProcList(ctx) {
     html`${ctx.procs.map(
       (p) => html`<div class="proc" data-id="${p.id}"><div class="nm">${p.n}</div>
       <div class="seg" role="group" aria-label="Ojo para ${p.n}">${OJOS.map((v) => html`<button type="button" data-v="${v}" aria-pressed="false">${v}</button>`)}</div>
-      ${p.pio ? html`<div class="pio">${['od', 'oi'].map((e) => html`<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${p.n}" placeholder="mmHg" inputmode="decimal"></label>`)}</div>` : ''}</div>`,
+      ${p.pio ? html`<div class="pio">${['od', 'oi'].map((e) => html`<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${p.n}" placeholder="mmHg" inputmode="decimal"></label>`)}</div>` : ''}
+      ${p.desc ? html`<div class="pdesc"><input data-desc aria-label="Descripción de ${p.n}" placeholder="Descripción de ${p.abrev || p.n} (opcional)" maxlength="400"></div>` : ''}</div>`,
     )}`,
   );
   ctx.applyPermissions?.(); // filas nuevas: solo lectura si la persona no edita lo clínico
@@ -147,6 +157,8 @@ export function syncAttentionView(ctx) {
       if (i.value !== v) i.value = v;
       i.closest('.pf').hidden = !!p && !coversEye(p.eye, i.dataset.e);
     });
+    const d = /** @type {HTMLInputElement | null} */ (row.querySelector('.pdesc input'));
+    if (d && d.value !== (p?.desc || '')) d.value = p?.desc || '';
   });
   $('#procBadge').textContent = n;
   const fromBirth = isIsoDate(rec.f.paciente_fnac);
