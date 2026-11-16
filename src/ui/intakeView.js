@@ -12,8 +12,8 @@ import { initSexSelector, renderSexSelector } from './patientFields.js';
 import { $ } from './dom.js';
 import { updateRutMark } from './rut.js';
 import { html, setHtml } from './html.js';
+import { icon } from './icons.js';
 
-const ICON = (n) => html`<svg aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const FIELDS = { ing_rut: 'paciente_rut', ing_nombre: 'paciente_nombre', ing_fnac: 'paciente_fnac', ing_fono: 'paciente_fono' };
 
 /** @param {import('./context.js').AppContext} ctx */
@@ -160,7 +160,7 @@ export function renderIntake(ctx) {
           <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}<span class="state ${done ? 'done' : 'pend'}">${done ? 'Atendido' : 'Por atender'}</span></span>
         </button>
         <div class="pact">
-          ${done ? '' : html`<button type="button" class="ib sm danger" data-a="del" data-id="${r.id}" title="Quitar de la lista" aria-label="Quitar de la lista">${ICON('trash')}</button>`}
+          ${done ? '' : html`<button type="button" class="ib sm danger" data-a="del" data-id="${r.id}" title="Quitar de la lista" aria-label="Quitar de la lista">${icon('trash')}</button>`}
         </div>
       </div>`;
   });

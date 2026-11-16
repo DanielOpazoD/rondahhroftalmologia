@@ -117,7 +117,7 @@ export async function collectChecks(ctx) {
       actionLabel: 'Activar',
     });
   } else {
-    await ctx.sync.syncNow({ quiet: true });
+    await ctx.sync.syncNow();
     const s = ctx.sync.state;
     if (s.status === 'idle') {
       push({ state: 'ok', title: 'Sincronización', text: `Funciona. Última: ${fmtDateTime(new Date(s.lastSync || Date.now()))}.` });

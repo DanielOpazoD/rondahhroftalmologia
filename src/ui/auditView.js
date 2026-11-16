@@ -9,14 +9,13 @@
 import { eventRows, sessionRows, fmtDuration, GROUPS } from '../core/accessLog.js';
 import { fmtDate, fmtDateTime, todayIso, normalizeText } from '../core/format.js';
 import { patientLabel } from '../core/patient.js';
-import { buildXlsx } from '../lib/xlsx.js';
+import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createAccountsApi } from '../sync/accountsApi.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
 import { $, download, toast, withBusy } from './dom.js';
 import { html, setHtml } from './html.js';
 
 const MAX_ROWS = 500;
-const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** @param {any} ctx contexto de la aplicación */
 export function initAuditView(ctx) {
@@ -121,8 +120,7 @@ export function initAuditView(ctx) {
     }
     await withBusy(button, async () => {
       try {
-        const t = ctx.accounts.token() || (await ctx.accounts.ensureToken());
-        if (!t) throw new Error('Necesitas conexión para consultar el registro.');
+        const t = await ctx.accounts.requireToken();
         // Días LOCALES completos (desde las 00:00 del primero hasta las 23:59 del último).
         const from = new Date(`${desde}T00:00:00`).getTime();
         const to = new Date(`${hasta}T23:59:59.999`).getTime();

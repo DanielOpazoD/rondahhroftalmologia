@@ -43,10 +43,20 @@ flowchart TD
 
 - **Cuentas de usuario** ([ADR 0014](adr/0014.md)):
   - reglas puras en `core/accounts.js`, `core/permissions.js` y `core/accessLog.js`;
-  - criptografía del PC en `sync/accountCrypto.js`;
+  - criptografía del PC en `sync/accountCrypto.js`, y la **sesión** (entrar con y sin conexión, crear la clave, renovar, salir, activar, cola del registro) en `sync/accountSession.js`, sin pantalla y probada contra el servidor en memoria;
   - servidor en `sync/accounts.js` (función `cuentas`), y la sincronización exige su sesión;
-  - interfaz: `ui/accounts.js` (ingreso, sesión, activación), `ui/usersView.js`, `ui/auditView.js` y `ui/permissionsView.js`;
+  - interfaz: `ui/accounts.js` (solo pantallas: ingreso, crear la clave, tarjeta de la sesión), `ui/usersView.js`, `ui/auditView.js` y `ui/permissionsView.js`;
   - `ui/guard.js` mantiene el ingreso y el bloqueo por encima de cualquier diálogo.
+
+- **Lógica separada de la pantalla:**
+  - la sincronización tiene su motor en `ui/syncController.js` (cuándo y cómo sincronizar, activar, estado), que avisa con `onChange` y `notify`;
+  - su vista está en `ui/syncView.js`;
+  - lo mismo pasa con la sesión de las cuentas (`sync/accountSession.js` y `ui/accounts.js`).
+- **Piezas compartidas de la interfaz:**
+  - `ui/icons.js` (íconos);
+  - `ui/patientFields.js` y `src/partials/paciente.html`: los datos del paciente, una sola plantilla para Ingreso y Atención;
+  - `ui/menu.js`, `ui/guard.js` y `ui/settingsSections.js`.
+- **Servicios del contexto:** se declaran todos en `ui/context.js` (cuentas, bloqueo, sincronización, permisos…) y los asigna `main.js` al arrancar. Ninguna vista agrega propiedades nuevas.
 
 - **Paciente como unidad** (`core/patient.js`): cada atención es un episodio vinculado a la ficha de su paciente (`pacienteId`). Ver [MODELO_DATOS.md](MODELO_DATOS.md).
 

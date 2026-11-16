@@ -5,8 +5,8 @@
 import { ACCEPT, kindOf, fmtSize, isInlineType, cleanType } from '../core/attachments.js';
 import { $ } from './dom.js';
 import { html, setHtml } from './html.js';
+import { icon } from './icons.js';
 
-const ICON = (n) => html`<svg aria-hidden="true"><use href="#i-${n}"/></svg>`;
 /** URLs de miniaturas vigentes (se liberan al re-dibujar). @type {string[]} */
 let thumbs = [];
 
@@ -60,7 +60,7 @@ export async function renderAttachments(ctx) {
   let missingThumbs = false;
   for (const a of list) {
     const kind = kindOf(a.tipo, a.nombre);
-    let preview = html`<span class="attico">${ICON(kind === 'pdf' ? 'pdf' : 'file')}</span>`;
+    let preview = html`<span class="attico">${icon(kind === 'pdf' ? 'pdf' : 'file')}</span>`;
     if (a.miniatura) {
       // Miniatura guardada con los metadatos (validada en normalizeAttachment).
       preview = html`<img class="attthumb" src="${a.miniatura}" alt="">`;
@@ -78,7 +78,7 @@ export async function renderAttachments(ctx) {
       <button type="button" class="attmain" data-a="open" data-id="${a.id}" title="Abrir ${a.nombre}">
         ${preview}<span class="attname">${a.nombre}</span><span class="muted">${status}</span>
       </button>
-      <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${a.id}" title="Eliminar" aria-label="Eliminar ${a.nombre}">${ICON('trash')}</button>
+      <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${a.id}" title="Eliminar" aria-label="Eliminar ${a.nombre}">${icon('trash')}</button>
     </li>`);
   }
   // Solo si la atención sigue siendo la misma al terminar de leer.
