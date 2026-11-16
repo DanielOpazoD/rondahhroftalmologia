@@ -183,10 +183,15 @@ test('examen: AVcc por ojo y descripción del fondo de ojo y la BMC; el PDF los 
   const fo = page.locator('#procList .proc[data-id="fo"]');
   await expect(fo.locator('.pdesc')).toBeHidden(); // aparece al marcarlo
   await fo.getByRole('button', { name: 'AO' }).click();
-  await fo.locator('.pdesc input').fill('Papila normal');
+  // Con AO hay una descripción por ojo (no una común).
+  await expect(fo.locator('.pdesc input:visible')).toHaveCount(2);
+  await fo.getByLabel('Descripción OD de Fondo de ojo (FO)').fill('Papila normal');
+  await fo.getByLabel('Descripción OI de Fondo de ojo (FO)').fill('Excavación 0,5');
   const bmc = page.locator('#procList .proc[data-id="bmc"]');
   await bmc.getByRole('button', { name: 'OD' }).click();
-  await bmc.locator('.pdesc input').fill('Cámara formada');
+  // Solo OD: solo la descripción del OD.
+  await expect(bmc.locator('.pdesc input:visible')).toHaveCount(1);
+  await bmc.getByLabel('Descripción OD de BMC').fill('Cámara formada');
   await save(page);
   // PDF editable (sin aplanar) para poder leer sus campos.
   await ajustes(page, 'Este equipo');
@@ -201,6 +206,6 @@ test('examen: AVcc por ojo y descripción del fondo de ojo y la BMC; el PDF los 
   expect(text('od_avcc')).toBe('20/30');
   expect(text('oi_avcc')).toBe('20/25');
   expect(text('od_hallazgos')).toBe('Catarata\nFO: Papila normal\nBMC: Cámara formada');
-  expect(text('oi_hallazgos')).toBe('FO: Papila normal');
+  expect(text('oi_hallazgos')).toBe('FO: Excavación 0,5');
   expect(form.getFields().some((f) => /_otro_(examen|resultado)$/.test(f.getName()))).toBe(false);
 });

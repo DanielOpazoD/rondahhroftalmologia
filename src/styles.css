@@ -718,11 +718,16 @@ input.warned {
   padding-bottom: 4px;
 }
 .proc.done .pdesc {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.pdesc input {
-  min-height: 30px;
-  padding: 4px 8px;
+.pdesc .pf span {
+  width: 18px; /* OD y OI alineados */
+}
+.pdesc .pf input {
+  width: auto;
+  flex: 1;
   font-size: var(--fs-md);
 }
 .pf {

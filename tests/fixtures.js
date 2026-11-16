@@ -26,8 +26,8 @@ export function fullRecord(overrides = {}) {
       autorref: { eye: 'AO' },
       t_aplan: { eye: 'AO', od: '14', oi: '16' },
       t_neum: { eye: 'OD', od: '18', oi: '99' },
-      fo: { eye: 'AO', desc: 'Papila 0,3, mácula sin brillo foveal' },
-      bmc: { eye: 'OD', desc: 'Catarata nuclear N3' },
+      fo: { eye: 'AO', desc_od: 'Papila 0,3, mácula sin brillo foveal', desc_oi: 'Papila 0,5' },
+      bmc: { eye: 'OD', desc_od: 'Catarata nuclear N3' },
       oct: { eye: 'OI' },
     },
     f: {

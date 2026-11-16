@@ -19,7 +19,10 @@ export function casosDeEjemplo() {
         plan: 'Control en 3 meses',
       },
       checks: { antecedente_hta: true, diagnostico_glaucoma: true },
-      proc: { t_aplan: { eye: 'AO', od: '22', oi: '19' }, fo: { eye: 'AO', desc: 'Excavación papilar 0,6 AO' } },
+      proc: {
+        t_aplan: { eye: 'AO', od: '22', oi: '19' },
+        fo: { eye: 'AO', desc_od: 'Excavación papilar 0,6', desc_oi: 'Excavación papilar 0,7' },
+      },
     },
     {
       f: {
@@ -30,7 +33,7 @@ export function casosDeEjemplo() {
         plan: 'Derivar a cirugía',
       },
       checks: { antecedente_dm2: true, diagnostico_catarata: true },
-      proc: { av: { eye: 'AO' }, fo: { eye: 'OD' }, bmc: { eye: 'OD', desc: 'Catarata nuclear N2' } },
+      proc: { av: { eye: 'AO' }, fo: { eye: 'OD' }, bmc: { eye: 'OD', desc_od: 'Catarata nuclear N2' } },
       cat: 'OD',
     },
     {

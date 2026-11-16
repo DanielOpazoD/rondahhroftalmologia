@@ -177,17 +177,26 @@ describe('clinical', () => {
     assert.equal(eyeCount('XX'), 0);
   });
 
-  test('descripción de procedimientos (FO, BMC): en la nota completa; en el PDF, en el recuadro del ojo con su abreviatura', () => {
+  test('descripción de procedimientos POR OJO (FO, BMC): cada una en el recuadro de su ojo', () => {
     const r = fullRecord();
     const fo = proceduresDone(r, PROCS).find((p) => p.id === 'fo');
-    assert.equal(procLabel(fo), 'Fondo de ojo (FO) AO: Papila 0,3, mácula sin brillo foveal');
+    assert.equal(procLabel(fo), 'Fondo de ojo (FO) AO: OD Papila 0,3, mácula sin brillo foveal; OI Papila 0,5');
     assert.equal(procLabel(fo, { desc: false }), 'Fondo de ojo (FO) AO');
-    // FO en AO va en ambos ojos; BMC (solo OD), solo en el OD.
+    const bmc = proceduresDone(r, PROCS).find((p) => p.id === 'bmc');
+    assert.equal(procLabel(bmc), 'BMC OD: Catarata nuclear N3');
+    // FO en AO: la del OD en el OD y la del OI en el OI. BMC solo OD.
     assert.deepEqual(procDescriptions(r, 'od', PROCS), ['FO: Papila 0,3, mácula sin brillo foveal', 'BMC: Catarata nuclear N3']);
-    assert.deepEqual(procDescriptions(r, 'oi', PROCS), ['FO: Papila 0,3, mácula sin brillo foveal']);
-    // Sin descripción, nada.
-    delete r.proc.fo.desc;
-    assert.deepEqual(procDescriptions(r, 'oi', PROCS), []);
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS), ['FO: Papila 0,5']);
+    // Una descripción de un ojo que no está marcado no se muestra.
+    r.proc.bmc.desc_oi = 'no corresponde';
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS), ['FO: Papila 0,5']);
+    // Atención de la 2.18.0 con una sola descripción: vale para cada ojo cubierto.
+    r.proc.fo = { eye: 'OI', desc: 'Retina aplicada' };
+    assert.deepEqual(procDescriptions(r, 'oi', PROCS).slice(0, 1), ['FO: Retina aplicada']);
+    assert.equal(
+      procDescriptions(r, 'od', PROCS).some((d) => d.startsWith('FO')),
+      false,
+    );
   });
 
   test('procedimiento que se quitó de la lista: no se muestra ni se cuenta; al restaurarlo, vuelve', () => {

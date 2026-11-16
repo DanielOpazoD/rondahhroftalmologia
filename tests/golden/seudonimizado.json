@@ -80,12 +80,13 @@
     {
      "procedimiento": "Fondo de ojo (FO)",
      "ojo": "AO",
-     "descripcion": "Papila 0,3, mácula sin brillo foveal"
+     "descripcion_od": "Papila 0,3, mácula sin brillo foveal",
+     "descripcion_oi": "Papila 0,5"
     },
     {
      "procedimiento": "BMC",
      "ojo": "OD",
-     "descripcion": "Catarata nuclear N3"
+     "descripcion_od": "Catarata nuclear N3"
     },
     {
      "procedimiento": "OCT",

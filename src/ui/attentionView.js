@@ -70,9 +70,16 @@ export function initAttentionView(ctx) {
     const d = e.target.closest('.pdesc input');
     if (d) {
       const id = d.closest('.proc').dataset.id;
-      if (!ctx.rec.proc[id]) return;
-      if (d.value.trim()) ctx.rec.proc[id].desc = d.value;
-      else delete ctx.rec.proc[id].desc;
+      const proc = ctx.rec.proc[id];
+      if (!proc) return;
+      const key = `desc_${d.dataset.desc}`;
+      // La descripción única de la 2.18.0 pasa a ser la de cada ojo al editar.
+      if (proc.desc !== undefined) {
+        for (const eye of ['od', 'oi']) if (proc[`desc_${eye}`] === undefined && coversEye(proc.eye, eye)) proc[`desc_${eye}`] = proc.desc;
+        delete proc.desc;
+      }
+      if (d.value.trim()) proc[key] = d.value;
+      else delete proc[key];
       ctx.changed({ silent: true });
       return;
     }
@@ -118,7 +125,7 @@ export function renderProcList(ctx) {
       (p) => html`<div class="proc" data-id="${p.id}"><div class="nm">${p.n}</div>
       <div class="seg" role="group" aria-label="Ojo para ${p.n}">${OJOS.map((v) => html`<button type="button" data-v="${v}" aria-pressed="false">${v}</button>`)}</div>
       ${p.pio ? html`<div class="pio">${['od', 'oi'].map((e) => html`<label class="pf"><span>PIO ${e.toUpperCase()}</span><input data-e="${e}" aria-label="PIO ${e.toUpperCase()} ${p.n}" placeholder="mmHg" inputmode="decimal"></label>`)}</div>` : ''}
-      ${p.desc ? html`<div class="pdesc"><input data-desc aria-label="Descripción de ${p.n}" placeholder="Descripción de ${p.abrev || p.n} (opcional)" maxlength="400"></div>` : ''}</div>`,
+      ${p.desc ? html`<div class="pdesc">${['od', 'oi'].map((e) => html`<label class="pf"><span>${e.toUpperCase()}</span><input data-desc="${e}" aria-label="Descripción ${e.toUpperCase()} de ${p.n}" placeholder="Descripción ${e.toUpperCase()} (opcional)" maxlength="400"></label>`)}</div>` : ''}</div>`,
     )}`,
   );
   ctx.applyPermissions?.(); // filas nuevas: solo lectura si la persona no edita lo clínico
@@ -157,8 +164,14 @@ export function syncAttentionView(ctx) {
       if (i.value !== v) i.value = v;
       i.closest('.pf').hidden = !!p && !coversEye(p.eye, i.dataset.e);
     });
-    const d = /** @type {HTMLInputElement | null} */ (row.querySelector('.pdesc input'));
-    if (d && d.value !== (p?.desc || '')) d.value = p?.desc || '';
+    row.querySelectorAll('.pdesc input').forEach((d) => {
+      const e = /** @type {'od' | 'oi'} */ (d.dataset.desc);
+      // La del ojo (o la única de la 2.18.0), solo si el ojo está marcado.
+      const v = p && coversEye(p.eye, e) ? String(p[`desc_${e}`] ?? p.desc ?? '') : '';
+      if (d.value !== v && document.activeElement !== d) d.value = v;
+      // Solo la del ojo marcado (con AO, las dos).
+      d.closest('.pf').hidden = !!p && !coversEye(p.eye, e);
+    });
   });
   $('#procBadge').textContent = n;
   const fromBirth = isIsoDate(rec.f.paciente_fnac);

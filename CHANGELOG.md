@@ -1,5 +1,16 @@
 # Cambios
 
+## 2.18.1 — 2026-11-15
+
+### Descripción por ojo (FO y BMC)
+- La descripción del **fondo de ojo** y de la **BMC** es ahora **por ojo**:
+  - OD u OI: una descripción, la de ese ojo;
+  - AO: dos, una por ojo, y no hay descripción común.
+- En el PDF, la del OD va en el recuadro del OD y la del OI en el del OI («FO: …», «BMC: …»).
+- En la nota: «Fondo de ojo (FO) AO: OD …; OI …».
+- En el seudonimizado van `descripcion_od` y `descripcion_oi`.
+- Una atención guardada con la 2.18.0 (una sola descripción) se sigue mostrando en cada ojo marcado; al editarla, pasa a quedar por ojo.
+
 ## 2.18.0 — 2026-11-15
 
 ### Examen físico y procedimientos
