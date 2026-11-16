@@ -17,8 +17,8 @@ import { $, toast } from './dom.js';
 import { html, setHtml } from './html.js';
 import { openDialog } from './dialog.js';
 import { uiAlert, uiConfirm } from './modal.js';
+import { icon } from './icons.js';
 
-const ICON = (n) => html`<svg aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const ROLE_OPTIONS = ROLES.map((r) => ({ value: r.key, label: r.label }));
 const ADMIN_OPTIONS = [
   { value: 'no', label: 'No' },
@@ -39,11 +39,7 @@ export function initUsersView(ctx) {
 
   const isAdmin = () => Boolean(ctx.accounts?.user?.admin);
   const teamKeyB64 = () => ctx.store.loadSyncConfig()?.encKey || '';
-  async function token() {
-    const t = ctx.accounts.token() || (await ctx.accounts.ensureToken());
-    if (!t) throw new Error('Necesitas conexión para administrar usuarios.');
-    return t;
-  }
+  const token = () => ctx.accounts.requireToken();
 
   async function load() {
     if (!isAdmin() || loading) return;
@@ -107,8 +103,8 @@ export function initUsersView(ctx) {
                 <span class="ptags">${tags}</span>
               </div>
               <div class="pact">
-                <button type="button" class="ib sm" data-a="edit" data-id="${u.id}" title="Editar" aria-label="Editar a ${u.nombre}">${ICON('edit')}</button>
-                <button type="button" class="ib sm" data-a="reset" data-id="${u.id}" title="Restablecer clave" aria-label="Restablecer la clave de ${u.nombre}">${ICON('lock')}</button>
+                <button type="button" class="ib sm" data-a="edit" data-id="${u.id}" title="Editar" aria-label="Editar a ${u.nombre}">${icon('edit')}</button>
+                <button type="button" class="ib sm" data-a="reset" data-id="${u.id}" title="Restablecer clave" aria-label="Restablecer la clave de ${u.nombre}">${icon('lock')}</button>
                 <button type="button" class="btn sm" data-a="toggle" data-id="${u.id}">${u.estado === 'activo' ? 'Desactivar' : 'Reactivar'}</button>
               </div>
             </div>`;

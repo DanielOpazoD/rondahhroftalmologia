@@ -8,8 +8,7 @@ import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs, isDel
 import { diagnosesList, proceduresDone } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 import { html, setHtml, join } from './html.js';
-
-const ICON = (name) => html`<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
+import { icon } from './icons.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initRegistryView(ctx) {
@@ -187,9 +186,9 @@ function renderPatient(ctx, recs) {
               <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}${done ? '' : html`<span class="state pend">Por atender</span>`}</span>
             </button>
             <div class="pact">
-              <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${ICON('copy')}</button>
-              <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu">${ICON('pdf')}</button>
-              <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${ICON('trash')}</button>
+              <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${icon('copy')}</button>
+              <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu">${icon('pdf')}</button>
+              <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${icon('trash')}</button>
             </div>
           </div>`;
   });
@@ -221,7 +220,7 @@ function renderOrphans(ctx, all, groups) {
           <span class="pmeta">${join([p.f.paciente_rut || 'sin RUT', p.f.paciente_fnac && fmtDate(p.f.paciente_fnac)].filter(Boolean), ' · ')}</span>
         </div>
         <div class="pact">
-          <button type="button" class="ib sm danger" data-a="delp" data-p="${p.id}" title="Eliminar ficha" aria-label="Eliminar ficha de ${patientLabel(p)}">${ICON('trash')}</button>
+          <button type="button" class="ib sm danger" data-a="delp" data-p="${p.id}" title="Eliminar ficha" aria-label="Eliminar ficha de ${patientLabel(p)}">${icon('trash')}</button>
         </div>
       </div>`,
     )}`,

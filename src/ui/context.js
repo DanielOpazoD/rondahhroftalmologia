@@ -86,6 +86,16 @@ export function createContext(store, templateB64) {
     lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
       null
     ),
+    /** Ficha abierta en la pestaña Pacientes (null: la lista). @type {string | null} */
+    openPatientId: null,
+    /** Sexo elegido en el formulario de Ingreso. */
+    intakeSexo: '',
+
+    /* ---------------------------------------------------------------
+     * SERVICIOS: se declaran aquí y los asigna main.js al arrancar (en este
+     * orden): cuentas → bloqueo → vistas → sincronización. Ninguna vista
+     * agrega propiedades nuevas al contexto: si hace falta una, se declara aquí.
+     * --------------------------------------------------------------- */
     /** Cuentas de usuario (lo asigna main.js; ver accounts.js y ADR 0014). @type {ReturnType<typeof import('./accounts.js').createAccountsController> | null} */
     accounts: null,
     /** Perfil que registra en esta sesión (ver userView.js); null si no se eligió. */

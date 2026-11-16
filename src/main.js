@@ -15,6 +15,7 @@ import { initFilter } from './ui/statsView.js';
 import { initExportView, exportStatsXlsx } from './ui/exportView.js';
 import { initSettingsView, renderSettings } from './ui/settingsView.js';
 import { createSyncController } from './ui/syncController.js';
+import { initSyncView, renderSyncView } from './ui/syncView.js';
 import { createClock, setClock } from './core/clock.js';
 import { initCatalogView, renderCatalogSettings } from './ui/catalogView.js';
 import { initIntakeView } from './ui/intakeView.js';
@@ -193,7 +194,8 @@ async function main() {
     }
   });
 
-  ctx.sync = createSyncController(ctx);
+  ctx.sync = createSyncController(ctx, { onChange: () => renderSyncView(ctx), notify: (m, ms) => toast(m, ms) });
+  initSyncView(ctx);
   ctx.sync.init();
 
   ctx.ensurePatients();
