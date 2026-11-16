@@ -4,7 +4,7 @@ Cada práctica de este proyecto tiene **dónde se hace cumplir** (una herramient
 
 ```bash
 npm run check     # lint, formato, tipos, pruebas y build (lo mismo que la CI, sin e2e)
-npm run calidad   # informe: tipos estrictos, complejidad, capas, manejo de errores
+npm run calidad   # informe: tipos estrictos, complejidad, capas, código muerto, manejo de errores
 npm run perf      # tamaño y rendimiento con datos sintéticos (docs/RENDIMIENTO.md)
 npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
 ```
@@ -15,11 +15,12 @@ npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
 | --- | --- | --- |
 | **Tipos estrictos en todo `src/`** | `npm run typecheck` (`jsconfig.json`, `strict: true`) | JSDoc + `tsc --checkJs --strict`: sin `any` implícito ni nulos sin revisar. Sin `@ts-ignore`. Los tipos del dominio están en `src/domain.d.ts`. |
 | **Capas sin ciclos** | `tests/deps.test.js` | `core/` y `lib/` son puros (sin DOM ni almacenamiento); `ui/` solo la usa `main.js`; la especialidad se usa a través de `specialties/activa/`. Ver `scripts/deps.mjs` (`LAYERS`). |
+| **Sin código muerto** | `tests/deps.test.js` (`exportUsage`) | Cada `export` de `src/` lo importa otro archivo. Si solo se usa en su archivo, no se exporta: la interfaz de cada módulo es lo que de verdad usan los demás. Las que solo usan las pruebas se cuentan en `npm run calidad`. |
 | **Pocas dependencias, conocidas** | `tests/deps.test.js` | Cada paquete externo está en `package.json` con versión fija y documentado en `scripts/deps.mjs` (`EXTERNAL`): para qué y dónde. Máximo 5. |
-| **Funciones simples** | ESLint `complexity` y `max-depth` | Tope de complejidad ciclomática por función y de anidamiento. El tope solo baja: al simplificar una función, se baja el número en `eslint.config.js`. |
+| **Funciones simples** | ESLint `complexity` (18) y `max-depth` (4) | Tope de complejidad ciclomática por función y de anidamiento, también en `scripts/`. El tope solo baja: al simplificar una función, se baja el número en `eslint.config.js` (108 → 25 en 2.23.0, → 18 en 2.24.0). |
 | **Errores que no se pierden** | ESLint `no-empty` + revisión | Cada `catch` relanza, informa (registro de errores o aviso), sigue con una alternativa o explica en un comentario por qué se ignora. |
-| **HTML seguro** | ESLint `no-restricted-syntax` + CSP | Sin `innerHTML`: plantillas `html\`…\`` que escapan solas. CSP sin `unsafe-inline` (verificada en e2e). |
-| **Pruebas** | CI: cobertura mínima, e2e, estrés | `node:test` con cobertura mínima (líneas, ramas, funciones); 200 escenarios de sincronización concurrente; Playwright en escritorio y celular, incluido lector de pantalla. |
+| **HTML seguro** | ESLint `no-restricted-syntax` + CSP | Sin `innerHTML`: plantillas `html\`…\`` que escapan solas, y fuera de `src/ui/html.js` no hay forma de marcar un texto como HTML sin escapar. CSP sin `unsafe-inline` (verificada en e2e). |
+| **Pruebas** | CI: cobertura mínima, e2e, estrés | `node:test` con cobertura mínima (líneas 97 %, ramas 87 %, funciones 92 %; el mínimo sube con la cobertura, no baja); 200 escenarios de sincronización concurrente; Playwright en escritorio y celular, incluido lector de pantalla. |
 | **Presupuesto de tamaño** | `tests/presupuesto.test.js` | Las plantillas PDF no pueden traer peso invisible ni pasar su tope. |
 | **Rendimiento medido** | `npm run perf` | Con 3.000 atenciones sintéticas; cambios de rendimiento se justifican con un antes y un después. |
 | **Formato uniforme** | Prettier (`format:check` en CI) | El estilo no se discute: lo decide la herramienta. |
@@ -34,6 +35,9 @@ npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
 - **PDF de la atención** (`src/specialties/oftalmologia/pdf.js`): las funciones para llenar campos pasan a `createFiller` y cada sección de la hoja es una función (`fillHeader`, `fillExam`, `fillObservations`, `fillPlan`, `fillChecks`).
 - **Excel seudonimizado**: cada columna define encabezado y valor juntos (`wideColumns`), así no se pueden desalinear.
 - **Chequeo del equipo** (`src/ui/checkView.js`): una función por punto revisado.
+- **Sincronizar** (`src/ui/syncController.js`, 2.24.0): `syncNow` (25) solo orquesta; las dos pasadas (`syncSpaces`), lo que dijo el servidor (`checkServer`) y el mensaje de cada error (`syncFailed`) son funciones aparte.
+- **Huella de contenido** (`src/core/merge.js`): una cadena de `if` por tipo pasó a una tabla `CONTENT_OF` (tipo → qué cuenta como contenido).
+- **Aplicar lo bajado** (`src/sync/protocol.js`): `applyPulled` usa `replacesLocal` (¿gana lo bajado?) y `resolvePulled` (fusión y si hay que volver a subir).
 
 La regla general: una función hace una cosa; si para explicarla hace falta «y además», son dos.
 

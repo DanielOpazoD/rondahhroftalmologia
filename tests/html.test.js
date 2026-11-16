@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { html, raw, join, setHtml, SafeHtml } from '../src/ui/html.js';
+import { html, join, setHtml, SafeHtml } from '../src/ui/html.js';
 
 test('html escapa los valores interpolados (< > & " \')', () => {
   const name = `Ana & <Bo> "x" 'y'`;
@@ -24,9 +24,9 @@ test('arreglos se concatenan; null, undefined y false no escriben; 0 sí', () =>
   assert.equal(String(html`${['a&', html`<b>b</b>`]}`), 'a&amp;<b>b</b>');
 });
 
-test('raw pasa sin escapar (solo para marcado del código)', () => {
-  assert.equal(String(html`${raw('<svg><use href="#i-x"/></svg>')}`), '<svg><use href="#i-x"/></svg>');
-  assert.ok(raw('x') instanceof SafeHtml);
+test('el marcado fijo de una plantilla pasa sin escapar; solo se escapan los valores', () => {
+  assert.equal(String(html`<svg><use href="#i-x"/></svg>${'<x>'}`), '<svg><use href="#i-x"/></svg>&lt;x&gt;');
+  assert.ok(join(['x']) instanceof SafeHtml);
 });
 
 test('join escapa el separador y respeta fragmentos', () => {

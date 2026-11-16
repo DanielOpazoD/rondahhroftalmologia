@@ -214,6 +214,67 @@ export function createRepo(
     return r;
   }
 
+  /**
+   * Carga en memoria lo leído del motor y lo marca como ya persistido.
+   * @param {{recs: DocumentoLeido[], dels: DocumentoLeido[], docs: DocumentoLeido[], pats: DocumentoLeido[], atts: DocumentoLeido[]}} read
+   */
+  function hydrate({ recs, dels, docs, pats, atts }) {
+    for (const raw of atts) {
+      const a = normalizeAttachment(raw);
+      if (!a) continue;
+      attachments.set(a.id, a);
+      persisted.set(keyOf('adjuntos', a.id), JSON.stringify(a));
+    }
+    for (const raw of pats) {
+      const p = normalizePatient(raw);
+      if (!p) continue;
+      patients.set(p.id, p);
+      patientsSorted = null;
+      persisted.set(keyOf('pacientes', p.id), JSON.stringify(p));
+    }
+    for (const r of recs) {
+      const saved = setRecord(r);
+      if (saved) persisted.set(keyOf('atenciones', r.id), JSON.stringify(r));
+    }
+    for (const d of dels) {
+      // Las lápidas ({id, t}) solo las escribe este repositorio.
+      tombs.set(d.id, /** @type {number} */ (d.t));
+      persisted.set(keyOf('eliminadas', d.id), JSON.stringify(d));
+    }
+    for (const d of docs) {
+      // La bitácora solo la escribe este repositorio (addAuditEntry, y saveAuditDocs tras validarla).
+      audit.set(d.id, /** @type {AuditDoc} */ (/** @type {unknown} */ (d)));
+      persisted.set(keyOf('bitacora', d.id), JSON.stringify(d));
+    }
+  }
+
+  /**
+   * Si hay datos de versiones anteriores (atenciones o eliminaciones) por migrar.
+   * @param {{records: object[], tombstones: Record<string, number>}} legacy
+   */
+  const hasLegacyData = (legacy) => Boolean(legacy.records.length || Object.keys(legacy.tombstones).length);
+
+  /**
+   * Migra al motor los datos de versiones anteriores guardados en localStorage.
+   * @param {{records: object[], tombstones: Record<string, number>}} legacy
+   * @param {(() => void) | undefined} clearLegacy libera el espacio antiguo
+   */
+  async function migrateLegacy(legacy, clearLegacy) {
+    for (const r of legacy.records) setRecord(r);
+    for (const [id, t] of Object.entries(legacy.tombstones)) tombs.set(id, t);
+    await backend.putMany('atenciones', [...records.values(), ...future.values()]);
+    await backend.putMany(
+      'eliminadas',
+      [...tombs].map(([id, t]) => ({ id, t })),
+    );
+    for (const r of [...records.values(), ...future.values()]) persisted.set(keyOf('atenciones', r.id), JSON.stringify(r));
+    for (const [id, t] of tombs) persisted.set(keyOf('eliminadas', id), JSON.stringify({ id, t }));
+    // Solo después de escribir y confirmar se libera el espacio antiguo.
+    const check = await backend.getAll('atenciones');
+    if (check.length >= records.size + future.size) clearLegacy?.();
+    return { migrated: legacy.records.length };
+  }
+
   const repo = {
     backendName: backend.name,
 
@@ -230,49 +291,9 @@ export function createRepo(
         backend.getAll('pacientes'),
         backend.getAll('adjuntos').catch(/** @returns {DocumentoLeido[]} */ () => []),
       ]);
-      for (const raw of atts) {
-        const a = normalizeAttachment(raw);
-        if (!a) continue;
-        attachments.set(a.id, a);
-        persisted.set(keyOf('adjuntos', a.id), JSON.stringify(a));
-      }
-      for (const raw of pats) {
-        const p = normalizePatient(raw);
-        if (!p) continue;
-        patients.set(p.id, p);
-        patientsSorted = null;
-        persisted.set(keyOf('pacientes', p.id), JSON.stringify(p));
-      }
-      for (const r of recs) {
-        const saved = setRecord(r);
-        if (saved) persisted.set(keyOf('atenciones', r.id), JSON.stringify(r));
-      }
-      for (const d of dels) {
-        // Las lápidas ({id, t}) solo las escribe este repositorio.
-        tombs.set(d.id, /** @type {number} */ (d.t));
-        persisted.set(keyOf('eliminadas', d.id), JSON.stringify(d));
-      }
-      for (const d of docs) {
-        // La bitácora solo la escribe este repositorio (addAuditEntry, y saveAuditDocs tras validarla).
-        audit.set(d.id, /** @type {AuditDoc} */ (/** @type {unknown} */ (d)));
-        persisted.set(keyOf('bitacora', d.id), JSON.stringify(d));
-      }
+      hydrate({ recs, dels, docs, pats, atts });
       const empty = !recs.length && !dels.length;
-      if (empty && legacy && (legacy.records.length || Object.keys(legacy.tombstones).length)) {
-        for (const r of legacy.records) setRecord(r);
-        for (const [id, t] of Object.entries(legacy.tombstones)) tombs.set(id, t);
-        await backend.putMany('atenciones', [...records.values(), ...future.values()]);
-        await backend.putMany(
-          'eliminadas',
-          [...tombs].map(([id, t]) => ({ id, t })),
-        );
-        for (const r of [...records.values(), ...future.values()]) persisted.set(keyOf('atenciones', r.id), JSON.stringify(r));
-        for (const [id, t] of tombs) persisted.set(keyOf('eliminadas', id), JSON.stringify({ id, t }));
-        // Solo después de escribir y confirmar se libera el espacio antiguo.
-        const check = await backend.getAll('atenciones');
-        if (check.length >= records.size + future.size) clearLegacy?.();
-        return { migrated: legacy.records.length };
-      }
+      if (empty && legacy && hasLegacyData(legacy)) return await migrateLegacy(legacy, clearLegacy);
       return { migrated: 0 };
     },
 

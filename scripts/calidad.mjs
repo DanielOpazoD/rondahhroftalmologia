@@ -8,7 +8,7 @@
  *  - tipos: módulos con verificación estricta (jsconfig.json);
  *  - complejidad: la más alta y cuántas funciones pasan de 15 (ESLint `complexity`,
  *    con tope en eslint.config.js);
- *  - capas y dependencias (scripts/deps.mjs);
+ *  - capas, dependencias y exportaciones sin uso (scripts/deps.mjs);
  *  - manejo de errores: cada `catch` relanza, informa, sigue con una
  *    alternativa o explica en un comentario por qué se ignora (un bloque vacío
  *    sin comentario ya lo rechaza la regla `no-empty` de ESLint).
@@ -17,7 +17,7 @@ import { readFileSync, globSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
-import { analyze } from './deps.mjs';
+import { analyze, exportUsage } from './deps.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const rel = (/** @type {string} */ f) => f.replace(ROOT + '/', '');
@@ -76,12 +76,14 @@ async function scan() {
 const t = strictCoverage();
 const { cx, kinds: c } = await scan();
 const d = analyze();
+const e = exportUsage();
 console.log(`Tipos estrictos:   ${t.strict}/${t.total} módulos de src/ (${Math.round((t.strict / t.total) * 100)} %)`);
 console.log(`Complejidad:       máxima ${cx[0]?.n ?? '≤15'}${cx[0] ? ` (${cx[0].where})` : ''}; ${cx.length} funciones sobre 15`);
 for (const x of cx.slice(0, 5)) console.log(`                   ${String(x.n).padStart(3)}  ${x.where}`);
 console.log(
   `Capas:             ${d.cycles.length} ciclos, ${d.violations.length} dependencias no permitidas, ${d.external.size} paquetes externos`,
 );
+console.log(`Exportaciones:     ${e.total} en src/; ${e.unused.length} sin uso, ${e.testOnly.length} usadas solo por las pruebas`);
 console.log(
   `catch:             ${Object.entries(c)
     .map(([k, v]) => `${v} ${k}`)

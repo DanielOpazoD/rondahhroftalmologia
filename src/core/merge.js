@@ -22,9 +22,6 @@ import { flatten, unflatten, isSafeKey } from './fields.js';
 import { isFutureVersion } from './migrations.js';
 import { mergeAuditDocs } from './audit.js';
 
-// Se re-exportan: muchos módulos las toman de aquí (ver core/fields.js).
-export { flatten, unflatten, isSafeKey };
-
 /** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
 
 /**
@@ -158,6 +155,27 @@ export function syncMerge(kind, local, remote) {
   return { data, sameAsRemote: sameContent(data, /** @type {RegistroFusionable} */ (remote)) };
 }
 
+/** @param {[string, unknown]} a @param {[string, unknown]} b */
+const byPath = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+
+/**
+ * Qué cuenta como contenido en cada tipo de elemento (ver syncFingerprint).
+ * @type {Record<string, (data: Record<string, unknown>) => unknown>}
+ */
+const CONTENT_OF = {
+  atencion: (data) => [...flatten(/** @type {RegistroFusionable} */ (data))].sort(byPath),
+  paciente: (data) => [...flatten(/** @type {RegistroFusionable} */ (data))].sort(byPath),
+  medico: (data) => [
+    data?.nombre || '',
+    data?.rut || '',
+    data?.apellido_paterno ?? null,
+    data?.apellido_materno ?? null,
+    data?.nombres ?? null,
+  ],
+  operativo: (data) => [data?.nombre || ''],
+  bitacora: (data) => /** @type {{id: string}[]} */ (data?.entries || []).map((e) => e.id).sort(),
+};
+
 /**
  * Representación canónica del CONTENIDO de un elemento sincronizado (sin
  * fechas de edición): dos versiones con igual huella tienen los mismos datos.
@@ -167,19 +185,5 @@ export function syncMerge(kind, local, remote) {
  * @param {Record<string, unknown>} data datos descifrados del elemento (forma según `kind`)
  */
 export function syncFingerprint(kind, data) {
-  if (kind === 'atencion' || kind === 'paciente') {
-    return JSON.stringify([...flatten(/** @type {RegistroFusionable} */ (data))].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
-  }
-  if (kind === 'medico') {
-    return JSON.stringify([
-      data?.nombre || '',
-      data?.rut || '',
-      data?.apellido_paterno ?? null,
-      data?.apellido_materno ?? null,
-      data?.nombres ?? null,
-    ]);
-  }
-  if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
-  if (kind === 'bitacora') return JSON.stringify(/** @type {{id: string}[]} */ (data?.entries || []).map((e) => e.id).sort());
-  return JSON.stringify(data ?? null);
+  return JSON.stringify(Object.hasOwn(CONTENT_OF, kind) ? CONTENT_OF[kind](data) : (data ?? null));
 }

@@ -4,7 +4,7 @@
  */
 
 /** Lado mayor máximo de una foto adjunta (px). */
-export const MAX_SIDE = 2400;
+const MAX_SIDE = 2400;
 /** Por debajo de este tamaño no se recomprime (si además cabe en MAX_SIDE). */
 const SMALL_BYTES = 1.5 * 1024 * 1024;
 

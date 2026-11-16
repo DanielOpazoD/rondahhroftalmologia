@@ -20,7 +20,7 @@ export default [
       curly: ['error', 'multi-line'],
       // Funciones simples (docs/CALIDAD.md). El tope solo baja: al simplificar
       // la función más compleja, se baja este número (npm run calidad la muestra).
-      complexity: ['error', 25],
+      complexity: ['error', 18],
       'max-depth': ['error', 4],
     },
   },

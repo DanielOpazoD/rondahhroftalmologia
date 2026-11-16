@@ -14,7 +14,7 @@
  */
 
 /** Campos de texto que la plataforma usa en todas las especialidades. */
-export const PLATFORM_FIELDS = [
+const PLATFORM_FIELDS = [
   'operativo',
   'fecha_atencion',
   'paciente_nombre',
@@ -34,7 +34,7 @@ export const PLATFORM_FIELDS = [
 ];
 
 /** Funciones que la plataforma llama en la especialidad. */
-export const REQUIRED_FUNCTIONS = [
+const REQUIRED_FUNCTIONS = [
   // clínica y formulario
   'validarClinico',
   'proceduresDone',

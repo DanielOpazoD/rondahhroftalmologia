@@ -55,10 +55,11 @@ export function gesDefaults(rec, now = new Date()) {
   };
 }
 
-/** @param {DatosGes} data @returns {string | null} */
-export function validateGes(data) {
-  if (!data.paciente_nombre.trim() || !data.paciente_rut.trim()) return 'Completa el nombre y RUT del paciente.';
-  if (!data.profesional_nombre.trim() || !data.profesional_rut.trim()) return 'Completa el nombre y RUT de quien notifica.';
+/**
+ * Mensaje para el primer RUT escrito que no es válido (formato o dígito verificador); null si todos lo son.
+ * @param {DatosGes} data @returns {string | null}
+ */
+function invalidRutError(data) {
   for (const [label, value] of [
     ['del paciente', data.paciente_rut],
     ['del profesional', data.profesional_rut],
@@ -68,6 +69,15 @@ export function validateGes(data) {
       return `El RUT ${label} no es válido. Revisa el número y dígito verificador.`;
     }
   }
+  return null;
+}
+
+/** @param {DatosGes} data @returns {string | null} */
+export function validateGes(data) {
+  if (!data.paciente_nombre.trim() || !data.paciente_rut.trim()) return 'Completa el nombre y RUT del paciente.';
+  if (!data.profesional_nombre.trim() || !data.profesional_rut.trim()) return 'Completa el nombre y RUT de quien notifica.';
+  const rutError = invalidRutError(data);
+  if (rutError) return rutError;
   if (!GES_PATOLOGIAS.includes(data.patologia)) return 'Selecciona una patología GES de la lista.';
   if (!['fonasa', 'isapre'].includes(data.prevision)) return 'Selecciona la previsión del paciente.';
   if (!fmtDate(data.fecha) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.hora)) return 'Revisa la fecha y hora de notificación.';

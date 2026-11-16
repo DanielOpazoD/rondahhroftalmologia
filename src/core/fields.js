@@ -39,12 +39,20 @@ export function flatten(rec) {
   for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
   if (rec?.cat) m.set('cat', String(rec.cat));
   if (rec?.pacienteId) m.set('pacienteId', String(rec.pacienteId));
-  // Cada procedimiento se recorre por partes (`eye` y las medidas de la especialidad).
-  for (const [id, p] of /** @type {[string, Record<string, unknown>][]} */ (Object.entries(rec?.proc || {}))) {
+  flattenProc(m, rec?.proc);
+  return m;
+}
+
+/**
+ * Agrega al mapa las partes presentes de cada procedimiento (`eye` y las medidas de la especialidad).
+ * @param {Map<string, ValorRuta>} m
+ * @param {RegistroFusionable['proc']} proc
+ */
+function flattenProc(m, proc) {
+  for (const [id, p] of /** @type {[string, Record<string, unknown>][]} */ (Object.entries(proc || {}))) {
     if (!isSafeKey(id) || !p || typeof p !== 'object') continue;
     for (const k of PROC_KEYS) if (present(p[k])) m.set(`proc.${id}.${k}`, String(p[k]));
   }
-  return m;
 }
 
 /**

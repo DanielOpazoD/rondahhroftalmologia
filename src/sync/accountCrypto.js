@@ -21,7 +21,7 @@ export const ACCOUNT_ITERATIONS = 310_000;
 const LABEL = 'hhr-cuentas-v1';
 
 /** Sal nueva para una cuenta (base64, 16 bytes). */
-export function newSalt() {
+function newSalt() {
   return bytesToB64(globalThis.crypto.getRandomValues(new Uint8Array(16)));
 }
 
@@ -66,7 +66,7 @@ function wrappingKey(envoltura, complemento) {
  * @param {{envoltura: Uint8Array, complemento: string, uid: string}} o
  * @returns {Promise<{iv: string, ct: string}>}
  */
-export async function wrapTeamKey(teamKeyB64, { envoltura, complemento, uid }) {
+async function wrapTeamKey(teamKeyB64, { envoltura, complemento, uid }) {
   return encryptPayload(await wrappingKey(envoltura, complemento), 'cuenta:' + uid, 1, { k: teamKeyB64 });
 }
 

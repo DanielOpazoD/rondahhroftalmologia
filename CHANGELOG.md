@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.24.0 — 2026-11-16
+
+### Cimientos (docs/CALIDAD.md)
+- **Sin código muerto**: una prueba exige que cada `export` del código lo use otro archivo. Sobraban 37 exportaciones (526 → 489): 34 se usaban solo dentro de su propio archivo y 3 eran una re-exportación duplicada.
+- **HTML seguro, más estricto**: la función que marca un texto como HTML sin escapar ya no se puede usar fuera de su módulo.
+- **Funciones más simples**: la complejidad máxima bajó de 25 a 18 (sincronización, huella de contenido, bitácora, estadísticas ORL, ajustes, apertura de datos…); funciones sobre 15: de 35 a 23. El tope ahora también rige para `scripts/`.
+- **Cobertura mínima más alta**: líneas 97 %, ramas 87 %, funciones 92 % (antes 95 / 85 / 87).
+- Sin cambios de comportamiento: salidas (PDF, nota, Excel) idénticas y 200 escenarios de sincronización concurrente sin diferencias.
+
 ## 2.23.0 — 2026-11-16
 
 ### Correcciones (encontradas al revisar los tipos)

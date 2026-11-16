@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import { deriveTeamKeys, tokenHash, importEncKey } from '../src/sync/crypto.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createSyncApi, syncOnce, createSyncCache } from '../src/sync/client.js';
-import { syncMerge, stampChanges, flatten } from '../src/core/merge.js';
+import { syncMerge, stampChanges } from '../src/core/merge.js';
+import { flatten } from '../src/core/fields.js';
 import { syncFingerprint } from '../src/core/merge.js';
 
 /** Generador pseudoaleatorio reproducible. */

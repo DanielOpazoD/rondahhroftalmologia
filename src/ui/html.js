@@ -2,7 +2,7 @@
  * Plantillas HTML seguras.
  *
  * `html` escapa TODO valor interpolado salvo que ya sea HTML seguro (otra
- * plantilla `html`, o `raw` para íconos y marcado fijo del código). Así no hay
+ * plantilla `html` o un `join` de ellas). Así no hay
  * que acordarse de escapar en cada lugar: un nombre de paciente con `<` nunca
  * se interpreta como HTML. `setHtml` es la única forma de escribir innerHTML
  * en la interfaz (ESLint prohíbe asignarlo directamente).
@@ -21,8 +21,12 @@ export class SafeHtml {
   }
 }
 
-/** Marca como seguro un texto con HTML escrito en el código (nunca datos del usuario). @param {unknown} s */
-export const raw = (s) => new SafeHtml(String(s));
+/**
+ * Marca como seguro un texto ya escapado o escrito en este módulo. No se
+ * exporta: fuera de aquí no hay forma de insertar HTML sin escapar.
+ * @param {unknown} s
+ */
+const raw = (s) => new SafeHtml(String(s));
 
 /**
  * @param {unknown} v valor interpolado (SafeHtml, arreglo o texto a escapar)

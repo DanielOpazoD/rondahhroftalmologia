@@ -16,7 +16,7 @@ import { remoteVersions, chunks as batches } from './protocol.js';
 import { chunkId, splitChunks, joinChunks, sha256Hex } from '../core/attachments.js';
 
 /** Partes por solicitud: ~350.000 caracteres cada una cifrada, bajo el límite de 5,5 MB por solicitud. */
-export const CHUNKS_PER_REQUEST = 12;
+const CHUNKS_PER_REQUEST = 12;
 
 /** @param {Uint8Array} bytes */
 const toB64 = (bytes) => {

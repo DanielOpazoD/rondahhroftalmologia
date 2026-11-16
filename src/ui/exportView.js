@@ -99,7 +99,7 @@ function requireData(ctx) {
  * @param {AppContext} ctx
  * @param {HTMLButtonElement} button
  */
-export function exportStatsXlsx(ctx, button) {
+function exportStatsXlsx(ctx, button) {
   const list = requireData(ctx);
   if (!list) return;
   return withBusy(button, async () => {

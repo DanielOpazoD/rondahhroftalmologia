@@ -8,7 +8,7 @@ import { isFutureVersion, versionOf } from './migrations.js';
 import { SCHEMA_VERSION } from '../config/catalogs.js';
 
 /** Cuántas versiones de esquema por delante se aceptan en un respaldo. */
-export const MAX_FUTURE_STEPS = 3;
+const MAX_FUTURE_STEPS = 3;
 import { mergeRecords, sameContent } from './merge.js';
 import { mergeAuditDocs } from './audit.js';
 import { normalizePatient } from './patient.js';

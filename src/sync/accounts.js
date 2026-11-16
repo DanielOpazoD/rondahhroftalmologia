@@ -51,7 +51,7 @@ import { ROLES } from '../config/catalogs.js';
 /** @typedef {{uid: string, inicio: number, ultimo: number, exp: number, fin?: number, motivo?: string}} Sesion */
 /** @typedef {{user: Cuenta, sid: string, mustChange: boolean}} Autenticado */
 
-export const ACCOUNT_IP_LIMIT = Object.freeze({ maxFails: 30, windowMs: 15 * 60_000, blockMs: 15 * 60_000 });
+const ACCOUNT_IP_LIMIT = Object.freeze({ maxFails: 30, windowMs: 15 * 60_000, blockMs: 15 * 60_000 });
 /** Eventos que puede informar la app (los demás los registra el servidor). */
 export const CLIENT_EVENTS = Object.freeze([
   'ficha.ver',
