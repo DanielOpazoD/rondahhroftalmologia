@@ -8,7 +8,7 @@
 /** Fecha de edición (ms) de cada campo: 'f.<campo>', 'checks.<clave>', 'cat', 'proc.<id>.eye|od|oi', 'pacienteId'. */
 export type FechasPorCampo = Record<string, number>;
 
-/** Episodio de atención de una especialidad (esquema v4). */
+/** Episodio de atención de una especialidad (esquema v6). */
 export interface Atencion {
   v: number;
   especialidad: string;
@@ -16,6 +16,7 @@ export interface Atencion {
   created?: number;
   updated?: number;
   pacienteId?: string;
+  /** Incluye form_ges_*, form_ipd_* y form_receta_*: borradores del formulario de esta atención. */
   f: Record<string, string>;
   checks: Record<string, boolean>;
   cat: '' | 'OD' | 'OI' | 'AO';

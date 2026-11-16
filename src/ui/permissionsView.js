@@ -42,6 +42,9 @@ export function applyPermissions(ctx) {
     }
   }
   $('#roBanner').hidden = edit;
+  $('#bForms').hidden = !ctx.hasClinicalForms;
+  $('#bForms').disabled = !edit;
+  document.body.classList.toggle('has-forms', ctx.hasClinicalForms);
 }
 
 /**
@@ -66,6 +69,8 @@ export function guardActions(ctx) {
   ctx.save = (/** @type {any[]} */ ...args) => (allowed(PERMISSIONS.EDITAR_CLINICO) ? save(...args) : Promise.resolve(false));
   wrap('newAttention', PERMISSIONS.EDITAR_CLINICO);
   wrap('newAttentionFor', PERMISSIONS.EDITAR_CLINICO);
+  wrap('openForms', PERMISSIONS.EDITAR_CLINICO);
+  wrap('rememberForm', PERMISSIONS.EDITAR_CLINICO);
   wrap('addAttachments', PERMISSIONS.EDITAR_CLINICO);
   wrap('deleteAttachment', PERMISSIONS.EDITAR_CLINICO);
   // Quitar de la lista a alguien aún no atendido (un ingreso por error) es parte del ingreso.

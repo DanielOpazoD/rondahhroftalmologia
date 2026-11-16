@@ -1,14 +1,16 @@
 # Formularios GES e IPD
 
-Desde **Atención → PDF** se puede abrir la constancia GES o el **IPD · Proceso diagnóstico**. Ambos permiten revisar los datos, descargar el PDF y elegir **Imprimir**: se muestra el mismo PDF en un visor del navegador y se solicita su diálogo de impresión. Se conserva el botón Imprimir del visor y la descarga para los navegadores que limiten la impresión automática. Las plantillas y el catálogo se incluyen en el HTML y funcionan sin red.
+Desde el **botón circular Formularios**, fijo abajo a la derecha, se puede abrir la constancia GES, el **IPD · Proceso diagnóstico** o la receta para lentes de la atención activa. Si se abre desde el detalle de otro paciente en Pacientes, primero se muestra su atención más reciente. Permiten revisar los datos, descargar el PDF y elegir **Imprimir**: se muestra el mismo PDF en un visor del navegador y se solicita su diálogo de impresión. Se conserva el botón Imprimir del visor y la descarga para los navegadores que limiten la impresión automática. Las plantillas y el catálogo se incluyen en el HTML y funcionan sin red.
 
-Los formularios toman una copia de la atención visible. Las correcciones hechas allí no cambian la atención, la ficha ni el perfil. Bloquear el equipo o cambiar la sesión descarta el diálogo y su vista previa. Las firmas se completan en papel.
+Los formularios toman inicialmente los datos de la atención visible. Las correcciones se guardan automáticamente en campos propios de esa atención, sin reemplazar datos demográficos ni perfiles. **Cerrar** conserva el borrador; al recargar o volver al paciente se recupera. Otro paciente y una atención nueva parten con sus propios datos. Los valores vaciados expresamente también se conservan vacíos. Los respaldos y la sincronización incluyen los borradores y sus fechas de edición por campo.
+
+El bloqueo, el cambio de cuenta o el cambio de atención cierra el diálogo y su vista previa, y revoca el PDF temporal. Lo escrito hasta entonces sigue en la atención. Las firmas se completan en papel.
 
 ## IPD
 
 - Servicio de Salud **Metropolitano Oriente** y establecimiento **Hospital Hanga Roa**, fijos.
 - Paciente y profesional con **apellido paterno, apellido materno y nombres** separados. El materno puede quedar vacío. RUT, nacimiento y sexo se proponen desde la atención; se pueden corregir para esta emisión.
-- Fecha y hora del informe: instante de apertura en **Pacific/Easter**. Cada dígito de día, mes, año, hora, RUT e historia clínica ocupa su casilla original.
+- Fecha y hora del informe: se proponen al empezar en **Pacific/Easter** y se recuperan al reabrir el borrador. Cada dígito de día, mes, año, hora, RUT e historia clínica ocupa su casilla original.
 - Confirmación de pertenencia a GES: **X en Sí**.
 - Especialidad, unidad, historia clínica, folio y fecha límite de tratamiento son opcionales y parten vacíos.
 - Problema GES y subgrupo se eligen explícitamente. Diagnóstico, fundamentos y tratamiento son de escritura libre; no se deducen de las casillas clínicas de la atención.
@@ -16,7 +18,7 @@ Los formularios toman una copia de la atención visible. Las correcciones hechas
 
 ### Plantilla y catálogo
 
-La plantilla proviene del formulario vacío que publica el Hospital Provincial del Huasco en la **página 16** de su [protocolo de ortodoncia y ortopedia dentomaxilofacial](https://www.hospitalprovincialdelhuasco.cl/web/wp-content/uploads/2017/08/protocolo-ortodoncia-y-ortopedia-dento-m%C3%A1xilo-facial.pdf). Se extrajo la imagen original de 1226 × 1612 píxeles y se centró en carta conservando su proporción; no se redibujaron sus textos ni casillas. La copia local `ipd-plantilla.pdf` tiene SHA-256 `6d3132e9cfd4e8a80ef50752db888f0313ad137bbe889c2e7aa2e6eb2caa8859`.
+La plantilla proviene del formulario vacío que publica el Hospital Provincial del Huasco en la **página 16** de su [protocolo de ortodoncia y ortopedia dentomaxilofacial](https://www.hospitalprovincialdelhuasco.cl/web/wp-content/uploads/2017/08/protocolo-ortodoncia-y-ortopedia-dento-m%C3%A1xilo-facial.pdf). Se extrajo la imagen original de 1226 × 1612 píxeles y se centró en carta conservando su proporción; no se redibujaron sus textos ni casillas. La copia original tenía SHA-256 `6d3132e9cfd4e8a80ef50752db888f0313ad137bbe889c2e7aa2e6eb2caa8859`. La plantilla optimizada desde 2.22.0 (ver [rendimiento](RENDIMIENTO.md)) tiene SHA-256 `ef068c1019a709989229051a31193680fecf3a096707a68624741426d9ee74cf`.
 
 Los **90 títulos** y números provienen del [CodeSystem MINSAL TEI 0.2.3, publicado el 22-07-2026](https://interoperabilidad.minsal.cl/fhir/ig/tei/0.2.3/CodeSystem-cs-problema-ges-tei.html). El JSON fuente consultado el 15-11-2026 tiene SHA-256 `a55e221be9edadd654f8b89fa6be8a735a3ded3b7af8217de0cc80bd4668d830`. Las **áreas son una agrupación para navegar en esta app**, no una clasificación oficial de especialidades.
 

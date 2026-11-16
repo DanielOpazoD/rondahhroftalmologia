@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 test.use({ timezoneId: 'UTC' });
 
 async function openGes(page) {
-  await page.locator('#bPdf').click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^Constancia GES/ }).click();
   return page.getByRole('dialog', { name: 'Constancia GES' });
 }
@@ -51,15 +51,16 @@ test('constancia GES: datos autocompletados, selección, validación y descarga 
   await expect(page.locator('#paciente_fono')).toHaveValue('+56 9 1234 5678');
 });
 
-test('cancelar GES no cambia la atención y el siguiente paciente trae sus propios datos', async ({ page }) => {
+test('cerrar GES conserva el formulario sin cambiar los datos demográficos y otro paciente empieza de cero', async ({ page }) => {
   await openApp(page);
   await fillPatient(page, { nombre: 'Primer Paciente Prueba', rut: '12.345.678-5' });
   let dlg = await openGes(page);
   await dlg.getByLabel('Nombre legal', { exact: true }).fill('Cambio solo en el formulario');
-  await dlg.getByRole('button', { name: 'Cancelar' }).click();
+  await dlg.getByRole('button', { name: 'Cerrar' }).click();
   await expect(page.locator('#paciente_nombre')).toHaveValue('Primer Paciente Prueba');
-  await expect(page.locator('#bPdf')).toBeFocused();
-  await page.locator('#paciente_nombres').fill('Segundo Paciente Prueba');
+  await expect(page.locator('#bForms')).toBeFocused();
+  await page.locator('#bNew').click();
+  await fillPatient(page, { nombre: 'Segundo Paciente Prueba', rut: '11.111.111-1' });
   await page.locator('#paciente_fono').fill('912345678');
   dlg = await openGes(page);
   await expect(dlg.getByLabel('Nombre legal', { exact: true })).toHaveValue('Segundo Paciente Prueba');

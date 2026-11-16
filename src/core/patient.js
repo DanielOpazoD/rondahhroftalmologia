@@ -35,6 +35,7 @@ import { NAME_PARTS, refreshNames, personName } from './names.js';
 import { sha256 } from '../lib/sha256.js';
 import { rutKey, normalizeText, compareCode } from './format.js';
 import { unknownFields, isSafeField } from './compat.js';
+import { isClinicalFormContent } from './clinicalForms.js';
 
 /** @typedef {import('../domain').Paciente} Paciente */
 /** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
@@ -269,7 +270,9 @@ const NON_CLINICAL = new Set([
 export function isAttended(rec) {
   if (Object.values(rec.checks || {}).some(Boolean)) return true;
   if (Object.keys(rec.proc || {}).length || rec.cat) return true;
-  return Object.entries(rec.f || {}).some(([k, v]) => !NON_CLINICAL.has(k) && String(v ?? '').trim() !== '');
+  return Object.entries(rec.f || {}).some(
+    ([k, v]) => !NON_CLINICAL.has(k) && (!k.startsWith('form_') || isClinicalFormContent(k)) && String(v ?? '').trim() !== '',
+  );
 }
 
 /* ------------------------------------------------- identidad y duplicados */

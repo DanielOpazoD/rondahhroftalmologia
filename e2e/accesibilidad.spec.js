@@ -14,18 +14,18 @@ async function audit(page, where) {
 
 async function auditGes(page, where) {
   await tab(page, 'Atención');
-  await page.locator('#bPdf').click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^Constancia GES/ }).click();
   const found = await audit(page, where);
-  await page.getByRole('dialog', { name: 'Constancia GES' }).getByRole('button', { name: 'Cancelar' }).click();
-  await page.locator('#bPdf').click();
+  await page.getByRole('dialog', { name: 'Constancia GES' }).getByRole('button', { name: 'Cerrar' }).click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^IPD/ }).click();
   found.push(...(await audit(page, where + ' IPD')));
-  await page.getByRole('dialog', { name: 'IPD · Informe del proceso diagnóstico' }).getByRole('button', { name: 'Cancelar' }).click();
-  await page.locator('#bPdf').click();
+  await page.getByRole('dialog', { name: 'IPD · Informe del proceso diagnóstico' }).getByRole('button', { name: 'Cerrar' }).click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^Receta para lentes/ }).click();
   found.push(...(await audit(page, where + ' receta para lentes')));
-  await page.getByRole('dialog', { name: 'Receta para lentes' }).getByRole('button', { name: 'Cancelar' }).click();
+  await page.getByRole('dialog', { name: 'Receta para lentes' }).getByRole('button', { name: 'Cerrar' }).click();
   return found;
 }
 

@@ -186,6 +186,9 @@ async function main() {
     ctx.downloadPdf(ctx.rec, /** @type {HTMLButtonElement} */ (e.currentTarget)),
   );
   $('#brandBtn').addEventListener('click', () => ctx.showTab('t-aj'));
+  $('#bForms').addEventListener('click', (/** @type {MouseEvent} */ e) =>
+    ctx.openForms(/** @type {HTMLButtonElement} */ (e.currentTarget)),
+  );
 
   // Ctrl/Cmd + S guarda la atención.
   document.addEventListener('keydown', (e) => {

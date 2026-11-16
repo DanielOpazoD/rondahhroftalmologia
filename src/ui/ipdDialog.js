@@ -8,6 +8,7 @@ import { SEXOS } from '../config/catalogs.js';
 import { html, setHtml } from './html.js';
 import { base64ToBytes, required } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
+import { clinicalFormValues } from '../core/clinicalForms.js';
 
 /**
  * @param {import('./context.js').AppContext} ctx
@@ -16,7 +17,7 @@ import { openClinicalForm, clinicalInput } from './clinicalForm.js';
  * @returns {Promise<void>}
  */
 export function downloadIpd(ctx, rec, anchor) {
-  const initial = ipdDefaults(rec);
+  const initial = clinicalFormValues(rec, 'ipd', ipdDefaults(rec));
   /** @param {string} key @param {string} label @param {string} [type] */
   const input = (key, label, type = 'text') => clinicalInput(initial, key, label, type);
   /** Apellidos y nombres de una persona. @param {string} prefix 'paciente_' o 'profesional_' */
@@ -36,6 +37,7 @@ export function downloadIpd(ctx, rec, anchor) {
     initial,
     anchor,
     id: rec.id,
+    remember: (values, previous) => ctx.rememberForm(rec, 'ipd', previous, values),
     validate: validateIpd,
     build: (values) => buildIpdPdf(base64ToBytes(templateB64), values),
     filename: ipdFileName,
@@ -77,10 +79,10 @@ export function downloadIpd(ctx, rec, anchor) {
       const problemSelect = form.elements.namedItem('problema');
       const sub = form.elements.namedItem('subgrupo');
       if (!(problemSelect instanceof HTMLSelectElement) || !(sub instanceof HTMLInputElement)) return;
-      problemSelect.addEventListener('change', () => {
+      const updateSubgroups = (/** @type {boolean} */ reset) => {
         const selected = problemSelect.value;
         const subgroups = GES_SUBGRUPOS.find((s) => s.problemaId === selected);
-        sub.value = '';
+        if (reset) sub.value = '';
         // Elementos del cuerpo de este formulario (arriba): siempre están.
         setHtml(
           required(form.querySelector('datalist'), 'la lista de subgrupos'),
@@ -89,7 +91,9 @@ export function downloadIpd(ctx, rec, anchor) {
         required(form.querySelector('[data-subgroup-hint]'), 'la ayuda de subgrupos').textContent = subgroups
           ? 'Opciones del manual SIGGES MINSAL. Selecciona o escribe el subgrupo.'
           : 'Sin subdivisiones verificadas en el catálogo local. Puedes escribir el subgrupo si corresponde.';
-      });
+      };
+      problemSelect.addEventListener('change', () => updateSubgroups(true));
+      updateSubgroups(false);
     },
   });
 }

@@ -7,7 +7,7 @@ import { readFile } from 'node:fs/promises';
 test.use({ timezoneId: 'UTC', channel: 'chromium' });
 
 async function openReceta(page) {
-  await page.locator('#bPdf').click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^Receta para lentes/ }).click();
   return page.getByRole('dialog', { name: 'Receta para lentes' });
 }
@@ -67,11 +67,11 @@ test('receta: propone paciente y profesional, permite correcciones y descarga lo
   await expect(dlg).toHaveCount(0);
   await expect(page.locator('#paciente_nombre')).toHaveValue('Ejemplo Ficticio Paciente de Prueba');
   const reopened = await openReceta(page);
-  await expect(reopened.getByLabel('Nombre del paciente')).toHaveValue('Ejemplo Ficticio Paciente de Prueba');
-  await expect(reopened.getByLabel('Lejos OD', { exact: true })).toHaveValue('');
+  await expect(reopened.getByLabel('Nombre del paciente')).toHaveValue('Ejemplo Ficticio Nombre Corregido');
+  await expect(reopened.getByLabel('Lejos OD', { exact: true })).toHaveValue('−1,00 −0,50 x 90');
 });
 
-test('receta: diálogo compacto, cancelación y datos del siguiente paciente sin arrastrar la graduación', async ({ page }) => {
+test('receta: diálogo compacto, cierre y datos del siguiente paciente sin arrastrar la graduación', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await openApp(page);
   await fillPatient(page, { nombre: 'Primer Paciente Ficticio', rut: '12.345.678-5' });
@@ -79,10 +79,11 @@ test('receta: diálogo compacto, cancelación y datos del siguiente paciente sin
   expect(await dlg.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
   await dlg.getByLabel('Lejos OD', { exact: true }).fill('-2,00');
   await dlg.getByLabel('Nombre del paciente').fill('Solo en el formulario');
-  await dlg.getByRole('button', { name: 'Cancelar' }).click();
-  await expect(page.locator('#bPdf')).toBeFocused();
+  await dlg.getByRole('button', { name: 'Cerrar' }).click();
+  await expect(page.locator('#bForms')).toBeFocused();
   await expect(page.locator('#paciente_nombre')).toHaveValue('Primer Paciente Ficticio');
-  await page.locator('#paciente_nombres').fill('Segundo Paciente Ficticio');
+  await page.locator('#bNew').click();
+  await fillPatient(page, { nombre: 'Segundo Paciente Ficticio', rut: '11.111.111-1' });
   await page.setViewportSize({ width: 390, height: 844 });
   dlg = await openReceta(page);
   await expect(dlg.getByLabel('Nombre del paciente')).toHaveValue('Segundo Paciente Ficticio');

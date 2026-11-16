@@ -18,12 +18,23 @@ const CHECK_LABELS = Object.fromEntries([
   ...DIAGNOSTICOS.map((d) => [d.key, 'Dx ' + d.label]),
 ]);
 
+/** Etiqueta de un campo de formulario clínico. @param {RegExpExecArray} form */
+function clinicalFormLabel(form) {
+  const title = form[1] === 'ges' ? 'GES' : form[1] === 'ipd' ? 'IPD' : 'Receta de lentes';
+  const key = form[2];
+  const label =
+    /** @type {Record<string, string>} */ (ETIQUETAS)[key] || key.replaceAll('_', ' ').replace(/\b(od|oi|dp)\b/g, (s) => s.toUpperCase());
+  return `${title} · ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+}
+
 /**
  * Nombre legible de una ruta de campo.
  * @param {string} path p. ej. 'f.od_pio', 'checks.diagnostico_rdp', 'proc.t_aplan.od'
  * @param {{id: string, n: string}[]} [procs]
  */
 export function auditLabel(path, procs = []) {
+  const form = /^f\.form_(ges|ipd|receta)_(.+)$/.exec(path);
+  if (form) return clinicalFormLabel(form);
   if (path.startsWith('f.')) return /** @type {Record<string, string>} */ (ETIQUETAS)[path.slice(2)] || path.slice(2);
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';

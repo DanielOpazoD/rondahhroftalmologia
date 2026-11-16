@@ -41,6 +41,8 @@ export const isFutureVersion = (raw) => versionOf(raw) > SCHEMA_VERSION;
  * @type {Record<number, (r: RegistroCrudo) => RegistroCrudo>}
  */
 export const STEPS = {
+  // v5 -> v6: borradores de formularios en f.form_<tipo>_<campo>, con sus sellos ft.
+  5: (r) => ({ ...r, v: 6 }),
   // v4 -> v5: nombres separados, opcionales. No se adivinan los apellidos ni se cambia pacienteId.
   4: (r) => {
     // Una ficha antigua sin vínculo explícito conserva la llave basada en su nombre anterior.

@@ -239,10 +239,10 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
   await expect(B.locator('#bNew')).toBeHidden();
   await expect(B.locator('#attAdd')).toBeHidden();
   // Puede descargar el PDF.
+  await expect(B.locator('#bForms')).toBeVisible();
+  await expect(B.locator('#bForms')).toBeDisabled();
   await B.locator('#bPdf').click();
-  await expect(B.getByRole('menuitem', { name: /^Constancia GES/ })).toBeDisabled();
-  await expect(B.getByRole('menuitem', { name: /^IPD/ })).toBeDisabled();
-  await expect(B.getByRole('menuitem', { name: /^Receta para lentes/ })).toBeDisabled();
+  await expect(B.getByRole('menuitem', { name: /^Constancia GES|^IPD|^Receta para lentes/ })).toHaveCount(0);
   const [pdf] = await Promise.all([B.waitForEvent('download'), B.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
   expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
   // Hace el ingreso.
