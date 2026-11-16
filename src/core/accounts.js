@@ -53,16 +53,20 @@ export function accountRut(rut) {
 /**
  * ¿Sirve como clave nueva? Devuelve el motivo si no.
  * @param {unknown} password
- * @param {{rut?: unknown}} [o] RUT de la cuenta (la clave no puede ser la inicial)
+ * @param {{rut?: unknown, current?: string}} [o] RUT de la cuenta (la clave no puede ser la inicial)
+ *   y clave actual (la nueva debe ser distinta). La regla de la clave actual
+ *   solo se puede revisar aquí: el servidor recibe la clave nueva ya derivada
+ *   con otra sal y no puede compararlas.
  * @returns {string | null}
  */
-export function passwordProblem(password, { rut } = {}) {
+export function passwordProblem(password, { rut, current } = {}) {
   const p = typeof password === 'string' ? password : '';
   if (p.length < PASSWORD_MIN) return `La clave debe tener al menos ${PASSWORD_MIN} caracteres.`;
   if (p.length > PASSWORD_MAX) return `La clave puede tener como máximo ${PASSWORD_MAX} caracteres.`;
   if (!/[A-ZÁÉÍÓÚÜÑ]/.test(p)) return 'La clave debe tener al menos una mayúscula.';
   if (!/[0-9]/.test(p)) return 'La clave debe tener al menos un número.';
   if (rut && p === initialPassword(rut)) return 'La clave nueva no puede ser la inicial (tu RUT).';
+  if (current && p === current) return 'La clave nueva debe ser distinta de la actual.';
   return null;
 }
 

@@ -17,10 +17,10 @@ npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
 | **Capas sin ciclos** | `tests/deps.test.js` | `core/` y `lib/` son puros (sin DOM ni almacenamiento); `ui/` solo la usa `main.js`; la especialidad se usa a través de `specialties/activa/`. Ver `scripts/deps.mjs` (`LAYERS`). |
 | **Sin código muerto** | `tests/deps.test.js` (`exportUsage`) | Cada `export` de `src/` lo importa otro archivo. Si solo se usa en su archivo, no se exporta: la interfaz de cada módulo es lo que de verdad usan los demás. Las que solo usan las pruebas se cuentan en `npm run calidad`. |
 | **Pocas dependencias, conocidas** | `tests/deps.test.js` | Cada paquete externo está en `package.json` con versión fija y documentado en `scripts/deps.mjs` (`EXTERNAL`): para qué y dónde. Máximo 5. |
-| **Funciones simples** | ESLint `complexity` (18) y `max-depth` (4) | Tope de complejidad ciclomática por función y de anidamiento, también en `scripts/`. El tope solo baja: al simplificar una función, se baja el número en `eslint.config.js` (108 → 25 en 2.23.0, → 18 en 2.24.0). |
+| **Funciones simples** | ESLint `complexity` (15) y `max-depth` (4) | Tope de complejidad ciclomática por función y de anidamiento, también en `scripts/`. El tope solo baja: al simplificar una función, se baja el número en `eslint.config.js` (108 → 25 en 2.23.0, → 18 en 2.24.0, → 15 en 2.25.0). `npm run calidad` cuenta las que pasan de 10: la próxima meta. |
 | **Errores que no se pierden** | ESLint `no-empty` + revisión | Cada `catch` relanza, informa (registro de errores o aviso), sigue con una alternativa o explica en un comentario por qué se ignora. |
 | **HTML seguro** | ESLint `no-restricted-syntax` + CSP | Sin `innerHTML`: plantillas `html\`…\`` que escapan solas, y fuera de `src/ui/html.js` no hay forma de marcar un texto como HTML sin escapar. CSP sin `unsafe-inline` (verificada en e2e). |
-| **Pruebas** | CI: cobertura mínima, e2e, estrés | `node:test` con cobertura mínima (líneas 97 %, ramas 87 %, funciones 92 %; el mínimo sube con la cobertura, no baja); 200 escenarios de sincronización concurrente; Playwright en escritorio y celular, incluido lector de pantalla. |
+| **Pruebas** | CI: cobertura mínima, e2e, estrés | `node:test` con cobertura mínima (líneas 97 %, ramas 91 %, funciones 92 %; el mínimo sube con la cobertura, no baja); 200 escenarios de sincronización concurrente; Playwright en escritorio y celular, incluido lector de pantalla. |
 | **Presupuesto de tamaño** | `tests/presupuesto.test.js` | Las plantillas PDF no pueden traer peso invisible ni pasar su tope. |
 | **Rendimiento medido** | `npm run perf` | Con 3.000 atenciones sintéticas; cambios de rendimiento se justifican con un antes y un después. |
 | **Formato uniforme** | Prettier (`format:check` en CI) | El estilo no se discute: lo decide la herramienta. |
@@ -38,6 +38,8 @@ npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
 - **Sincronizar** (`src/ui/syncController.js`, 2.24.0): `syncNow` (25) solo orquesta; las dos pasadas (`syncSpaces`), lo que dijo el servidor (`checkServer`) y el mensaje de cada error (`syncFailed`) son funciones aparte.
 - **Huella de contenido** (`src/core/merge.js`): una cadena de `if` por tipo pasó a una tabla `CONTENT_OF` (tipo → qué cuenta como contenido).
 - **Aplicar lo bajado** (`src/sync/protocol.js`): `applyPulled` usa `replacesLocal` (¿gana lo bajado?) y `resolvePulled` (fusión y si hay que volver a subir).
+- **Acceso a las rutas de cuentas** (2.25.0): `handle` delega en `accessDenied(acceso, sesión)`, la regla completa en dos líneas (clave inicial → solo rutas de sesión; `admin` → solo administradores). Una prueba de mutación confirma que quitar cualquiera de las dos hace fallar las pruebas.
+- **Código repetido entre especialidades**: las dos seudonimizaciones tenían las mismas funciones copiadas; ahora están una vez en `core/pseudonym.js`.
 
 La regla general: una función hace una cosa; si para explicarla hace falta «y además», son dos.
 
@@ -50,6 +52,15 @@ Activar la revisión de nulos en todo `src/` (antes, una opción heredada la dej
 - **Dos sincronizaciones que se cruzan**: una respuesta parcial (solo lo cambiado) podía quedar como si fuera toda la lista del servidor. Ahora pide la lista completa (prueba de regresión en `tests/sync.test.js`, verificada: falla sin el arreglo).
 - **Unir fichas o corregir datos**: una ficha con id inválido devolvía `null` donde se esperaba una ficha; ahora falla con un mensaje claro en vez de guardar un nulo.
 - **Atributos `data-*` faltantes** en la interfaz se usaban como clave `undefined` en silencio; ahora `dataOf()` (en `src/ui/dom.js`) falla con el nombre del atributo.
+
+## Lo que encontraron las pruebas de ramas (2.25.0)
+
+Probar las ramas sin cubrir del servidor de cuentas, la sesión, las fichas y la bitácora (135 → 4 sin probar) mostró cuatro errores reales. Cada uno tiene su prueba, verificada: falla sin el arreglo.
+
+- **Activación a medias**: si se guardaba la cuenta del primer administrador pero no la configuración, reintentar respondía «ya existe una cuenta con ese RUT» para siempre. Ahora el reintento reemplaza la cuenta que quedó a medias (antes de activar no puede haber otras).
+- **Clave nueva igual a la actual**: se aceptaba. El servidor recibe la clave ya derivada con otra sal y no puede compararlas; la regla vive ahora donde se puede revisar, en el cliente (`passwordProblem`, y `changeMyPassword` antes de ir al servidor).
+- **Ficha con `f: null`** (respaldo o sincronización manipulados): rompía con un TypeError; ahora se limpia como cualquier dato inválido.
+- **Solicitud demasiado grande** al servidor de cuentas: respondía 500 y se registraba como falla del servidor; ahora 413, como el de sincronización.
 
 Una revisión que confía en el informe de quien hizo el cambio no basta: el arreglo de las sincronizaciones cruzadas se revisó a mano, se encontró que no hacía lo que decía, y se corrigió con su prueba.
 

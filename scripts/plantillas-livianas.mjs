@@ -47,6 +47,25 @@ const STANDARD = {
 };
 
 /**
+ * Predicción de cada filtro PNG a partir del byte de la izquierda (a), el de
+ * arriba (b) y el de arriba a la izquierda (c): None, Sub, Up, Average, Paeth.
+ * @type {((a: number, b: number, c: number) => number)[]}
+ */
+const PREDICT = [
+  () => 0,
+  (a) => a,
+  (a, b) => b,
+  (a, b) => (a + b) >> 1,
+  (a, b, c) => {
+    const p = a + b - c;
+    const pa = Math.abs(p - a);
+    const pb = Math.abs(p - b);
+    const pc = Math.abs(p - c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  },
+];
+
+/**
  * Filtros PNG por fila (como un PNG: se elige por fila el que deja bytes más
  * pequeños): la imagen se comprime mucho mejor. PDF lo declara con Predictor 15.
  * @param {Uint8Array} raw @param {number} stride bytes por fila @param {number} bpp bytes por píxel
@@ -66,17 +85,7 @@ function pngPredict(raw, stride, bpp) {
         const a = i >= bpp ? cur[i - bpp] : 0;
         const b = up[i];
         const c = i >= bpp ? up[i - bpp] : 0;
-        let pred = 0;
-        if (t === 1) pred = a;
-        else if (t === 2) pred = b;
-        else if (t === 3) pred = (a + b) >> 1;
-        else if (t === 4) {
-          const p = a + b - c;
-          const pa = Math.abs(p - a);
-          const pb = Math.abs(p - b);
-          const pc = Math.abs(p - c);
-          pred = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-        }
+        const pred = PREDICT[t](a, b, c);
         const v = (cur[i] - pred) & 0xff;
         cand[t][i] = v;
         score += v < 128 ? v : 256 - v;

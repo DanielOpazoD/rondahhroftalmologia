@@ -74,15 +74,23 @@ export function normalizeRecord(raw) {
   r.proc = objectOr(r.proc);
   r.cat = OJOS.includes(r.cat) ? r.cat : '';
   cleanStamps(r);
+  cleanParts(r);
+  refreshNames(r.f);
+  return r;
+}
+
+/**
+ * Quita claves inseguras y procedimientos sin ojo válido; los campos quedan
+ * siempre como texto (null/undefined se quitan).
+ * @param {import('../domain').Atencion} r
+ */
+function cleanParts(r) {
   for (const [id, p] of Object.entries(r.proc)) if (!safeKey(id) || !p || !OJOS.includes(p.eye)) delete r.proc[id];
   for (const obj of [r.f, r.checks]) for (const k of Object.keys(obj)) if (!safeKey(k)) delete obj[k];
-  // Campos: siempre texto; null/undefined se quitan.
   for (const [k, v] of Object.entries(r.f)) {
     if (v === null || v === undefined) delete r.f[k];
     else if (typeof v !== 'string') r.f[k] = String(v);
   }
-  refreshNames(r.f);
-  return r;
 }
 
 /** El objeto si es un objeto; si no, uno vacío. @template T @param {T} v @returns {T} */

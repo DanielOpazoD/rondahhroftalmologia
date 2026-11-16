@@ -307,7 +307,7 @@ export function createAccountsController(ctx) {
         { id: 'nueva2', label: 'Repite la clave nueva', type: 'password' },
       ],
       onSave: ({ actual, nueva, nueva2 }) => {
-        const problem = passwordProblem(nueva, { rut: session.user?.rut });
+        const problem = passwordProblem(nueva, { rut: session.user?.rut, current: actual });
         if (problem) return problem;
         if (nueva !== nueva2) return 'Las claves nuevas no coinciden.';
         setTimeout(async () => {

@@ -20,7 +20,16 @@ import { SEXOS, APP } from '../../config/catalogs.js';
 import { DIAGNOSTICOS, ANTECEDENTES, SOLICITADOS } from './config.js';
 import { normalizeText, rutKey, fmtDateTime } from '../../core/format.js';
 import { patientKey } from '../../core/record.js';
-import { pseudonym, scrubText, generalizeAge, generalizeDate, ANON_DEFAULTS, ANON_OPTIONS } from '../../core/pseudonym.js';
+import {
+  pseudonym,
+  scrubText,
+  generalizeAge,
+  generalizeDate,
+  countAttention,
+  trimmed,
+  ANON_DEFAULTS,
+  ANON_OPTIONS,
+} from '../../core/pseudonym.js';
 import { proceduresDone, pioFor } from './clinica.js';
 import { ageOf } from './estadistica.js';
 import { STYLE } from '../../lib/xlsx.js';
@@ -94,21 +103,13 @@ export function anonymizeRecords(records, procs, options) {
     /** @param {string | undefined} v */
     const txt = (v) => (opt.texto === 'excluir' ? undefined : scrubText((v || '').trim(), { names }) || undefined);
 
-    const entry = correspondencia.get(codigo) || {
-      codigo_paciente: codigo,
-      nombre: f.paciente_nombre || '',
-      rut: f.paciente_rut || '',
-      base_codigo: pk.basis,
-      atenciones: 0,
-    };
-    entry.atenciones++;
-    correspondencia.set(codigo, entry);
+    countAttention(correspondencia, codigo, f, pk.basis);
 
     /** @param {'od' | 'oi'} e */
     const eye = (e) =>
       compact({
-        av: (f[`${e}_av`] || '').trim() || undefined,
-        avcc: (f[`${e}_avcc`] || '').trim() || undefined,
+        av: trimmed(f[`${e}_av`]),
+        avcc: trimmed(f[`${e}_avcc`]),
         pio: pioFor(r, e, procs) || undefined,
         hallazgos: txt(f[`${e}_hallazgos`]),
       });
@@ -118,7 +119,7 @@ export function anonymizeRecords(records, procs, options) {
       codigo_paciente: codigo,
       codigo_atencion: pseudonym(secret, 'atencion:' + r.id, 'A'),
       base_codigo: pk.basis,
-      operativo: (f.operativo || '').trim() || undefined,
+      operativo: trimmed(f.operativo),
       edad: generalizeAge(ageOf(r), opt.edad),
       sexo: SEXOS.find((s) => s.key === f.paciente_sexo)?.label || '',
       antecedentes: ANTECEDENTES.filter((d) => r.checks?.[d.key]).map((d) => d.label),
@@ -137,7 +138,7 @@ export function anonymizeRecords(records, procs, options) {
         }),
       ),
       procedimientos_solicitados: SOLICITADOS.filter((d) => r.checks?.[d.key]).map((d) => d.label),
-      test_schirmer_detalle: (f.test_schirmer_detalle || '').trim() || undefined,
+      test_schirmer_detalle: trimmed(f.test_schirmer_detalle),
       procedimientos_solicitados_otros: txt(f.procedimientos_otros),
       diagnosticos: DIAGNOSTICOS.filter((d) => r.checks?.[d.key]).map((d) => d.label),
       catarata_ojo: r.checks?.diagnostico_catarata ? r.cat || undefined : undefined,
@@ -278,25 +279,13 @@ function wideColumns({ procNames, dateHeader, dateKey, withText }) {
 }
 
 /**
- * Hojas Excel con los datos seudonimizados (formato ancho + prestaciones + diccionario).
- * @param {ResultadoSeudonimizacion} result
- * @param {ProcDef[]} procs
- * @returns {Hoja[]}
+ * Hoja «Prestaciones»: una fila por procedimiento realizado.
+ * @param {AtencionSeudonimizada[]} regs
+ * @param {string | null} dateHeader título de la columna de fecha (null: sin fecha)
+ * @param {CampoFecha | null} dateKey campo de fecha de la salida
+ * @returns {unknown[][]}
  */
-export function anonymizedSheets(result, procs, now = new Date()) {
-  const regs = result.registros;
-  const dateHeader = /** @type {Record<string, string | null>} */ ({ mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null })[
-    result.opciones.fechas
-  ];
-  const dateKey = DATE_FIELD[result.opciones.fechas];
-  const procNames = [
-    ...new Set([...procs.map((p) => p.n), ...regs.flatMap((r) => r.procedimientos_realizados.map((p) => p.procedimiento))]),
-  ];
-  const withText = result.opciones.texto !== 'excluir';
-  const cols = wideColumns({ procNames, dateHeader, dateKey, withText });
-  const header = cols.map((c) => c.h);
-  const rows = regs.map((r) => cols.map((c) => c.v(r)));
-
+function prestacionesRows(regs, dateHeader, dateKey) {
   /** @type {unknown[][]} */
   const prest = [
     ['Código paciente', 'Código atención', ...(dateHeader ? [dateHeader] : []), 'Edad', 'Sexo', 'Procedimiento', 'Ojo', 'PIO OD', 'PIO OI'],
@@ -316,15 +305,46 @@ export function anonymizedSheets(result, procs, now = new Date()) {
       ]);
     }
   }
+  return prest;
+}
+
+/**
+ * Descripción de la opción elegida ('' si no se reconoce).
+ * @param {keyof typeof ANON_OPTIONS} kind
+ * @param {string} value
+ */
+const optionLabel = (kind, value) => ANON_OPTIONS[kind].find((o) => o[0] === value)?.[1] || '';
+
+/**
+ * Hojas Excel con los datos seudonimizados (formato ancho + prestaciones + diccionario).
+ * @param {ResultadoSeudonimizacion} result
+ * @param {ProcDef[]} procs
+ * @returns {Hoja[]}
+ */
+export function anonymizedSheets(result, procs, now = new Date()) {
+  const regs = result.registros;
+  const dateHeader = /** @type {Record<string, string | null>} */ ({ mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null })[
+    result.opciones.fechas
+  ];
+  const dateKey = DATE_FIELD[result.opciones.fechas];
+  const procNames = [
+    ...new Set([...procs.map((p) => p.n), ...regs.flatMap((r) => r.procedimientos_realizados.map((p) => p.procedimiento))]),
+  ];
+  const withText = result.opciones.texto !== 'excluir';
+  const cols = wideColumns({ procNames, dateHeader, dateKey, withText });
+  const header = cols.map((c) => c.h);
+  const rows = regs.map((r) => cols.map((c) => c.v(r)));
+
+  const prest = prestacionesRows(regs, dateHeader, dateKey);
 
   const info = [
     [{ v: 'Datos seudonimizados — ' + APP.establecimiento, s: STYLE.bold }],
     ['Generado', fmtDateTime(now)],
     ['Atenciones', regs.length],
     ['Pacientes (códigos distintos)', result.correspondencia.length],
-    ['Fechas', ANON_OPTIONS.fechas.find((o) => o[0] === result.opciones.fechas)?.[1] || ''],
-    ['Edad', ANON_OPTIONS.edad.find((o) => o[0] === result.opciones.edad)?.[1] || ''],
-    ['Textos libres', ANON_OPTIONS.texto.find((o) => o[0] === result.opciones.texto)?.[1] || ''],
+    ['Fechas', optionLabel('fechas', result.opciones.fechas)],
+    ['Edad', optionLabel('edad', result.opciones.edad)],
+    ['Textos libres', optionLabel('texto', result.opciones.texto)],
     [],
     [{ v: 'Advertencia', s: STYLE.bold }],
     ['Los textos libres se limpian automáticamente, pero conviene revisarlos antes de compartir.'],

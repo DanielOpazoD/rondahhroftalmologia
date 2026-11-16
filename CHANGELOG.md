@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.25.0 — 2026-11-16
+
+### Correcciones (encontradas al probar ramas sin cubrir)
+- Si la activación de cuentas se interrumpía a medias, ahora se puede reintentar (antes respondía «ya existe una cuenta con ese RUT» para siempre).
+- «Cambiar mi clave» ya no acepta como nueva la misma clave actual.
+- Una ficha de paciente dañada (sin datos como objeto) en un respaldo o en la sincronización ya no rompe la carga: se limpia.
+- Una solicitud demasiado grande al servidor de cuentas responde 413 en vez de un error interno.
+
+### Cimientos (docs/CALIDAD.md)
+- **Complejidad máxima 15** (antes 18): ninguna función de `src/` ni de `scripts/` pasa de 15. `npm run calidad` muestra la próxima meta (funciones sobre 10).
+- **Cobertura de ramas 87 % → 91 %**: 81 pruebas nuevas del servidor de cuentas, la sesión, las fichas y la bitácora (acceso por rol, clave inicial, bloqueos por intentos, sesiones adulteradas, validación de cada acción). El mínimo exigido sube a 91 %.
+- Sin código repetido entre especialidades en la seudonimización.
+
 ## 2.24.0 — 2026-11-16
 
 ### Cimientos (docs/CALIDAD.md)
