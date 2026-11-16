@@ -69,24 +69,30 @@ export function normalizeRecord(raw) {
   r.especialidad = typeof r.especialidad === 'string' && r.especialidad ? r.especialidad : ESPECIALIDAD.id;
   // Los ids vienen también de respaldos importados: solo se aceptan caracteres seguros.
   r.id = isValidId(r.id) ? r.id : null;
-  r.f = r.f && typeof r.f === 'object' ? r.f : {};
-  r.checks = r.checks && typeof r.checks === 'object' ? r.checks : {};
-  r.proc = r.proc && typeof r.proc === 'object' ? r.proc : {};
+  r.f = objectOr(r.f);
+  r.checks = objectOr(r.checks);
+  r.proc = objectOr(r.proc);
   r.cat = OJOS.includes(r.cat) ? r.cat : '';
-  if (r.ft !== undefined) {
-    if (!r.ft || typeof r.ft !== 'object' || Array.isArray(r.ft)) delete r.ft;
-    else for (const [k, v] of Object.entries(r.ft)) if (!Number.isFinite(v)) delete r.ft[k];
-  }
-  for (const [id, p] of Object.entries(r.proc)) {
-    if (!SAFE_KEY.test(id) || UNSAFE.has(id) || !p || !OJOS.includes(p.eye)) delete r.proc[id];
-  }
-  for (const obj of [r.f, r.checks]) for (const k of Object.keys(obj)) if (!SAFE_KEY.test(k) || UNSAFE.has(k)) delete obj[k];
+  cleanStamps(r);
+  for (const [id, p] of Object.entries(r.proc)) if (!safeKey(id) || !p || !OJOS.includes(p.eye)) delete r.proc[id];
+  for (const obj of [r.f, r.checks]) for (const k of Object.keys(obj)) if (!safeKey(k)) delete obj[k];
+  // Campos: siempre texto; null/undefined se quitan.
   for (const [k, v] of Object.entries(r.f)) {
     if (v === null || v === undefined) delete r.f[k];
     else if (typeof v !== 'string') r.f[k] = String(v);
   }
   refreshNames(r.f);
   return r;
+}
+
+/** El objeto si es un objeto; si no, uno vacío. @template T @param {T} v @returns {T} */
+const objectOr = (v) => (v && typeof v === 'object' ? v : /** @type {T} */ ({}));
+
+/** Sellos de tiempo por campo (`ft`): solo números finitos; si no es un objeto, se quita. @param {import('../domain').Atencion} r */
+function cleanStamps(r) {
+  if (r.ft === undefined) return;
+  if (!r.ft || typeof r.ft !== 'object' || Array.isArray(r.ft)) delete r.ft;
+  else for (const [k, v] of Object.entries(r.ft)) if (!Number.isFinite(v)) delete r.ft[k];
 }
 
 /**
@@ -98,9 +104,18 @@ export function isValidId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
 }
 
+/**
+ * ¿La atención tiene un id válido (ya se guardó)? normalizeRecord deja en null los inválidos.
+ * @param {import('../domain').Atencion} r
+ * @returns {r is import('../domain').AtencionGuardada}
+ */
+export const isSavedRecord = (r) => isValidId(r.id);
+
 /** Claves aceptadas en f / checks / proc (evita `__proto__` y similares en datos externos). */
 const SAFE_KEY = /^[A-Za-z0-9_-]{1,64}$/;
 const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
+/** @param {string} k */
+const safeKey = (k) => SAFE_KEY.test(k) && !UNSAFE.has(k);
 
 /** Genera un id único para una atención. */
 export function newRecordId(now = Date.now(), rand = Math.random) {
@@ -117,53 +132,63 @@ export function newRecordId(now = Date.now(), rand = Math.random) {
  */
 export function validateRecord(rec, now = new Date()) {
   const f = rec.f || {};
-  /** @type {string[]} */
-  const errors = [];
-  /** @type {string[]} */
-  const warnings = [];
-  /** @type {Record<string, {msg: string, level: 'error'|'warn'}>} */
-  const fields = {};
-  /** @type {(field: string, msg: string) => void} */
+  /** @type {Validacion} */
+  const v = { errors: [], warnings: [], fields: {} };
+  /** @type {Avisar} */
   const warn = (field, msg) => {
-    warnings.push(msg);
-    fields[field] = { msg, level: 'warn' };
+    v.warnings.push(msg);
+    v.fields[field] = { msg, level: 'warn' };
   };
   /** @type {(field: string, msg: string, fieldMsg?: string) => void} */
   const error = (field, msg, fieldMsg = msg) => {
-    errors.push(msg);
-    fields[field] = { msg: fieldMsg, level: 'error' };
+    v.errors.push(msg);
+    v.fields[field] = { msg: fieldMsg, level: 'error' };
   };
+  checkIdentity(f, warn, error);
+  checkDates(f, warn, error, todayIso(now));
+  checkDemographics(f, warn);
+  // Validaciones clínicas propias de la especialidad activa.
+  validarClinico(rec, warn, (msg) => v.warnings.push(msg));
+  return v;
+}
 
+/**
+ * @typedef {{errors: string[], warnings: string[], fields: Record<string, {msg: string, level: 'error'|'warn'}>}} Validacion
+ * @typedef {(field: string, msg: string) => void} Avisar
+ * @typedef {(field: string, msg: string, fieldMsg?: string) => void} MarcarError
+ */
+
+/** Paciente identificable (nombre o RUT) y RUT con dígito verificador correcto. @param {Record<string, string>} f @param {Avisar} warn @param {MarcarError} error */
+function checkIdentity(f, warn, error) {
   if (!f.paciente_nombre?.trim() && !f.paciente_rut?.trim()) {
     error('paciente_nombres', 'Falta nombre o RUT del paciente', 'Requerido (nombre o RUT)');
   }
   if (f.paciente_rut?.trim() && !isValidRut(f.paciente_rut)) warn('paciente_rut', 'RUT con dígito verificador inválido');
   if (f.medico_rut?.trim() && !isValidRut(f.medico_rut)) warn('medico_rut', 'RUT del médico inválido');
+}
 
-  if (!isIsoDate(f.fecha_atencion)) {
-    error('fecha_atencion', 'Falta la fecha de atención', 'Requerida');
-  } else if (f.fecha_atencion > todayIso(now)) {
-    warn('fecha_atencion', 'La fecha de atención es futura');
+/** Fecha de atención (requerida, no futura) y de nacimiento (válida y plausible). @param {Record<string, string>} f @param {Avisar} warn @param {MarcarError} error @param {string} today */
+function checkDates(f, warn, error, today) {
+  const fecha = isIsoDate(f.fecha_atencion) ? f.fecha_atencion : '';
+  if (!fecha) error('fecha_atencion', 'Falta la fecha de atención', 'Requerida');
+  else if (fecha > today) warn('fecha_atencion', 'La fecha de atención es futura');
+  if (!f.paciente_fnac) return;
+  if (!isIsoDate(f.paciente_fnac)) warn('paciente_fnac', 'Fecha de nacimiento no válida');
+  else if (fecha && f.paciente_fnac > fecha) warn('paciente_fnac', 'Nacimiento posterior a la fecha de atención');
+  else {
+    // Sin edad (null) cuando, sin fecha de atención, el nacimiento es posterior a hoy.
+    const edad = ageAt(f.paciente_fnac, fecha || today);
+    if (edad !== null && edad > LIMITS.edadMax) warn('paciente_fnac', 'Fecha de nacimiento implausible');
   }
+}
 
-  if (f.paciente_fnac) {
-    if (!isIsoDate(f.paciente_fnac)) warn('paciente_fnac', 'Fecha de nacimiento no válida');
-    else if (isIsoDate(f.fecha_atencion) && f.paciente_fnac > f.fecha_atencion) {
-      warn('paciente_fnac', 'Nacimiento posterior a la fecha de atención');
-    } else if (ageAt(f.paciente_fnac, f.fecha_atencion || todayIso(now)) > LIMITS.edadMax) {
-      warn('paciente_fnac', 'Fecha de nacimiento implausible');
-    }
-  }
+/** Edad (años enteros 0–120) y sexo del catálogo. @param {Record<string, string>} f @param {Avisar} warn */
+function checkDemographics(f, warn) {
   if (f.paciente_edad?.trim()) {
     const e = parseNumber(f.paciente_edad);
     if (e === null || e < 0 || e > LIMITS.edadMax || !Number.isInteger(e)) warn('paciente_edad', 'Edad no válida (años enteros 0–120)');
   }
   if (f.paciente_sexo && !SEXOS.some((s) => s.key === f.paciente_sexo)) warn('paciente_sexo', 'Sexo no reconocido');
-
-  // Validaciones clínicas propias de la especialidad activa.
-  validarClinico(rec, warn, (msg) => warnings.push(msg));
-
-  return { errors, warnings, fields };
 }
 
 /**

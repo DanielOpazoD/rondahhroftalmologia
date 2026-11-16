@@ -24,6 +24,9 @@ const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
 /** @type {(k: unknown) => k is string} */
 export const isSafeKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(k) && !FORBIDDEN.has(k);
 
+/** ¿Tiene valor? (ni vacío, ni null, ni undefined) @param {unknown} v */
+const present = (v) => v !== undefined && v !== null && v !== '';
+
 /**
  * Valores presentes de la atención como mapa ruta -> valor (vacíos y `false` se omiten).
  * @param {RegistroFusionable | null | undefined} rec
@@ -32,16 +35,14 @@ export const isSafeKey = (k) => typeof k === 'string' && /^[A-Za-z0-9_-]{1,64}$/
 export function flatten(rec) {
   /** @type {Map<string, ValorRuta>} */
   const m = new Map();
-  for (const [k, v] of Object.entries(rec?.f || {})) {
-    if (isSafeKey(k) && v !== undefined && v !== null && v !== '') m.set('f.' + k, String(v));
-  }
+  for (const [k, v] of Object.entries(rec?.f || {})) if (isSafeKey(k) && present(v)) m.set('f.' + k, String(v));
   for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
   if (rec?.cat) m.set('cat', String(rec.cat));
   if (rec?.pacienteId) m.set('pacienteId', String(rec.pacienteId));
   // Cada procedimiento se recorre por partes (`eye` y las medidas de la especialidad).
   for (const [id, p] of /** @type {[string, Record<string, unknown>][]} */ (Object.entries(rec?.proc || {}))) {
     if (!isSafeKey(id) || !p || typeof p !== 'object') continue;
-    for (const k of PROC_KEYS) if (p[k] !== undefined && p[k] !== null && p[k] !== '') m.set(`proc.${id}.${k}`, String(p[k]));
+    for (const k of PROC_KEYS) if (present(p[k])) m.set(`proc.${id}.${k}`, String(p[k]));
   }
   return m;
 }

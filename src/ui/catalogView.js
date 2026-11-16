@@ -19,23 +19,29 @@ import { profileNameFields, profileNameValues } from './patientFields.js';
 const NEW = '__nuevo';
 const CUR = '__actual';
 
-/** @param {import('./context.js').AppContext} ctx */
+/** @typedef {import('./context.js').AppContext} AppContext */
+/** @typedef {import('../domain').Perfil} Medico */
+/** @typedef {import('../domain').Operativo} Operativo */
+/** @typedef {'medico' | 'operativo'} TipoCatalogo */
+
+/** @param {AppContext} ctx */
 export function initCatalogView(ctx) {
-  $('#operativoSel').addEventListener('change', (e) => {
-    const v = e.target.value;
+  $('#operativoSel').addEventListener('change', (/** @type {Event} */ e) => {
+    const v = /** @type {HTMLSelectElement} */ (e.target).value;
     if (v === NEW) return editOperativo(ctx, null, (o) => setOperativo(ctx, o?.nombre));
     if (v !== CUR) setOperativo(ctx, v);
   });
-  $('#medicoSel').addEventListener('change', (e) => {
-    const v = e.target.value;
+  $('#medicoSel').addEventListener('change', (/** @type {Event} */ e) => {
+    const v = /** @type {HTMLSelectElement} */ (e.target).value;
     if (v === NEW) return editProfile(ctx, { rol: 'medico' }, (m) => setMedico(ctx, m));
     if (v !== CUR) setMedico(ctx, ctx.medicos.find((m) => m.id === v) || null);
   });
 
   $('#medAdd').addEventListener('click', () => editProfile(ctx));
   $('#opAdd').addEventListener('click', () => editOperativo(ctx));
-  const listClick = (kind) => async (e) => {
-    const b = e.target.closest('button[data-a]');
+  /** @param {TipoCatalogo} kind */
+  const listClick = (kind) => async (/** @type {MouseEvent} */ e) => {
+    const b = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('button[data-a]'));
     if (!b) return;
     const list = kind === 'medico' ? ctx.medicos : ctx.operativos;
     const item = list.find((x) => x.id === b.dataset.id);
@@ -54,6 +60,11 @@ export function initCatalogView(ctx) {
   $('#opList').addEventListener('click', listClick('operativo'));
 }
 
+/**
+ * Pone el operativo en la atención; undefined (diálogo cancelado) solo re-dibuja los selectores.
+ * @param {AppContext} ctx
+ * @param {string | undefined} nombre
+ */
 function setOperativo(ctx, nombre) {
   if (nombre !== undefined) {
     ctx.rec.f.operativo = nombre || '';
@@ -61,6 +72,11 @@ function setOperativo(ctx, nombre) {
   } else renderCatalogSelects(ctx);
 }
 
+/**
+ * Pone el médico en la atención (null: ninguno); undefined (diálogo cancelado) solo re-dibuja los selectores.
+ * @param {AppContext} ctx
+ * @param {Medico | null | undefined} m
+ */
 function setMedico(ctx, m) {
   if (m === undefined) return renderCatalogSelects(ctx);
   ctx.rec.f.medico_nombre = m?.nombre || '';
@@ -74,8 +90,12 @@ function setMedico(ctx, m) {
  * Diálogo de perfil profesional. `m` es el perfil a editar, o valores
  * iniciales de uno nuevo (p. ej. `{rol: 'medico'}`). `done(m)` recibe el
  * perfil guardado, o undefined si se canceló.
+ * @param {AppContext} ctx
+ * @param {Partial<Medico> | null} [m]
+ * @param {(m: Medico | undefined) => void} [done]
  */
 export function editProfile(ctx, m = null, done) {
+  /** @type {Medico | undefined} */
   let result;
   const editing = Boolean(m?.id);
   openDialog({
@@ -91,6 +111,7 @@ export function editProfile(ctx, m = null, done) {
       if (!personName(parts)) return 'Escribe los nombres y apellidos';
       if (rut && !isValidRut(rut)) return 'RUT con dígito verificador inválido';
       const item = makeMedico({ ...m, ...parts, rut, rol, updated: clock.tick() });
+      if (!item) return 'Escribe los nombres y apellidos';
       result = ctx.saveCatalog('medico', item);
       return null;
     },
@@ -98,7 +119,15 @@ export function editProfile(ctx, m = null, done) {
   });
 }
 
+/**
+ * Diálogo de operativo (`o`: el que se edita; null: uno nuevo). `done(o)` recibe
+ * el operativo guardado, o undefined si se canceló.
+ * @param {AppContext} ctx
+ * @param {Operativo | null} [o]
+ * @param {(o: Operativo | undefined) => void} [done]
+ */
 function editOperativo(ctx, o = null, done) {
+  /** @type {Operativo | undefined} */
   let result;
   openDialog({
     title: o ? 'Editar operativo' : 'Nuevo operativo',
@@ -107,14 +136,19 @@ function editOperativo(ctx, o = null, done) {
       if (!nombre) return 'Escribe el nombre';
       const dup = ctx.operativos.find((x) => x.nombre.toLowerCase() === nombre.toLowerCase() && x.id !== o?.id);
       if (dup) return 'Ya existe un operativo con ese nombre';
-      result = ctx.saveCatalog('operativo', makeOperativo({ ...o, nombre, updated: clock.tick() }));
+      const item = makeOperativo({ ...o, nombre, updated: clock.tick() });
+      if (!item) return 'Escribe el nombre';
+      result = ctx.saveCatalog('operativo', item);
       return null;
     },
     onClose: () => done?.(result),
   });
 }
 
-/** Opciones de los selectores del formulario según la atención en edición. */
+/**
+ * Opciones de los selectores del formulario según la atención en edición.
+ * @param {AppContext} ctx
+ */
 export function renderCatalogSelects(ctx) {
   const f = ctx.rec.f;
   const op = f.operativo || '';
@@ -139,8 +173,15 @@ export function renderCatalogSelects(ctx) {
   $('#medicoSel').value = m ? m.id : hasOther ? CUR : '';
 }
 
-/** Listas de perfiles y operativos en Ajustes. */
+/**
+ * Listas de perfiles y operativos en Ajustes.
+ * @param {AppContext} ctx
+ */
 export function renderCatalogSettings(ctx) {
+  /**
+   * @param {Medico | Operativo} x
+   * @param {string} [sub] detalle bajo el nombre
+   */
   const row = (x, sub) => html`<div class="it"><div class="t"><b>${x.nombre}</b>${sub ? html`<span class="muted">${sub}</span>` : ''}</div>
     <button type="button" class="ib sm" data-perm="ajustes" data-a="edit" data-id="${x.id}" title="Editar" aria-label="Editar">${icon('edit')}</button>
     <button type="button" class="ib sm danger" data-perm="ajustes" data-a="del" data-id="${x.id}" title="Eliminar" aria-label="Eliminar">${icon('trash')}</button></div>`;

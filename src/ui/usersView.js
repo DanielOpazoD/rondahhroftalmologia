@@ -15,7 +15,7 @@ import { formatRut, fmtDate, normalizeText } from '../core/format.js';
 import { importEncKey } from '../sync/crypto.js';
 import { createAccountsApi } from '../sync/accountsApi.js';
 import { decryptProfile, encryptProfile, credentialsFor } from '../sync/accountCrypto.js';
-import { $, toast } from './dom.js';
+import { $, toast, required } from './dom.js';
 import { html, setHtml } from './html.js';
 import { openDialog } from './dialog.js';
 import { uiAlert, uiConfirm } from './modal.js';
@@ -32,7 +32,12 @@ const ADMIN_OPTIONS = [
  *   creado: number, ultimoIngreso: number | null, bloqueadaHasta: number, nombre: string, rut: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string}} UsuarioVista
  */
 
-/** @param {any} ctx contexto de la aplicación */
+/**
+ * Cuenta tal como la entrega el servidor: el perfil (nombre, RUT) viene cifrado.
+ * @typedef {Omit<UsuarioVista, 'nombre' | 'rut' | 'apellido_paterno' | 'apellido_materno' | 'nombres'> & {perfil: {iv: string, ct: string}}} UsuarioServidor
+ */
+
+/** @param {import('./context.js').AppContext} ctx */
 export function initUsersView(ctx) {
   const api = createAccountsApi();
   /** @type {UsuarioVista[]} */
@@ -41,7 +46,8 @@ export function initUsersView(ctx) {
 
   const isAdmin = () => Boolean(ctx.accounts?.user?.admin);
   const teamKeyB64 = () => ctx.store.loadSyncConfig()?.encKey || '';
-  const token = () => ctx.accounts.requireToken();
+  // main.js crea las cuentas antes de iniciar las vistas.
+  const token = () => required(ctx.accounts, 'ctx.accounts').requireToken();
 
   async function load() {
     if (!isAdmin() || loading) return;
@@ -51,7 +57,7 @@ export function initUsersView(ctx) {
       const { usuarios } = await api.usuarios(await token());
       const key = await importEncKey(teamKeyB64());
       users = await Promise.all(
-        usuarios.map(async (u) => {
+        usuarios.map(async (/** @type {UsuarioServidor} */ u) => {
           const p = await decryptProfile(key, u.id, u.perfil).catch(() => ({ nombre: '(no se pudo leer)', rut: '' }));
           return { ...u, ...p };
         }),
@@ -97,7 +103,7 @@ export function initUsersView(ctx) {
             ]
               .filter(Boolean)
               .join(' · ');
-            const me = u.id === ctx.accounts.user?.id;
+            const me = u.id === ctx.accounts?.user?.id;
             return html`<div class="prow${u.estado !== 'activo' ? ' off' : ''}">
               <div class="pmain static">
                 <span class="pname">${u.nombre}${me ? html` <span class="muted">(tú)</span>` : ''}</span>
@@ -141,7 +147,10 @@ export function initUsersView(ctx) {
         if (!accountRut(rut)) return 'RUT inválido (revisa el dígito verificador).';
         if (nombre.length < 3) return 'Escribe el nombre completo.';
         if (users.some((u) => accountRut(u.rut) === accountRut(rut))) return 'Ya existe una cuenta con ese RUT.';
-        setTimeout(() => void doCreate({ rut: accountRut(rut), nombre, ...parts, rol, admin: admin === 'si' }), 0);
+        setTimeout(
+          /** @returns {undefined} */ () => void doCreate({ rut: accountRut(rut), nombre, ...parts, rol, admin: admin === 'si' }),
+          0,
+        );
         return null;
       },
     });
@@ -290,14 +299,14 @@ export function initUsersView(ctx) {
 
   $('#usersAdd').addEventListener('click', () => create());
   $('#usersFromProfiles').addEventListener('click', createFromProfiles);
-  $('#usersReload').addEventListener('click', () => void load());
+  $('#usersReload').addEventListener('click', /** @returns {undefined} */ () => void load());
   $('#usersSearch').addEventListener('input', () => {
     const q = normalizeText($('#usersSearch').value);
     for (const row of /** @type {HTMLElement[]} */ ([...$('#usersList').querySelectorAll('.prow')])) {
       row.hidden = Boolean(q) && !normalizeText(row.textContent).includes(q);
     }
   });
-  $('#usersList').addEventListener('click', (e) => {
+  $('#usersList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
     const b = /** @type {HTMLElement} */ (e.target).closest('button[data-a]');
     const u = b && users.find((x) => x.id === /** @type {HTMLElement} */ (b).dataset.id);
     if (!u) return;
@@ -311,6 +320,6 @@ export function initUsersView(ctx) {
     void load();
   });
   // Al abrir Ajustes, la lista se actualiza.
-  ctx.on('tab:t-aj', () => void load());
+  ctx.on('tab:t-aj', /** @returns {undefined} */ () => void load());
   render();
 }

@@ -29,8 +29,12 @@ import { makeMedico, makeOperativo, byName } from '../core/catalog.js';
 /** Ids que viajan opacos en el espacio de la especialidad: perfiles (huella del RUT). Ver ADR 0005. */
 export const opaqueInSpecialty = (/** @type {string} */ id) => id.startsWith('m_');
 
-/** @type {(kind: import('../domain').TipoSync) => (x: Documento) => ElementoSync} */
-const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated, kind, data: x });
+/**
+ * Documento local -> elemento sincronizado. Sin `updated` (p. ej. una atención de una
+ * versión más nueva que no lo trae) queda en 0: sin versión, no se sube (ver localVersions).
+ * @type {(kind: import('../domain').TipoSync) => (x: Documento) => ElementoSync}
+ */
+const wrap = (kind) => (x) => ({ id: x.id, updated: x.updated || 0, kind, data: x });
 /** Elemento sincronizado -> documento local (con id y versión del elemento). @param {ElementoSync} i */
 const unwrap = (i) => ({ ...i.data, id: i.id, updated: i.updated });
 
@@ -88,14 +92,14 @@ export function writeSpecialtyItems(store, items, tombstones) {
     byName(
       of('medico')
         .map((m) => makeMedico(m))
-        .filter(Boolean),
+        .filter((m) => m !== null),
     ),
   );
   store.saveOperativos(
     byName(
       of('operativo')
         .map((o) => makeOperativo(o))
-        .filter(Boolean),
+        .filter((o) => o !== null),
     ),
   );
   // Adjuntos: los recibidos se agregan; los eliminados en otro equipo (lápida) se quitan.

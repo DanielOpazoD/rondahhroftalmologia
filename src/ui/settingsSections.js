@@ -8,7 +8,7 @@ import { $ } from './dom.js';
 const STORE_KEY = 'hhr_ajustes_seccion';
 const SECTIONS = ['equipo', 'listas', 'datos', 'admin'];
 
-/** @param {any} ctx contexto de la aplicación */
+/** @param {import('./context.js').AppContext} ctx */
 export function initSettingsSections(ctx) {
   const tabs = () => /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll('.ajnav [role="tab"]')]).filter((b) => !b.hidden);
   const isAdmin = () => Boolean(ctx.accounts?.user?.admin);

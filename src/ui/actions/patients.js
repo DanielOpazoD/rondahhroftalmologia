@@ -27,14 +27,20 @@ import { uiConfirm } from '../modal.js';
 import { hasNameParts, NAME_PARTS, refreshNames } from '../../core/names.js';
 import { profileNameFields, profileNameValues } from '../patientFields.js';
 
+/** @typedef {import('../../domain').Atencion} Atencion */
+/** @typedef {import('../../domain').AtencionGuardada} AtencionGuardada */
+/** @typedef {import('../../domain').Paciente} Paciente */
+
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
+ *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function patientActions(ctx, store) {
   /**
    * @param {import('../../domain').Paciente} p
    * @param {Record<string, string>} fields
+   * @returns {Promise<void>}
    */
   async function applyPatientEdit(p, fields) {
     const other = fields.paciente_rut ? rutOwner(store.loadPatients(), fields.paciente_rut, p.id) : null;
@@ -93,7 +99,13 @@ export function patientActions(ctx, store) {
       }
       // Por RUT entre las fichas existentes (aunque la ficha naciera solo con nombre).
       const pacienteId = resolvePatientId(f, store.loadPatients(), currentId);
-      const existing = ctx.records.find((r) => r.pacienteId === pacienteId && r.f.fecha_atencion === fecha);
+      // Sin nombre y con un RUT incompleto (p. ej. «1») no hay con qué identificar la ficha.
+      if (!pacienteId) {
+        toast('Escribe el nombre o un RUT completo');
+        return { ok: false };
+      }
+      /** @type {AtencionGuardada | undefined} */
+      const existing = ctx.records.find((/** @type {AtencionGuardada} */ r) => r.pacienteId === pacienteId && r.f.fecha_atencion === fecha);
       if (existing) {
         toast(`${existing.f.paciente_nombre || existing.f.paciente_rut} ya está en la lista de ese día`, 3500);
         return { ok: true, id: existing.id };
@@ -119,7 +131,10 @@ export function patientActions(ctx, store) {
       return { ok: true, id: saved.id };
     },
 
-    /** Nueva atención (otro día u otra consulta) para un paciente ya registrado. */
+    /**
+     * Nueva atención (otro día u otra consulta) para un paciente ya registrado.
+     * @param {string} pacienteId
+     */
     async newAttentionFor(pacienteId) {
       const p = store.getPatient(pacienteId);
       if (!p) return;
@@ -165,6 +180,7 @@ export function patientActions(ctx, store) {
      * campo a campo con la ficha existente (gana lo editado más recientemente),
      * así un cambio de teléfono hecho en el ingreso y otro dato corregido por
      * el médico se conservan ambos.
+     * @param {Atencion} rec
      */
     syncPatientFromRecord(rec) {
       const next = patientUpdateFromRecord(rec, rec.pacienteId ? store.getPatient(rec.pacienteId) : null, clock.tick());
@@ -181,15 +197,18 @@ export function patientActions(ctx, store) {
       const missing = missingPatients(ctx.records, existing);
       if (missing.length) store.savePatients(missing);
       for (const p of missing) existing.set(p.id, p);
-      const relinked = ctx.records
-        .filter((r) => r.pacienteId && canonicalPatientId(existing, r.pacienteId) !== r.pacienteId)
-        .map((r) => relinkRecord(r, canonicalPatientId(existing, r.pacienteId), clock.tick()));
+      /** @type {Atencion[]} */
+      const records = ctx.records;
+      const relinked = records.flatMap((r) => {
+        const target = r.pacienteId && canonicalPatientId(existing, r.pacienteId);
+        return target && target !== r.pacienteId ? [relinkRecord(r, target, clock.tick())] : [];
+      });
       if (relinked.length) {
         for (const r of relinked) ctx.records = store.upsertRecord(r);
         ctx.sync?.schedule();
       }
       // Fichas eliminadas que tienen atenciones (p. ej. llegó una de otro equipo): se restauran.
-      const used = new Set(ctx.records.map((r) => r.pacienteId).filter(Boolean));
+      const used = new Set(ctx.records.map((/** @type {Atencion} */ r) => r.pacienteId).filter(Boolean));
       const restored = [...existing.values()]
         .filter((p) => isDeletedPatient(p) && used.has(p.id))
         .map((p) => restorePatient(p, clock.tick()));
@@ -204,12 +223,15 @@ export function patientActions(ctx, store) {
      * Une dos fichas de la misma persona: `keepId` se conserva (completa sus
      * datos vacíos con los de la otra) y las atenciones de `dropId` pasan a
      * ella. Se sincroniza: los demás equipos ven el resultado.
+     * @param {string} keepId
+     * @param {string} dropId
      */
     async mergePatients(keepId, dropId) {
       const keep = store.getPatient(keepId);
       const drop = store.getPatient(dropId);
       if (!keep || !drop) return false;
-      const recs = ctx.records.filter((r) => r.pacienteId === dropId);
+      /** @type {Atencion[]} */
+      const recs = ctx.records.filter((/** @type {Atencion} */ r) => r.pacienteId === dropId);
       const ok = await uiConfirm({
         title: 'Unir fichas',
         message: `Se conservará la ficha de ${patientLabel(keep)}${keep.f.paciente_rut ? ` (${keep.f.paciente_rut})` : ''} y se le pasarán ${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'} de la otra. Los datos que falten se completan; nada se borra.`,
@@ -222,7 +244,7 @@ export function patientActions(ctx, store) {
       try {
         merged = mergePatients(keep, drop, at);
       } catch (e) {
-        toast(e.message, 4000);
+        toast(/** @type {Error} */ (e).message, 4000);
         return false;
       }
       const done = ctx.persist(() => {
@@ -245,11 +267,12 @@ export function patientActions(ctx, store) {
     /**
      * Elimina una ficha creada por error. Solo si no tiene atenciones en este
      * equipo; se sincroniza (deja de aparecer en todos los equipos).
+     * @param {string} id
      */
     async deletePatient(id) {
       const p = store.getPatient(id);
       if (!p || isDeletedPatient(p)) return false;
-      if (ctx.records.some((r) => r.pacienteId === id)) {
+      if (ctx.records.some((/** @type {Atencion} */ r) => r.pacienteId === id)) {
         toast('Esta ficha tiene atenciones: no se puede eliminar.', 4000);
         return false;
       }
@@ -273,6 +296,7 @@ export function patientActions(ctx, store) {
      * Corrige los datos personales del paciente (ficha y todas sus atenciones)
      * sin perder la continuidad: la ficha conserva su id. Si el RUT nuevo ya es
      * de otra ficha, ofrece unirlas.
+     * @param {string} id
      */
     editPatient(id) {
       const p = store.getPatient(id);
@@ -310,13 +334,19 @@ export function patientActions(ctx, store) {
           };
           refreshNames(out); // el nombre completo se arma con apellidos y nombres
           if (!out.paciente_rut && !out.paciente_nombre?.trim()) return 'Indica al menos el nombre o el RUT.';
-          setTimeout(() => void applyPatientEdit(p, out), 0);
+          setTimeout(() => {
+            void applyPatientEdit(p, out);
+          }, 0);
           return null;
         },
       });
     },
 
-    /** Marca dos fichas como personas distintas (deja de sugerir unirlas en este equipo). */
+    /**
+     * Marca dos fichas como personas distintas (deja de sugerir unirlas en este equipo).
+     * @param {string} aId
+     * @param {string} bId
+     */
     notDuplicates(aId, bId) {
       const set = store.loadNotDuplicates();
       set.add([aId, bId].sort().join('|'));

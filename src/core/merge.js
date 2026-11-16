@@ -62,23 +62,25 @@ export function ftOf(rec, path) {
 export function stampChanges(rec, before, now = Date.now()) {
   const paths = changedPaths(before, rec);
   if (!paths.length) return rec;
-  ensureFt(rec);
-  for (const p of paths) rec.ft[p] = now;
+  const { ft } = ensureFt(rec);
+  for (const p of paths) ft[p] = now;
   return rec;
 }
 
 /**
  * Da `ft` a un registro antiguo: todos sus campos con su fecha `updated`.
+ * Modifica y devuelve `rec`, ya con `ft` garantizado.
  * @template {RegistroFusionable} T
  * @param {T} rec
- * @returns {T}
+ * @returns {T & {ft: import('../domain').FechasPorCampo}}
  */
 export function ensureFt(rec) {
-  if (rec.ft) return rec;
-  const t = rec.updated || 0;
-  rec.ft = {};
-  if (t) for (const p of flatten(rec).keys()) rec.ft[p] = t;
-  return rec;
+  const ft = rec.ft ?? {};
+  if (!rec.ft) {
+    const t = rec.updated || 0;
+    if (t) for (const p of flatten(rec).keys()) ft[p] = t;
+  }
+  return Object.assign(rec, { ft });
 }
 
 /** Compara valores de forma determinista (para desempates). */
@@ -111,7 +113,7 @@ export function mergeRecords(a, b) {
   }
   const merged = unflatten(values);
   refreshNames(merged.f);
-  const created = [a.created, b.created].filter(Boolean);
+  const created = [a.created, b.created].flatMap((t) => (t ? [t] : []));
   return {
     ...b,
     ...a,

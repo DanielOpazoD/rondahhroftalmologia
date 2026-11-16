@@ -11,23 +11,58 @@ import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js
 import { renderCatalogSelects } from './catalogView.js';
 import { initSexSelector, renderSexSelector, renderLegacyName } from './patientFields.js';
 import { refreshNames } from '../core/names.js';
-import { $, $$, toast } from './dom.js';
+import { $, $$, toast, dataOf } from './dom.js';
 import { renderAttachments } from './attachmentsView.js';
 import { html, setHtml } from './html.js';
 
-/** @param {import('./context.js').AppContext} ctx */
+/** @typedef {import('./context.js').AppContext} AppContext */
+/** @typedef {import('../domain').Atencion} Atencion */
+
+/**
+ * Elemento más cercano al destino del evento que cumple `sel` (o null).
+ * @param {Event} e
+ * @param {string} sel
+ */
+const closestTo = (e, sel) => /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(sel));
+
+/**
+ * Procedimientos de la atención en edición tal como los escribe el formulario:
+ * texto por clave (ojo, PIO y descripción de cada ojo).
+ * @param {AppContext} ctx
+ */
+const procsOf = (ctx) => /** @type {Record<string, Record<string, string>>} */ (ctx.rec.proc);
+
+/**
+ * Id del procedimiento de la fila (`.proc`) que contiene `el`.
+ * @param {Element} el
+ */
+const procIdOf = (el) => dataOf(/** @type {HTMLElement} */ (el.closest('.proc')), 'id');
+
+/**
+ * La atención en edición con su tipo de dominio (el contexto la declara con la
+ * forma de una atención en blanco, ver core/record.js).
+ * @param {AppContext} ctx
+ */
+const editingOf = (ctx) => /** @type {Atencion} */ (ctx.rec);
+
+/** @param {AppContext} ctx */
 export function initAttentionView(ctx) {
   $('#remoteClose').addEventListener('click', () => ($('#remoteBanner').hidden = true));
+  /**
+   * @param {HTMLElement} el
+   * @param {{key: string, label: string}[]} defs
+   */
   const chips = (el, defs) => {
     setHtml(
       el,
       html`${defs.map((d) => html`<button type="button" class="chip" data-k="${d.key}" aria-pressed="false">${d.label}</button>`)}`,
     );
     el.addEventListener('click', (e) => {
-      const b = e.target.closest('.chip');
+      const b = closestTo(e, '.chip');
       if (!b) return;
       const rec = ctx.rec;
-      rec.checks[b.dataset.k] = !rec.checks[b.dataset.k];
+      const k = dataOf(b, 'k');
+      rec.checks[k] = !rec.checks[k];
       ctx.changed();
     });
   };
@@ -35,11 +70,17 @@ export function initAttentionView(ctx) {
   chips($('#solChips'), SOLICITADOS);
   chips($('#dxChips'), DIAGNOSTICOS);
 
+  /**
+   * @param {HTMLElement} el
+   * @param {string[]} values
+   * @param {string[]} labels
+   * @param {(v: string) => void} onPick
+   */
   const seg = (el, values, labels, onPick) => {
     setHtml(el, html`${values.map((v, i) => html`<button type="button" data-v="${v}" aria-pressed="false">${labels[i]}</button>`)}`);
     el.addEventListener('click', (e) => {
-      const b = e.target.closest('button');
-      if (b) onPick(b.dataset.v);
+      const b = closestTo(e, 'button');
+      if (b) onPick(dataOf(b, 'v'));
     });
   };
   seg($('#catSeg'), OJOS, OJOS, (v) => {
@@ -57,23 +98,25 @@ export function initAttentionView(ctx) {
 
   renderProcList(ctx);
   const list = $('#procList');
-  list.addEventListener('click', (e) => {
-    const b = e.target.closest('.seg button');
+  list.addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = closestTo(e, '.seg button');
     if (!b) return;
-    const id = b.closest('.proc').dataset.id;
-    const cur = ctx.rec.proc[id] || {};
-    cur.eye = cur.eye === b.dataset.v ? '' : b.dataset.v;
-    if (!cur.eye) delete ctx.rec.proc[id];
-    else ctx.rec.proc[id] = cur;
+    const id = procIdOf(b);
+    const procs = procsOf(ctx);
+    const cur = procs[id] || {};
+    const eye = dataOf(b, 'v');
+    cur.eye = cur.eye === eye ? '' : eye;
+    if (!cur.eye) delete procs[id];
+    else procs[id] = cur;
     ctx.changed();
   });
-  list.addEventListener('input', (e) => {
-    const d = e.target.closest('.pdesc input');
+  list.addEventListener('input', (/** @type {InputEvent} */ e) => {
+    const d = /** @type {HTMLInputElement | null} */ (closestTo(e, '.pdesc input'));
     if (d) {
-      const id = d.closest('.proc').dataset.id;
-      const proc = ctx.rec.proc[id];
+      const id = procIdOf(d);
+      const proc = procsOf(ctx)[id];
       if (!proc) return;
-      const key = `desc_${d.dataset.desc}`;
+      const key = `desc_${dataOf(d, 'desc')}`;
       // La descripción única de la 2.18.0 pasa a ser la de cada ojo al editar.
       if (proc.desc !== undefined) {
         for (const eye of ['od', 'oi']) if (proc[`desc_${eye}`] === undefined && coversEye(proc.eye, eye)) proc[`desc_${eye}`] = proc.desc;
@@ -84,11 +127,12 @@ export function initAttentionView(ctx) {
       ctx.changed({ silent: true });
       return;
     }
-    const i = e.target.closest('.pio input');
+    const i = /** @type {HTMLInputElement | null} */ (closestTo(e, '.pio input'));
     if (!i) return;
-    const id = i.closest('.proc').dataset.id;
-    ctx.rec.proc[id] ||= { eye: 'AO' };
-    ctx.rec.proc[id][i.dataset.e] = i.value;
+    const id = procIdOf(i);
+    const procs = procsOf(ctx);
+    procs[id] ||= { eye: 'AO' };
+    procs[id][dataOf(i, 'e')] = i.value;
     ctx.changed({ silent: true });
   });
 
@@ -108,20 +152,24 @@ export function initAttentionView(ctx) {
     }
   });
   $('#dupJoin').addEventListener('click', () => ctx.joinExisting($('#dupBanner').dataset.id));
-  $('#paciente_rut').addEventListener('blur', (e) => {
-    if (!e.target.value.trim()) return;
-    ctx.rec.f.paciente_rut = formatRut(e.target.value);
+  $('#paciente_rut').addEventListener('blur', (/** @type {FocusEvent} */ e) => {
+    const input = /** @type {HTMLInputElement} */ (e.target);
+    if (!input.value.trim()) return;
+    ctx.rec.f.paciente_rut = formatRut(input.value);
     ctx.changed();
     // Paciente ya registrado: se completan sus datos desde la ficha.
     if (ctx.fillFromPatient()) toast('Paciente registrado: se completaron sus datos');
   });
-  $('#patPrev').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-id]');
-    if (b) ctx.openRecord(b.dataset.id);
+  $('#patPrev').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = closestTo(e, 'button[data-id]');
+    if (b) ctx.openRecord(dataOf(b, 'id'));
   });
 }
 
-/** Dibuja la lista de procedimientos según la configuración actual. */
+/**
+ * Dibuja la lista de procedimientos según la configuración actual.
+ * @param {AppContext} ctx
+ */
 export function renderProcList(ctx) {
   setHtml(
     $('#procList'),
@@ -135,12 +183,19 @@ export function renderProcList(ctx) {
   ctx.applyPermissions?.(); // filas nuevas: solo lectura si la persona no edita lo clínico
 }
 
+/**
+ * @param {Element} b
+ * @param {boolean} on
+ */
 const setPressed = (b, on) => {
   b.classList.toggle('on', on);
   b.setAttribute('aria-pressed', String(on));
 };
 
-/** Refleja el registro en edición en el formulario. */
+/**
+ * Refleja el registro en edición en el formulario.
+ * @param {AppContext} ctx
+ */
 export function syncAttentionView(ctx) {
   const rec = ctx.rec;
   refreshNames(rec.f);
@@ -160,23 +215,27 @@ export function syncAttentionView(ctx) {
   renderSexSelector($('#sexSeg'), rec.f.paciente_sexo || '');
 
   let n = 0;
-  $$('#procList .proc').forEach((row) => {
-    const p = rec.proc[row.dataset.id];
+  const procs = procsOf(ctx);
+  $$('#procList .proc').forEach((/** @type {HTMLElement} */ row) => {
+    const p = procs[dataOf(row, 'id')];
     row.classList.toggle('done', !!p);
     if (p) n++;
-    row.querySelectorAll('.seg button').forEach((b) => setPressed(b, !!p && p.eye === b.dataset.v));
-    row.querySelectorAll('.pio input').forEach((i) => {
-      const v = p ? p[i.dataset.e] || '' : '';
+    /** @type {NodeListOf<HTMLElement>} */ (row.querySelectorAll('.seg button')).forEach((b) =>
+      setPressed(b, !!p && p.eye === b.dataset.v),
+    );
+    /** @type {NodeListOf<HTMLInputElement>} */ (row.querySelectorAll('.pio input')).forEach((i) => {
+      const eye = dataOf(i, 'e');
+      const v = p ? p[eye] || '' : '';
       if (i.value !== v) i.value = v;
-      i.closest('.pf').hidden = !!p && !coversEye(p.eye, i.dataset.e);
+      /** @type {HTMLElement} */ (i.closest('.pf')).hidden = !!p && !coversEye(p.eye, eye);
     });
-    row.querySelectorAll('.pdesc input').forEach((d) => {
+    /** @type {NodeListOf<HTMLInputElement>} */ (row.querySelectorAll('.pdesc input')).forEach((d) => {
       const e = /** @type {'od' | 'oi'} */ (d.dataset.desc);
       // La del ojo (o la única de la 2.18.0), solo si el ojo está marcado.
       const v = p && coversEye(p.eye, e) ? String(p[`desc_${e}`] ?? p.desc ?? '') : '';
       if (d.value !== v && document.activeElement !== d) d.value = v;
       // Solo la del ojo marcado (con AO, las dos).
-      d.closest('.pf').hidden = !!p && !coversEye(p.eye, e);
+      /** @type {HTMLElement} */ (d.closest('.pf')).hidden = !!p && !coversEye(p.eye, e);
     });
   });
   $('#procBadge').textContent = n;
@@ -192,11 +251,14 @@ export function syncAttentionView(ctx) {
   void renderAttachments(ctx);
 }
 
-/** Título y estado de la barra superior: a quién se atiende y si hay cambios sin guardar. */
+/**
+ * Título y estado de la barra superior: a quién se atiende y si hay cambios sin guardar.
+ * @param {AppContext} ctx
+ */
 export function renderToolbar(ctx) {
   const f = ctx.rec.f;
   // Atención nueva de un paciente (mismo RUT o nombre) que ya tiene una ese día.
-  const dup = !ctx.rec.id && (f.paciente_rut?.trim() || f.paciente_nombre?.trim()) ? findDuplicate(ctx.rec, ctx.records) : null;
+  const dup = !ctx.rec.id && (f.paciente_rut?.trim() || f.paciente_nombre?.trim()) ? findDuplicate(editingOf(ctx), ctx.records) : null;
   $('#dupBanner').hidden = !dup;
   if (dup) {
     $('#dupBanner').dataset.id = dup.id;
@@ -207,7 +269,7 @@ export function renderToolbar(ctx) {
   // Con guardado automático, «sin guardar» solo dura la pausa al escribir, salvo que algo lo impida.
   let state = ctx.rec.id ? 'Guardada' : 'Sin datos';
   if (ctx.dirty) {
-    const blocking = validateRecord(ctx.rec).errors[0];
+    const blocking = validateRecord(editingOf(ctx)).errors[0];
     state = blocking ? `Sin guardar · ${blocking}` : dup ? 'Sin guardar · continúa en la atención existente' : 'Guardando…';
   }
   const el = $('#tbState');
@@ -218,9 +280,11 @@ export function renderToolbar(ctx) {
 /**
  * Muestra mensajes de validación junto a los campos.
  * Las advertencias se ven mientras se escribe; los errores, solo al intentar guardar.
+ * @param {AppContext} ctx
+ * @param {{showErrors?: boolean}} [o]
  */
 export function showValidation(ctx, { showErrors = false } = {}) {
-  const { fields } = validateRecord(ctx.rec);
+  const { fields } = validateRecord(editingOf(ctx));
   $$('.msg').forEach((m) => {
     const k = m.dataset.msg;
     const item = fields[k];
@@ -239,6 +303,7 @@ export function showValidation(ctx, { showErrors = false } = {}) {
   });
 }
 
+/** @type {Record<string, string>} */
 const TIPO = { ingresada: 'Ingresada a la lista', creada: 'Creada', editada: 'Editada', eliminada: 'Eliminada' };
 
 /** Temporizador del aviso de cambios de otro equipo. @type {ReturnType<typeof setTimeout> | undefined} */
@@ -285,7 +350,10 @@ export function flashFields(paths) {
   }
 }
 
-/** Historial de cambios (bitácora) de la atención abierta. */
+/**
+ * Historial de cambios (bitácora) de la atención abierta.
+ * @param {AppContext} ctx
+ */
 export function renderHistory(ctx) {
   const id = ctx.rec.id;
   const entries = id ? ctx.store.auditFor(id) : [];
@@ -306,7 +374,10 @@ export function renderHistory(ctx) {
   );
 }
 
-/** Otras atenciones del mismo paciente (historial clínico a lo largo del tiempo). */
+/**
+ * Otras atenciones del mismo paciente (historial clínico a lo largo del tiempo).
+ * @param {AppContext} ctx
+ */
 export function renderPrevious(ctx) {
   const id = ctx.rec.pacienteId || patientIdFor(ctx.rec.f);
   const others = id ? attentionsOf(ctx.records, id).filter((r) => r.id !== ctx.rec.id) : [];

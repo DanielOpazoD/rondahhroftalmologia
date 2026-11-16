@@ -32,10 +32,12 @@ export const PROTOCOL_HEADER = 'x-hhr-protocol';
  * @returns {Map<string, {u: number, deleted: boolean}>}
  */
 export function localVersions(records, tombstones = {}) {
+  /** @type {Map<string, {u: number, deleted: boolean}>} */
   const map = new Map();
   for (const r of records) if (r.id && r.updated) map.set(r.id, { u: r.updated, deleted: false });
   for (const [id, u] of Object.entries(tombstones)) {
-    if (!map.has(id) || map.get(id).u < u) map.set(id, { u, deleted: true });
+    const cur = map.get(id);
+    if (!cur || cur.u < u) map.set(id, { u, deleted: true });
   }
   return map;
 }
@@ -61,20 +63,25 @@ export function remoteVersions(items) {
  * - pull: el servidor tiene una versión más nueva;
  * - conflicts: mismo número de versión pero distinta huella de contenido
  *   (dos equipos fusionaron a la vez): hay que bajar y fusionar.
- * @param {Map<string, {u: number}>} local
+ * @template {{u: number}} L
+ * @param {Map<string, L>} local
  * @param {Map<string, {u: number, h?: string}>} remote
- * @param {(id: string) => string} [localHash] huella del contenido local (solo se calcula si hace falta)
+ * @param {(id: string, local: L) => string} [localHash] huella del contenido local de `id`, con su versión local
+ *   (solo se calcula si hace falta)
  * @returns {{push: string[], pull: {id: string, u: number, h?: string}[], conflicts: {id: string, u: number, h: string}[]}}
  */
 export function planSync(local, remote, localHash) {
   const push = [];
   const pull = [];
   const conflicts = [];
-  for (const [id, { u }] of local) if (!remote.has(id) || remote.get(id).u < u) push.push(id);
+  for (const [id, { u }] of local) {
+    const r = remote.get(id);
+    if (!r || r.u < u) push.push(id);
+  }
   for (const [id, r] of remote) {
     const l = local.get(id);
     if (!l || l.u < r.u) pull.push(r.h ? { id, u: r.u, h: r.h } : { id, u: r.u });
-    else if (l.u === r.u && r.h && localHash && localHash(id) !== r.h) conflicts.push({ id, u: r.u, h: r.h });
+    else if (l.u === r.u && r.h && localHash && localHash(id, l) !== r.h) conflicts.push({ id, u: r.u, h: r.h });
   }
   return { push, pull, conflicts };
 }
@@ -114,7 +121,7 @@ export function applyPulled(items, tombstones, pulled, mergeFn) {
       let data = item.data;
       let u = item.u;
       const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
-      if (m) {
+      if (cur && m) {
         data = /** @type {Record<string, unknown>} */ (m.data);
         // Si la fusión agregó algo local que el servidor no tiene, es una versión nueva que hay que subir.
         if (!m.sameAsRemote) {

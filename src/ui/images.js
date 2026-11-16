@@ -17,7 +17,15 @@ async function decode(blob) {
   }
 }
 
-/** Dibuja en un canvas y exporta. @param {ImageBitmap} img */
+/**
+ * Dibuja en un canvas y exporta.
+ * @param {ImageBitmap} img
+ * @param {number} width
+ * @param {number} height
+ * @param {string} type tipo MIME de salida
+ * @param {number | undefined} quality calidad JPEG (0 a 1)
+ * @returns {Promise<Uint8Array | null>}
+ */
 async function render(img, width, height, type, quality) {
   const canvas = document.createElement('canvas');
   canvas.width = width;

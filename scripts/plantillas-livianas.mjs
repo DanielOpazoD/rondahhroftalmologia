@@ -92,73 +92,91 @@ function pngPredict(raw, stride, bpp) {
   return out;
 }
 
+/**
+ * Flujo comprimido con Flate (y filtros PNG si es una imagen).
+ * @param {PDFContext} ctx @param {PDFDict} dict diccionario a reutilizar (ya clonado) @param {Uint8Array} raw
+ * @param {{width: number, colors: number}} [image]
+ */
+function flateStream(ctx, dict, raw, image) {
+  const data = deflateSync(image ? pngPredict(raw, image.width * image.colors, image.colors) : raw, { level: 9 });
+  dict.set(N('Filter'), N('FlateDecode'));
+  if (image) dict.set(N('DecodeParms'), ctx.obj({ Predictor: 15, Colors: image.colors, BitsPerComponent: 8, Columns: image.width }));
+  else dict.delete(N('DecodeParms'));
+  dict.set(N('Length'), PDFNumber.of(data.length));
+  return PDFRawStream.of(dict, data);
+}
+
+/** Los píxeles RGB en gris si todos tienen R=G=B; si alguno tiene color, null. @param {Uint8Array} raw */
+function grayOf(raw) {
+  const gray = new Uint8Array(raw.length / 3);
+  for (let i = 0, j = 0; i < raw.length; i += 3, j++) {
+    if (raw[i] !== raw[i + 1] || raw[i] !== raw[i + 2]) return null;
+    gray[j] = raw[i];
+  }
+  return gray;
+}
+
+/**
+ * Imagen binaria (sin ASCII85) y en gris si no tiene color; null si ya está bien.
+ * @param {PDFContext} ctx @param {PDFRawStream} obj
+ */
+function slimImage(ctx, obj) {
+  const ascii = String(obj.dict.get(N('Filter'))).includes('ASCII85');
+  const rgb =
+    obj.dict.get(N('ColorSpace')) === N('DeviceRGB') &&
+    obj.dict.get(N('BitsPerComponent'))?.toString() === '8' &&
+    !obj.dict.get(N('SMask')) &&
+    !obj.dict.get(N('DecodeParms'));
+  if (!ascii && !rgb) return null;
+  const raw = decodePDFRawStream(obj).decode();
+  const gray = rgb ? grayOf(raw) : null;
+  if (!ascii && !gray) return null;
+  const dict = obj.dict.clone(ctx);
+  if (gray) dict.set(N('ColorSpace'), N('DeviceGray'));
+  const width = Number(obj.dict.get(N('Width'))?.toString());
+  return flateStream(ctx, dict, gray || raw, { width, colors: gray ? 1 : 3 });
+}
+
+/**
+ * Flujo aligerado (imágenes; otros flujos en ASCII85 pasan a binarios), o null si no cambia.
+ * @param {PDFContext} ctx @param {PDFRawStream} obj
+ */
+function slimStream(ctx, obj) {
+  if (obj.dict.get(N('Subtype')) === N('Image')) return slimImage(ctx, obj);
+  if (!String(obj.dict.get(N('Filter'))).includes('ASCII85')) return null;
+  return flateStream(ctx, obj.dict.clone(ctx), decodePDFRawStream(obj).decode());
+}
+
+/**
+ * Fuente TrueType simple (WinAnsi) con las medidas de una fuente estándar → la estándar; null si no aplica.
+ * @param {PDFContext} ctx @param {PDFDict} obj
+ */
+function standardFont(ctx, obj) {
+  if (obj.get(N('Type')) !== N('Font') || obj.get(N('Subtype')) !== N('TrueType')) return null;
+  const base = obj.get(N('BaseFont'))?.toString().slice(1) || '';
+  const std = STANDARD[/** @type {keyof typeof STANDARD} */ (base.replace(/^[A-Z]{6}\+/, ''))];
+  if (!std || obj.get(N('Encoding')) !== N('WinAnsiEncoding')) return null;
+  const name = obj.get(N('Name'));
+  return ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: std, Encoding: 'WinAnsiEncoding', ...(name ? { Name: name } : {}) });
+}
+
+/** Quita del catálogo el perfil de imprenta, las credenciales de contenido y los metadatos XMP. @param {PDFDocument} doc */
+function removeInvisible(doc) {
+  for (const k of ['OutputIntents', 'AF', 'Metadata']) doc.catalog.delete(N(k));
+  const names = doc.catalog.lookupMaybe(N('Names'), PDFDict);
+  if (!names) return;
+  names.delete(N('EmbeddedFiles'));
+  if (!names.keys().length) doc.catalog.delete(N('Names'));
+}
+
 /** @param {Uint8Array} bytes */
 export async function slim(bytes) {
   const doc = await PDFDocument.load(bytes, { updateMetadata: false });
   const ctx = doc.context;
-  for (const k of ['OutputIntents', 'AF', 'Metadata']) doc.catalog.delete(N(k));
-  const names = doc.catalog.lookupMaybe(N('Names'), PDFDict);
-  if (names) {
-    names.delete(N('EmbeddedFiles'));
-    if (!names.keys().length) doc.catalog.delete(N('Names'));
-  }
+  removeInvisible(doc);
   for (const [ref, obj] of ctx.enumerateIndirectObjects()) {
-    // Otros flujos en ASCII85 (contenido de página, etc.): binarios.
-    if (obj instanceof PDFRawStream && obj.dict.get(N('Subtype')) !== N('Image') && String(obj.dict.get(N('Filter'))).includes('ASCII85')) {
-      const data = deflateSync(decodePDFRawStream(obj).decode(), { level: 9 });
-      const dict = obj.dict.clone(ctx);
-      dict.set(N('Filter'), N('FlateDecode'));
-      dict.delete(N('DecodeParms'));
-      dict.set(N('Length'), PDFNumber.of(data.length));
-      ctx.assign(ref, PDFRawStream.of(dict, data));
-      continue;
-    }
-    // Imágenes: binarias (sin ASCII85) y en gris si no tienen color.
-    if (obj instanceof PDFRawStream && obj.dict.get(N('Subtype')) === N('Image')) {
-      const filter = obj.dict.get(N('Filter'));
-      const ascii = String(filter).includes('ASCII85');
-      const rgb =
-        obj.dict.get(N('ColorSpace')) === N('DeviceRGB') &&
-        obj.dict.get(N('BitsPerComponent'))?.toString() === '8' &&
-        !obj.dict.get(N('SMask')) &&
-        !obj.dict.get(N('DecodeParms'));
-      if (!ascii && !rgb) continue;
-      let raw = decodePDFRawStream(obj).decode();
-      const dict = obj.dict.clone(ctx);
-      if (rgb) {
-        const gray = new Uint8Array(raw.length / 3);
-        let ok = true;
-        for (let i = 0, j = 0; i < raw.length; i += 3, j++) {
-          if (raw[i] !== raw[i + 1] || raw[i] !== raw[i + 2]) {
-            ok = false;
-            break;
-          }
-          gray[j] = raw[i];
-        }
-        if (ok) {
-          raw = gray;
-          dict.set(N('ColorSpace'), N('DeviceGray'));
-        } else if (!ascii) continue;
-      }
-      const width = Number(obj.dict.get(N('Width'))?.toString());
-      const colors = dict.get(N('ColorSpace')) === N('DeviceGray') ? 1 : 3;
-      const data = deflateSync(pngPredict(raw, width * colors, colors), { level: 9 });
-      dict.set(N('Filter'), N('FlateDecode'));
-      dict.set(N('DecodeParms'), ctx.obj({ Predictor: 15, Colors: colors, BitsPerComponent: 8, Columns: width }));
-      dict.set(N('Length'), PDFNumber.of(data.length));
-      ctx.assign(ref, PDFRawStream.of(dict, data));
-    }
-    // Fuentes TrueType simples (WinAnsi) con medidas de Helvetica → Helvetica estándar.
-    if (obj instanceof PDFDict && obj.get(N('Type')) === N('Font') && obj.get(N('Subtype')) === N('TrueType')) {
-      const base = obj.get(N('BaseFont'))?.toString().slice(1) || '';
-      const std = STANDARD[/** @type {keyof typeof STANDARD} */ (base.replace(/^[A-Z]{6}\+/, ''))];
-      if (!std || obj.get(N('Encoding')) !== N('WinAnsiEncoding')) continue;
-      const name = obj.get(N('Name'));
-      ctx.assign(
-        ref,
-        ctx.obj({ Type: 'Font', Subtype: 'Type1', BaseFont: std, Encoding: 'WinAnsiEncoding', ...(name ? { Name: name } : {}) }),
-      );
-    }
+    const next = obj instanceof PDFRawStream ? slimStream(ctx, obj) : obj instanceof PDFDict ? standardFont(ctx, obj) : null;
+    if (next) ctx.assign(ref, next);
   }
   // Copia solo lo alcanzable desde el catálogo y la info, con números seguidos.
   const out = PDFContext.create();

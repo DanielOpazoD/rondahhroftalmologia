@@ -24,13 +24,14 @@ export const isPractice = () => {
   }
 };
 
-/** Nombre de la base IndexedDB según el modo. */
+/** Nombre de la base IndexedDB según el modo. @param {boolean} practice */
 export const dbName = (practice) => `hhr-rondas-${ESPECIALIDAD.id}${practice ? '-practica' : ''}`;
 
 /**
  * localStorage con prefijo: el modo práctica guarda sus ajustes, catálogos y
  * borrador aparte, con las mismas claves que la app normal.
  * @param {Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>} base
+ * @returns {Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>}
  */
 export function prefixedStorage(base, prefix = PRACTICE_PREFIX) {
   return {
@@ -40,7 +41,11 @@ export function prefixedStorage(base, prefix = PRACTICE_PREFIX) {
   };
 }
 
-/** Carga los datos de ejemplo si el modo práctica está vacío. */
+/**
+ * Carga los datos de ejemplo si el modo práctica está vacío.
+ * @param {ReturnType<typeof import('../storage/store.js').createStore>} store
+ * @returns {boolean} true si los cargó
+ */
 export function seedPractice(store) {
   if (store.loadRecords().length || store.loadMedicos().length) return false;
   const data = buildPracticeData({ today: todayIso(), now: Date.now(), casos: casosDeEjemplo() });
@@ -68,7 +73,7 @@ export async function resetPractice() {
   });
 }
 
-/** Dirección para entrar o salir del modo práctica (misma página). */
+/** Dirección para entrar o salir del modo práctica (misma página). @param {boolean} on */
 export function practiceUrl(on) {
   const u = new URL(location.href);
   if (on) u.searchParams.set('practica', '');

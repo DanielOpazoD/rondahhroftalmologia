@@ -10,22 +10,40 @@ import { STYLE } from '../../lib/xlsx.js';
 import { computeStats, sortedEntries, ageOf, ageGroup, ageGroupLabels, describeFilter } from './estadistica.js';
 import { proceduresDone, pioFor, antecedentsList, requestedList, diagnosesList, procName } from './clinica.js';
 
+/** @import { Atencion } from '../../domain' */
+/** @import { Hoja } from '../../lib/xlsx.js' */
+/** @import { ProcDef } from './config.js' */
+/** @import { Estadistica, RecordFilter } from './estadistica.js' */
+
+/** Celda en negrita. @param {unknown} v */
 const b = (v) => ({ v, s: STYLE.bold });
+/** Porcentaje con un decimal (0 si no hay total). @param {number} n @param {number} d */
 const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0);
+/** @param {string} k */
 const sexLabel = (k) => SEXOS.find((s) => s.key === k)?.label || '';
+/** Número si el texto es numérico (para que Excel sume), si no el texto. @param {string} v */
 const num = (v) => {
   const n = Number(String(v ?? '').replace(',', '.'));
   return v !== '' && v !== undefined && v !== null && Number.isFinite(n) ? n : (v ?? '');
 };
 
-/** Ids de procedimientos presentes: primero los de la lista, luego los históricos. */
+/**
+ * Ids de procedimientos presentes: primero los de la lista, luego los históricos.
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ */
 function procColumns(records, procs) {
   const ids = procs.map((p) => p.id);
   for (const r of records) for (const id of Object.keys(r.proc || {})) if (!ids.includes(id)) ids.push(id);
   return ids.map((id) => ({ id, nombre: procName(id, records.find((r) => r.proc?.[id]) || {}, procs) }));
 }
 
-/** Hoja "Atenciones": una fila por atención con todas las variables. */
+/**
+ * Hoja "Atenciones": una fila por atención con todas las variables.
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ * @returns {Hoja}
+ */
 export function atencionesSheet(records, procs) {
   const cols = procColumns(records, procs);
   const header = [
@@ -114,7 +132,12 @@ export function atencionesSheet(records, procs) {
   return { name: 'Atenciones', header: true, rows: [header, ...rows] };
 }
 
-/** Hoja "Prestaciones": una fila por procedimiento realizado (formato largo). */
+/**
+ * Hoja "Prestaciones": una fila por procedimiento realizado (formato largo).
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ * @returns {Hoja}
+ */
 export function prestacionesSheet(records, procs) {
   const header = [
     'Fecha',
@@ -131,6 +154,7 @@ export function prestacionesSheet(records, procs) {
     'PIO OI',
     'Médico',
   ];
+  /** @type {unknown[][]} */
   const rows = [];
   for (const r of records) {
     const f = r.f || {};
@@ -155,10 +179,17 @@ export function prestacionesSheet(records, procs) {
   return { name: 'Prestaciones', header: true, rows: [header, ...rows] };
 }
 
-/** Hoja "Resumen": indicadores y tablas agregadas. */
+/**
+ * Hoja "Resumen": indicadores y tablas agregadas.
+ * @param {Estadistica} S
+ * @param {string} filterText
+ * @returns {Hoja}
+ */
 export function resumenSheet(S, filterText, now = new Date()) {
+  /** @type {unknown[][]} */
   const rows = [];
   const blank = () => rows.push([]);
+  /** @param {string} title @param {string[]} head @param {unknown[][]} body */
   const table = (title, head, body) => {
     blank();
     rows.push([b(title)]);
@@ -179,6 +210,7 @@ export function resumenSheet(S, filterText, now = new Date()) {
   rows.push(['Edad mediana (años)', S.edad.mediana ?? '']);
   rows.push(['Rango de edad', S.edad.n ? `${S.edad.min}–${S.edad.max}` : '']);
 
+  /** [procedimiento, pacientes, OD, OI, ojos] @type {[string, number, number, number, number][]} */
   const procRows = sortedEntries(Object.fromEntries(Object.entries(S.proc).map(([k, o]) => [k, o.pac]))).map(([k]) => {
     const o = S.proc[k];
     return [k, o.pac, o.od, o.oi, o.ojos];
@@ -230,7 +262,11 @@ export function resumenSheet(S, filterText, now = new Date()) {
   return { name: 'Resumen', header: false, rows, widths: [34, 16, 12, 12, 12] };
 }
 
-/** Hoja "Por día". */
+/**
+ * Hoja "Por día".
+ * @param {Estadistica} S
+ * @returns {Hoja}
+ */
 export function porDiaSheet(S) {
   return {
     name: 'Por día',
@@ -243,7 +279,11 @@ export function porDiaSheet(S) {
   };
 }
 
-/** Hoja "Edad y sexo" (tipo REM). */
+/**
+ * Hoja "Edad y sexo" (tipo REM).
+ * @param {Estadistica} S
+ * @returns {Hoja}
+ */
 export function edadSexoSheet(S) {
   const groups = ageGroupLabels();
   const keys = ['F', 'M', 'O', 'Sin dato'];
@@ -265,7 +305,10 @@ export function edadSexoSheet(S) {
 
 /**
  * Libro completo de estadística.
- * @returns {{name: string, rows: any[][], header?: boolean, widths?: number[]}[]}
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
+ * @param {RecordFilter} [filter]
+ * @returns {Hoja[]}
  */
 export function statsWorkbook(records, procs, filter = {}, now = new Date()) {
   const S = computeStats(records, procs);

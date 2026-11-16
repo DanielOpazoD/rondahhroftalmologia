@@ -4,10 +4,23 @@
  * PURAS, sin DOM ni almacenamiento. La interfaz (ui/actions/) solo orquesta:
  * pide confirmaciones, persiste y re-dibuja. Así cada regla se prueba en Node.
  */
-import { blankRecord, normalizeRecord, newRecordId, applyBirthDate } from '../core/record.js';
+import { blankRecord, normalizeRecord, newRecordId, applyBirthDate, isSavedRecord } from '../core/record.js';
 import { mergeRecords, sameContent, stampChanges, ensureFt } from '../core/merge.js';
-import { resolvePatientId, patientFields, PATIENT_FIELDS, isDeletedPatient, DELETED_FIELD, normalizePatient } from '../core/patient.js';
+import { resolvePatientId, patientFields, PATIENT_FIELDS, isDeletedPatient, DELETED_FIELD, renormalizePatient } from '../core/patient.js';
 import { rutKey } from '../core/format.js';
+
+/** @typedef {import('../domain').AtencionGuardada} AtencionGuardada */
+
+/**
+ * La atención con su id (invariante de las funciones de este módulo: siempre
+ * le asignan uno válido). Si no lo tuviera, falla aquí y no al guardar.
+ * @param {import('../domain').Atencion} r
+ * @returns {AtencionGuardada}
+ */
+function withId(r) {
+  if (!isSavedRecord(r)) throw new Error('Atención sin id válido');
+  return r;
+}
 
 /**
  * Atención lista para guardar: normalizada, fusionada con la versión guardada
@@ -15,7 +28,7 @@ import { rutKey } from '../core/format.js';
  * con la versión nueva.
  * @param {{rec: import('../domain').Atencion, stored?: import('../domain').Atencion | null, patients: import('../domain').Paciente[] | Map<string, import('../domain').Paciente>, procs: {id: string, n: string}[], now: number}} o
  *   `rec`: la atención en edición; `stored`: la guardada con el mismo id (si hay).
- * @returns {import('../domain').Atencion} la atención a guardar
+ * @returns {AtencionGuardada} la atención a guardar
  */
 export function prepareSave({ rec: draft, stored = null, patients, procs, now }) {
   let rec = normalizeRecord(draft);
@@ -27,14 +40,14 @@ export function prepareSave({ rec: draft, stored = null, patients, procs, now })
   // Vínculo con la ficha: por RUT entre las fichas (si se agregó o corrigió el RUT, pasa a esa ficha).
   const prevPid = rec.pacienteId;
   rec.pacienteId = resolvePatientId(rec.f, patients, rec.pacienteId) || undefined;
-  ensureFt(rec);
+  const { ft } = ensureFt(rec);
   rec.updated = Math.max(now, (stored?.updated || 0) + 1);
   // El vínculo es un campo más: su cambio se fecha para que la fusión entre equipos lo respete.
-  if (rec.pacienteId !== prevPid) rec.ft.pacienteId = rec.updated;
+  if (rec.pacienteId !== prevPid) ft.pacienteId = rec.updated;
   rec.procNames = Object.fromEntries(
     Object.keys(rec.proc).map((id) => [id, procs.find((p) => p.id === id)?.n || rec.procNames?.[id] || id]),
   );
-  return rec;
+  return withId(rec);
 }
 
 /**
@@ -49,7 +62,7 @@ export function buildAdmission({ fields, fecha, operativo = '', master = null, p
   applyBirthDate(rec);
   Object.assign(rec, { id: newRecordId(now), created: now, updated: now, pacienteId });
   stampChanges(rec, { f: {} }, now);
-  return normalizeRecord(rec);
+  return withId(normalizeRecord(rec));
 }
 
 /**
@@ -72,7 +85,7 @@ export const nonEmpty = (data) =>
 export function relinkRecord(r, pacienteId, at) {
   const u = Math.max(at, (r.updated || 0) + 1);
   const next = ensureFt(structuredClone(r));
-  return normalizeRecord({ ...next, pacienteId, updated: u, ft: { ...next.ft, pacienteId: u } });
+  return withId(normalizeRecord({ ...next, pacienteId, updated: u, ft: { ...next.ft, pacienteId: u } }));
 }
 
 /**
@@ -123,7 +136,7 @@ export function rutOwner(patients, rut, exceptId) {
  * vacío borra el dato.
  * @param {{patient: import('../domain').Paciente, fields: Record<string, string>, records: import('../domain').Atencion[], now: number}} o
  *   `records`: las atenciones de este equipo (se corrigen las de este paciente).
- * @returns {{patient: import('../domain').Paciente, records: {before: import('../domain').Atencion, after: import('../domain').Atencion}[], changed: string[]}}
+ * @returns {{patient: import('../domain').Paciente, records: {before: import('../domain').Atencion, after: AtencionGuardada}[], changed: string[]}}
  */
 export function editPatientData({ patient, fields, records, now }) {
   const clean = (/** @type {unknown} */ v) => String(v ?? '').trim();
@@ -152,7 +165,7 @@ export function editPatientData({ patient, fields, records, now }) {
     // La edad de cada atención se recalcula con la fecha de nacimiento corregida.
     if (changed.includes('paciente_fnac') && applyBirthDate(next)) next.ft['f.paciente_edad'] = u;
     next.updated = u;
-    out.push({ before: r, after: normalizeRecord(next) });
+    out.push({ before: r, after: withId(normalizeRecord(next)) });
   }
-  return { patient: /** @type {import('../domain').Paciente} */ (normalizePatient(p)), records: out, changed };
+  return { patient: renormalizePatient(p), records: out, changed };
 }

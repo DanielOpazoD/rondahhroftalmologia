@@ -6,9 +6,15 @@ import { html } from './html.js';
 import { base64ToBytes } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
 
-/** @param {import('./context.js').AppContext} ctx @param {import('../domain').Atencion} rec @param {HTMLElement} anchor */
+/**
+ * @param {import('./context.js').AppContext} ctx
+ * @param {import('../domain').Atencion} rec
+ * @param {HTMLElement} anchor botón que recupera el foco al cerrar
+ * @returns {Promise<void>}
+ */
 export function downloadGes(ctx, rec, anchor) {
   const initial = gesDefaults(rec);
+  /** @param {string} key @param {string} label @param {string} [type] */
   const input = (key, label, type = 'text') => clinicalInput(initial, key, label, type);
   return openClinicalForm(ctx, {
     title: 'Constancia GES',

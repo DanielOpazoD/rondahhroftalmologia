@@ -12,13 +12,13 @@ import { patientLabel } from '../core/patient.js';
 import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createAccountsApi } from '../sync/accountsApi.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
-import { $, download, toast } from './dom.js';
+import { $, download, toast, required } from './dom.js';
 import { withBusy } from './busy.js';
 import { html, setHtml } from './html.js';
 
 const MAX_ROWS = 500;
 
-/** @param {any} ctx contexto de la aplicación */
+/** @param {import('./context.js').AppContext} ctx */
 export function initAuditView(ctx) {
   const api = createAccountsApi();
   /** @type {{eventos: any[], sesiones: any[]} | null} */
@@ -30,39 +30,47 @@ export function initAuditView(ctx) {
   /** @param {string | undefined} uid */
   const userName = (uid) => (uid ? names.get(uid) || `Cuenta ${uid.slice(1, 7)}` : '');
 
-  /** Qué se tocó, en palabras (con los datos de este PC). @param {any} e */
+  /** @typedef {import('../core/accessLog.js').EventoAcceso} EventoAuditoria */
+
+  /** @param {string} id */
+  const recordLabel = (id) => {
+    const r = ctx.records.find((x) => x.id === id);
+    if (!r) return `atención ${id} (no está en este PC)`;
+    return `${r.f.paciente_nombre || r.f.paciente_rut || 'Sin nombre'} · ${fmtDate(r.f.fecha_atencion) || 'sin fecha'}`;
+  };
+  /** @param {string} id */
+  const fileLabel = (id) => {
+    const p = ctx.store.getPatient(id);
+    return p ? patientLabel(p) : `ficha ${id} (no está en este PC)`;
+  };
+  /** @param {string} id */
+  const attachmentLabel = (id) => {
+    const a = ctx.store.getAttachment(id);
+    if (!a) return `adjunto ${id}`;
+    const r = ctx.records.find((x) => x.id === a.atencionId);
+    return `${a.nombre}${r ? ` · ${r.f.paciente_nombre || r.f.paciente_rut}` : ''}`;
+  };
+  /** Cuenta afectada y qué cambió (estado o campos). @param {EventoAuditoria} e */
+  const accountLabel = (e) => {
+    const campos = Array.isArray(e.det?.campos) ? e.det.campos : [];
+    const det = e.det?.estado ? ` (${String(e.det.estado)})` : campos.length ? ` (${campos.join(', ')})` : '';
+    return userName(e.obj) + det;
+  };
+  /** Qué datos sincronizó (el servidor no ve cuáles). @param {string | undefined} esp */
+  const syncLabel = (esp) => {
+    if (esp === 'pacientes') return 'fichas de pacientes';
+    if (esp?.endsWith('-adjuntos')) return 'contenido de adjuntos';
+    return `atenciones de ${ESPECIALIDAD.nombre}`;
+  };
+
+  /** Qué se tocó, en palabras (con los datos de este PC). @param {EventoAuditoria} e */
   function objectLabel(e) {
-    const id = e.obj;
-    if (e.ev.startsWith('atencion.')) {
-      const r = ctx.records.find((/** @type {any} */ x) => x.id === id);
-      return r
-        ? `${r.f.paciente_nombre || r.f.paciente_rut || 'Sin nombre'} · ${fmtDate(r.f.fecha_atencion) || 'sin fecha'}`
-        : `atención ${id} (no está en este PC)`;
-    }
-    if (e.ev === 'ficha.ver') {
-      const p = ctx.store.getPatient(id);
-      return p ? patientLabel(p) : `ficha ${id} (no está en este PC)`;
-    }
-    if (e.ev === 'adjunto.ver') {
-      const a = ctx.store.getAttachment(id);
-      const r = a && ctx.records.find((/** @type {any} */ x) => x.id === a.atencionId);
-      return a ? `${a.nombre}${r ? ` · ${r.f.paciente_nombre || r.f.paciente_rut}` : ''}` : `adjunto ${id}`;
-    }
-    if (e.ev.startsWith('usuario.') || e.ev === 'cuentas.activar') {
-      const det = e.det?.estado
-        ? ` (${e.det.estado})`
-        : Array.isArray(e.det?.campos) && e.det.campos.length
-          ? ` (${e.det.campos.join(', ')})`
-          : '';
-      return userName(id) + det;
-    }
-    if (e.ev === 'sync.escribir') {
-      return e.esp === 'pacientes'
-        ? 'fichas de pacientes'
-        : e.esp?.endsWith('-adjuntos')
-          ? 'contenido de adjuntos'
-          : `atenciones de ${ESPECIALIDAD.nombre}`;
-    }
+    const id = e.obj || '';
+    if (e.ev.startsWith('atencion.')) return recordLabel(id);
+    if (e.ev === 'ficha.ver') return fileLabel(id);
+    if (e.ev === 'adjunto.ver') return attachmentLabel(id);
+    if (e.ev.startsWith('usuario.') || e.ev === 'cuentas.activar') return accountLabel(e);
+    if (e.ev === 'sync.escribir') return syncLabel(e.esp);
     if (e.ev === 'sesion.fin' && e.det?.motivo) return String(e.det.motivo);
     if (e.n !== undefined) return `${e.n} ${e.n === 1 ? 'atención' : 'atenciones'}`;
     return '';
@@ -112,6 +120,7 @@ export function initAuditView(ctx) {
     setHtml($('#audResult'), html`${sesTable}${evTable}`);
   }
 
+  /** Pide al servidor el registro del rango elegido. @param {HTMLButtonElement} button @returns {Promise<void>} */
   async function load(button) {
     const desde = $('#audDesde').value;
     const hasta = $('#audHasta').value;
@@ -121,16 +130,17 @@ export function initAuditView(ctx) {
     }
     await withBusy(button, async () => {
       try {
-        const t = await ctx.accounts.requireToken();
+        // main.js crea las cuentas antes de iniciar las vistas.
+        const t = await required(ctx.accounts, 'ctx.accounts').requireToken();
         // Días LOCALES completos (desde las 00:00 del primero hasta las 23:59 del último).
         const from = new Date(`${desde}T00:00:00`).getTime();
         const to = new Date(`${hasta}T23:59:59.999`).getTime();
         const [res, users] = await Promise.all([api.auditoria(t, from, to), ctx.loadAccountUsers()]);
-        names = new Map(users.map((/** @type {any} */ u) => [u.id, u.nombre]));
+        names = new Map(users.map((u) => [u.id, u.nombre]));
         data = res;
         setHtml(
           $('#audUser'),
-          html`<option value="">Todas las personas</option>${users.map((/** @type {any} */ u) => html`<option value="${u.id}">${u.nombre}</option>`)}`,
+          html`<option value="">Todas las personas</option>${users.map((u) => html`<option value="${u.id}">${u.nombre}</option>`)}`,
         );
         $('#audErr').textContent = '';
       } catch (e) {
@@ -171,7 +181,10 @@ export function initAuditView(ctx) {
   $('#audHasta').value = today;
   $('#audDesde').value = todayIso(new Date(Date.now() - 6 * 86_400_000));
   setHtml($('#audGroup'), html`${GROUPS.map((g) => html`<option value="${g.key}">${g.label}</option>`)}`);
-  $('#audLoad').addEventListener('click', (e) => void load(e.currentTarget));
+  $('#audLoad').addEventListener(
+    'click',
+    /** @param {MouseEvent} e @returns {undefined} */ (e) => void load(/** @type {HTMLButtonElement} */ (e.currentTarget)),
+  );
   for (const id of ['#audUser', '#audGroup']) $(id).addEventListener('change', render);
   $('#audQuery').addEventListener('input', render);
   $('#audXlsx').addEventListener('click', exportXlsx);

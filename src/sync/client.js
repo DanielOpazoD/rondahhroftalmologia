@@ -214,13 +214,21 @@ const vNewer = (a, b) => a.u > b.u || (a.u === b.u && (a.h || '') > (b.h || ''))
  * @param {SyncDeps['api']} api
  * @param {SyncCache | undefined} cache
  */
-async function listRemote(api, cache, nowMs = Date.now()) {
-  const incremental = cache?.snapshot && cache.cursor && nowMs - cache.fullAt < FULL_LIST_EVERY_MS;
-  const res = await api.list(incremental ? cache.cursor - CURSOR_MARGIN_MS : undefined);
+export async function listRemote(api, cache, nowMs = Date.now()) {
+  // Incremental (solo lo cambiado desde el cursor): hay copia de las versiones y la lista completa es reciente.
+  const cursor = cache?.snapshot && nowMs - cache.fullAt < FULL_LIST_EVERY_MS ? cache.cursor : null;
+  const res = await api.list(cursor ? cursor - CURSOR_MARGIN_MS : undefined);
   const got = remoteVersions(res.items || []);
   if (!cache) return got;
-  if (incremental && res.full === false) {
-    for (const [id, v] of got) if (!cache.snapshot.has(id) || vNewer(v, cache.snapshot.get(id))) cache.snapshot.set(id, v);
+  const snapshot = cursor ? cache.snapshot : null;
+  // Se pidió solo lo cambiado, pero mientras tanto otra sincronización descartó
+  // la copia: esa respuesta parcial no sirve como lista completa. Se pide la completa.
+  if (cursor && res.full === false && !snapshot) return listRemote(api, cache, nowMs);
+  if (snapshot && res.full === false) {
+    for (const [id, v] of got) {
+      const known = snapshot.get(id);
+      if (!known || vNewer(v, known)) snapshot.set(id, v);
+    }
   } else {
     // Lista completa (o servidor antiguo sin cursor). Las huellas verificadas
     // se vuelven a comprobar: acota cualquier cambio local que no haya subido
@@ -229,7 +237,7 @@ async function listRemote(api, cache, nowMs = Date.now()) {
     cache.verified = new Map();
     cache.fullAt = nowMs;
   }
-  cache.cursor = Number.isFinite(res.now) ? res.now : null;
+  cache.cursor = typeof res.now === 'number' && Number.isFinite(res.now) ? res.now : null;
   return cache.snapshot ? new Map(cache.snapshot) : got;
 }
 
@@ -240,8 +248,9 @@ const subkeys = new Map();
  * @param {string} encKey
  */
 function fingerprintKey(encKey) {
-  if (!subkeys.has(encKey)) subkeys.set(encKey, hmacSha256(b64ToBytes(encKey), 'hhr-huella-v2'));
-  return subkeys.get(encKey);
+  let k = subkeys.get(encKey);
+  if (!k) subkeys.set(encKey, (k = hmacSha256(b64ToBytes(encKey), 'hhr-huella-v2')));
+  return k;
 }
 
 /**
@@ -271,8 +280,9 @@ const idKeys = new Map();
  * @param {string} localId
  */
 export function serverId(encKey, localId) {
-  if (!idKeys.has(encKey)) idKeys.set(encKey, hmacSha256(b64ToBytes(encKey), 'hhr-id-opaco-v1'));
-  return 'h_' + toHex(hmacSha256(idKeys.get(encKey), localId)).slice(0, 32);
+  let k = idKeys.get(encKey);
+  if (!k) idKeys.set(encKey, (k = hmacSha256(b64ToBytes(encKey), 'hhr-id-opaco-v1')));
+  return 'h_' + toHex(hmacSha256(k, localId)).slice(0, 32);
 }
 
 /**
@@ -282,10 +292,11 @@ export function serverId(encKey, localId) {
  * @returns {PassDeps}
  */
 function withOpaqueIds(deps) {
-  if (!deps.encKey) throw new Error('opaqueIds requiere encKey');
+  const { encKey } = deps;
+  if (!encKey) throw new Error('opaqueIds requiere encKey');
   const isOpaque = typeof deps.opaqueIds === 'function' ? deps.opaqueIds : () => true;
   /** id local → id que ve el servidor @param {string} lid */
-  const wire = (lid) => (isOpaque(lid) ? serverId(deps.encKey, lid) : lid);
+  const wire = (lid) => (isOpaque(lid) ? serverId(encKey, lid) : lid);
   /** id del servidor → id local @type {Map<string, string>} */
   const lids = new Map();
   /** @param {string} lid */
@@ -306,17 +317,17 @@ function withOpaqueIds(deps) {
       const { items, tombstones } = deps.readLocal();
       return { items: items.map((i) => ({ ...i, id: toServer(i.id) })), tombstones: mapKeys(tombstones, toServer) };
     },
+    // Solo vuelve lo que tiene id local conocido (lo leído o bajado en esta sincronización).
     writeLocal(items, tombstones) {
-      const back = items
-        .filter((i) => lids.has(i.id))
-        .map((i) => {
-          const lid = lids.get(i.id);
-          return { ...i, id: lid, data: { ...i.data, id: lid } };
-        });
-      deps.writeLocal(
-        back,
-        mapKeys(Object.fromEntries(Object.entries(tombstones || {}).filter(([k]) => lids.has(k))), (k) => lids.get(k)),
-      );
+      const back = items.flatMap((i) => {
+        const lid = lids.get(i.id);
+        return lid === undefined ? [] : [{ ...i, id: lid, data: { ...i.data, id: lid } }];
+      });
+      const tombs = Object.entries(tombstones || {}).flatMap(([sid, u]) => {
+        const lid = lids.get(sid);
+        return lid === undefined ? [] : [[lid, u]];
+      });
+      deps.writeLocal(back, Object.fromEntries(tombs));
     },
   };
 }
@@ -345,7 +356,7 @@ function withOpaqueIds(deps) {
 async function syncPass(deps) {
   const p = await preparePass(deps);
   const legacyPulled = p.toMigrate.length ? await fetchItems(p, p.toMigrate, { fromLegacy: true }) : [];
-  const merged = deps.mergeFn ? await mergeBeforePush(p) : 0;
+  const merged = deps.mergeFn ? await mergeBeforePush(p, deps.mergeFn) : 0;
   const { pushed, skipped } = await pushChanges(p);
   p.pulled.push(...(await fetchItems(p, p.plan.pull)), ...legacyPulled);
   const result = applyChanges(p);
@@ -389,7 +400,11 @@ async function preparePass(deps) {
   // más nuevo (lo volvió a subir un equipo aún sin actualizar), primero se
   // fusiona y después se borra.
   /** @param {SyncVersion} l */
-  const isMigrated = (l) => remote.has(wire(l.id)) && remote.get(wire(l.id)).u >= l.u;
+  const isMigrated = (l) => {
+    // Sin ids opacos (`wire`) no hay ids antiguos que migrar.
+    const opaque = wire ? remote.get(wire(l.id)) : undefined;
+    return opaque !== undefined && opaque.u >= l.u;
+  };
   const migrated = legacy.filter(isMigrated);
   if (migrated.length) {
     await api.purge(migrated.map((l) => l.id));
@@ -406,26 +421,28 @@ async function preparePass(deps) {
    * (misma versión local y misma huella remota), no se recalcula: lo local
    * solo cambia de contenido con una versión nueva o adoptando la del servidor.
    */
-  /** @param {string} id */
-  const hashOf = (id) => {
-    const v = local.get(id);
-    const rec = byId.get(id);
-    const r = remote.get(id);
-    const mark = `${v.u}|${v.deleted || !rec ? 'd' : 'r'}|${r?.h}`;
-    if (cache && r?.h && cache.verified.get(id) === mark) return r.h;
-    const h =
-      v.deleted || !rec
-        ? contentHash(encKey, id, v.u, 'eliminado', '')
-        : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
-    if (cache && h === r?.h) cache.verified.set(id, mark);
-    return h;
-  };
+  /** @type {((id: string, v: {u: number, deleted: boolean}) => string) | undefined} */
+  const hashOf =
+    encKey && fingerprint
+      ? (id, v) => {
+          const rec = byId.get(id);
+          const r = remote.get(id);
+          const mark = `${v.u}|${v.deleted || !rec ? 'd' : 'r'}|${r?.h}`;
+          if (cache && r?.h && cache.verified.get(id) === mark) return r.h;
+          const h =
+            v.deleted || !rec
+              ? contentHash(encKey, id, v.u, 'eliminado', '')
+              : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
+          if (cache && h === r?.h) cache.verified.set(id, mark);
+          return h;
+        }
+      : undefined;
   return {
     deps,
     remote,
     local0,
     byId,
-    plan: planSync(local, remote, encKey && fingerprint ? hashOf : undefined),
+    plan: planSync(local, remote, hashOf),
     toMigrate: legacy.filter((l) => !isMigrated(l)),
     /** Lo que se aplicará sobre el estado local al final. */
     pulled: /** @type {ElementoBajado[]} */ ([]),
@@ -434,6 +451,24 @@ async function preparePass(deps) {
     /** Eliminaciones locales que suben de versión para ganar un conflicto. */
     tombBumps: /** @type {Record<string, number>} */ ({}),
   };
+}
+
+/**
+ * Id local de un elemento bajado y su id en el servidor, o null si no
+ * corresponden (se descarta). El id local viene dentro del contenido cifrado
+ * (o es el mismo id) y debe corresponder al id del servidor: el cifrado está
+ * atado al id del servidor, así que un elemento no se puede reubicar.
+ * @param {{lid?: unknown}} content
+ * @param {string} sid id del elemento en el servidor
+ * @param {(lid: string) => string} wire
+ * @param {boolean} fromLegacy id antiguo en claro: el contenido no trae `lid` y el id nuevo se deriva de él
+ * @returns {{id: string, lid: string} | null}
+ */
+export function resolveLocalId(content, sid, wire, fromLegacy) {
+  const lid = content.lid ?? sid;
+  if (typeof lid !== 'string') return null;
+  if (fromLegacy) return content.lid === undefined && lid === sid ? { id: wire(lid), lid } : null;
+  return wire(lid) === sid ? { id: sid, lid } : null;
 }
 
 /**
@@ -452,17 +487,11 @@ async function fetchItems(p, list, { fromLegacy = false } = {}) {
       if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
       const content = await decryptPayload(key, it.id, it.u, it);
       let id = it.id;
-      if (lids) {
-        // El id local viene dentro del contenido cifrado (o es el mismo id) y
-        // debe corresponder al id del servidor. El cifrado está atado al id
-        // del servidor, así que un elemento no se puede reubicar.
-        const lid = content.lid ?? it.id;
-        if (typeof lid !== 'string') continue;
-        if (fromLegacy) {
-          if (content.lid !== undefined || lid !== it.id) continue;
-          id = wire(lid);
-        } else if (wire(lid) !== it.id) continue;
-        lids.set(id, lid);
+      if (lids && wire) {
+        const ids = resolveLocalId(content, it.id, wire, fromLegacy);
+        if (!ids) continue;
+        id = ids.id;
+        lids.set(id, ids.lid);
       }
       // `record` = formato de la v2.1 (solo atenciones)
       const data = content.data ?? content.record;
@@ -482,15 +511,22 @@ async function fetchItems(p, list, { fromLegacy = false } = {}) {
  * 3. Fusionar antes de subir lo que también cambió en el servidor, y resolver
  * conflictos (mismo número de versión, distinto contenido).
  * @param {PassState} p
+ * @param {import('./protocol.js').MergeFn} mergeFn
  * @returns {Promise<number>} cuántos elementos se fusionaron
  */
-async function mergeBeforePush(p) {
-  const { mergeFn } = p.deps;
+async function mergeBeforePush(p, mergeFn) {
   const { remote, byId, local0, plan, pulled, extraPush } = p;
   let merged = 0;
   /** @param {string} id */
-  const isLiveLocal = (id) => byId.has(id) && !(local0.tombstones[id] >= byId.get(id).updated);
-  const both = plan.push.filter((id) => remote.has(id) && isLiveLocal(id)).map((id) => ({ id, u: remote.get(id).u, h: remote.get(id).h }));
+  const isLiveLocal = (id) => {
+    const it = byId.get(id);
+    return it !== undefined && !(local0.tombstones[id] >= it.updated);
+  };
+  /** @type {SyncVersion[]} */
+  const both = plan.push.flatMap((id) => {
+    const r = remote.get(id);
+    return r && isLiveLocal(id) ? [{ id, u: r.u, h: r.h }] : [];
+  });
   const conflictIds = new Set(plan.conflicts.map((c) => c.id));
   for (const r of await fetchItems(p, [...both, ...plan.conflicts])) {
     const localItem = byId.get(r.id);
@@ -557,14 +593,16 @@ async function pushChanges(p) {
         const rec = byId.get(id);
         const tomb = local0.tombstones[id];
         const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
+        // Sube el elemento si su versión es la vigente; si no, su eliminación.
+        const live = rec && u === rec.updated ? rec : null;
         /** @type {{kind?: string, data?: Record<string, unknown>, deleted?: boolean, lid?: string}} */
-        const content = rec && u === rec.updated ? { kind: rec.kind, data: rec.data } : { deleted: true };
+        const content = live ? { kind: live.kind, data: live.data } : { deleted: true };
         if (lids && lids.get(id) !== id) content.lid = lids.get(id);
         const h =
           encKey && fingerprint
-            ? content.deleted
-              ? contentHash(encKey, id, u, 'eliminado', '')
-              : contentHash(encKey, id, u, rec.kind, fingerprint(rec.kind, rec.data))
+            ? live
+              ? contentHash(encKey, id, u, live.kind, fingerprint(live.kind, live.data))
+              : contentHash(encKey, id, u, 'eliminado', '')
             : undefined;
         return { id, u, ...(h ? { h } : {}), ...(await encryptPayload(key, id, u, content)) };
       }),

@@ -25,16 +25,54 @@ import { proceduresDone, pioFor } from './clinica.js';
 import { ageOf } from './estadistica.js';
 import { STYLE } from '../../lib/xlsx.js';
 
+/** @import { Atencion } from '../../domain' */
+/** @import { FilaCorrespondencia } from '../../core/pseudonym.js' */
+/** @import { Hoja } from '../../lib/xlsx.js' */
+/** @import { ProcDef } from './config.js' */
+
+/** Campo de fecha de la salida: depende de la opción `fechas` (ninguno si se omite). @typedef {'mes' | 'dia_relativo' | 'fecha'} CampoFecha */
+
+/** @type {Record<string, CampoFecha | null>} */
 const DATE_FIELD = { mes: 'mes', relativa: 'dia_relativo', exacta: 'fecha', omitir: null };
+
+/** Examen de un ojo en la salida. @typedef {{av?: string, avcc?: string, pio?: string, hallazgos?: string}} OjoSeudonimizado */
+
+/**
+ * Procedimiento realizado en la salida.
+ * @typedef {{procedimiento: string, ojo: 'OD' | 'OI' | 'AO', pio_od?: string, pio_oi?: string, descripcion_od?: string, descripcion_oi?: string}} ProcSeudonimizado
+ */
+
+/**
+ * Atención seudonimizada: sin nombre, RUT ni teléfono. Los campos vacíos se
+ * omiten (ver compact); las listas quedan aunque estén vacías.
+ * @typedef {{
+ *   codigo_paciente: string, codigo_atencion: string, base_codigo: 'rut' | 'nombre' | 'id',
+ *   operativo?: string, mes?: string | number, dia_relativo?: string | number, fecha?: string | number,
+ *   edad?: string | number, sexo?: string, antecedentes: string[],
+ *   antecedente_cirugia_detalle?: string, antecedentes_otros?: string, motivo_consulta?: string,
+ *   examen?: {od?: OjoSeudonimizado, oi?: OjoSeudonimizado, observaciones?: string},
+ *   procedimientos_realizados: ProcSeudonimizado[], procedimientos_solicitados: string[],
+ *   test_schirmer_detalle?: string, procedimientos_solicitados_otros?: string,
+ *   diagnosticos: string[], catarata_ojo?: 'OD' | 'OI' | 'AO', diagnosticos_otros?: string,
+ *   ges?: string, interconsulta?: string, receta?: string, otras_acciones?: string,
+ *   plan?: string, seguimiento?: string, alta?: string, codigo_medico?: string,
+ * }} AtencionSeudonimizada
+ */
+
+/** Opciones con que se generó la exportación (ver ANON_OPTIONS). @typedef {{fechas: string, edad: string, texto: string}} OpcionesSeudonimizacion */
+
+/**
+ * @typedef {{registros: AtencionSeudonimizada[], correspondencia: FilaCorrespondencia[], opciones: OpcionesSeudonimizacion, primeraFecha: string | null}} ResultadoSeudonimizacion
+ */
 
 /* ------------------------------------------------------- transformación */
 
 /**
  * Seudonimiza un conjunto de atenciones.
- * @param {object[]} records
- * @param {import('./config.js').ProcDef[]} procs
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
  * @param {{secret: string, fechas?: string, edad?: string, texto?: string}} options
- * @returns {{registros: object[], correspondencia: import('../../core/pseudonym.js').FilaCorrespondencia[], opciones: object, primeraFecha: string|null}}
+ * @returns {ResultadoSeudonimizacion}
  */
 export function anonymizeRecords(records, procs, options) {
   const opt = { ...ANON_DEFAULTS, ...options };
@@ -44,6 +82,7 @@ export function anonymizeRecords(records, procs, options) {
     .filter(Boolean)
     .sort();
   const firstDate = dates[0] || null;
+  /** @type {Map<string, FilaCorrespondencia>} */
   const correspondencia = new Map();
 
   const registros = records.map((r) => {
@@ -52,6 +91,7 @@ export function anonymizeRecords(records, procs, options) {
     const codigo = pseudonym(secret, pk.key, 'P');
     const medicoKey = rutKey(f.medico_rut) || normalizeText(f.medico_nombre);
     const names = [f.paciente_nombre, f.medico_nombre].filter(Boolean);
+    /** @param {string | undefined} v */
     const txt = (v) => (opt.texto === 'excluir' ? undefined : scrubText((v || '').trim(), { names }) || undefined);
 
     const entry = correspondencia.get(codigo) || {
@@ -64,6 +104,7 @@ export function anonymizeRecords(records, procs, options) {
     entry.atenciones++;
     correspondencia.set(codigo, entry);
 
+    /** @param {'od' | 'oi'} e */
     const eye = (e) =>
       compact({
         av: (f[`${e}_av`] || '').trim() || undefined,
@@ -72,6 +113,7 @@ export function anonymizeRecords(records, procs, options) {
         hallazgos: txt(f[`${e}_hallazgos`]),
       });
 
+    /** @type {AtencionSeudonimizada} */
     const out = {
       codigo_paciente: codigo,
       codigo_atencion: pseudonym(secret, 'atencion:' + r.id, 'A'),
@@ -122,7 +164,12 @@ export function anonymizeRecords(records, procs, options) {
   };
 }
 
-/** Quita claves con undefined / '' / objetos vacíos (deja arrays vacíos: informan "ninguno"). */
+/**
+ * Quita claves con undefined / '' / objetos vacíos (deja arrays vacíos: informan "ninguno").
+ * @template {Record<string, unknown>} T
+ * @param {T} obj
+ * @returns {T}
+ */
 function compact(obj) {
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === '' || (v && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length)) delete obj[k];
@@ -132,7 +179,7 @@ function compact(obj) {
 
 /* --------------------------------------------------- verificación de fugas */
 
-/** Diccionario de variables, incluido en el JSON y en el Excel. */
+/** Diccionario de variables, incluido en el JSON y en el Excel. @type {[string, string][]} */
 export const DICCIONARIO = [
   ['codigo_paciente', 'Código seudónimo estable del paciente (HMAC-SHA256 de RUT o nombre con clave del equipo).'],
   ['codigo_atencion', 'Código seudónimo de la atención.'],
@@ -157,7 +204,10 @@ export const DICCIONARIO = [
   ['[NOMBRE] [RUT] [NÚMERO] [FECHA] [EMAIL]', 'Marcadores que reemplazan identificadores encontrados en textos libres.'],
 ];
 
-/** Documento JSON listo para compartir con una herramienta de análisis. */
+/**
+ * Documento JSON listo para compartir con una herramienta de análisis.
+ * @param {ResultadoSeudonimizacion} result
+ */
 export function anonymizedJson(result, now = new Date()) {
   return {
     descripcion:
@@ -174,68 +224,80 @@ export function anonymizedJson(result, now = new Date()) {
   };
 }
 
-/** Hojas Excel con los datos seudonimizados (formato ancho + prestaciones + diccionario). */
+/**
+ * Una columna de la hoja ancha: encabezado y valor, definidos juntos (no se pueden desalinear).
+ * @typedef {{h: string, v: (r: AtencionSeudonimizada) => unknown}} Columna
+ */
+
+const EYES = /** @type {const} */ (['od', 'oi']);
+
+/**
+ * Columnas de la hoja «Atenciones» (una fila por atención). Las de fecha y de
+ * texto libre dependen de las opciones de seudonimización.
+ * @param {{procNames: string[], dateHeader: string | null, dateKey: CampoFecha | null, withText: boolean}} o
+ * @returns {Columna[]}
+ */
+function wideColumns({ procNames, dateHeader, dateKey, withText }) {
+  /** @param {string} h @param {(r: AtencionSeudonimizada) => unknown} v @returns {Columna} */
+  const col = (h, v) => ({ h, v });
+  /** @param {string} h @param {(r: AtencionSeudonimizada) => string | undefined | null} v */
+  const text = (h, v) => col(h, (r) => v(r) || '');
+  /** @param {string[]} list @param {string} label */
+  const flag = (list, label) => (list.includes(label) ? 1 : 0);
+  /** @param {'od' | 'oi'} side @param {'av' | 'avcc' | 'pio' | 'hallazgos'} k @param {string} label */
+  const exam = (side, k, label) => text(`${label} ${side.toUpperCase()}`, (r) => r.examen?.[side]?.[k]);
+  return [
+    col('Código paciente', (r) => r.codigo_paciente),
+    col('Código atención', (r) => r.codigo_atencion),
+    text('Operativo', (r) => r.operativo),
+    ...(dateHeader && dateKey ? [col(dateHeader, (r) => r[dateKey] ?? '')] : []),
+    col('Edad', (r) => r.edad ?? ''),
+    text('Sexo', (r) => r.sexo),
+    ...ANTECEDENTES.map((d) => col('Ant ' + d.label, (r) => flag(r.antecedentes, d.label))),
+    ...(withText ? [text('Motivo de consulta', (r) => r.motivo_consulta)] : []),
+    ...EYES.flatMap((side) => [exam(side, 'av', 'AV'), exam(side, 'avcc', 'AVcc'), exam(side, 'pio', 'PIO')]),
+    ...(withText ? [exam('od', 'hallazgos', 'Hallazgos'), exam('oi', 'hallazgos', 'Hallazgos')] : []),
+    ...procNames.map((n) => text(n, (r) => r.procedimientos_realizados.find((p) => p.procedimiento === n)?.ojo)),
+    col('N° procedimientos', (r) => r.procedimientos_realizados.length),
+    ...SOLICITADOS.map((d) => col('Sol ' + d.label, (r) => flag(r.procedimientos_solicitados, d.label))),
+    ...DIAGNOSTICOS.map((d) => col('Dx ' + d.label, (r) => flag(r.diagnosticos, d.label))),
+    text('Catarata ojo', (r) => r.catarata_ojo),
+    ...(withText
+      ? [
+          text('Otros diagnósticos', (r) => r.diagnosticos_otros),
+          text('GES', (r) => r.ges),
+          text('IC', (r) => r.interconsulta),
+          text('Receta', (r) => r.receta),
+          text('Plan', (r) => r.plan),
+          text('Seguimiento', (r) => r.seguimiento),
+          text('Alta', (r) => r.alta),
+        ]
+      : []),
+    text('Código médico', (r) => r.codigo_medico),
+  ];
+}
+
+/**
+ * Hojas Excel con los datos seudonimizados (formato ancho + prestaciones + diccionario).
+ * @param {ResultadoSeudonimizacion} result
+ * @param {ProcDef[]} procs
+ * @returns {Hoja[]}
+ */
 export function anonymizedSheets(result, procs, now = new Date()) {
   const regs = result.registros;
-  const dateHeader = { mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null }[result.opciones.fechas];
+  const dateHeader = /** @type {Record<string, string | null>} */ ({ mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null })[
+    result.opciones.fechas
+  ];
   const dateKey = DATE_FIELD[result.opciones.fechas];
   const procNames = [
     ...new Set([...procs.map((p) => p.n), ...regs.flatMap((r) => r.procedimientos_realizados.map((p) => p.procedimiento))]),
   ];
   const withText = result.opciones.texto !== 'excluir';
+  const cols = wideColumns({ procNames, dateHeader, dateKey, withText });
+  const header = cols.map((c) => c.h);
+  const rows = regs.map((r) => cols.map((c) => c.v(r)));
 
-  const header = [
-    'Código paciente',
-    'Código atención',
-    'Operativo',
-    ...(dateHeader ? [dateHeader] : []),
-    'Edad',
-    'Sexo',
-    ...ANTECEDENTES.map((d) => 'Ant ' + d.label),
-    ...(withText ? ['Motivo de consulta'] : []),
-    'AV OD',
-    'AVcc OD',
-    'PIO OD',
-    'AV OI',
-    'AVcc OI',
-    'PIO OI',
-    ...(withText ? ['Hallazgos OD', 'Hallazgos OI'] : []),
-    ...procNames,
-    'N° procedimientos',
-    ...SOLICITADOS.map((d) => 'Sol ' + d.label),
-    ...DIAGNOSTICOS.map((d) => 'Dx ' + d.label),
-    'Catarata ojo',
-    ...(withText ? ['Otros diagnósticos', 'GES', 'IC', 'Receta', 'Plan', 'Seguimiento', 'Alta'] : []),
-    'Código médico',
-  ];
-  const flag = (list, label) => (list.includes(label) ? 1 : 0);
-  const rows = regs.map((r) => [
-    r.codigo_paciente,
-    r.codigo_atencion,
-    r.operativo || '',
-    ...(dateKey ? [r[dateKey] ?? ''] : []),
-    r.edad ?? '',
-    r.sexo || '',
-    ...ANTECEDENTES.map((d) => flag(r.antecedentes, d.label)),
-    ...(withText ? [r.motivo_consulta || ''] : []),
-    r.examen?.od?.av || '',
-    r.examen?.od?.avcc || '',
-    r.examen?.od?.pio || '',
-    r.examen?.oi?.av || '',
-    r.examen?.oi?.avcc || '',
-    r.examen?.oi?.pio || '',
-    ...(withText ? [r.examen?.od?.hallazgos || '', r.examen?.oi?.hallazgos || ''] : []),
-    ...procNames.map((n) => r.procedimientos_realizados.find((p) => p.procedimiento === n)?.ojo || ''),
-    r.procedimientos_realizados.length,
-    ...SOLICITADOS.map((d) => flag(r.procedimientos_solicitados, d.label)),
-    ...DIAGNOSTICOS.map((d) => flag(r.diagnosticos, d.label)),
-    r.catarata_ojo || '',
-    ...(withText
-      ? [r.diagnosticos_otros || '', r.ges || '', r.interconsulta || '', r.receta || '', r.plan || '', r.seguimiento || '', r.alta || '']
-      : []),
-    r.codigo_medico || '',
-  ]);
-
+  /** @type {unknown[][]} */
   const prest = [
     ['Código paciente', 'Código atención', ...(dateHeader ? [dateHeader] : []), 'Edad', 'Sexo', 'Procedimiento', 'Ojo', 'PIO OD', 'PIO OI'],
   ];

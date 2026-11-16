@@ -125,6 +125,18 @@ export function normalizePatient(raw) {
 }
 
 /**
+ * Vuelve a normalizar una ficha ya válida tras modificarla. Su id no cambia,
+ * así que normalizePatient no puede rechazarla; si lo hiciera, es un error del código.
+ * @param {Paciente} p
+ * @returns {Paciente}
+ */
+export function renormalizePatient(p) {
+  const out = normalizePatient(p);
+  if (!out) throw new Error('Ficha de paciente con id inválido');
+  return out;
+}
+
+/**
  * Textos de la ficha que esta versión no conoce (de una versión más nueva): se conservan.
  * @param {unknown} f
  * @returns {Record<string, string>}
@@ -189,9 +201,12 @@ export function missingPatients(records, patients) {
     if (!id || has(id)) continue;
     const at = r.updated || r.created || 0;
     const cur = out.get(id);
-    if (!cur || at > cur.updated) out.set(id, patientFromRecord({ ...r, pacienteId: id }, at));
+    if (cur && at <= cur.updated) continue;
+    // Un pacienteId inválido (p. ej. recibido de otro equipo) no da ficha.
+    const p = patientFromRecord({ ...r, pacienteId: id }, at);
+    if (p) out.set(id, p);
   }
-  return [...out.values()].filter(Boolean);
+  return [...out.values()];
 }
 
 /**
@@ -357,8 +372,9 @@ export function findDuplicatePairs(patients, dismissed = new Set()) {
     for (const p of live) {
       const k = keyOf(p);
       if (!k) continue;
-      if (!g.has(k)) g.set(k, []);
-      g.get(k).push(p);
+      const same = g.get(k);
+      if (same) same.push(p);
+      else g.set(k, [p]);
     }
     return [...g.values()].filter((list) => list.length > 1);
   };
@@ -366,7 +382,7 @@ export function findDuplicatePairs(patients, dismissed = new Set()) {
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) add(list[i], list[j], 'rut');
   }
   /** @type {(a: Paciente, b: Paciente, k: string) => boolean} */
-  const differ = (a, b, k) => a.f[k] && b.f[k] && (k === 'paciente_rut' ? rutKey(a.f[k]) !== rutKey(b.f[k]) : a.f[k] !== b.f[k]);
+  const differ = (a, b, k) => Boolean(a.f[k] && b.f[k]) && (k === 'paciente_rut' ? rutKey(a.f[k]) !== rutKey(b.f[k]) : a.f[k] !== b.f[k]);
   for (const list of group((p) => normalizeText(p.f.paciente_nombre))) {
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
@@ -406,5 +422,5 @@ export function mergePatients(keep, drop, at) {
   d.f[MERGED_FIELD] = keep.id;
   d.ft['f.' + MERGED_FIELD] = at;
   d.updated = Math.max(at, (drop.updated || 0) + 1);
-  return { keep: normalizePatient(k), drop: normalizePatient(d) };
+  return { keep: renormalizePatient(k), drop: renormalizePatient(d) };
 }

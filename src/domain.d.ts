@@ -25,6 +25,20 @@ export interface Atencion {
   [campoDeOtraVersion: string]: unknown;
 }
 
+/** Atención ya guardada: su id es válido (ver isValidId en core/record.js). */
+export type AtencionGuardada = Atencion & { id: string };
+
+/**
+ * Atención de una versión más nueva de la app (`v` mayor que el esquema actual):
+ * se guarda y sincroniza intacta, sin interpretarla (ver core/migrations.js).
+ */
+export interface AtencionFutura {
+  id: string;
+  v: number;
+  updated?: number;
+  [campoDeOtraVersion: string]: unknown;
+}
+
 /** Ficha del paciente (espacio común a las especialidades). */
 export interface Paciente {
   id: string;
@@ -120,6 +134,26 @@ export interface Operativo {
   nombre: string;
   created: number;
   updated: number;
+  [campoDeOtraVersion: string]: unknown;
+}
+
+/** Metadatos de un adjunto (core/attachments.js); el contenido se guarda aparte, de a uno. */
+export interface Adjunto {
+  id: string;
+  atencionId: string;
+  nombre: string;
+  /** Tipo MIME normalizado. */
+  tipo: string;
+  /** Bytes del archivo. */
+  tamano: number;
+  /** Huella SHA-256 del contenido (64 hex). */
+  sha256: string;
+  /** Partes en que viaja el contenido al servidor. */
+  partes: number;
+  created: number;
+  updated: number;
+  /** Miniatura (data URL) para verla antes de que llegue el contenido. */
+  miniatura?: string;
   [campoDeOtraVersion: string]: unknown;
 }
 

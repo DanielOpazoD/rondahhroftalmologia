@@ -12,21 +12,28 @@ const ICONS = {
   danger: html`<svg aria-hidden="true"><use href="#i-alert"/></svg>`,
 };
 
-/** Texto plano con saltos de línea como <br> (el texto se escapa). */
+/**
+ * @typedef {{title: string, message?: string, html?: SafeHtml, tone?: 'info'|'ok'|'warn'|'danger', altLabel?: string,
+ *   okLabel?: string, cancelLabel?: string|null, copyText?: string}} MsgOptions
+ */
+
+/** Respuesta del diálogo: true/false, o 'ok'|'alt'|false si hay `altLabel`. @typedef {boolean | 'ok' | 'alt'} MsgAnswer */
+
+/** Texto plano con saltos de línea como <br> (el texto se escapa). @param {unknown} s */
 const textWithBreaks = (s) =>
   html`${String(s || '')
     .split('\n')
     .map((line, i) => html`${i ? html`<br>` : ''}${line}`)}`;
 
+/** Cierra el mensaje abierto con esa respuesta (null: no hay ninguno). @type {((v: MsgAnswer) => void) | null} */
 let pending = null;
 
 /**
  * Muestra el diálogo de mensajes.
  * `html`: plantilla html`…` (los datos interpolados se escapan solos). Si no
  * es una plantilla segura, se muestra como texto.
- * @param {{title: string, message?: string, html?: SafeHtml, tone?: 'info'|'ok'|'warn'|'danger', altLabel?: string,
- *   okLabel?: string, cancelLabel?: string|null, copyText?: string}} o
- * @returns {Promise<any>} true/false (o 'ok'|'alt'|false si hay `altLabel`)
+ * @param {MsgOptions} o
+ * @returns {Promise<MsgAnswer>} true/false (o 'ok'|'alt'|false si hay `altLabel`)
  */
 function show(o) {
   const dlg = $('#msgDlg');
@@ -51,6 +58,7 @@ function show(o) {
   cancel.textContent = o.cancelLabel || '';
 
   return new Promise((resolve) => {
+    /** @param {MsgAnswer} v */
     const finish = (v) => {
       if (pending !== finish) return;
       pending = null;
@@ -61,7 +69,7 @@ function show(o) {
     ok.onclick = () => finish(o.altLabel ? 'ok' : true);
     alt.onclick = () => finish('alt');
     cancel.onclick = () => finish(false);
-    dlg.oncancel = (e) => {
+    dlg.oncancel = (/** @type {Event} */ e) => {
       e.preventDefault();
       finish(false);
     };
@@ -73,17 +81,33 @@ function show(o) {
   });
 }
 
-/** Aviso con un solo botón. */
-export const uiAlert = (o) => show({ ...o, cancelLabel: null }).then(() => undefined);
+/**
+ * Aviso con un solo botón.
+ * @param {MsgOptions} o
+ * @returns {Promise<undefined>}
+ */
+export const uiAlert = (o) => show({ ...o, cancelLabel: null }).then(/** @returns {undefined} */ () => undefined);
 
-/** Confirmación: resuelve true si se acepta. */
+/**
+ * Confirmación: resuelve true si se acepta.
+ * @param {MsgOptions} o
+ * @returns {Promise<MsgAnswer>} true/false (o 'ok'|'alt'|false si se pasa `altLabel`)
+ */
 export const uiConfirm = (o) => show({ cancelLabel: 'Cancelar', okLabel: 'Continuar', ...o });
 
-/** Muestra un texto seleccionado para copiarlo a mano (si el portapapeles falla). */
-export const uiCopy = (o) => show({ tone: 'info', okLabel: 'Listo', ...o, cancelLabel: null }).then(() => undefined);
+/**
+ * Muestra un texto seleccionado para copiarlo a mano (si el portapapeles falla).
+ * @param {MsgOptions} o
+ * @returns {Promise<undefined>}
+ */
+export const uiCopy = (o) =>
+  show({ tone: 'info', okLabel: 'Listo', ...o, cancelLabel: null }).then(/** @returns {undefined} */ () => undefined);
 
 /**
  * Tres opciones: resuelve 'ok' (botón principal), 'alt' (alternativa) o false (cancelar).
+ * @param {MsgOptions & {altLabel: string}} o
  * @returns {Promise<'ok'|'alt'|false>}
  */
-export const uiChoose = (o) => show({ cancelLabel: 'Cancelar', ...o });
+export const uiChoose = (o) =>
+  // Con `altLabel`, show nunca resuelve true (ver finish en show).
+  /** @type {Promise<'ok'|'alt'|false>} */ (show({ cancelLabel: 'Cancelar', ...o }));

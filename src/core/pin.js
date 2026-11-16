@@ -103,9 +103,9 @@ function same(a, b) {
 }
 
 /** @type {(lock: LockConfig | null | undefined, pin: unknown) => boolean} */
-export const verifyPin = (lock, pin) => Boolean(lock?.hash) && same(pbkdf2(String(pin ?? ''), lock.salt, lock.iter), lock.hash);
+export const verifyPin = (lock, pin) => !!lock?.hash && same(pbkdf2(String(pin ?? ''), lock.salt, lock.iter), lock.hash);
 /** @type {(lock: LockConfig | null | undefined, code: unknown) => boolean} */
-export const verifyRecovery = (lock, code) => Boolean(lock?.rhash) && same(pbkdf2(normCode(code), lock.rsalt, lock.iter), lock.rhash);
+export const verifyRecovery = (lock, code) => !!lock?.rhash && same(pbkdf2(normCode(code), lock.rsalt, lock.iter), lock.rhash);
 
 /** ¿Es una configuración de bloqueo válida? (lo guardado puede venir alterado o de otra versión) */
 /** @type {(l: any) => boolean} lo guardado, sin validar */

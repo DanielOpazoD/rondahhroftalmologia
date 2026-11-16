@@ -160,7 +160,7 @@ export function createAccountsController(ctx) {
     }
   }
 
-  /** @param {SubmitEvent} e */
+  /** @param {SubmitEvent} e @returns {Promise<void>} */
   async function submitChange(e) {
     e.preventDefault();
     const p1 = $('#pwNew').value;
@@ -248,7 +248,7 @@ export function createAccountsController(ctx) {
 
   function scheduleFlush() {
     clearTimeout(ui.flushTimer);
-    ui.flushTimer = setTimeout(() => void session.flushEvents().then((n) => n && scheduleFlush()), 3000);
+    ui.flushTimer = setTimeout(/** @returns {undefined} */ () => void session.flushEvents().then((n) => n && scheduleFlush()), 3000);
   }
 
   /* --------------------------------------------- activar (primer administrador) */
@@ -270,7 +270,7 @@ export function createAccountsController(ctx) {
         const nombre = personName(parts);
         if (!accountRut(rut)) return 'RUT inválido (revisa el dígito verificador).';
         if (nombre.length < 3) return 'Escribe tu nombre completo.';
-        setTimeout(() => void confirmActivate({ rut: accountRut(rut), nombre, ...parts, rol }), 0);
+        setTimeout(/** @returns {undefined} */ () => void confirmActivate({ rut: accountRut(rut), nombre, ...parts, rol }), 0);
         return null;
       },
     });
@@ -347,15 +347,17 @@ export function createAccountsController(ctx) {
 
   function init() {
     setHtml($('#acctLockMin'), html`${LOCK_MINUTES.map((m) => html`<option value="${m}">${m} min sin uso</option>`)}`);
-    $('#acctLockMin').addEventListener('change', (e) => ctx.persist(() => store.saveSessionLockMinutes(Number(e.target.value))));
+    $('#acctLockMin').addEventListener('change', (/** @type {Event} */ e) =>
+      ctx.persist(() => store.saveSessionLockMinutes(Number(/** @type {HTMLSelectElement} */ (e.target).value))),
+    );
     $('#acctActivateBtn').addEventListener('click', activate);
     $('#acctPass').addEventListener('click', changeMyPassword);
-    $('#acctLogout').addEventListener('click', () => void logout('salir'));
+    $('#acctLogout').addEventListener('click', /** @returns {undefined} */ () => void logout('salir'));
     $('#loginForm').addEventListener('submit', submitLogin);
     $('#pwForm').addEventListener('submit', submitChange);
     $('#loginPractice').addEventListener('click', () => location.assign(practiceUrl(true)));
-    window.addEventListener('online', () => void session.ensureToken().then(() => ctx.sync?.schedule()));
-    setInterval(() => void session.flushEvents(), 60_000);
+    window.addEventListener('online', /** @returns {undefined} */ () => void session.ensureToken().then(() => ctx.sync?.schedule()));
+    setInterval(/** @returns {undefined} */ () => void session.flushEvents(), 60_000);
   }
 
   /** Al abrir la app: recupera la sesión de la pestaña o muestra el ingreso. */
@@ -399,7 +401,7 @@ export function createAccountsController(ctx) {
     get user() {
       return session.user;
     },
-    /** Ejecuta `fn` cuando haya sesión (de inmediato si no se usan cuentas o ya hay). */
+    /** Ejecuta `fn` cuando haya sesión (de inmediato si no se usan cuentas o ya hay). @param {() => void} fn */
     whenReady(fn) {
       if (!usable() || !session.on || session.user) fn();
       else ui.waiters.push(fn);

@@ -6,17 +6,20 @@ import { SEXOS } from '../../config/catalogs.js';
 import { antecedentsList, requestedList, diagnosesList, proceduresDone, procLabel, examFindings, actionsList } from './clinica.js';
 
 /**
- * @param {object} rec registro de atención
+ * @param {import('../../domain').Atencion} rec registro de atención
  * @param {import('./config.js').ProcDef[]} procs lista de procedimientos
  * @param {{pie?: string}} [opts] `pie`: línea final opcional
  * @returns {string}
  */
 export function buildNote(rec, procs, opts = {}) {
   const f = rec.f || {};
+  /** @type {string[]} */
   const L = [];
+  /** @param {string | undefined} v */
   const t = (v) => (v || '').trim();
+  /** @param {string} title @param {string[]} [lines] */
   const section = (title, lines = []) => L.push('', title, ...lines);
-  /** Sección con título y líneas, solo si hay líneas. */
+  /** Sección con título y líneas, solo si hay líneas. @param {string} title @param {string[]} lines */
   const list = (title, lines) => lines.length && section(title, lines);
 
   L.push('ATENCIÓN OTORRINOLARINGOLÓGICA – RONDAS Y OPERATIVOS' + (t(f.operativo) ? ` (${t(f.operativo)})` : ''));

@@ -5,86 +5,75 @@ import { fmtDate, doctorName } from '../../core/format.js';
 import { SEXOS } from '../../config/catalogs.js';
 import { antecedentsList, requestedList, diagnosesList, proceduresDone, procLabel, eyeSummary, actionsList } from './clinica.js';
 
+/** Texto sin espacios en los extremos ('' si no hay). @param {string | undefined} v */
+const t = (v) => (v || '').trim();
+
+/** «Nombre | RUT … | 70 años | Femenino | Fono …» (solo lo que hay). @param {Record<string, string>} f */
+function patientLine(f) {
+  const sexo = SEXOS.find((s) => s.key === f.paciente_sexo)?.label;
+  return [
+    t(f.paciente_nombre),
+    t(f.paciente_rut) && 'RUT ' + t(f.paciente_rut),
+    t(f.paciente_edad) && t(f.paciente_edad) + ' años',
+    sexo,
+    t(f.paciente_fono) && 'Fono ' + t(f.paciente_fono),
+  ]
+    .filter(Boolean)
+    .join(' | ');
+}
+
 /**
- * @param {object} rec registro de atención
+ * @param {import('../../domain').Atencion} rec registro de atención
  * @param {import('./config.js').ProcDef[]} procs lista de procedimientos
  * @param {{pie?: string}} [opts] `pie`: línea final opcional
  * @returns {string}
  */
 export function buildNote(rec, procs, opts = {}) {
   const f = rec.f || {};
+  /** @type {string[]} */
   const L = [];
+  /** Línea «etiqueta valor», solo si hay valor. @param {string} label @param {string | undefined} v */
   const add = (label, v) => {
-    if (v && String(v).trim()) L.push(label + String(v).trim());
+    if (t(v)) L.push(label + t(v));
   };
-  const section = (title) => {
-    L.push('');
-    L.push(title);
+  /** Sección con título y una línea por elemento (nada si no hay elementos). @param {string} title @param {string[]} lines */
+  const block = (title, lines) => {
+    if (lines.length) L.push('', title, ...lines);
   };
+  const bullets = (/** @type {string[]} */ xs) => xs.map((x) => '- ' + x);
 
-  L.push('ATENCIÓN OFTALMOLÓGICA – RONDAS Y OPERATIVOS' + (f.operativo?.trim() ? ` (${f.operativo.trim()})` : ''));
+  L.push('ATENCIÓN OFTALMOLÓGICA – RONDAS Y OPERATIVOS' + (t(f.operativo) ? ` (${t(f.operativo)})` : ''));
   add('Fecha: ', fmtDate(f.fecha_atencion));
-  const sexo = SEXOS.find((s) => s.key === f.paciente_sexo)?.label;
-  add(
-    'Paciente: ',
-    [
-      f.paciente_nombre?.trim(),
-      f.paciente_rut?.trim() && 'RUT ' + f.paciente_rut.trim(),
-      f.paciente_edad?.trim() && f.paciente_edad.trim() + ' años',
-      sexo,
-      f.paciente_fono?.trim() && 'Fono ' + f.paciente_fono.trim(),
-    ]
-      .filter(Boolean)
-      .join(' | '),
-  );
+  add('Paciente: ', patientLine(f));
 
   const ant = antecedentsList(rec);
-  section('ANTECEDENTES: ' + (ant.length ? ant.join(', ') : 'No refiere'));
+  L.push('', 'ANTECEDENTES: ' + (ant.length ? ant.join(', ') : 'No refiere'));
+  block('MOTIVO DE CONSULTA:', t(f.motivo_consulta) ? [t(f.motivo_consulta)] : []);
 
-  if (f.motivo_consulta?.trim()) {
-    section('MOTIVO DE CONSULTA:');
-    L.push(f.motivo_consulta.trim());
-  }
-
-  const od = eyeSummary(rec, 'od', procs);
-  const oi = eyeSummary(rec, 'oi', procs);
-  if (od || oi || f.examen_obs?.trim()) {
-    section('EXAMEN FÍSICO:');
-    add('OD: ', od);
-    add('OI: ', oi);
-    add('Obs: ', f.examen_obs);
-  }
-
-  const done = proceduresDone(rec, procs);
-  if (done.length) {
-    section('PROCEDIMIENTOS REALIZADOS:');
-    done.forEach((p) => L.push('- ' + procLabel(p)));
-  }
+  const exam = [
+    ['OD: ', eyeSummary(rec, 'od', procs)],
+    ['OI: ', eyeSummary(rec, 'oi', procs)],
+    ['Obs: ', t(f.examen_obs)],
+  ];
+  block(
+    'EXAMEN FÍSICO:',
+    exam.filter(([, v]) => v).map(([k, v]) => k + t(v)),
+  );
+  block('PROCEDIMIENTOS REALIZADOS:', bullets(proceduresDone(rec, procs).map((p) => procLabel(p))));
 
   const sol = requestedList(rec);
-  if (sol.length) section('PROCEDIMIENTOS SOLICITADOS: ' + sol.join(', '));
-
-  const dx = diagnosesList(rec);
-  if (dx.length) {
-    section('DIAGNÓSTICOS:');
-    dx.forEach((x) => L.push('- ' + x));
-  }
+  if (sol.length) L.push('', 'PROCEDIMIENTOS SOLICITADOS: ' + sol.join(', '));
+  block('DIAGNÓSTICOS:', bullets(diagnosesList(rec)));
   const acc = actionsList(rec);
   if (acc.length) L.push(acc.join(' | '));
 
-  if (f.plan?.trim()) {
-    section('PLAN E INDICACIONES:');
-    L.push(f.plan.trim());
-  }
-  if (f.seguimiento?.trim() || f.alta?.trim()) {
+  block('PLAN E INDICACIONES:', t(f.plan) ? [t(f.plan)] : []);
+  if (t(f.seguimiento) || t(f.alta)) {
     L.push('');
     add('Seguimiento: ', f.seguimiento);
     add('Alta: ', f.alta);
   }
-  if (f.medico_nombre?.trim()) {
-    L.push('');
-    L.push(doctorName(f.medico_nombre) + (f.medico_rut?.trim() ? ' – RUT ' + f.medico_rut.trim() : ''));
-  }
+  if (t(f.medico_nombre)) L.push('', doctorName(f.medico_nombre) + (t(f.medico_rut) ? ' – RUT ' + t(f.medico_rut) : ''));
   if (opts.pie) L.push(opts.pie);
 
   return L.join('\n')

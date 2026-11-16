@@ -12,9 +12,43 @@ import { ageOf } from '../../core/estadistica.js';
 import { STYLE } from '../../lib/xlsx.js';
 import { proceduresDone } from './clinica.js';
 
+/** @import { Atencion } from '../../domain' */
+/** @import { FilaCorrespondencia } from '../../core/pseudonym.js' */
+/** @import { Hoja } from '../../lib/xlsx.js' */
+/** @import { ProcDef } from './config.js' */
+
+/** Campo de fecha de la salida: depende de la opción `fechas` (ninguno si se omite). @typedef {'mes' | 'dia_relativo' | 'fecha'} CampoFecha */
+
+/** @type {Record<string, CampoFecha | null>} */
 const DATE_FIELD = { mes: 'mes', relativa: 'dia_relativo', exacta: 'fecha', omitir: null };
 
-/** Quita claves vacías (undefined, '' u objeto vacío); deja las listas vacías: informan "ninguno". */
+/**
+ * Atención ORL seudonimizada: sin nombre, RUT ni teléfono. Los campos vacíos se
+ * omiten (ver compact); las listas quedan aunque estén vacías. Los textos libres
+ * (claves de TEXTOS) van con su propia clave, por eso la firma de índice.
+ * @typedef {{
+ *   codigo_paciente: string, codigo_atencion: string, base_codigo: 'rut' | 'nombre' | 'id',
+ *   operativo?: string, mes?: string | number, dia_relativo?: string | number, fecha?: string | number,
+ *   edad?: string | number, sexo?: string, antecedentes: string[],
+ *   audiometria_od_db?: string, audiometria_oi_db?: string,
+ *   procedimientos_realizados: {procedimiento: string, oido: 'OD' | 'OI' | 'AO'}[],
+ *   examenes_solicitados: string[], diagnosticos: string[], codigo_medico?: string,
+ *   [textoLibre: string]: unknown,
+ * }} AtencionSeudonimizada
+ */
+
+/** Opciones con que se generó la exportación (ver ANON_OPTIONS). @typedef {{fechas: string, edad: string, texto: string}} OpcionesSeudonimizacion */
+
+/**
+ * @typedef {{registros: AtencionSeudonimizada[], correspondencia: FilaCorrespondencia[], opciones: OpcionesSeudonimizacion, primeraFecha: string | null}} ResultadoSeudonimizacion
+ */
+
+/**
+ * Quita claves vacías (undefined, '' u objeto vacío); deja las listas vacías: informan "ninguno".
+ * @template {Record<string, unknown>} T
+ * @param {T} obj
+ * @returns {T}
+ */
 function compact(obj) {
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === '' || (v && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length)) delete obj[k];
@@ -22,7 +56,7 @@ function compact(obj) {
   return obj;
 }
 
-/** Textos libres de la salida: [clave de salida, campo del registro]. */
+/** Textos libres de la salida: [clave de salida, campo del registro]. @type {[string, string][]} */
 const TEXTOS = [
   ['antecedente_cirugia_detalle', 'antecedente_cirugia_detalle'],
   ['antecedentes_otros', 'antecedentes_otros'],
@@ -44,9 +78,10 @@ const TEXTOS = [
 
 /**
  * Seudonimiza un conjunto de atenciones.
- * @param {object[]} records
- * @param {import('./config.js').ProcDef[]} procs
+ * @param {Atencion[]} records
+ * @param {ProcDef[]} procs
  * @param {{secret: string, fechas?: string, edad?: string, texto?: string}} options
+ * @returns {ResultadoSeudonimizacion}
  */
 export function anonymizeRecords(records, procs, options) {
   const opt = { ...ANON_DEFAULTS, ...options };
@@ -55,6 +90,7 @@ export function anonymizeRecords(records, procs, options) {
       .map((r) => r.f?.fecha_atencion)
       .filter(Boolean)
       .sort()[0] || null;
+  /** @type {Map<string, FilaCorrespondencia>} */
   const correspondencia = new Map();
 
   const registros = records.map((r) => {
@@ -63,6 +99,7 @@ export function anonymizeRecords(records, procs, options) {
     const codigo = pseudonym(opt.secret, pk.key, 'P');
     const medicoKey = rutKey(f.medico_rut) || normalizeText(f.medico_nombre);
     const names = [f.paciente_nombre, f.medico_nombre].filter(Boolean);
+    /** @param {string | undefined} v */
     const txt = (v) => (opt.texto === 'excluir' ? undefined : scrubText((v || '').trim(), { names }) || undefined);
 
     const entry = correspondencia.get(codigo) || {
@@ -75,6 +112,7 @@ export function anonymizeRecords(records, procs, options) {
     entry.atenciones++;
     correspondencia.set(codigo, entry);
 
+    /** @type {AtencionSeudonimizada} */
     const out = {
       codigo_paciente: codigo,
       codigo_atencion: pseudonym(opt.secret, 'atencion:' + r.id, 'A'),
@@ -104,7 +142,7 @@ export function anonymizeRecords(records, procs, options) {
   };
 }
 
-/** Diccionario de variables, incluido en el JSON y en el Excel. */
+/** Diccionario de variables, incluido en el JSON y en el Excel. @type {[string, string][]} */
 export const DICCIONARIO = [
   ['codigo_paciente', 'Código seudónimo estable del paciente (HMAC-SHA256 de RUT o nombre con clave del equipo).'],
   ['codigo_atencion', 'Código seudónimo de la atención.'],
@@ -121,7 +159,10 @@ export const DICCIONARIO = [
   ['[NOMBRE] [RUT] [NÚMERO] [FECHA] [EMAIL]', 'Marcadores que reemplazan identificadores encontrados en textos libres.'],
 ];
 
-/** Documento JSON listo para compartir con una herramienta de análisis. */
+/**
+ * Documento JSON listo para compartir con una herramienta de análisis.
+ * @param {ResultadoSeudonimizacion} result
+ */
 export function anonymizedJson(result, now = new Date()) {
   return {
     descripcion: `Atenciones de ${ESPECIALIDAD.nombre.toLowerCase()} seudonimizadas (rondas y operativos). Sin nombres, RUT ni teléfonos.`,
@@ -136,12 +177,20 @@ export function anonymizedJson(result, now = new Date()) {
   };
 }
 
-/** Hojas Excel con los datos seudonimizados (una fila por atención + diccionario). */
+/**
+ * Hojas Excel con los datos seudonimizados (una fila por atención + diccionario).
+ * @param {ResultadoSeudonimizacion} result
+ * @param {ProcDef[]} _procs sin uso (la plataforma la pasa igual)
+ * @returns {Hoja[]}
+ */
 export function anonymizedSheets(result, _procs, now = new Date()) {
   const regs = result.registros;
-  const dateHeader = { mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null }[result.opciones.fechas];
+  const dateHeader = /** @type {Record<string, string | null>} */ ({ mes: 'Mes', relativa: 'Día relativo', exacta: 'Fecha', omitir: null })[
+    result.opciones.fechas
+  ];
   const dateKey = DATE_FIELD[result.opciones.fechas];
   const textos = result.opciones.texto === 'excluir' ? [] : TEXTOS.map(([k]) => k);
+  /** @param {string[]} list @param {string} label */
   const flag = (list, label) => (list.includes(label) ? 1 : 0);
   const header = [
     'Código paciente',

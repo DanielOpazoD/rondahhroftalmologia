@@ -12,8 +12,8 @@ import { html, setHtml } from './html.js';
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initSettingsView(ctx) {
-  $('#ajList').addEventListener('click', async (e) => {
-    const b = e.target.closest('button');
+  $('#ajList').addEventListener('click', async (/** @type {MouseEvent} */ e) => {
+    const b = /** @type {Element} */ (e.target).closest('button');
     if (!b) return;
     if (b.id === 'ajReset') {
       if (
@@ -114,9 +114,10 @@ export function initSettingsView(ctx) {
     ctx.accounts?.event('respaldo.descargar', undefined, { n: ctx.records.length });
   });
   $('#bkImpBtn').addEventListener('click', () => $('#bkImp').click());
-  $('#bkImp').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    e.target.value = '';
+  $('#bkImp').addEventListener('change', async (/** @type {Event} */ e) => {
+    const input = /** @type {HTMLInputElement} */ (e.target);
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
     try {
       const { text, contents } = unpackBackup(new Uint8Array(await file.arrayBuffer()));
@@ -177,7 +178,7 @@ export function initSettingsView(ctx) {
         tone: 'ok',
       });
     } catch (err) {
-      uiAlert({ title: 'No se pudo importar', message: err.message, tone: 'danger' });
+      uiAlert({ title: 'No se pudo importar', message: /** @type {Error} */ (err).message, tone: 'danger' });
     }
   });
 
@@ -213,6 +214,7 @@ export function initSettingsView(ctx) {
   });
 }
 
+/** Dibuja la lista de procedimientos y los ajustes guardados. @param {import('./context.js').AppContext} ctx */
 export function renderSettings(ctx) {
   const procRows = ctx.procs.map(
     (p, i) => html`<div class="it"><div class="t"><b>${p.n}</b></div>
