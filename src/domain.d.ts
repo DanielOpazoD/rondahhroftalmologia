@@ -71,6 +71,8 @@ export type ProcRealizado = {
   eye: 'OD' | 'OI' | 'AO';
   od?: string;
   oi?: string;
+  /** Descripción en texto (procedimientos que la admiten, p. ej. FO y BMC). */
+  desc?: string;
 };
 
 /** Parte clínica de una atención de ejemplo para el modo práctica (la aporta la especialidad). */

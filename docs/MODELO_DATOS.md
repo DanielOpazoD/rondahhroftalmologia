@@ -78,7 +78,7 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
     "paciente_fnac": "1959-03-20",                 // fecha de nacimiento (v3)
     "paciente_edad": "67", "paciente_sexo": "F",   // edad: se calcula sola si hay fecha de nacimiento
     "paciente_fono": "…",
-    "od_av": "20/40", "od_pio": "14", "od_hallazgos": "…",
+    "od_av": "20/40", "od_avcc": "20/25", "od_pio": "14", "od_hallazgos": "…",   // AVcc desde la 2.18 (sin «Otro» ni «Resultado»)
     "oi_av": "…", "...": "…",
     "medico_nombre": "…", "medico_rut": "…"
   },
@@ -90,7 +90,7 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
   "cat": "OD",                     // lateralidad de catarata: "" | OD | OI | AO
   "proc": {                        // procedimientos REALIZADOS
     "t_aplan": { "eye": "AO", "od": "14", "oi": "16" },
-    "fo": { "eye": "OI" }
+    "fo": { "eye": "OI", "desc": "Papila 0,3" }   // descripción: procedimientos con «Texto» (FO y BMC por defecto)
   },
   "procNames": { "t_aplan": "T. Aplanática", "fo": "Fondo de ojo (FO)" },
   "ft": { "f.od_pio": 1763150000000, "checks.diagnostico_glaucoma": 1763150050000, "proc.t_aplan.od": 1763150000000 }
@@ -108,7 +108,9 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
 - `f.<campo>` para cada texto;
 - `checks.<clave>` para cada casilla;
 - `cat` para el ojo de la catarata;
-- `proc.<id>.eye`, `proc.<id>.od` y `proc.<id>.oi` para cada procedimiento.
+- `proc.<id>.eye`, `proc.<id>.od`, `proc.<id>.oi` y `proc.<id>.desc` para cada procedimiento.
+
+**Examen físico (2.18):** por ojo, AV, AVcc y PIO; los campos `od/oi_otro_examen` y `od/oi_otro_resultado` ya no están en el formulario ni en el PDF (si una atención antigua los tiene, se conservan en los datos y en el historial). La descripción de un procedimiento (FO, BMC) va en el PDF dentro del recuadro del examen del ojo correspondiente, como «FO: …» o «BMC: …» (en AO, en ambos ojos). La plantilla se ajustó con `scripts/plantilla-examen.mjs`.
 
 Con `ft`, dos versiones de una misma atención se fusionan campo a campo (`src/core/merge.js`): en cada campo gana la edición más reciente. Las atenciones antiguas sin `ft` usan su `updated` para todos sus campos.
 

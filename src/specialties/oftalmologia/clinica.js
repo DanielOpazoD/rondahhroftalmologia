@@ -34,7 +34,7 @@ function procHasPio(id, rec, procs) {
 /**
  * Procedimientos realizados como datos estructurados, en el orden de la lista
  * configurada (los que ya no están en ella no se incluyen).
- * @returns {{id: string, nombre: string, ojo: string, ojos: number, pioOd: string, pioOi: string}[]}
+ * @returns {{id: string, nombre: string, abrev: string, desc: string, ojo: string, ojos: number, pioOd: string, pioOi: string}[]}
  */
 export function proceduresDone(rec, procs) {
   // Solo los procedimientos de la lista configurada: uno que se quitó de la
@@ -44,9 +44,12 @@ export function proceduresDone(rec, procs) {
   return ordered.map((id) => {
     const v = rec.proc[id];
     const pio = procHasPio(id, rec, procs);
+    const def = procs.find((x) => x.id === id);
     return {
       id,
       nombre: procName(id, rec, procs),
+      abrev: def?.abrev || procName(id, rec, procs),
+      desc: (v.desc || '').trim(),
       ojo: v.eye,
       ojos: eyeCount(v.eye),
       pioOd: pio && coversEye(v.eye, 'od') ? (v.od || '').trim() : '',
@@ -55,10 +58,25 @@ export function proceduresDone(rec, procs) {
   });
 }
 
-/** "T. Aplanática AO (OD 14 / OI 15 mmHg)" */
-export function procLabel(p) {
+/**
+ * "T. Aplanática AO (OD 14 / OI 15 mmHg)" · "Fondo de ojo (FO) OD: papila normal".
+ * @param {{nombre: string, ojo: string, pioOd?: string, pioOi?: string, desc?: string}} p
+ * @param {{desc?: boolean}} [o] `desc: false` sin la descripción (el PDF la pone en el recuadro del examen)
+ */
+export function procLabel(p, { desc = true } = {}) {
   const vals = [p.pioOd && 'OD ' + p.pioOd, p.pioOi && 'OI ' + p.pioOi].filter(Boolean);
-  return `${p.nombre} ${p.ojo}` + (vals.length ? ` (${vals.join(' / ')} mmHg)` : '');
+  return `${p.nombre} ${p.ojo}` + (vals.length ? ` (${vals.join(' / ')} mmHg)` : '') + (desc && p.desc ? `: ${p.desc}` : '');
+}
+
+/**
+ * Descripciones de procedimientos que van en el recuadro del examen de un ojo
+ * («FO: …», «BMC: …»): las de los procedimientos hechos en ese ojo (o en AO).
+ * @param {any} rec @param {string} e @param {import('./config.js').ProcDef[]} procs
+ */
+export function procDescriptions(rec, e, procs) {
+  return proceduresDone(rec, procs)
+    .filter((p) => p.desc && coversEye(p.ojo, e))
+    .map((p) => `${p.abrev}: ${p.desc}`);
 }
 
 /**
@@ -112,7 +130,7 @@ export function diagnosesList(rec, { withOthers = true } = {}) {
   return out;
 }
 
-/** Resumen de un ojo para la nota: "AV 20/40 | PIO 14 mmHg | AE 3 | hallazgos". */
+/** Resumen de un ojo para la nota: "AV 20/40 | AVcc 20/25 | PIO 14 mmHg | hallazgos". */
 export function eyeSummary(rec, e, procs) {
   const f = rec.f || {};
   const parts = [];
@@ -120,11 +138,8 @@ export function eyeSummary(rec, e, procs) {
   const pio = pioFor(rec, e, procs);
   if (av) parts.push('AV ' + av);
   if (pio) parts.push('PIO ' + pio + (/mm/i.test(pio) ? '' : ' mmHg'));
-  const otro = [f[`${e}_otro_examen`], f[`${e}_otro_resultado`]]
-    .map((x) => (x || '').trim())
-    .filter(Boolean)
-    .join(' ');
-  if (otro) parts.push(otro);
+  const avcc = (f[`${e}_avcc`] || '').trim();
+  if (avcc) parts.splice(av ? 1 : 0, 0, 'AVcc ' + avcc);
   if (f[`${e}_hallazgos`]?.trim()) parts.push(f[`${e}_hallazgos`].trim().replace(/\n+/g, '; '));
   return parts.join(' | ');
 }

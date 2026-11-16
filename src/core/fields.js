@@ -9,8 +9,8 @@ import { MEDIDAS_PROC } from '../specialties/activa/config.js';
 /** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
 /** Valor de una ruta: texto, o `true` para una casilla marcada. @typedef {string | true} ValorRuta */
 
-/** Partes de un procedimiento realizado: el lado (`eye`) y las medidas por lado de la especialidad. */
-const PROC_KEYS = ['eye', ...MEDIDAS_PROC];
+/** Partes de un procedimiento realizado: el lado (`eye`), las medidas por lado de la especialidad y su descripción (texto). */
+const PROC_KEYS = ['eye', ...MEDIDAS_PROC, 'desc'];
 
 /**
  * Claves aceptadas para campos, casillas e ids de procedimiento. Los datos

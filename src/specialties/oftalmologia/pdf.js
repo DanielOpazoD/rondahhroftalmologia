@@ -18,7 +18,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { APP } from '../../config/catalogs.js';
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS } from './config.js';
 import { fmtDate, fmtDateTime, toWinAnsi, fileSafe, rutKey, doctorName } from '../../core/format.js';
-import { proceduresDone, procLabel, pioFor } from './clinica.js';
+import { proceduresDone, procLabel, pioFor, procDescriptions } from './clinica.js';
 
 const MIN_LINE_PT = 7; // tamaño mínimo legible en líneas
 const MIN_BOX_PT = 6.5; // tamaño mínimo en recuadros multilínea
@@ -193,17 +193,18 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   for (const e of ['od', 'oi']) {
     const E = e.toUpperCase();
     setSingle(`${e}_av`, f[`${e}_av`], { title: `AV ${E}` });
+    setSingle(`${e}_avcc`, f[`${e}_avcc`], { title: `AVcc ${E}` });
     setSingle(`${e}_pio`, pioFor(rec, e, procs), { title: `PIO ${E}` });
-    setSingle(`${e}_otro_examen`, f[`${e}_otro_examen`], { max: 9 });
-    setSingle(`${e}_otro_resultado`, f[`${e}_otro_resultado`], { title: `Otro examen ${E}` });
-    setBox(`${e}_hallazgos`, f[`${e}_hallazgos`], `Hallazgos ${E}`);
+    // Recuadro del ojo: hallazgos y, debajo, las descripciones de procedimientos («FO: …», «BMC: …»).
+    const box = [(f[`${e}_hallazgos`] || '').trim(), ...procDescriptions(rec, e, procs)].filter(Boolean).join('\n');
+    setBox(`${e}_hallazgos`, box, `Examen ${E}`);
   }
 
   /* ---- observaciones + procedimientos realizados ---- */
   const done = proceduresDone(rec, procs);
   const obsNames = ['examen_observaciones_1', 'examen_observaciones_2'];
   const obs = (f.examen_obs || '').trim();
-  const procText = done.length ? `Proc. realizados: ${done.map(procLabel).join('; ')}.` : '';
+  const procText = done.length ? `Proc. realizados: ${done.map((p) => procLabel(p, { desc: false })).join('; ')}.` : '';
   const full = [obs, procText].filter(Boolean).join(' | ');
   let procsInAnnex = false;
   if (full) {

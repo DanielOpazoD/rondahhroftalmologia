@@ -711,6 +711,20 @@ input.warned {
 .proc.done .pio {
   display: flex;
 }
+/* Descripción de un procedimiento (FO, BMC…): visible al marcarlo. */
+.pdesc {
+  display: none;
+  flex: 1 1 100%;
+  padding-bottom: 4px;
+}
+.proc.done .pdesc {
+  display: block;
+}
+.pdesc input {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: var(--fs-md);
+}
 .pf {
   display: flex;
   align-items: center;

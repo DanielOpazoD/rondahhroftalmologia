@@ -45,6 +45,8 @@ export function initSettingsView(ctx) {
       [procs[i - 1], procs[i]] = [procs[i], procs[i - 1]];
     } else if (b.dataset.a === 'pio') {
       procs[i] = { ...procs[i], pio: procs[i].pio ? 0 : 1 };
+    } else if (b.dataset.a === 'desc') {
+      procs[i] = { ...procs[i], desc: procs[i].desc ? 0 : 1 };
     }
     ctx.setProcs(procs);
   });
@@ -216,6 +218,8 @@ export function renderSettings(ctx) {
     (p, i) => html`<div class="it"><div class="t"><b>${p.n}</b></div>
         <button type="button" data-perm="ajustes" class="chip mini piotg${p.pio ? ' on' : ''}" data-a="pio" data-i="${i}" aria-pressed="${String(!!p.pio)}"
           aria-label="Pide PIO por ojo en ${p.n}" title="${p.pio ? 'Pide PIO por ojo (clic para quitar)' : 'Pedir PIO por ojo'}">${p.pio ? 'PIO' : '+ PIO'}</button>
+        <button type="button" data-perm="ajustes" class="chip mini piotg${p.desc ? ' on' : ''}" data-a="desc" data-i="${i}" aria-pressed="${String(!!p.desc)}"
+          aria-label="Texto: admite descripción en ${p.n}" title="${p.desc ? 'Admite una descripción en texto (clic para quitar)' : 'Permitir una descripción en texto'}">${p.desc ? 'Texto' : '+ Texto'}</button>
         <button type="button" class="ib sm" data-perm="ajustes" data-a="up" data-i="${i}" title="Subir" aria-label="Subir"${i ? '' : html` disabled`}><svg aria-hidden="true"><use href="#i-up"/></svg></button>
         <button type="button" class="ib sm danger" data-perm="ajustes" data-a="rm" data-i="${i}" title="Quitar" aria-label="Quitar"><svg aria-hidden="true"><use href="#i-trash"/></svg></button></div>`,
   );
