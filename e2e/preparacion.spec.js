@@ -1,9 +1,9 @@
 import { test, expect } from './fixtures.js';
-import { openApp, tab } from './helpers.js';
+import { openApp, tab, ajustes } from './helpers.js';
 
 test('chequeo del equipo: indica qué falta y lleva a resolverlo; aparece solo tras días sin uso', async ({ page }) => {
   await openApp(page);
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#checkOpen').click();
   const dlg = page.locator('#checkDlg');
   await expect(dlg).toBeVisible();
@@ -24,7 +24,7 @@ test('chequeo del equipo: indica qué falta y lleva a resolverlo; aparece solo t
 
 test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales no cambian', async ({ page }) => {
   await openApp(page);
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#practiceEnter').click();
   await expect(page).toHaveURL(/\?practica/);
   await expect(page.locator('#practiceBar')).toBeVisible();
@@ -34,7 +34,7 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
   await tab(page, 'Ingreso');
   await expect(page.locator('#ingList .prow')).toHaveCount(6);
   await expect(page.locator('#ingPend')).toHaveText('5');
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await expect(page.locator('#syncUnavailable')).toContainText('modo práctica');
   await expect(page.locator('#syncSetup')).toBeHidden();
   // Los archivos descargados se distinguen.
@@ -53,7 +53,7 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
   await tab(page, 'Pacientes');
   await expect(page.locator('#regCount')).toHaveText('0');
   // Volver a entrar: lo practicado sigue ahí hasta reiniciar.
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#practiceEnter').click();
   await tab(page, 'Pacientes');
   await expect(page.locator('#regList .prow', { hasText: 'Paciente Practicado' })).toHaveCount(1);
@@ -68,7 +68,7 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
 test('bloqueo con PIN: al abrir, por inactividad y con el candado; recuperación con el código', async ({ page }) => {
   await page.clock.install();
   await openApp(page);
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#pinSet').click();
   const dlg = page.locator('#dlg');
   await dlg.locator('#dlg_pin').fill('4821');
@@ -109,13 +109,13 @@ test('bloqueo con PIN: al abrir, por inactividad y con el candado; recuperación
   await page.locator('#lockCode').fill(code.toLowerCase());
   await page.locator('#lockRecoverGo').click();
   await expect(lock).toBeHidden();
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await expect(page.locator('#pinState')).toHaveText('Desactivado');
 });
 
 /** Configura un PIN en Ajustes; devuelve el código de recuperación. */
 async function setPin(page, pin = '4821') {
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#pinSet').click();
   await page.locator('#dlg_pin').fill(pin);
   await page.locator('#dlg_pin2').fill(pin);
@@ -169,11 +169,12 @@ test('bloqueo robusto: no se imprime, Escape no lo cierra, queda sobre otros di�
 test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los reales', async ({ page }) => {
   await openApp(page);
   // Un perfil real.
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
   await page.locator('#dlg_nombre').fill('Dra. Real');
   await page.locator('#dlg').getByRole('button', { name: 'Guardar' }).click();
   // En práctica se elige (al abrir) un perfil de ejemplo y se descarga un respaldo.
+  await ajustes(page, 'Este equipo');
   await page.locator('#practiceEnter').click();
   await expect(page.locator('#dlgTitle')).toHaveText('¿Quién registra?');
   await page.locator('#dlg_perfil').selectOption({ label: 'Dra. Ejemplo · Médico/a' });
@@ -182,7 +183,7 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   await page.locator('#paciente_nombre').fill('Paciente de Práctica');
   await page.locator('#bSave').click();
   await expect(page.locator('#toast')).toContainText('Atención guardada');
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Datos');
   const [bk] = await Promise.all([page.waitForEvent('download'), page.locator('#bkExp').click()]);
   expect(bk.suggestedFilename()).toMatch(/^PRACTICA_respaldo/);
   const bkPath = await bk.path();
@@ -193,7 +194,7 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
   await expect(page.locator('#userChip')).toHaveText('Dra. Real');
   // El respaldo de práctica no se importa a los datos reales.
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Datos');
   await page.locator('#bkImp').setInputFiles(bkPath);
   await expect(page.locator('#msgTitle')).toHaveText('No se pudo importar');
   await expect(page.locator('#msgText')).toContainText('modo práctica');
@@ -215,7 +216,7 @@ test('aviso de versión nueva: aparece al volver a la pestaña si hay una public
 test('registro de errores: un error inesperado queda registrado en Ajustes', async ({ page }) => {
   await openApp(page);
   await page.evaluate(() => setTimeout(() => Promise.reject(new Error('Falla de prueba'))));
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await expect(page.locator('#errCount')).toHaveText('1');
   await page.locator('#errCard summary').click();
   await expect(page.locator('#errText')).toContainText('Falla de prueba');
@@ -240,7 +241,7 @@ test('almacenamiento: si una escritura falla, se avisa y se guarda al reintentar
   await expect(page.locator('#saveBar')).toBeVisible();
   await expect(page.locator('#saveText')).toHaveText(/no se pudieron? guardar en este equipo/);
   // Chequeo del equipo: lo marca como problema.
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#checkOpen').click();
   await expect(page.locator('#checkDlg li', { hasText: 'Almacenamiento' })).toHaveClass(/bad/);
   await page.locator('#checkClose').click();

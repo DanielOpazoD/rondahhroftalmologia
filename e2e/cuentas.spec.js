@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, tab, activateSync, syncNow, fillPatient, save } from './helpers.js';
+import { openApp, tab, activateSync, syncNow, fillPatient, save, ajustes } from './helpers.js';
 
 const RUT = '17.752.753-K';
 const NOMBRE = 'Dra. Admin Prueba';
@@ -14,7 +14,7 @@ async function login(page, rut, pass) {
 
 /** Activa las cuentas desde Ajustes (PC con la contraseña del equipo): primer administrador. */
 async function activateAccounts(page) {
-  await tab(page, 'Ajustes');
+  await ajustes(page, 'Este equipo');
   await page.locator('#acctActivateBtn').click();
   await page.locator('#dlg_rut').fill(RUT);
   await page.locator('#dlg_nombre').fill(NOMBRE);
@@ -64,7 +64,7 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await syncNow(A);
 
   // B (con la contraseña del equipo) ya no puede sincronizar: se le pide entrar.
-  await tab(B, 'Ajustes');
+  await ajustes(B, 'Este equipo');
   await B.locator('#syncNowBtn').click();
   await expect(B.locator('#loginDlg')).toBeVisible({ timeout: 20_000 });
   await login(B, RUT, 'Ojo2026');
@@ -129,7 +129,7 @@ test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre q
   const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
   const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
   await adminReady(A);
-  await tab(A, 'Ajustes');
+  await ajustes(A, 'Administración');
   const card = A.locator('#usersCard');
   await expect(card).toBeVisible();
   await expect(card.locator('#usersList')).toContainText(NOMBRE);
@@ -211,7 +211,7 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
   await A.locator('#plan').fill('Control en 6 meses');
   await save(A);
   await syncNow(A);
-  await tab(A, 'Ajustes');
+  await ajustes(A, 'Administración');
   await createUser(A, { rut: '11.111.111-1', nombre: 'Ana Admisión', rol: 'administrativo' });
 
   await B.goto('/');
@@ -244,8 +244,15 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
   await B.locator('#ingAdd').click();
   await expect(B.locator('#ingList')).toContainText('Paciente Ingresado Por Admisión');
   // No cambia ajustes del sistema.
-  await tab(B, 'Ajustes');
-  for (const id of ['#ajAdd', '#bkImpBtn', '#medAdd', '#opAdd', '#wipe', '#usersCard']) await expect(B.locator(id)).toBeHidden();
+  await ajustes(B, 'Listas');
+  await expect(B.locator('#ajt-admin')).toBeHidden();
+  for (const [sec, ids] of [
+    ['Listas', ['#ajAdd', '#medAdd', '#opAdd']],
+    ['Datos', ['#bkImpBtn', '#wipe']],
+  ]) {
+    await ajustes(B, sec);
+    for (const id of ids) await expect(B.locator(id)).toBeHidden();
+  }
   // El administrador (médico) sí edita.
   await tab(A, 'Atención');
   await expect(A.locator('#roBanner')).toBeHidden();
@@ -260,7 +267,7 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
       { timeout: 15_000 },
     )
     .toBe(true);
-  await tab(A, 'Ajustes');
+  await ajustes(A, 'Administración');
   await expect(A.locator('#auditCard')).toBeVisible();
   await A.locator('#audLoad').click();
   const result = A.locator('#audResult');

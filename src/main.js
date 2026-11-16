@@ -30,6 +30,7 @@ import { initHeaderFit } from './ui/headerFit.js';
 import { initAttachmentsView } from './ui/attachmentsView.js';
 import { createAccountsController } from './ui/accounts.js';
 import { initUsersView } from './ui/usersView.js';
+import { initSettingsSections } from './ui/settingsSections.js';
 import { initAuditView } from './ui/auditView.js';
 import { applyPermissions, guardActions } from './ui/permissionsView.js';
 
@@ -144,6 +145,7 @@ async function main() {
   initFilter(ctx);
   initExportView(ctx);
   initSettingsView(ctx);
+  initSettingsSections(ctx);
   initCatalogView(ctx);
   initIntakeView(ctx);
   initUserView(ctx);

@@ -359,7 +359,7 @@ export function createSyncController(ctx) {
     $('#syncCopyHash').addEventListener('click', async () =>
       toast((await copyText(st.config?.hash || '')) ? 'Valor copiado' : 'No se pudo copiar'),
     );
-    $('#syncBadge').addEventListener('click', () => ctx.showTab('t-aj'));
+    $('#syncBadge').addEventListener('click', () => ctx.showSettings('#syncCard'));
     window.addEventListener('online', () => syncNow());
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncNow());
   }

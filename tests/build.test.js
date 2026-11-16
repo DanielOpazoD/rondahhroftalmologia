@@ -37,7 +37,7 @@ test('cada id que usa la interfaz existe en el HTML', () => {
     readFileSync(new URL('../src/index.html', import.meta.url), 'utf8') +
     readFileSync(new URL('../src/specialties/oftalmologia/formulario.html', import.meta.url), 'utf8');
   const sources = [...uiFiles().map((f) => f.text), readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')];
-  const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_]+)/g)].map((m) => m[1])));
+  const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_-]+)/g)].map((m) => m[1])));
   const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
   assert.deepEqual(missing, []);
 });

@@ -30,7 +30,7 @@
  *   POST crear    🔒admin {id, rut, rol, admin, perfil, sal, iter, acceso, envuelta}
  *   POST editar   🔒admin {id, rol?, admin?, estado?, perfil?}
  *   POST restablecer 🔒admin {id, sal, iter, acceso, envuelta}
- *   GET  auditoria 🔒admin ?desde=AAAA-MM-DD&hasta=AAAA-MM-DD → {eventos, sesiones}
+ *   GET  auditoria 🔒admin ?desde=<ms>&hasta=<ms> (o AAAA-MM-DD) → {eventos, sesiones}
  */
 import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { bytesToB64 } from './crypto.js';
@@ -622,20 +622,28 @@ export function createAccounts({
     }
 
     if (action === 'auditoria') {
-      const desde = Date.parse(url.searchParams.get('desde') || '');
-      const hasta = Date.parse(url.searchParams.get('hasta') || '') || t;
-      if (!Number.isFinite(desde) || hasta < desde || (hasta - desde) / DAY_MS > MAX_AUDIT_DAYS) {
+      // Rango en ms (inicio y fin del día LOCAL del PC: el servidor guarda por día UTC y en
+      // Rapa Nui, de tarde, ya es el día siguiente en UTC). También acepta AAAA-MM-DD (días UTC completos).
+      /** @param {string | null} v @param {boolean} end */
+      const when = (v, end) => (/^\d{10,16}$/.test(v || '') ? Number(v) : Date.parse(v || '') + (end ? DAY_MS - 1 : 0));
+      const desde = when(url.searchParams.get('desde'), false);
+      const hasta = url.searchParams.get('hasta') ? when(url.searchParams.get('hasta'), true) : t;
+      if (!Number.isFinite(desde) || !Number.isFinite(hasta) || hasta < desde || (hasta - desde) / DAY_MS > MAX_AUDIT_DAYS) {
         return fail(400, 'rango_invalido', `Elige un rango de hasta ${MAX_AUDIT_DAYS} días.`);
       }
       const eventos = [];
       const sesiones = [];
-      for (let d = desde; d <= hasta + DAY_MS - 1; d += DAY_MS) {
+      const inRange = (/** @type {number} */ x) => x >= desde && x <= hasta;
+      for (let d = desde - (desde % DAY_MS); d <= hasta; d += DAY_MS) {
         const day = dayOf(d);
         const [ev, ses] = await Promise.all([store.list({ prefix: `_auditoria/${day}/` }), store.list({ prefix: `_cuentas/s/${day}/` })]);
-        for (const x of ev.blobs) eventos.push(await store.get(x.key, { type: 'json' }));
+        for (const x of ev.blobs) {
+          const e = /** @type {{t: number} | null} */ (await store.get(x.key, { type: 'json' }));
+          if (e && inRange(e.t)) eventos.push(e);
+        }
         for (const x of ses.blobs) {
           const s = /** @type {Sesion | null} */ (await store.get(x.key, { type: 'json' }));
-          if (s) sesiones.push({ id: x.key.split('/').pop(), ...s });
+          if (s && inRange(s.inicio)) sesiones.push({ id: x.key.split('/').pop(), ...s });
         }
       }
       await audit({ ev: 'auditoria.ver', u: me.id, s: a.sid });

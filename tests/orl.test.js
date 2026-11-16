@@ -80,7 +80,7 @@ test('el formulario ORL tiene cada id que usa la interfaz', () => {
     .filter((f) => f.endsWith('.js'))
     .map((f) => readFileSync(new URL(f, uiDir), 'utf8'));
   sources.push(readFileSync(new URL('../src/main.js', import.meta.url), 'utf8'));
-  const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_]+)/g)].map((m) => m[1])));
+  const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_-]+)/g)].map((m) => m[1])));
   assert.deepEqual(
     [...ids].filter((id) => !html.includes(`id="${id}"`)),
     [],

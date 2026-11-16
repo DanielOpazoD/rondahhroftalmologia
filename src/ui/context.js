@@ -76,6 +76,8 @@ export function createContext(store, templateB64) {
     storageKind: 'indexeddb',
     /** Escrituras pendientes por fallos (lo asigna main.js). */
     storageHealth: () => ({ pending: 0 }),
+    /** Lleva a un elemento de Ajustes, abriendo su sección (lo asigna settingsSections.js). @type {(selector: string) => HTMLElement | null} */
+    showSettings: (/** @type {string} */ _selector) => /** @type {HTMLElement | null} */ (null),
     /** Cuentas con nombre (lo asigna usersView.js; solo administradores). @type {() => Promise<any[]>} */
     loadAccountUsers: async () => [],
     /** Aplica los permisos de la sesión a la interfaz (lo asigna main.js; ver permissionsView.js). */
