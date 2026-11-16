@@ -28,6 +28,7 @@ export function initIntakeView(ctx) {
   ctx.intakeSexo = '';
   ctx.intakePatientId = null;
   const updateName = () => {
+    ctx.intakePatientId = null;
     const f = Object.fromEntries(NAME_PARTS.map((k) => ['paciente_' + k, $(`#ing_${k}`).value]));
     refreshNames(f);
     $('#ing_nombre').value = f.paciente_nombre;

@@ -70,6 +70,8 @@ test('IPD: autocompleta nombres explícitos y usa Rapa Nui; no deduce clínica n
   assert.equal(legacy.paciente_nombres, '');
   assert.equal(legacy.profesional_apellido_paterno, '');
   assert.match(validateIpd(legacy), /apellido paterno y nombres del paciente/);
+  assert.equal(ipdDefaults({ f: { paciente_edad: '60', fecha_atencion: '2026-11-15' } }, NOW).paciente_edad, '60');
+  assert.equal(ipdDefaults({ f: { paciente_edad: '60', fecha_atencion: '2020-01-01' } }, NOW).paciente_edad, '');
   assert.match(ipdDefaults({ f: {} }).fecha, /^\d{4}-\d{2}-\d{2}$/);
 });
 
@@ -96,6 +98,8 @@ test('IPD: valida identidad y fechas, permite materno y administrativos vacíos 
     { inicio_tratamiento: 'no' },
     { historia: '1234567890' },
     { historia: 'ABC' },
+    { paciente_edad: '1000' },
+    { paciente_edad: 'abc' },
   ]) {
     assert.ok(validateIpd({ ...d, ...change }), JSON.stringify(change));
   }
@@ -152,7 +156,9 @@ test('IPD: aplanado sin widgets ni referencias colgantes; todos los títulos cab
   assert.equal(pdf.getForm().getFields().length, 0);
   assert.equal(pdf.getPage(0).node.get(PDFName.of('Annots')), undefined);
   // getForm agrega un AcroForm vacío: comprobar el original nuevamente.
-  const original = await PDFDocument.load(await buildIpdPdf(TEMPLATE, { ...ready(), paciente_sexo: 'M', paciente_fnac: '' }));
+  const original = await PDFDocument.load(
+    await buildIpdPdf(TEMPLATE, { ...ready(), paciente_sexo: 'M', paciente_fnac: '', paciente_edad: '' }),
+  );
   assert.equal(original.catalog.get(PDFName.of('AcroForm')), undefined);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   for (const p of GES_PROBLEMAS) assert.ok(wrapText(p.titulo, font, 10, (800 * 568) / 1226).length <= 3, p.titulo);

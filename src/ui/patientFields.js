@@ -18,7 +18,7 @@ export function profileNameFields(person = {}) {
 
 /** Campos de perfil para guardar; editar otro dato no reparte un nombre antiguo. */
 export function profileNameValues(values, previous = {}) {
-  return NAME_PARTS.some((k) => values[k]?.trim())
+  return hasNameParts(previous) || NAME_PARTS.some((k) => values[k]?.trim())
     ? Object.fromEntries(NAME_PARTS.map((k) => [k, values[k]?.trim() || '']))
     : { nombre: values.nombre || previous.nombre || '' };
 }

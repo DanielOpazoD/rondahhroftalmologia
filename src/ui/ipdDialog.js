@@ -3,6 +3,7 @@ import templateB64 from '../specialties/activa/ipdPlantilla.js';
 import { GES_AREAS, GES_SUBGRUPOS } from '../config/gesCatalog.js';
 import { IPD_HOSPITAL, ipdDefaults, validateIpd, buildIpdPdf, ipdFileName } from '../core/ipd.js';
 import { NAME_PARTS, personName, hasNameParts } from '../core/names.js';
+import { ageAt, isIsoDate } from '../core/format.js';
 import { SEXOS } from '../config/catalogs.js';
 import { html, setHtml } from './html.js';
 import { base64ToBytes } from './dom.js';
@@ -34,7 +35,7 @@ export function downloadIpd(ctx, rec, anchor) {
     body: html`<p class="muted">Servicio de Salud ${IPD_HOSPITAL.servicio} · ${IPD_HOSPITAL.establecimiento}</p>
       <div class="ipd-columns"><div>
         <h4>Paciente</h4>${legacy('paciente_')}<fieldset class="clinical-fieldset"><legend class="sr">Paciente</legend>${names('paciente_')}
-        <div class="clinical-names">${input('paciente_rut', 'RUT del paciente')}${input('paciente_fnac', 'Fecha de nacimiento', 'date')}
+        <div class="clinical-names">${input('paciente_rut', 'RUT del paciente')}${input('paciente_fnac', 'Fecha de nacimiento', 'date')}${input('paciente_edad', 'Edad en años', 'number')}
         <label><span class="l">Sexo</span><select name="paciente_sexo"><option value="">Sin informar</option>${SEXOS.map((s) => html`<option value="${s.key}"${initial.paciente_sexo === s.key ? html` selected` : ''}>${s.label}</option>`)}</select></label></div></fieldset>
         <h4>Profesional</h4>${legacy('medico_')}<fieldset class="clinical-fieldset"><legend class="sr">Profesional</legend>${names('profesional_')}${input('profesional_rut', 'RUT del profesional')}</fieldset>
         <h4>Informe · hora de Rapa Nui</h4><div class="clinical-names">${input('fecha', 'Fecha del informe', 'date')}${input('hora', 'Hora del informe', 'time')}${input('folio', 'Folio (opcional)')}</div>
@@ -52,6 +53,19 @@ export function downloadIpd(ctx, rec, anchor) {
         <p class="hint">Confirmación GES: Sí (X) · Firma en el formulario impreso.</p>
       </div></div>`,
     setup: (form) => {
+      const birth = form.elements.namedItem('paciente_fnac');
+      const report = form.elements.namedItem('fecha');
+      const age = form.elements.namedItem('paciente_edad');
+      if (birth instanceof HTMLInputElement && report instanceof HTMLInputElement && age instanceof HTMLInputElement) {
+        const updateAge = () => {
+          age.readOnly = isIsoDate(birth.value);
+          if (age.readOnly) age.value = String(ageAt(birth.value, report.value) ?? '');
+        };
+        birth.addEventListener('input', updateAge);
+        report.addEventListener('input', updateAge);
+        updateAge();
+      }
+
       const problemSelect = form.elements.namedItem('problema');
       const sub = form.elements.namedItem('subgrupo');
       if (!(problemSelect instanceof HTMLSelectElement) || !(sub instanceof HTMLInputElement)) return;

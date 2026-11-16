@@ -11,6 +11,7 @@ export const IPD_HOSPITAL = Object.freeze({ servicio: 'Metropolitano Oriente', e
 /** @param {Pick<import('../domain').Atencion, 'f'>} rec @param {Date} [now] */
 export function ipdDefaults(rec, now = new Date()) {
   const f = rec.f;
+  const clock = hospitalDateTime(now);
   return {
     paciente_apellido_paterno: f.paciente_apellido_paterno || '',
     paciente_apellido_materno: f.paciente_apellido_materno || '',
@@ -20,9 +21,14 @@ export function ipdDefaults(rec, now = new Date()) {
     profesional_nombres: f.medico_nombres || '',
     paciente_rut: f.paciente_rut || '',
     paciente_fnac: f.paciente_fnac || '',
+    paciente_edad: isIsoDate(f.paciente_fnac)
+      ? String(ageAt(f.paciente_fnac, clock.fecha) ?? '')
+      : f.fecha_atencion === clock.fecha
+        ? f.paciente_edad || ''
+        : '',
     paciente_sexo: f.paciente_sexo || '',
     profesional_rut: f.medico_rut || '',
-    ...hospitalDateTime(now),
+    ...clock,
     problema: '',
     subgrupo: '',
     diagnostico: '',
@@ -53,6 +59,10 @@ export function validateIpd(data) {
   if (!GES_PROBLEMAS.some((p) => p.id === data.problema)) return 'Selecciona el problema de salud GES.';
   if (!fmtDate(data.fecha) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.hora)) return 'Revisa la fecha y hora del informe.';
   if (data.paciente_fnac && (!isIsoDate(data.paciente_fnac) || data.paciente_fnac > data.fecha)) return 'Revisa la fecha de nacimiento.';
+  if (data.paciente_fnac && (ageAt(data.paciente_fnac, data.fecha) ?? 0) > 999) return 'La edad no cabe en las tres casillas del IPD.';
+  if (data.paciente_edad && !/^\d{1,3}$/.test(data.paciente_edad)) {
+    return 'Revisa la edad en años (hasta 3 dígitos).';
+  }
   if (data.inicio_tratamiento && !isIsoDate(data.inicio_tratamiento)) return 'Revisa la fecha límite de inicio del tratamiento.';
   if (data.historia && !/^\d{1,9}$/.test(data.historia)) return 'La historia clínica admite hasta 9 dígitos (puede quedar vacía).';
   return null;
@@ -142,7 +152,7 @@ export async function buildIpdPdf(template, data, { flatten = true, now = new Da
   rut('profesional_rut', data.profesional_rut, 1541);
   date('fecha_nacimiento', data.paciente_fnac, [415, 449, 492, 526, 570, 603, 636, 669], 404);
   if (['M', 'F'].includes(data.paciente_sexo)) text('sexo', 'X', 189, data.paciente_sexo === 'M' ? 390 : 416, 21, 22, 8);
-  const age = data.paciente_fnac ? ageAt(data.paciente_fnac, data.fecha) : null;
+  const age = data.paciente_fnac ? ageAt(data.paciente_fnac, data.fecha) : data.paciente_edad ? Number(data.paciente_edad) : null;
   if (age !== null) {
     digits('edad', String(age).padStart(3, ' '), [929, 963, 997], 398);
     text('edad_anos', 'X', 1048, 393, 25, 19, 8);

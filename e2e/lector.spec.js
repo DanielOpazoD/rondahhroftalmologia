@@ -40,7 +40,9 @@ test('formulario: campos con etiqueta, sexo con nombre completo y errores asocia
   await expect(page.locator('#t-at .card').nth(1)).toMatchAriaSnapshot(`
     - heading "Paciente" [level=2]
     - textbox "RUT"
-    - textbox "Nombre y apellidos"
+    - textbox "Apellido paterno"
+    - textbox "Apellido materno"
+    - textbox "Nombres"
     - textbox "Fono"
     - textbox "Fecha de nacimiento"
     - textbox "Edad"
@@ -50,7 +52,7 @@ test('formulario: campos con etiqueta, sexo con nombre completo y errores asocia
       - button "Otro / no informa"
   `);
   await page.locator('#bSave').click();
-  await expect(page.getByRole('textbox', { name: 'Nombre y apellidos' })).toHaveAccessibleDescription('Requerido (nombre o RUT)');
+  await expect(page.getByRole('textbox', { name: 'Nombres', exact: true })).toHaveAccessibleDescription('Requerido (nombre o RUT)');
 });
 
 test('diálogos y bloqueo: nombre del diálogo y de sus controles', async ({ page }) => {

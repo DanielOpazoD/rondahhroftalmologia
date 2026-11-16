@@ -99,7 +99,7 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
 
 - `proc[id].od / .oi` son la PIO en mmHg y solo existen en procedimientos con `pio: 1`.
 - `procNames` guarda el nombre del procedimiento al momento de guardar. Así, si después se quita de la lista en Ajustes, la estadística sigue mostrando su nombre.
-- `normalizeRecord()` acepta registros v1 a v3 o incompletos y los lleva a v4 sin perder datos (la v4 agrega `pacienteId`) (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
+- `normalizeRecord()` acepta registros v1 a v4 o incompletos y los lleva a v5 sin perder datos (v4 agrega `pacienteId`; v5 admite nombres separados y conserva los nombres anteriores) (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
 
 ### Fechas por campo (`ft`)
 
