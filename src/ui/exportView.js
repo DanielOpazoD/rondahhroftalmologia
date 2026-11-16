@@ -13,7 +13,8 @@ import {
 import { ANON_DEFAULTS, ANON_OPTIONS, correspondenciaSheets, findLeaks, secretFingerprint } from '../core/pseudonym.js';
 import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createZip } from '../lib/zip.js';
-import { $, download, toast, withBusy, nextFrame } from './dom.js';
+import { $, download, toast, nextFrame } from './dom.js';
+import { withBusy } from './busy.js';
 import { uiConfirm } from './modal.js';
 import { html, setHtml } from './html.js';
 

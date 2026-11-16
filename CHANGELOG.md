@@ -1,5 +1,34 @@
 # Cambios
 
+## 2.17.0 — 2026-11-15
+
+### Más limpio y compacto (#52)
+- **Ajustes en 4 secciones**:
+  - **Este equipo**: chequeo, sesión o PIN, sincronización, cuentas, PDF y nota, errores;
+  - **Listas**: perfiles, operativos, procedimientos;
+  - **Datos**: respaldo y zona de cuidado;
+  - **Administración**: usuarios y registro de accesos; solo la ven los administradores.
+- **Escala visual única**: 5 tamaños de letra y 4 radios para toda la app (antes había 13 y 10), y los colores como variables.
+- La barra de la atención muestra «Nueva», «Copiar nota» y «PDF» con su nombre en escritorio.
+
+### Coherencia (#53)
+- **Una sola identidad**: con cuentas, quien entra aparece solo entre los profesionales del formulario.
+  - El chequeo del equipo muestra la sesión y el bloqueo de sesión, en vez de perfiles y PIN.
+- **Datos del paciente con una sola plantilla** para Ingreso y Atención, y un solo selector de sexo.
+
+### Arquitectura (#54, y esta versión)
+- La **sesión de las cuentas** funciona sin pantalla (`sync/accountSession.js`), con pruebas contra el servidor en memoria.
+- La **sincronización** separa el motor de la vista.
+- Ayudantes compartidos (íconos, acciones con botón ocupado) y servicios del contexto declarados en un solo lugar.
+- **Dependencias conocidas**: `npm run deps` y [docs/DEPENDENCIAS.md](docs/DEPENDENCIAS.md) muestran:
+  - las capas y qué puede usar cada una;
+  - el mapa real de dependencias;
+  - los 3 paquetes externos y para qué se usan.
+- Las pruebas fallan si aparece un ciclo, una dependencia no permitida o un paquete sin documentar. Se eliminaron los 2 ciclos que había: bitácora ↔ fusión y avisos ↔ utilidades de pantalla.
+
+### Corrección
+- **Registro de accesos en hora local**: en Rapa Nui, los eventos de la tarde (desde las 19:00) no aparecían en el día consultado, porque el servidor agrupa por día UTC. Ahora se consulta por la hora local exacta.
+
 ## 2.16.1 — 2026-11-15
 
 ### Cambios visuales

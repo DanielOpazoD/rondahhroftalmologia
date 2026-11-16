@@ -9,7 +9,7 @@
  * se sincroniza cifrado como cualquier otro dato. Dos equipos que agregan
  * entradas a la vez se fusionan por UNIÓN (nunca se pierde una entrada).
  */
-import { flatten } from './merge.js';
+import { flatten } from './fields.js';
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, ETIQUETAS, ETIQUETAS_PROC } from '../specialties/activa/config.js';
 
 const CHECK_LABELS = Object.fromEntries([

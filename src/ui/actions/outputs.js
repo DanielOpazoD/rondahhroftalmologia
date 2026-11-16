@@ -3,7 +3,8 @@
  */
 import { buildAttentionPdf, pdfFileName } from '../../specialties/activa/index.js';
 import { createSecret } from '../../core/pseudonym.js';
-import { toast, download, copyText, withBusy } from '../dom.js';
+import { toast, download, copyText } from '../dom.js';
+import { withBusy } from '../busy.js';
 import { uiCopy } from '../modal.js';
 import { openMenu } from '../menu.js';
 import { appendAnnexes } from '../../core/pdfAnexos.js';

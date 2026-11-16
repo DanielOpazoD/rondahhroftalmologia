@@ -1,5 +1,3 @@
-import { logError } from './errorLog.js';
-
 /**
  * Utilidades de interfaz: selección de elementos, avisos, descargas y portapapeles.
  */
@@ -68,27 +66,6 @@ export function base64ToBytes(b64) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
-}
-
-/**
- * Ejecuta una acción asíncrona deshabilitando el botón mientras corre y
- * mostrando el error al usuario si falla (nunca se pierde en silencio).
- */
-export async function withBusy(button, fn) {
-  if (button) button.disabled = true;
-  try {
-    return await fn();
-  } catch (e) {
-    console.error(e);
-    logError('acción', e);
-    // Import dinámico para no crear una dependencia circular dom ↔ modal.
-    import('./modal.js').then(({ uiAlert }) =>
-      uiAlert({ title: 'No se pudo completar la acción', message: String(e?.message || e), tone: 'danger' }),
-    );
-    return undefined;
-  } finally {
-    if (button) button.disabled = false;
-  }
 }
 
 /** Cede el control al navegador (para que se actualice la interfaz en procesos largos). */
