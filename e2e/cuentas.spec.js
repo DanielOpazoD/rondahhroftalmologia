@@ -54,6 +54,10 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await expect(A.locator('#loginDlg')).toBeHidden();
   await expect(A.locator('#userChip')).toContainText(NOMBRE);
   await expect(A.locator('#syncBadge')).toHaveText('Sincronizado', { timeout: 20_000 });
+  // Una sola identidad: la cuenta aparece sola entre los profesionales del formulario.
+  await ajustes(A, 'Listas');
+  await expect(A.locator('#medList')).toContainText(NOMBRE);
+  await expect(A.locator('#medHint')).toContainText('se agrega sola al entrar');
   // Lo que registra queda a nombre de la cuenta (identidad verificada).
   await tab(A, 'Atención');
   await A.locator('#bNew').click();

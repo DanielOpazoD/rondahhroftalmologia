@@ -89,6 +89,21 @@ export const buildIdOf = (...parts) => createHash('sha256').update(parts.join('\
 export const appBuildOf = (html) => /data-build="([0-9a-f]{12})"/.exec(html)?.[1] || '';
 
 /** @returns {Promise<string>} el HTML final de la app */
+/**
+ * Expande las plantillas compartidas del HTML: `<!-- @PACIENTE <prefijo> <idSexo> [validar] -->`
+ * (los datos del paciente, iguales en Ingreso y Atención; src/partials/paciente.html).
+ * @param {string} html
+ */
+export async function expandPartials(html) {
+  const tpl = (await readFile(resolve(root, 'src/partials/paciente.html'), 'utf8')).replace(/^<!--[\s\S]*?-->\n/, '');
+  return html.replace(/[ \t]*<!-- @PACIENTE (\w+) (\w+)( validar)? -->\n/g, (_m, p, sexo, validar) =>
+    tpl
+      .replaceAll('{p}', p)
+      .replaceAll('{sexo}', sexo)
+      .replace(/\{msg:(\w+)\}/g, (_x, f) => (validar ? `<small class="msg" data-msg="${p}${f}"></small>` : '')),
+  );
+}
+
 export async function buildHtml() {
   const id = especialidadActiva();
   const formHtml = await checkSpecialty(id);
@@ -108,7 +123,7 @@ export async function buildHtml() {
   // Evita que "</script" dentro del código cierre la etiqueta antes de tiempo.
   let js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const css = await readFile(resolve(root, 'src/styles.css'), 'utf8');
-  const html = await readFile(resolve(root, 'src/index.html'), 'utf8');
+  const html = await expandPartials(await readFile(resolve(root, 'src/index.html'), 'utf8'));
   // Logo del Hospital Hanga Roa: va dentro del HTML (la app es un solo archivo; la CSP admite imágenes data:).
   const logo = `data:image/png;base64,${(await readFile(resolve(root, 'src/assets/logo-hhr.png'))).toString('base64')}`;
   // Identificador de esta compilación, que la app conoce (APP.build) y que el

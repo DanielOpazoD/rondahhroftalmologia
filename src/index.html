@@ -83,12 +83,7 @@
   <div class="card">
     <h2>Ingresar paciente a la lista</h2>
     <div class="g4">
-      <div><label class="l" for="ing_rut">RUT</label><div class="rutwrap"><input id="ing_rut" autocomplete="off" placeholder="12.345.678-9"><span class="rutmark" data-rut-for="ing_rut" aria-live="polite"></span></div></div>
-      <div class="span2"><label class="l" for="ing_nombre">Nombre y apellidos</label><input id="ing_nombre" autocomplete="off"></div>
-      <div><label class="l" for="ing_fono">Fono</label><input id="ing_fono" inputmode="tel"></div>
-      <div><label class="l" for="ing_fnac">Fecha de nacimiento</label><input id="ing_fnac" type="date"></div>
-      <div><label class="l" for="ing_edad">Edad</label><input id="ing_edad" inputmode="numeric" placeholder="años"></div>
-      <div class="span2"><span class="l">Sexo</span><div class="seg" id="ingSexo" role="group" aria-label="Sexo"></div></div>
+      <!-- @PACIENTE ing_ ingSexo -->
     </div>
     <div class="ingfoot">
       <p class="hint" id="ingHint"></p>
@@ -139,12 +134,7 @@
   <div class="card">
     <h2>Paciente</h2>
     <div class="g4">
-      <div><label class="l" for="paciente_rut">RUT</label><div class="rutwrap"><input id="paciente_rut" autocomplete="off" placeholder="12.345.678-9"><span class="rutmark" data-rut-for="paciente_rut" aria-live="polite"></span></div><small class="msg" data-msg="paciente_rut"></small></div>
-      <div class="span2"><label class="l" for="paciente_nombre">Nombre y apellidos</label><input id="paciente_nombre" autocomplete="off"><small class="msg" data-msg="paciente_nombre"></small></div>
-      <div><label class="l" for="paciente_fono">Fono</label><input id="paciente_fono" inputmode="tel"></div>
-      <div><label class="l" for="paciente_fnac">Fecha de nacimiento</label><input id="paciente_fnac" type="date"><small class="msg" data-msg="paciente_fnac"></small></div>
-      <div><label class="l" for="paciente_edad">Edad</label><input id="paciente_edad" inputmode="numeric" placeholder="años"><small class="msg" data-msg="paciente_edad"></small></div>
-      <div class="span2"><span class="l">Sexo</span><div class="seg" id="sexSeg" role="group" aria-label="Sexo"></div></div>
+      <!-- @PACIENTE paciente_ sexSeg validar -->
     </div>
     <div class="prevlist" id="patPrev" hidden></div>
   </div>
@@ -343,7 +333,7 @@
     <div class="g2 cards">
       <div class="card">
         <h2>Perfiles <span class="badge" id="medCount">0</span></h2>
-        <p class="hint">Médicos y otros profesionales. Cada uno elige su perfil al registrar: el historial de cambios guarda quién hizo cada cambio.</p>
+        <p class="hint" id="medHint">Médicos y otros profesionales. Cada uno elige su perfil al registrar: el historial de cambios guarda quién hizo cada cambio.</p>
         <div class="list" id="medList"></div>
         <button type="button" class="btn sm addbtn" id="medAdd" data-perm="ajustes"><svg aria-hidden="true"><use href="#i-plus"/></svg>Agregar perfil</button>
       </div>

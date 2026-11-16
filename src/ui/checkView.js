@@ -7,7 +7,7 @@
  */
 import { APP } from '../config/catalogs.js';
 import { fmtDateTime } from '../core/format.js';
-import { onlyDoctors } from '../core/catalog.js';
+import { onlyDoctors, rolLabel } from '../core/catalog.js';
 import { $ } from './dom.js';
 import { fetchPublishedVersion } from './version.js';
 import { html, setHtml } from './html.js';
@@ -161,25 +161,40 @@ export async function collectChecks(ctx) {
   );
 
   const doctors = onlyDoctors(ctx.medicos).length;
-  push(
-    !ctx.medicos.length
-      ? {
-          state: 'warn',
-          title: 'Perfiles',
-          text: 'No hay perfiles: no quedará registrado quién hizo cada cambio.',
-          action: 'profiles',
-          actionLabel: 'Crear',
-        }
-      : !doctors
+  const acc = ctx.accounts?.user;
+  if (acc) {
+    // Con cuentas de usuario, quien registra es la persona que entró: no hacen falta perfiles.
+    push({ state: 'ok', title: 'Sesión', text: `${acc.nombre} · ${rolLabel(acc.rol)}${acc.admin ? ' · administrador/a' : ''}.` });
+    push(
+      doctors
+        ? { state: 'ok', title: 'Médicos en el formulario', text: `${doctors} ${doctors === 1 ? 'médico' : 'médicos'}.` }
+        : {
+            state: 'info',
+            title: 'Médicos en el formulario',
+            text: 'Aún no hay: cada médico aparece al entrar con su cuenta (o agrégalo en Ajustes → Listas).',
+          },
+    );
+  } else {
+    push(
+      !ctx.medicos.length
         ? {
             state: 'warn',
             title: 'Perfiles',
-            text: 'No hay perfiles de médico para la atención.',
+            text: 'No hay perfiles: no quedará registrado quién hizo cada cambio.',
             action: 'profiles',
             actionLabel: 'Crear',
           }
-        : { state: 'ok', title: 'Perfiles', text: `${ctx.medicos.length} (${doctors} ${doctors === 1 ? 'médico' : 'médicos'}).` },
-  );
+        : !doctors
+          ? {
+              state: 'warn',
+              title: 'Perfiles',
+              text: 'No hay perfiles de médico para la atención.',
+              action: 'profiles',
+              actionLabel: 'Crear',
+            }
+          : { state: 'ok', title: 'Perfiles', text: `${ctx.medicos.length} (${doctors} ${doctors === 1 ? 'médico' : 'médicos'}).` },
+    );
+  }
   push(
     ctx.operativos.length
       ? { state: 'ok', title: 'Operativo', text: ctx.operativos.map((o) => o.nombre).join(' · ') }
@@ -205,7 +220,13 @@ export async function collectChecks(ctx) {
     );
   }
 
-  if (!ctx.practice) {
+  if (!ctx.practice && acc) {
+    push({
+      state: 'ok',
+      title: 'Bloqueo de la sesión',
+      text: `Tras ${ctx.store.loadSessionLockMinutes()} min sin uso se bloquea y pide tu clave.`,
+    });
+  } else if (!ctx.practice) {
     const lock = ctx.lock?.state;
     push(
       lock?.enabled
