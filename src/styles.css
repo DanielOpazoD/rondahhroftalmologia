@@ -133,6 +133,39 @@ header.top {
   align-items: center;
   gap: 9px;
   flex: none;
+  border: 0;
+  background: none;
+  padding: 4px 6px 4px 2px;
+  margin-left: -2px;
+  border-radius: var(--r-sm);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.brand:hover,
+.brand.on {
+  background: var(--surface-2);
+}
+.brand:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+.brandtx {
+  display: block;
+  min-width: 0;
+}
+/* El engranaje dice que el logo abre Ajustes (discreto; más visible al pasar o si está abierto). */
+.brandgear {
+  width: 14px;
+  height: 14px;
+  color: var(--mut);
+  opacity: 0.55;
+}
+.brand:hover .brandgear,
+.brand.on .brandgear {
+  opacity: 1;
+  color: var(--acc-text);
 }
 /* Logo del Hospital Hanga Roa (amarillo): encabezado, ingreso y bloqueo. */
 .hhrlogo {
@@ -150,7 +183,7 @@ header.top {
   font-size: 14px;
   line-height: 1.15;
 }
-.brand > div {
+.brand > .brandtx {
   min-width: 0;
 }
 .brand small {
@@ -1402,13 +1435,34 @@ table.st tr.tot td {
 }
 .filterbar .badge {
   margin-left: 4px;
+  white-space: nowrap;
 }
+/* Celular: operativo arriba, fechas lado a lado y «Descargar» a la derecha (el total ya está en las cifras). */
 @media (max-width: 560px) {
-  .filterbar input[type='date'] {
-    flex: 1 1 120px;
+  .viewhead {
+    flex-wrap: wrap;
+  }
+  .viewhead .filterSlot {
+    flex: 1 1 100%;
+  }
+  .viewhead > .btn {
+    margin-left: auto;
+  }
+  .filterSlot #filterCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
   .filterbar select {
+    grid-column: 1 / -1;
+    width: 100%;
     max-width: none;
+  }
+  .filterbar input[type='date'] {
+    width: 100%;
+  }
+  .filterbar .sep,
+  #t-est .filterbar .badge {
+    display: none;
   }
 }
 
@@ -1926,7 +1980,7 @@ body.perm-sin-ajustes [data-perm~='ajustes'] {
   gap: 12px;
   flex-wrap: wrap;
 }
-.patcard #patNew {
+.patcard > .row {
   flex: none;
 }
 .patsum {
@@ -2352,7 +2406,7 @@ html.locked body > *:not(#lockDlg):not(#loginDlg) {
 
 /* ------------------------------------------------ cabecera adaptable (ui/headerFit.js) */
 /* Paso 1: si no cabe, solo el logo de la marca. */
-html.hdr-compact .brand > div {
+html.hdr-compact .brand > .brandtx {
   display: none;
 }
 /* Paso 2: si aún no cabe, pestañas con ícono (el nombre sigue disponible para lectores de pantalla). */

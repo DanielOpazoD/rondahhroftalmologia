@@ -12,7 +12,7 @@ import { $, $$, toast } from './ui/dom.js';
 import { initAttentionView, syncAttentionView } from './ui/attentionView.js';
 import { initRegistryView } from './ui/registryView.js';
 import { initFilter } from './ui/statsView.js';
-import { initExportView, exportStatsXlsx } from './ui/exportView.js';
+import { initExportView } from './ui/exportView.js';
 import { initSettingsView, renderSettings } from './ui/settingsView.js';
 import { createSyncController } from './ui/syncController.js';
 import { initSyncView, renderSyncView } from './ui/syncView.js';
@@ -178,7 +178,7 @@ async function main() {
   $('#bSave').addEventListener('click', () => ctx.save());
   $('#bCopy').addEventListener('click', () => ctx.copyNote(ctx.rec));
   $('#bPdf').addEventListener('click', (e) => ctx.downloadPdf(ctx.rec, e.currentTarget));
-  $('#stXlsx').addEventListener('click', (e) => exportStatsXlsx(ctx, e.currentTarget));
+  $('#brandBtn').addEventListener('click', () => ctx.showTab('t-aj'));
 
   // Ctrl/Cmd + S guarda la atención.
   document.addEventListener('keydown', (e) => {

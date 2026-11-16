@@ -15,10 +15,10 @@ test('pestañas: nombre de cada una y cuál está activa, sin «imagen» de los 
       - tab "Ingreso"
       - tab "Atención" [selected]
       - tab "Pacientes"
-      - tab "Estadística"
-      - tab "Exportar"
-      - tab "Ajustes"
+      - tab "Reportes"
   `);
+  // Ajustes: el logo del hospital (botón con nombre).
+  await expect(page.getByRole('button', { name: /Hospital Hanga Roa — Ajustes/ })).toBeVisible();
   expect(await page.getByRole('tablist').ariaSnapshot()).not.toContain('img');
 });
 

@@ -19,15 +19,58 @@ import { makeAuditEntry } from '../../core/audit.js';
 import { toast } from '../dom.js';
 import { syncAttentionView } from '../attentionView.js';
 import { confirmDiscard } from './attention.js';
-import { buildAdmission, nonEmpty, relinkRecord, patientUpdateFromRecord } from '../../app/attentions.js';
+import { buildAdmission, nonEmpty, relinkRecord, patientUpdateFromRecord, editPatientData, rutOwner } from '../../app/attentions.js';
+import { SEXOS } from '../../config/catalogs.js';
+import { formatRut, isValidRut } from '../../core/format.js';
+import { openDialog } from '../dialog.js';
 import { uiConfirm } from '../modal.js';
-import { hasNameParts, NAME_PARTS } from '../../core/names.js';
+import { hasNameParts, NAME_PARTS, refreshNames } from '../../core/names.js';
+import { profileNameFields, profileNameValues } from '../patientFields.js';
 
 /**
  * @param {any} ctx contexto de la aplicación (ver ui/context.js)
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function patientActions(ctx, store) {
+  /**
+   * @param {import('../../domain').Paciente} p
+   * @param {Record<string, string>} fields
+   */
+  async function applyPatientEdit(p, fields) {
+    const other = fields.paciente_rut ? rutOwner(store.loadPatients(), fields.paciente_rut, p.id) : null;
+    if (other) {
+      const ok = await uiConfirm({
+        title: 'Ese RUT ya tiene ficha',
+        message: `El RUT ${fields.paciente_rut} ya pertenece a la ficha de ${patientLabel(other)}. Si es la misma persona, se unen las dos fichas (sus atenciones quedan juntas; nada se borra).`,
+        okLabel: 'Unir las fichas',
+      });
+      if (ok) await ctx.mergePatients(other.id, p.id);
+      return;
+    }
+    await ctx.ensureUser();
+    const r = editPatientData({ patient: p, fields, records: ctx.records, now: clock.tick() });
+    if (!r.changed.length) return toast('Sin cambios');
+    const done = ctx.persist(() => {
+      store.savePatients([r.patient]);
+      for (const { before, after } of r.records) {
+        ctx.records = store.upsertRecord(after);
+        const entry = makeAuditEntry({ tipo: 'editada', before, after, at: after.updated, ...ctx.author() });
+        if (entry) store.addAuditEntry(after.id, entry);
+      }
+    });
+    if (!done) return;
+    // La atención abierta de este paciente muestra los datos corregidos.
+    const open = r.records.find((x) => x.after.id === ctx.rec.id);
+    if (open && !ctx.dirty) ctx.loadIntoForm(open.after);
+    ctx.emit('datos');
+    ctx.sync?.schedule();
+    toast(
+      r.records.length
+        ? `Datos corregidos en la ficha y en ${r.records.length} ${r.records.length === 1 ? 'atención' : 'atenciones'}`
+        : 'Datos de la ficha corregidos',
+    );
+  }
+
   return {
     /**
      * Preingreso: registra (o actualiza) al paciente y lo agrega a la lista de
@@ -224,6 +267,53 @@ export function patientActions(ctx, store) {
       ctx.sync?.schedule();
       toast('Ficha eliminada');
       return true;
+    },
+
+    /**
+     * Corrige los datos personales del paciente (ficha y todas sus atenciones)
+     * sin perder la continuidad: la ficha conserva su id. Si el RUT nuevo ya es
+     * de otra ficha, ofrece unirlas.
+     */
+    editPatient(id) {
+      const p = store.getPatient(id);
+      if (!p) return;
+      const f = p.f || {};
+      // Nombre: apellidos y nombres separados; un nombre antiguo (un solo texto) se muestra sin repartirlo.
+      const person = {
+        nombre: f.paciente_nombre || '',
+        ...Object.fromEntries(NAME_PARTS.filter((k) => Object.hasOwn(f, 'paciente_' + k)).map((k) => [k, f['paciente_' + k]])),
+      };
+      openDialog({
+        title: 'Editar datos del paciente',
+        fields: [
+          { id: 'paciente_rut', label: 'RUT', value: f.paciente_rut || '', placeholder: '12.345.678-9' },
+          ...profileNameFields(person),
+          { id: 'paciente_fnac', label: 'Fecha de nacimiento', type: 'date', value: f.paciente_fnac || '' },
+          {
+            id: 'paciente_sexo',
+            label: 'Sexo',
+            value: f.paciente_sexo || '',
+            options: [{ value: '', label: '—' }, ...SEXOS.map((s) => ({ value: s.key, label: s.label }))],
+          },
+          { id: 'paciente_fono', label: 'Fono', value: f.paciente_fono || '' },
+        ],
+        onSave: (v) => {
+          if (v.paciente_rut && !isValidRut(v.paciente_rut)) return 'RUT inválido (revisa el dígito verificador).';
+          const names = profileNameValues(v, person);
+          /** @type {Record<string, string>} */
+          const out = {
+            paciente_rut: v.paciente_rut ? formatRut(v.paciente_rut) : '',
+            paciente_fnac: v.paciente_fnac,
+            paciente_sexo: v.paciente_sexo,
+            paciente_fono: v.paciente_fono,
+            ...Object.fromEntries(Object.entries(names).map(([k, x]) => ['paciente_' + k, x])),
+          };
+          refreshNames(out); // el nombre completo se arma con apellidos y nombres
+          if (!out.paciente_rut && !out.paciente_nombre?.trim()) return 'Indica al menos el nombre o el RUT.';
+          setTimeout(() => void applyPatientEdit(p, out), 0);
+          return null;
+        },
+      });
     },
 
     /** Marca dos fichas como personas distintas (deja de sugerir unirlas en este equipo). */

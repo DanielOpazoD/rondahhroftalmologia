@@ -1,5 +1,6 @@
 /**
- * Pestaña Exportar: PDFs en lote, Excel de estadística y datos seudonimizados.
+ * Descargas de la pestaña Reportes (junto a la estadística, con el mismo
+ * filtro): Excel de estadística, PDF de cada atención y datos seudonimizados.
  */
 import { todayIso, fileSafe } from '../core/format.js';
 import {
@@ -16,6 +17,7 @@ import { createZip } from '../lib/zip.js';
 import { $, download, toast, nextFrame } from './dom.js';
 import { withBusy } from './busy.js';
 import { uiConfirm } from './modal.js';
+import { openMenu } from './menu.js';
 import { html, setHtml } from './html.js';
 
 /** Sufijo de archivo según el filtro: _OperativoNov_2026-11-14. */
@@ -35,8 +37,24 @@ export function initExportView(ctx) {
   fill('#anTexto', ANON_OPTIONS.texto, ANON_DEFAULTS.texto);
   ['#anFechas', '#anEdad', '#anTexto'].forEach((s) => $(s).addEventListener('change', () => ($('#anPre').hidden = true)));
 
-  $('#expXlsx').addEventListener('click', (e) => exportStatsXlsx(ctx, e.currentTarget));
-  $('#expPdfZip').addEventListener('click', (e) => exportPdfZip(ctx, e.currentTarget));
+  $('#repDownload').addEventListener('click', async (e) => {
+    const button = e.currentTarget;
+    const n = ctx.filtered().length;
+    const choice = await openMenu(
+      button,
+      [
+        { value: 'xlsx', label: 'Estadística (Excel)', hint: 'Resumen, atenciones, prestaciones, por día, edad y sexo' },
+        { value: 'pdfs', label: 'PDF de cada atención', hint: `${n} ${n === 1 ? 'hoja' : 'hojas'} en un ZIP`, disabled: !n },
+        { value: 'anXlsx', label: 'Datos seudonimizados (Excel)', hint: 'Sin nombre, RUT ni teléfono' },
+        { value: 'anJson', label: 'Datos seudonimizados (JSON)' },
+      ],
+      { label: 'Descargar' },
+    );
+    if (choice === 'xlsx') exportStatsXlsx(ctx, button);
+    if (choice === 'pdfs') void exportPdfZip(ctx, button);
+    if (choice === 'anXlsx') exportAnon(ctx, 'xlsx', button);
+    if (choice === 'anJson') exportAnon(ctx, 'json', button);
+  });
   $('#anPreview').addEventListener('click', () => preview(ctx));
   $('#anXlsx').addEventListener('click', (e) => exportAnon(ctx, 'xlsx', e.currentTarget));
   $('#anJson').addEventListener('click', (e) => exportAnon(ctx, 'json', e.currentTarget));
@@ -44,8 +62,6 @@ export function initExportView(ctx) {
 }
 
 export function renderExportView(ctx) {
-  const n = ctx.filtered().length;
-  $('#expPdfZip').textContent = n ? `Descargar (${n})` : 'Descargar';
   const s = ctx.store.loadSecret();
   $('#anFp').textContent = s ? secretFingerprint(s) : 'se crea en la primera exportación';
 }
