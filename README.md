@@ -29,6 +29,8 @@ Los campos de RUT muestran **✓ verde** si el dígito verificador es correcto y
 
 **Constancia GES:** desde **PDF → Constancia GES**, revisa los datos del paciente y del profesional, selecciona una de las siete patologías oftalmológicas y la previsión, y descarga el formulario oficial autocompletado. Trae los datos del Hospital Hanga Roa y la fecha y hora actuales de **Rapa Nui**. Las firmas se completan en papel. Funciona sin conexión. Ver [fuentes y alcance](docs/CONSTANCIA_GES.md).
 
+**Receta para lentes:** desde **PDF → Receta para lentes**, revisa nombre, RUT, edad, profesional y fecha actual de Rapa Nui; completa manualmente Lejos, Cerca, distancias pupilares y ejes TABO. Permite descargar un PDF editable o verlo e imprimirlo desde el navegador. La firma queda vacía. Funciona sin conexión. Ver [plantilla y alcance](docs/RECETA_LENTES.md).
+
 **Posibles duplicados:** si un paciente quedó registrado dos veces (por ejemplo, primero sin RUT), Pacientes lo avisa y permite unir las fichas sin perder atenciones, o marcarlas como personas distintas.
 
 ### Antes de cada operativo

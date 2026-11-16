@@ -14,6 +14,8 @@ import { GES_PATOLOGIAS } from '../../specialties/activa/config.js';
 import { can, PERMISSIONS } from '../../core/permissions.js';
 import { downloadGes } from '../gesDialog.js';
 import { downloadIpd } from '../ipdDialog.js';
+import { downloadReceta } from '../recetaDialog.js';
+import recetaTemplate from '../../specialties/activa/recetaPlantilla.js';
 
 /**
  * Cómo entra un adjunto al PDF: JPEG/PNG como página, otras imágenes
@@ -59,6 +61,16 @@ export function outputActions(ctx, store) {
             hint: n ? `La hoja y ${n} ${n === 1 ? 'adjunto' : 'adjuntos'} en un solo PDF` : 'Esta atención no tiene adjuntos',
             disabled: !n,
           },
+          ...(recetaTemplate
+            ? [
+                {
+                  value: 'receta',
+                  label: 'Receta para lentes',
+                  hint: 'Autocompletar, descargar o imprimir',
+                  disabled: !can(ctx.accounts?.user, PERMISSIONS.EDITAR_CLINICO),
+                },
+              ]
+            : []),
           ...(GES_PATOLOGIAS.length
             ? [
                 {
@@ -81,6 +93,7 @@ export function outputActions(ctx, store) {
       if (!choice) return undefined;
       if (choice === 'ges') return downloadGes(ctx, rec, button);
       if (choice === 'ipd') return downloadIpd(ctx, rec, button);
+      if (choice === 'receta') return downloadReceta(ctx, rec, button);
       const withAnnexes = choice === 'anexos';
       return withBusy(button, async () => {
         const r = await buildAttentionPdf(ctx.templateBytes(), rec, ctx.procs, ctx.pdfOptions());
