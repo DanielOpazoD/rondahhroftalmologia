@@ -12,7 +12,8 @@ import { patientLabel } from '../core/patient.js';
 import { buildXlsx, XLSX_MIME } from '../lib/xlsx.js';
 import { createAccountsApi } from '../sync/accountsApi.js';
 import { ESPECIALIDAD } from '../config/catalogs.js';
-import { $, download, toast, withBusy } from './dom.js';
+import { $, download, toast } from './dom.js';
+import { withBusy } from './busy.js';
 import { html, setHtml } from './html.js';
 
 const MAX_ROWS = 500;

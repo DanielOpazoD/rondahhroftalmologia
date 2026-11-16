@@ -11,6 +11,8 @@ Las decisiones de fondo, con su porqué, están en el [registro de decisiones (A
 
 ## Capas
 
+El mapa completo y generado (capas, qué usa cada una, módulos y paquetes externos) está en [DEPENDENCIAS.md](DEPENDENCIAS.md). `npm run deps` revisa que no haya ciclos ni dependencias no permitidas, y las pruebas lo exigen.
+
 Cada flecha es una dependencia permitida (ESLint impide las demás: las capas puras no tocan el DOM, y la plataforma solo ve la especialidad a través de `specialties/activa/`).
 
 ```mermaid

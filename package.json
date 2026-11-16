@@ -1,6 +1,6 @@
 {
   "name": "hoja-atencion-oftalmologica",
-  "version": "2.16.1",
+  "version": "2.17.0",
   "private": true,
   "description": "Hoja de atención oftalmológica offline para rondas y operativos del Hospital Hanga Roa.",
   "type": "module",
@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -p jsconfig.json && tsc -p jsconfig.strict.json",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=87 \"tests/*.test.js\""
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=87 \"tests/*.test.js\"",
+    "deps": "node scripts/deps.mjs"
   },
   "engines": {
     "node": ">=20"
