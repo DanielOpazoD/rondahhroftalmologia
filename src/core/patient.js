@@ -31,6 +31,7 @@
  * atenciones de ese paciente. Si una atención vuelve a usarla, la marca se
  * quita sola (`restorePatient`).
  */
+import { NAME_PARTS, refreshNames, personName } from './names.js';
 import { sha256 } from '../lib/sha256.js';
 import { rutKey, normalizeText } from './format.js';
 import { unknownFields, isSafeField } from './compat.js';
@@ -40,7 +41,14 @@ import { unknownFields, isSafeField } from './compat.js';
 /** Fichas: lista o Map por id. @typedef {Paciente[] | Map<string, Paciente>} Fichas */
 
 /** Campos de la ficha del paciente (mismos nombres que en la atención). */
-export const PATIENT_FIELDS = ['paciente_rut', 'paciente_nombre', 'paciente_fnac', 'paciente_sexo', 'paciente_fono'];
+export const PATIENT_FIELDS = [
+  'paciente_rut',
+  'paciente_nombre',
+  ...NAME_PARTS.map((k) => 'paciente_' + k),
+  'paciente_fnac',
+  'paciente_sexo',
+  'paciente_fono',
+];
 
 export const PATIENT_SCHEMA = 1;
 
@@ -65,7 +73,7 @@ const hashId = (s) => Array.from(sha256(s).slice(0, 10), (b) => B32[b & 31]).joi
 export function patientIdFor(f = {}) {
   const k = rutKey(f.paciente_rut);
   if (k) return 'p_' + hashId('rut:' + k);
-  const n = normalizeText(f.paciente_nombre);
+  const n = normalizeText(personName(f, 'paciente_'));
   if (n) return 'p_' + hashId('nombre:' + n);
   return null;
 }
@@ -79,7 +87,7 @@ export function patientFields(f = {}) {
   /** @type {Record<string, string>} */
   const out = {};
   for (const k of PATIENT_FIELDS) if (f[k] !== undefined && f[k] !== null && String(f[k]).trim() !== '') out[k] = String(f[k]).trim();
-  return out;
+  return refreshNames(out);
 }
 
 /**
@@ -138,7 +146,7 @@ function unknownTextFields(f) {
       out[k] = v;
     }
   }
-  return out;
+  return refreshNames(out);
 }
 
 /**
@@ -160,7 +168,7 @@ export function patientFromRecord(rec, at) {
  */
 export function patientLabel(p) {
   const f = p?.f || {};
-  return f.paciente_nombre || f.paciente_rut || '(sin nombre)';
+  return personName(f, 'paciente_') || f.paciente_rut || '(sin nombre)';
 }
 
 /**
@@ -209,7 +217,15 @@ export function attentionsOf(records, pacienteId) {
  * Se consideran clínicos todos los campos que no son del paciente ni de la
  * organización (operativo, fecha, médico).
  */
-const NON_CLINICAL = new Set([...PATIENT_FIELDS, 'paciente_edad', 'operativo', 'fecha_atencion', 'medico_nombre', 'medico_rut']);
+const NON_CLINICAL = new Set([
+  ...PATIENT_FIELDS,
+  'paciente_edad',
+  'operativo',
+  'fecha_atencion',
+  'medico_nombre',
+  'medico_rut',
+  ...NAME_PARTS.map((k) => 'medico_' + k),
+]);
 /** @param {RegistroFusionable} rec */
 export function isAttended(rec) {
   if (Object.values(rec.checks || {}).some(Boolean)) return true;

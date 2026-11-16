@@ -9,6 +9,8 @@
  * Mientras nadie active las cuentas, nada de esto se muestra y la app funciona
  * como siempre (contraseña del equipo). En el modo práctica no hay cuentas.
  */
+import { nameParts, personName } from '../core/names.js';
+import { profileNameFields, profileNameValues } from './patientFields.js';
 import { ESPECIALIDAD, ROLES } from '../config/catalogs.js';
 import { accountRut, passwordProblem, rutBody } from '../core/accounts.js';
 import { rolLabel, makeMedico } from '../core/catalog.js';
@@ -196,7 +198,7 @@ export function createAccountsController(ctx) {
     if (!u) return;
     ctx.userAsked = true;
     if (u.rol === 'medico') {
-      store.saveMedico({ ...store.loadMedico(), n: u.nombre, r: u.rut });
+      store.saveMedico({ op: store.loadMedico().op, n: u.nombre, r: u.rut, ...nameParts(u) });
       if (!ctx.rec.id && !ctx.dirty) {
         ctx.rec = blankRecord(store.loadMedico());
         ctx.snap = structuredClone(ctx.rec);
@@ -210,11 +212,18 @@ export function createAccountsController(ctx) {
     setTimeout(() => syncProfile(u), 0);
   }
 
-  /** @param {{nombre: string, rut: string, rol: string}} u */
+  /** @param {import('../sync/accountSession.js').CuentaActiva} u */
   function syncProfile(u) {
     const existing = ctx.medicos.find((/** @type {any} */ m) => rutKey(m.rut) === rutKey(u.rut));
-    if (existing && existing.nombre === u.nombre && (existing.rol || 'medico') === u.rol) return;
-    const m = makeMedico({ ...(existing || {}), nombre: u.nombre, rut: u.rut, rol: u.rol, updated: clock.tick() });
+    if (
+      existing &&
+      existing.nombre === u.nombre &&
+      JSON.stringify(nameParts(existing)) === JSON.stringify(nameParts(u)) &&
+      (existing.rol || 'medico') === u.rol
+    ) {
+      return;
+    }
+    const m = makeMedico({ ...(existing || {}), nombre: u.nombre, ...nameParts(u), rut: u.rut, rol: u.rol, updated: clock.tick() });
     if (m) ctx.saveCatalog?.('medico', m);
   }
 
@@ -252,19 +261,22 @@ export function createAccountsController(ctx) {
       okLabel: 'Continuar',
       fields: [
         { id: 'rut', label: 'Tu RUT (serás el primer administrador)', placeholder: '12.345.678-9' },
-        { id: 'nombre', label: 'Tu nombre completo' },
+        ...profileNameFields(),
         { id: 'rol', label: 'Tu profesión', value: 'medico', options: ROLES.map((r) => ({ value: r.key, label: r.label })) },
       ],
-      onSave: ({ rut, nombre, rol }) => {
+      onSave: (values) => {
+        const { rut, rol } = values;
+        const parts = profileNameValues(values);
+        const nombre = personName(parts);
         if (!accountRut(rut)) return 'RUT inválido (revisa el dígito verificador).';
         if (nombre.length < 3) return 'Escribe tu nombre completo.';
-        setTimeout(() => void confirmActivate({ rut: accountRut(rut), nombre, rol }), 0);
+        setTimeout(() => void confirmActivate({ rut: accountRut(rut), nombre, ...parts, rol }), 0);
         return null;
       },
     });
   }
 
-  /** @param {{rut: string, nombre: string, rol: string}} p */
+  /** @param {import('../sync/accountCrypto.js').PerfilCuenta & {rol: string}} p */
   async function confirmActivate(p) {
     const ok = await uiConfirm({
       title: 'Activar cuentas de usuario',

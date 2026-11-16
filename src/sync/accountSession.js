@@ -8,6 +8,7 @@
  * a los avisos (`hooks`). Así esta lógica se prueba en Node contra el
  * servidor real en memoria (tests/accountSession.test.js).
  */
+import { nameParts } from '../core/names.js';
 import { accountRut, initialPassword, newUserId } from '../core/accounts.js';
 import { sha256, toHex } from '../lib/sha256.js';
 import { importEncKey, DecryptError } from './crypto.js';
@@ -21,8 +22,8 @@ import {
 } from './accountCrypto.js';
 
 /**
- * @typedef {{id: string, rut: string, nombre: string, rol: string, admin: boolean, offline: boolean}} CuentaActiva
- * @typedef {{uid: string, rut: string, sal: string, iter: number, localHash: string, nombre: string, rol: string, admin: boolean}} CuentaLocal
+ * @typedef {import('./accountCrypto.js').PerfilCuenta & {id: string, rol: string, admin: boolean, offline: boolean}} CuentaActiva
+ * @typedef {import('./accountCrypto.js').PerfilCuenta & {uid: string, sal: string, iter: number, localHash: string, rol: string, admin: boolean}} CuentaLocal
  * @typedef {{get: () => any, set: (v: any) => void}} SesionGuardada  sesión de la pestaña (sessionStorage)
  */
 
@@ -145,13 +146,22 @@ export function createAccountSession({
     st.exp = r.exp;
     st.acceso = sec.acceso;
     st.complemento = u.complemento;
-    st.user = { id: u.id, rut: accountRut(rut), nombre: perfil.nombre, rol: u.rol, admin: u.admin === true, offline: false };
+    st.user = {
+      id: u.id,
+      rut: accountRut(rut),
+      nombre: perfil.nombre,
+      ...nameParts(perfil),
+      rol: u.rol,
+      admin: u.admin === true,
+      offline: false,
+    };
     saveLocal(u.id, {
       rut: accountRut(rut),
       sal: s.sal,
       iter: s.iter,
       localHash: localHashOf(sec.local),
       nombre: perfil.nombre,
+      ...nameParts(perfil),
       rol: u.rol,
       admin: u.admin === true,
     });
@@ -166,7 +176,15 @@ export function createAccountSession({
     if (!local) throw new Error('Sin conexión. Para entrar por primera vez en este PC se necesita internet.');
     const sec = await deriveAccountSecrets(password, local.sal, local.iter);
     if (localHashOf(sec.local) !== local.localHash) throw new Error('RUT o clave incorrectos.');
-    st.user = { id: local.uid, rut: local.rut, nombre: local.nombre, rol: local.rol, admin: local.admin === true, offline: true };
+    st.user = {
+      id: local.uid,
+      rut: local.rut,
+      nombre: local.nombre,
+      ...nameParts(local),
+      rol: local.rol,
+      admin: local.admin === true,
+      offline: true,
+    };
     st.acceso = sec.acceso;
     st.token = null;
     complete();
@@ -219,7 +237,15 @@ export function createAccountSession({
     if (!s || !local || !(s.exp > now()) || typeof s.token !== 'string') return false;
     st.token = s.token;
     st.exp = s.exp;
-    st.user = { id: local.uid, rut: local.rut, nombre: local.nombre, rol: local.rol, admin: local.admin === true, offline: false };
+    st.user = {
+      id: local.uid,
+      rut: local.rut,
+      nombre: local.nombre,
+      ...nameParts(local),
+      rol: local.rol,
+      admin: local.admin === true,
+      offline: false,
+    };
     return true;
   }
 
@@ -358,7 +384,7 @@ export function createAccountSession({
   /**
    * Activa las cuentas creando el primer administrador (desde un PC con la
    * contraseña del equipo). Su clave inicial es su RUT sin dígito verificador.
-   * @param {{rut: string, nombre: string, rol: string}} p
+   * @param {import('./accountCrypto.js').PerfilCuenta & {rol: string}} p
    */
   async function activate(p) {
     const cfg = store.loadSyncConfig();
@@ -366,7 +392,12 @@ export function createAccountSession({
     const uid = newUserId();
     const { complemento } = await api.preparar(cfg.token, uid);
     const c = await credentialsFor({ password: initialPassword(p.rut), teamKeyB64: cfg.encKey, uid, complemento, iterations });
-    const perfil = await encryptProfile(await importEncKey(cfg.encKey), uid, { nombre: p.nombre, rut: accountRut(p.rut), rol: p.rol });
+    const perfil = await encryptProfile(await importEncKey(cfg.encKey), uid, {
+      nombre: p.nombre,
+      ...nameParts(p),
+      rut: accountRut(p.rut),
+      rol: p.rol,
+    });
     await api.activar(cfg.token, {
       id: uid,
       rut: p.rut,

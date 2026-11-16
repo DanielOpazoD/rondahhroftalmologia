@@ -31,7 +31,7 @@ test('barra de la atención: botones con nombre y estado del guardado anunciado'
     - button "Descargar PDF"
     - button "Guardar"
   `);
-  await page.locator('#paciente_nombre').fill('Paciente Lector');
+  await page.locator('#paciente_nombres').fill('Paciente Lector');
   await expect(page.getByRole('status').filter({ hasText: 'Guardada' })).toBeVisible({ timeout: 5000 });
 });
 
@@ -40,7 +40,9 @@ test('formulario: campos con etiqueta, sexo con nombre completo y errores asocia
   await expect(page.locator('#t-at .card').nth(1)).toMatchAriaSnapshot(`
     - heading "Paciente" [level=2]
     - textbox "RUT"
-    - textbox "Nombre y apellidos"
+    - textbox "Apellido paterno"
+    - textbox "Apellido materno"
+    - textbox "Nombres"
     - textbox "Fono"
     - textbox "Fecha de nacimiento"
     - textbox "Edad"
@@ -50,7 +52,7 @@ test('formulario: campos con etiqueta, sexo con nombre completo y errores asocia
       - button "Otro / no informa"
   `);
   await page.locator('#bSave').click();
-  await expect(page.getByRole('textbox', { name: 'Nombre y apellidos' })).toHaveAccessibleDescription('Requerido (nombre o RUT)');
+  await expect(page.getByRole('textbox', { name: 'Nombres', exact: true })).toHaveAccessibleDescription('Requerido (nombre o RUT)');
 });
 
 test('diálogos y bloqueo: nombre del diálogo y de sus controles', async ({ page }) => {

@@ -16,6 +16,7 @@
  * llegan al mismo resultado sin importar el orden en que reciben los cambios.
  * Registros antiguos sin `ft` usan su `updated` para todos sus campos.
  */
+import { refreshNames } from './names.js';
 import { normalizeRecord } from './record.js';
 import { flatten, unflatten, isSafeKey } from './fields.js';
 import { isFutureVersion } from './migrations.js';
@@ -109,6 +110,7 @@ export function mergeRecords(a, b) {
     if (t) ft[p] = t;
   }
   const merged = unflatten(values);
+  refreshNames(merged.f);
   const created = [a.created, b.created].filter(Boolean);
   return {
     ...b,
@@ -166,7 +168,15 @@ export function syncFingerprint(kind, data) {
   if (kind === 'atencion' || kind === 'paciente') {
     return JSON.stringify([...flatten(/** @type {RegistroFusionable} */ (data))].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
   }
-  if (kind === 'medico') return JSON.stringify([data?.nombre || '', data?.rut || '']);
+  if (kind === 'medico') {
+    return JSON.stringify([
+      data?.nombre || '',
+      data?.rut || '',
+      data?.apellido_paterno ?? null,
+      data?.apellido_materno ?? null,
+      data?.nombres ?? null,
+    ]);
+  }
   if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
   if (kind === 'bitacora') return JSON.stringify(/** @type {{id: string}[]} */ (data?.entries || []).map((e) => e.id).sort());
   return JSON.stringify(data ?? null);

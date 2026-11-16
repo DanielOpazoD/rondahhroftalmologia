@@ -74,6 +74,8 @@ export function contentSecurityPolicy(scriptHash, styleHash) {
     `script-src ${scriptHash}`,
     `style-src ${styleHash}`,
     "img-src 'self' data: blob:",
+    'frame-src blob:',
+    'object-src blob:',
     "connect-src 'self'",
     "worker-src 'self'",
     "manifest-src 'self'",

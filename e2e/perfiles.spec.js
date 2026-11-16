@@ -6,7 +6,7 @@ async function addProfile(page, { nombre, rol, rut = '' }) {
   await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
   const dlg = page.locator('#dlg');
-  await dlg.locator('#dlg_nombre').fill(nombre);
+  await dlg.locator('#dlg_nombres').fill(nombre);
   await dlg.locator('#dlg_rol').selectOption(rol);
   if (rut) await dlg.locator('#dlg_rut').fill(rut);
   await dlg.getByRole('button', { name: 'Guardar' }).click();
@@ -53,7 +53,7 @@ test('identidad: ingresado sin RUT y luego con RUT sigue siendo el mismo pacient
   await tab(page, 'Ingreso');
   await page.locator('#ingFecha').fill('2018-04-02');
   await page.locator('#ingFecha').dispatchEvent('change');
-  await page.locator('#ing_nombre').fill('Rosa Sin Rut');
+  await page.locator('#ing_nombres').fill('Rosa Sin Rut');
   await page.locator('#ingAdd').click();
   await page.locator('#ingList .pmain', { hasText: 'Rosa Sin Rut' }).click();
   await page.locator('#paciente_rut').fill('12.345.678-5');
@@ -106,7 +106,7 @@ test('quién registra: «Nuevo perfil…» desde la pregunta crea el perfil y lo
   await dlg.getByRole('button', { name: 'Continuar' }).click();
   await expect(dlg.locator('#dlgTitle')).toHaveText('Nuevo perfil');
   await expect(dlg).toBeVisible();
-  await dlg.locator('#dlg_nombre').fill('Enf. Nueva');
+  await dlg.locator('#dlg_nombres').fill('Enf. Nueva');
   await dlg.locator('#dlg_rol').selectOption('enfermeria');
   await dlg.getByRole('button', { name: 'Guardar' }).click();
   await expect(page.locator('#toast')).toContainText('Atención guardada');

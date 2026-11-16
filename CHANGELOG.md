@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.19.0 — 2026-11-15
+
+### Nuevo
+- **Constancia GES** desde el menú PDF de una atención de oftalmología: autocompleta paciente, teléfono y profesional, con los datos del Hospital Hanga Roa.
+- Selector con los siete títulos oficiales de patologías oftalmológicas GES. La previsión se elige al revisar el formulario.
+- Fecha y hora de notificación actuales de **Rapa Nui**, aunque el PC esté en otra zona horaria; se pueden corregir antes de descargar.
+- PDF de una página sobre la plantilla IF/N°469 de la Superintendencia de Salud, disponible sin conexión. Firmas en blanco para completar en papel.
+
+- **Impresión GES e IPD**: PDF visible y solicitud del diálogo de impresión del navegador, conservando la descarga. Revisión GES compacta, sin desplazamiento vertical en 1024 × 768.
+- **IPD** autocompletado y editable sobre el formulario original: datos fijos del hospital, 90 problemas GES por área, subgrupos oftalmológicos documentados, clínica libre y X en Sí. La fecha y hora de Rapa Nui se distribuyen dígito por casilla; administrativos opcionales vacíos.
+- **Apellidos y nombres separados** para pacientes, perfiles y cuentas. Las listas y formularios usan apellido paterno, apellido materno y nombres. Migración v5 conserva el texto y la ficha anteriores sin inferir apellidos.
+
 ## 2.18.1 — 2026-11-15
 
 ### Descripción por ojo (FO y BMC)

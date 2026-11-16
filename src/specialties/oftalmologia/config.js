@@ -12,6 +12,17 @@
 /** Identidad: `id` separa los datos en el servidor; `prefijo`, en el navegador. */
 export const ESPECIALIDAD = Object.freeze({ id: 'oftalmologia', nombre: 'Oftalmología', prefijo: 'oft_' });
 
+/** Títulos oficiales GES de oftalmología (Superintendencia de Salud; docs/CONSTANCIA_GES.md). */
+export const GES_PATOLOGIAS = Object.freeze([
+  'Tratamiento quirúrgico de cataratas',
+  'Vicios de refracción en personas de 65 años y más',
+  'Estrabismo en personas menores de 9 años',
+  'Retinopatía diabética',
+  'Desprendimiento de retina regmatógeno no traumático',
+  'Trauma ocular grave',
+  'Retinopatía del prematuro',
+]);
+
 /** @typedef {{key: string, label: string}} CheckDef */
 
 /** @type {CheckDef[]} */
@@ -95,6 +106,9 @@ export const TEXT_FIELDS = [
   'operativo',
   'fecha_atencion',
   'paciente_nombre',
+  'paciente_apellido_paterno',
+  'paciente_apellido_materno',
+  'paciente_nombres',
   'paciente_rut',
   'paciente_fnac',
   'paciente_edad',
@@ -123,6 +137,9 @@ export const TEXT_FIELDS = [
   'seguimiento',
   'alta',
   'medico_nombre',
+  'medico_apellido_paterno',
+  'medico_apellido_materno',
+  'medico_nombres',
   'medico_rut',
 ];
 
@@ -158,7 +175,13 @@ export const MEDIDAS_PROC = ['od', 'oi'];
 export const ETIQUETAS = {
   operativo: 'Operativo',
   fecha_atencion: 'Fecha',
-  paciente_nombre: 'Nombre',
+  paciente_nombre: 'Nombre completo',
+  paciente_apellido_paterno: 'Apellido paterno',
+  paciente_apellido_materno: 'Apellido materno',
+  paciente_nombres: 'Nombres',
+  medico_apellido_paterno: 'Apellido paterno del médico',
+  medico_apellido_materno: 'Apellido materno del médico',
+  medico_nombres: 'Nombres del médico',
   paciente_rut: 'RUT',
   paciente_fnac: 'Fecha de nacimiento',
   paciente_edad: 'Edad',

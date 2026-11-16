@@ -4,6 +4,7 @@
  */
 import { blankRecord, normalizeRecord, validateRecord, findDuplicate } from '../../core/record.js';
 import { fmtDate } from '../../core/format.js';
+import { nameParts, NAME_PARTS } from '../../core/names.js';
 import { mergeRecords } from '../../core/merge.js';
 import { isAttended } from '../../core/patient.js';
 import { prepareSave } from '../../app/attentions.js';
@@ -74,7 +75,7 @@ export function attentionActions(ctx, store) {
           ...ctx.author(),
         });
         if (entry) store.addAuditEntry(rec.id, entry);
-        store.saveMedico({ n: rec.f.medico_nombre, r: rec.f.medico_rut, op: rec.f.operativo });
+        store.saveMedico({ n: rec.f.medico_nombre, r: rec.f.medico_rut, op: rec.f.operativo, ...nameParts(rec.f, 'medico_') });
         store.saveDraft(rec);
       });
       if (!ok) return false;
@@ -118,6 +119,8 @@ export function attentionActions(ctx, store) {
       if (!isAttended(ctx.rec) && !ctx.rec.f.medico_nombre && remembered.n) {
         ctx.rec.f.medico_nombre = remembered.n;
         ctx.rec.f.medico_rut = remembered.r || '';
+        for (const k of NAME_PARTS) delete ctx.rec.f['medico_' + k];
+        Object.assign(ctx.rec.f, Object.fromEntries(Object.entries(nameParts(remembered)).map(([k, v]) => ['medico_' + k, v])));
         ctx.changed();
       }
       ctx.showTab('t-at');

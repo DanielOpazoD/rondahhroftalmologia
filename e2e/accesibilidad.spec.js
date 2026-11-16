@@ -12,6 +12,19 @@ async function audit(page, where) {
   return found;
 }
 
+async function auditGes(page, where) {
+  await tab(page, 'Atención');
+  await page.locator('#bPdf').click();
+  await page.getByRole('menuitem', { name: /^Constancia GES/ }).click();
+  const found = await audit(page, where);
+  await page.getByRole('dialog', { name: 'Constancia GES' }).getByRole('button', { name: 'Cancelar' }).click();
+  await page.locator('#bPdf').click();
+  await page.getByRole('menuitem', { name: /^IPD/ }).click();
+  found.push(...(await audit(page, where + ' IPD')));
+  await page.getByRole('dialog', { name: 'IPD · Informe del proceso diagnóstico' }).getByRole('button', { name: 'Cancelar' }).click();
+  return found;
+}
+
 test('accesibilidad: pestañas, diálogos, bloqueo y modo práctica sin infracciones WCAG A/AA', async ({ page }) => {
   await openApp(page);
   const all = [];
@@ -22,6 +35,7 @@ test('accesibilidad: pestañas, diálogos, bloqueo y modo práctica sin infracci
     await tab(page, t);
     all.push(...(await audit(page, t)));
   }
+  all.push(...(await auditGes(page, 'constancia GES')));
   for (const sec of ['Listas', 'Datos']) {
     await ajustes(page, sec);
     all.push(...(await audit(page, `Ajustes · ${sec}`)));
@@ -59,12 +73,14 @@ test('accesibilidad: tema oscuro y celular sin infracciones WCAG A/AA', async ({
     await tab(page, t);
     all.push(...(await audit(page, 'oscuro ' + t)));
   }
+  all.push(...(await auditGes(page, 'oscuro constancia GES')));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'light' });
   for (const t of ['Ingreso', 'Atención', 'Pacientes']) {
     await tab(page, t);
     all.push(...(await audit(page, 'celular ' + t)));
   }
+  all.push(...(await auditGes(page, 'celular constancia GES')));
   expect(all, all.join('\n')).toEqual([]);
 });
 

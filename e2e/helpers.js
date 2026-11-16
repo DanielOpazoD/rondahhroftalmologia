@@ -22,7 +22,7 @@ export async function ajustes(page, seccion) {
 /** Completa lo mínimo de una atención. */
 export async function fillPatient(page, { nombre, rut, fecha = '2026-11-14' }) {
   await page.locator('#fecha_atencion').fill(fecha);
-  await page.locator('#paciente_nombre').fill(nombre);
+  await page.locator('#paciente_nombres').fill(nombre);
   if (rut) await page.locator('#paciente_rut').fill(rut);
 }
 

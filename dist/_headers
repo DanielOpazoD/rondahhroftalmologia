@@ -1,2 +1,2 @@
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'sha256-1EYPMd62xixGkzLwoV1tZLiBGFzqcp0X/GUd4teV12I='; style-src 'sha256-umoOj2J8ht2qdzfd7jPdIO+SURtB95MOPT2Aae/vL3g='; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'sha256-Q8gPushnVfHyPOsdAa0G2g5VFNlY9wRp1Y6pCWNYKDU='; style-src 'sha256-27sO3sivPd6O+2QxGjBG9BrORPYOBHB1OorqzL+zhpE='; img-src 'self' data: blob:; frame-src blob:; object-src blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'

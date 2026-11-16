@@ -42,6 +42,9 @@ export interface Paciente {
 
 /** Perfil profesional (en el código y la sincronización se llama «médico» por compatibilidad). */
 export interface Perfil {
+  apellido_paterno?: string;
+  apellido_materno?: string;
+  nombres?: string;
   id: string;
   nombre: string;
   rut: string;

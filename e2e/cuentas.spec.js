@@ -17,7 +17,7 @@ async function activateAccounts(page) {
   await ajustes(page, 'Este equipo');
   await page.locator('#acctActivateBtn').click();
   await page.locator('#dlg_rut').fill(RUT);
-  await page.locator('#dlg_nombre').fill(NOMBRE);
+  await page.locator('#dlg_nombres').fill(NOMBRE);
   await page.locator('#dlgOk').click();
   await expect(page.locator('#msgTitle')).toHaveText('Activar cuentas de usuario');
   await page.locator('#msgDlg').getByRole('button', { name: 'Activar' }).click();
@@ -140,7 +140,7 @@ test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre q
   // Alta de una administrativa.
   await A.locator('#usersAdd').click();
   await A.locator('#dlg_rut').fill('11.111.111-1');
-  await A.locator('#dlg_nombre').fill('Ana Admisión');
+  await A.locator('#dlg_nombres').fill('Ana Admisión');
   await A.locator('#dlg_rol').selectOption('administrativo');
   await A.locator('#dlgOk').click();
   await expect(A.locator('#msgTitle')).toHaveText('Cuenta creada', { timeout: 20_000 });
@@ -151,7 +151,7 @@ test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre q
   // RUT repetido.
   await A.locator('#usersAdd').click();
   await A.locator('#dlg_rut').fill('11111111-1');
-  await A.locator('#dlg_nombre').fill('Otra Persona');
+  await A.locator('#dlg_nombres').fill('Otra Persona');
   await A.locator('#dlgOk').click();
   await expect(A.locator('#dlgErr')).toHaveText('Ya existe una cuenta con ese RUT.');
   await A.locator('#dlg').getByRole('button', { name: 'Cancelar' }).click();
@@ -198,7 +198,7 @@ test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre q
 async function createUser(page, { rut, nombre, rol }) {
   await page.locator('#usersAdd').click();
   await page.locator('#dlg_rut').fill(rut);
-  await page.locator('#dlg_nombre').fill(nombre);
+  await page.locator('#dlg_nombres').fill(nombre);
   await page.locator('#dlg_rol').selectOption(rol);
   await page.locator('#dlgOk').click();
   await expect(page.locator('#msgTitle')).toHaveText('Cuenta creada', { timeout: 20_000 });
@@ -240,11 +240,13 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
   await expect(B.locator('#attAdd')).toBeHidden();
   // Puede descargar el PDF.
   await B.locator('#bPdf').click();
+  await expect(B.getByRole('menuitem', { name: /^Constancia GES/ })).toBeDisabled();
+  await expect(B.getByRole('menuitem', { name: /^IPD/ })).toBeDisabled();
   const [pdf] = await Promise.all([B.waitForEvent('download'), B.getByRole('menuitem', { name: /^PDF Hoja/ }).click()]);
   expect(pdf.suggestedFilename()).toMatch(/\.pdf$/);
   // Hace el ingreso.
   await tab(B, 'Ingreso');
-  await B.locator('#ing_nombre').fill('Paciente Ingresado Por Admisión');
+  await B.locator('#ing_nombres').fill('Paciente Ingresado Por Admisión');
   await B.locator('#ingAdd').click();
   await expect(B.locator('#ingList')).toContainText('Paciente Ingresado Por Admisión');
   // No cambia ajustes del sistema.

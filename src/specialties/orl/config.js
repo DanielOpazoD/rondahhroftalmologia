@@ -70,6 +70,9 @@ export const TEXT_FIELDS = [
   'operativo',
   'fecha_atencion',
   'paciente_nombre',
+  'paciente_apellido_paterno',
+  'paciente_apellido_materno',
+  'paciente_nombres',
   'paciente_rut',
   'paciente_fnac',
   'paciente_edad',
@@ -94,6 +97,9 @@ export const TEXT_FIELDS = [
   'seguimiento',
   'alta',
   'medico_nombre',
+  'medico_apellido_paterno',
+  'medico_apellido_materno',
+  'medico_nombres',
   'medico_rut',
 ];
 
@@ -130,7 +136,13 @@ export const MEDIDAS_PROC = [];
 export const ETIQUETAS = {
   operativo: 'Operativo',
   fecha_atencion: 'Fecha',
-  paciente_nombre: 'Nombre',
+  paciente_nombre: 'Nombre completo',
+  paciente_apellido_paterno: 'Apellido paterno',
+  paciente_apellido_materno: 'Apellido materno',
+  paciente_nombres: 'Nombres',
+  medico_apellido_paterno: 'Apellido paterno del médico',
+  medico_apellido_materno: 'Apellido materno del médico',
+  medico_nombres: 'Nombres del médico',
   paciente_rut: 'RUT',
   paciente_fnac: 'Fecha de nacimiento',
   paciente_edad: 'Edad',
@@ -160,3 +172,5 @@ export const ETIQUETAS = {
 
 /** Etiqueta de cada parte de un procedimiento realizado (solo el lado). */
 export const ETIQUETAS_PROC = { eye: '(oído)' };
+/** Sin catálogo GES configurado para esta especialidad piloto. */
+export const GES_PATOLOGIAS = Object.freeze([]);

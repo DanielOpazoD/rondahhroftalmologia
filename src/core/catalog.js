@@ -9,6 +9,7 @@
  * Los ids son deterministas (derivados del RUT o del nombre), así dos equipos
  * que crean el mismo médico u operativo por separado no generan duplicados.
  */
+import { nameParts, personName } from './names.js';
 import { hmacSha256 } from '../lib/sha256.js';
 import { normalizeText, rutKey, formatRut } from './format.js';
 import { isValidId } from './record.js';
@@ -47,13 +48,13 @@ export function operativoId(nombre) {
 /**
  * Crea o normaliza un perfil de médico; null si no es válido.
  * Los perfiles de versiones anteriores (sin `rol`) son médicos.
- * @param {{nombre?: string, rut?: string, rol?: string, id?: string, created?: number, updated?: number}} [m]
+ * @param {{nombre?: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string, rut?: string, rol?: string, id?: string, created?: number, updated?: number}} [m]
  * @param {number} [now]
  * @returns {Medico|null}
  */
 export function makeMedico(m = {}, now = Date.now()) {
-  const { nombre, rut = '', rol, id, created, updated } = m;
-  const n = String(nombre ?? '').trim();
+  const { rut = '', rol, id, created, updated } = m;
+  const n = personName(m);
   if (!n) return null;
   const r = String(rut ?? '').trim() ? formatRut(rut) : '';
   const mid = isValidId(id) ? id : medicoId(n, r);
@@ -65,6 +66,7 @@ export function makeMedico(m = {}, now = Date.now()) {
     ...unknownFields(m, MEDICO_FIELDS),
     id: mid,
     nombre: n,
+    ...nameParts(m),
     rut: r,
     rol: role,
     created: created || now,

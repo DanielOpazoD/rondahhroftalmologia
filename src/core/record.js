@@ -19,6 +19,7 @@ import { SCHEMA_VERSION, LIMITS, SEXOS, ESPECIALIDAD } from '../config/catalogs.
 import { OJOS } from '../specialties/activa/config.js';
 import { validarClinico } from '../specialties/activa/validacion.js';
 import { migrate } from './migrations.js';
+import { refreshNames, nameParts, personName } from './names.js';
 import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt } from './format.js';
 
 /**
@@ -32,7 +33,7 @@ import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ag
 
 /**
  * Registro vacío listo para completar.
- * @param {{n?: string, r?: string, op?: string}} [medico] datos recordados del médico
+ * @param {{n?: string, r?: string, op?: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string}} [medico] datos recordados del médico
  * @returns {AtencionEnBlanco}
  */
 export function blankRecord(medico = {}, now = new Date()) {
@@ -47,6 +48,7 @@ export function blankRecord(medico = {}, now = new Date()) {
     f: {
       fecha_atencion: todayIso(now),
       medico_nombre: medico.n || '',
+      ...Object.fromEntries(Object.entries(nameParts(medico)).map(([k, v]) => ['medico_' + k, v])),
       medico_rut: medico.r || '',
       operativo: medico.op || '',
     },
@@ -83,6 +85,7 @@ export function normalizeRecord(raw) {
     if (v === null || v === undefined) delete r.f[k];
     else if (typeof v !== 'string') r.f[k] = String(v);
   }
+  refreshNames(r.f);
   return r;
 }
 
@@ -132,7 +135,7 @@ export function validateRecord(rec, now = new Date()) {
   };
 
   if (!f.paciente_nombre?.trim() && !f.paciente_rut?.trim()) {
-    error('paciente_nombre', 'Falta nombre o RUT del paciente', 'Requerido (nombre o RUT)');
+    error('paciente_nombres', 'Falta nombre o RUT del paciente', 'Requerido (nombre o RUT)');
   }
   if (f.paciente_rut?.trim() && !isValidRut(f.paciente_rut)) warn('paciente_rut', 'RUT con dígito verificador inválido');
   if (f.medico_rut?.trim() && !isValidRut(f.medico_rut)) warn('medico_rut', 'RUT del médico inválido');
@@ -173,9 +176,17 @@ export function validateRecord(rec, now = new Date()) {
 export function patientKey(rec) {
   const k = rutKey(rec.f?.paciente_rut);
   if (k) return { key: 'rut:' + k, basis: 'rut' };
-  const n = normalizeText(rec.f?.paciente_nombre);
+  const n = normalizeText(personName(rec.f || {}, 'paciente_'));
   if (n) return { key: 'nombre:' + n, basis: 'nombre' };
   return { key: 'id:' + rec.id, basis: 'id' };
+}
+
+/** Identidad para conteo y duplicados: conserva la ficha al organizar un nombre sin RUT.
+ * @param {import('../domain').RegistroFusionable} rec
+ */
+export function patientIdentityKey(rec) {
+  const p = patientKey(rec);
+  return p.basis !== 'rut' && rec.pacienteId ? 'paciente:' + rec.pacienteId : p.key;
 }
 
 /**
@@ -187,7 +198,12 @@ export function patientKey(rec) {
  */
 export function findDuplicate(rec, records) {
   const key = patientKey(rec).key;
-  return records.find((r) => r.id !== rec.id && r.f?.fecha_atencion === rec.f?.fecha_atencion && patientKey(r).key === key);
+  return records.find(
+    (r) =>
+      r.id !== rec.id &&
+      r.f?.fecha_atencion === rec.f?.fecha_atencion &&
+      (patientIdentityKey(r) === patientIdentityKey(rec) || patientKey(r).key === key),
+  );
 }
 
 /**

@@ -6,6 +6,8 @@
  * Todo lo sensible se calcula en este PC: el perfil se cifra con la clave del
  * equipo y la clave inicial (RUT sin dígito verificador) nunca viaja.
  */
+import { nameParts, personName } from '../core/names.js';
+import { profileNameFields, profileNameValues } from './patientFields.js';
 import { ROLES } from '../config/catalogs.js';
 import { accountRut, initialPassword, newUserId, rutBody, INITIAL_PASSWORD_DAYS } from '../core/accounts.js';
 import { rolLabel } from '../core/catalog.js';
@@ -27,7 +29,7 @@ const ADMIN_OPTIONS = [
 
 /**
  * @typedef {{id: string, rol: string, admin: boolean, estado: string, debeCambiar: boolean, tempExpira: number | null,
- *   creado: number, ultimoIngreso: number | null, bloqueadaHasta: number, nombre: string, rut: string}} UsuarioVista
+ *   creado: number, ultimoIngreso: number | null, bloqueadaHasta: number, nombre: string, rut: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string}} UsuarioVista
  */
 
 /** @param {any} ctx contexto de la aplicación */
@@ -51,7 +53,7 @@ export function initUsersView(ctx) {
       users = await Promise.all(
         usuarios.map(async (u) => {
           const p = await decryptProfile(key, u.id, u.perfil).catch(() => ({ nombre: '(no se pudo leer)', rut: '' }));
-          return { ...u, nombre: p.nombre, rut: p.rut };
+          return { ...u, ...p };
         }),
       );
       users.sort((a, b) => (a.estado === b.estado ? a.nombre.localeCompare(b.nombre, 'es') : a.estado === 'activo' ? -1 : 1));
@@ -121,35 +123,43 @@ export function initUsersView(ctx) {
 
   /* ---------------------------------------------------------- alta */
 
-  /** @param {{rut?: string, nombre?: string, rol?: string}} [preset] */
+  /** @param {{rut?: string, nombre?: string, rol?: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string}} [preset] */
   function create(preset = {}) {
     openDialog({
       title: 'Nuevo usuario',
       okLabel: 'Crear',
       fields: [
         { id: 'rut', label: 'RUT', value: preset.rut ? formatRut(preset.rut) : '', placeholder: '12.345.678-9' },
-        { id: 'nombre', label: 'Nombre completo', value: preset.nombre || '' },
+        ...profileNameFields(preset),
         { id: 'rol', label: 'Profesión', value: preset.rol || 'medico', options: ROLE_OPTIONS },
         { id: 'admin', label: 'Administrador/a', value: 'no', options: ADMIN_OPTIONS },
       ],
-      onSave: ({ rut, nombre, rol, admin }) => {
+      onSave: (values) => {
+        const { rut, rol, admin } = values;
+        const parts = profileNameValues(values, preset);
+        const nombre = personName(parts);
         if (!accountRut(rut)) return 'RUT inválido (revisa el dígito verificador).';
         if (nombre.length < 3) return 'Escribe el nombre completo.';
         if (users.some((u) => accountRut(u.rut) === accountRut(rut))) return 'Ya existe una cuenta con ese RUT.';
-        setTimeout(() => void doCreate({ rut: accountRut(rut), nombre, rol, admin: admin === 'si' }), 0);
+        setTimeout(() => void doCreate({ rut: accountRut(rut), nombre, ...parts, rol, admin: admin === 'si' }), 0);
         return null;
       },
     });
   }
 
-  /** @param {{rut: string, nombre: string, rol: string, admin: boolean}} p */
+  /** @param {import('../sync/accountCrypto.js').PerfilCuenta & {rol: string, admin: boolean}} p */
   async function doCreate(p) {
     try {
       const t = await token();
       const uid = newUserId();
       const { complemento } = await api.preparar(t, uid);
       const c = await credentialsFor({ password: initialPassword(p.rut), teamKeyB64: teamKeyB64(), uid, complemento });
-      const perfil = await encryptProfile(await importEncKey(teamKeyB64()), uid, { nombre: p.nombre, rut: p.rut, rol: p.rol });
+      const perfil = await encryptProfile(await importEncKey(teamKeyB64()), uid, {
+        nombre: p.nombre,
+        ...nameParts(p),
+        rut: p.rut,
+        rol: p.rol,
+      });
       await api.crear(t, {
         id: uid,
         rut: p.rut,
@@ -188,7 +198,12 @@ export function initUsersView(ctx) {
       ],
       onSave: ({ perfil }) => {
         const m = list.find((x) => x.id === perfil);
-        if (m) setTimeout(() => create({ rut: m.rut, nombre: m.nombre, rol: m.rol === 'admision' ? 'administrativo' : m.rol }), 0);
+        if (m) {
+          setTimeout(
+            () => create({ rut: m.rut, nombre: m.nombre, ...nameParts(m), rol: m.rol === 'admision' ? 'administrativo' : m.rol }),
+            0,
+          );
+        }
         return null;
       },
     });
@@ -201,15 +216,18 @@ export function initUsersView(ctx) {
     openDialog({
       title: `Editar a ${u.nombre}`,
       fields: [
-        { id: 'nombre', label: 'Nombre completo', value: u.nombre },
+        ...profileNameFields(u),
         { id: 'rol', label: 'Profesión', value: u.rol, options: ROLE_OPTIONS },
         { id: 'admin', label: 'Administrador/a', value: u.admin ? 'si' : 'no', options: ADMIN_OPTIONS },
       ],
-      onSave: ({ nombre, rol, admin }) => {
+      onSave: (values) => {
+        const { rol, admin } = values;
+        const parts = profileNameValues(values, u);
+        const nombre = personName(parts);
         if (nombre.length < 3) return 'Escribe el nombre completo.';
         setTimeout(async () => {
           try {
-            const perfil = await encryptProfile(await importEncKey(teamKeyB64()), u.id, { nombre, rut: u.rut, rol });
+            const perfil = await encryptProfile(await importEncKey(teamKeyB64()), u.id, { nombre, ...parts, rut: u.rut, rol });
             await api.editar(await token(), { id: u.id, rol, admin: admin === 'si', perfil });
             await load();
             toast('Usuario actualizado');

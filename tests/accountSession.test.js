@@ -122,3 +122,28 @@ test('sesión: desbloquear con la clave, recuperar la pestaña y cuenta desactiv
   assert.deepEqual(A.store.loadLocalAccounts(), {});
   assert.match(A.needLogin.at(-1), /desactivada/);
 });
+
+test('sesión: componentes del nombre sobreviven al cifrado, recarga y entrada sin conexión', async () => {
+  const w = await world();
+  const A = w.pc();
+  const names = { apellido_paterno: 'Prueba', apellido_materno: 'Ficticio', nombres: 'Profesional' };
+  A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
+  await A.session.activate({ rut: RUT, nombre: 'Nombre anterior', rol: 'medico', ...names });
+  const B = w.pc();
+  await B.session.login(RUT, '17752753');
+  await B.session.changePassword('Ojo2026');
+  assert.equal(B.session.user.nombre, 'Prueba Ficticio Profesional');
+  for (const [k, v] of Object.entries(names)) assert.equal(B.session.user[k], v);
+  const copy = createAccountSession({
+    store: B.store,
+    api: createAccountsApi(),
+    session: { get: () => B.reloadTab(), set: () => {} },
+    now: () => w.clock.t,
+  });
+  assert.equal(copy.restore(), true);
+  assert.equal(copy.user.apellido_materno, 'Ficticio');
+  await B.session.logout();
+  B.net.online = false;
+  await B.session.login(RUT, 'Ojo2026');
+  assert.equal(B.session.user.nombres, 'Profesional');
+});
