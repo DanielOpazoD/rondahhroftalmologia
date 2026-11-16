@@ -150,6 +150,25 @@ test('formularios: un fallo de almacenamiento se avisa y evita cerrar hasta guar
   await expect(reopened.getByLabel('Lejos OD', { exact: true })).toHaveValue('-2,00');
 });
 
+test('formularios: si la atención pendiente no se puede guardar, conserva sus datos antes de abrir otro paciente', async ({ page }) => {
+  await openApp(page);
+  await fillPatient(page, { nombre: 'Paciente Ficticio Pendiente', rut: '12.345.678-5' });
+  await page.locator('#bSave').click();
+  await page.locator('#bNew').click();
+  await fillPatient(page, { nombre: 'Paciente Ficticio Seleccionado', rut: '11.111.111-1' });
+  await page.locator('#bSave').click();
+  await openPatient(page, 'Paciente Ficticio Pendiente');
+  await page.locator('#plan').fill('Indicaciones ficticias pendientes');
+  await page.locator('#fecha_atencion').fill('');
+  await showPatientRecord(page, 'Paciente Ficticio Seleccionado');
+  await page.locator('#bForms').click();
+  await expect(page.getByRole('tab', { name: 'Atención', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#tbName')).toHaveText('Paciente Ficticio Pendiente');
+  await expect(page.locator('#plan')).toHaveValue('Indicaciones ficticias pendientes');
+  await expect(page.locator('#fecha_atencion')).toHaveValue('');
+  await expect(page.locator('dialog.clinical-form, #msgDlg[open]')).toHaveCount(0);
+});
+
 test('formularios: la sincronización conserva ediciones de dos PC y cierra una ventana que quedó desactualizada', async ({
   page: a,
   browser,

@@ -9,7 +9,7 @@
  * servidor real en memoria (tests/accountSession.test.js).
  */
 import { nameParts } from '../core/names.js';
-import { accountRut, initialPassword, newUserId } from '../core/accounts.js';
+import { accountRut, initialPassword, newUserId, passwordProblem } from '../core/accounts.js';
 import { sha256, toHex } from '../lib/sha256.js';
 import { importEncKey, DecryptError } from './crypto.js';
 import {
@@ -225,6 +225,8 @@ export function createAccountSession({
   /** Cambio de clave voluntario: verifica la actual. @param {string} actual @param {string} nueva */
   async function changeMyPassword(actual, nueva) {
     if (!st.user) throw new Error('No hay sesión.');
+    const problem = passwordProblem(nueva, { rut: st.user.rut, current: actual });
+    if (problem) throw new Error(problem);
     const s = await api.sal(st.user.rut);
     const cur = await deriveAccountSecrets(actual, s.sal, s.iter);
     await changePassword(nueva, cur.acceso);

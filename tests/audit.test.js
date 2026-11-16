@@ -226,3 +226,69 @@ test('changesSummary: resumen breve de lo que cambió otro equipo', async () => 
   assert.match(s, /^Plan: vacío → Lentes · .*: 15 → 18 · .*: vacío → sí y 1 más$/);
   assert.equal(changesSummary(cambios.slice(0, 1)), 'Plan: vacío → Lentes');
 });
+
+test('etiquetas de la bitácora: rutas desconocidas se muestran tal cual, sin romper', () => {
+  assert.equal(auditLabel('f.campo_de_version_nueva'), 'campo_de_version_nueva');
+  assert.equal(auditLabel('checks.check_nuevo'), 'check_nuevo');
+  assert.equal(auditLabel('pacienteId'), 'Paciente (vínculo)');
+  assert.equal(auditLabel('adjunto.x1'), 'Adjunto');
+  assert.equal(auditLabel('proc.p_borrado.od', PROCS), 'p_borrado PIO OD', 'procedimiento eliminado: su id');
+  assert.equal(auditLabel('proc.fo.parte_nueva', PROCS), 'Fondo de ojo (FO)', 'parte desconocida: solo el procedimiento');
+  assert.equal(auditLabel('otra.cosa'), 'otra.cosa');
+});
+
+test('auditChanges: sin versión anterior (o posterior) todo aparece como agregado (o quitado)', () => {
+  const r = minimalRecord('x', { plan: 'Control' });
+  const created = auditChanges(null, r);
+  assert.ok(created.some((c) => c.c === 'f.plan' && c.d === 'Control' && !('a' in c)));
+  const removed = auditChanges(r, undefined);
+  assert.ok(removed.some((c) => c.c === 'f.plan' && c.a === 'Control' && !('d' in c)));
+  assert.deepEqual(auditChanges(null, undefined), []);
+});
+
+test('bitácora con guardado automático: vaciar un campo dentro de la ventana queda como «antes → vacío»', async () => {
+  const { appendAuditEntry } = await import('../src/core/audit.js');
+  const e = (id, at, cambios) => ({ id, at, tipo: 'editada', equipo: 'B', equipoId: 'pc1', cambios });
+  let list = appendAuditEntry([], e('e1', 100, [{ c: 'f.plan', a: 'Lentes', d: 'Control' }]));
+  list = appendAuditEntry(
+    list,
+    e('e2', 200, [
+      { c: 'f.plan', a: 'Control' },
+      { c: 'f.dx', d: 'Catarata' },
+      { c: 'f.antecedentes', d: 'HTA' },
+    ]),
+  );
+  assert.equal(list.length, 1);
+  assert.deepEqual(list[0].cambios, [
+    { c: 'f.antecedentes', d: 'HTA' },
+    { c: 'f.dx', d: 'Catarata' },
+    { c: 'f.plan', a: 'Lentes' },
+  ]);
+  // Una edición con hora anterior (reloj de otro equipo atrasado) no se junta: no se reescribe el pasado.
+  assert.equal(appendAuditEntry(list, e('e3', 50, [{ c: 'f.x', d: '1' }])).length, 2);
+});
+
+test('unión de bitácoras: entradas dañadas se descartan, empates por hora se ordenan por id y faltantes no rompen', () => {
+  const a = {
+    id: 'b_x',
+    atencionId: 'x',
+    updated: 3,
+    entries: [null, { at: 5 }, { id: 42, at: 6 }, { id: 'e2', at: 10 }, { id: 'e1', at: 10 }],
+  };
+  const m = mergeAuditDocs(a, { entries: [{ id: 'e0', at: 10 }] });
+  assert.deepEqual(
+    m.entries.map((e) => e.id),
+    ['e0', 'e1', 'e2'],
+    'mismo orden en todos los equipos',
+  );
+  assert.deepEqual(mergeAuditDocs({ entries: [{ id: 'e0', at: 10 }] }, a).entries, m.entries, 'sin importar el orden de la unión');
+  assert.deepEqual([m.id, m.atencionId, m.updated], ['b_x', 'x', 3]);
+  assert.deepEqual(mergeAuditDocs(null, a).entries, mergeAuditDocs(a, null).entries);
+  assert.deepEqual(mergeAuditDocs(null, undefined), { id: '', atencionId: '', updated: 0, entries: [] }, 'dato dañado: id vacío');
+  assert.deepEqual(mergeAuditDocs({ entries: [] }, { id: 'b_y', atencionId: 'y', updated: 7 }), {
+    id: 'b_y',
+    atencionId: 'y',
+    updated: 7,
+    entries: [],
+  });
+});

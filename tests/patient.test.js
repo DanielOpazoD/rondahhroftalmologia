@@ -216,3 +216,131 @@ test('ficha eliminada (creada por error): viaja campo a campo, sale de duplicado
   assert.equal(isDeletedPatient(normalizePatient(next)), false);
   assert.equal(isDeletedPatient(normalizePatient(mergeRecords(d, next))), false);
 });
+
+test('fichas dañadas o mal formadas: se rechazan o se limpian sin romper', async () => {
+  const { renormalizePatient } = await import('../src/core/patient.js');
+  for (const raw of [null, 'p_x', { id: 'a_123' }, { id: 'p_ con espacio' }, { id: 'p_' + 'x'.repeat(70) }]) {
+    assert.equal(normalizePatient(raw), null, JSON.stringify(raw)?.slice(0, 30));
+  }
+  assert.throws(() => renormalizePatient({ id: 'no-es-ficha' }), /id inválido/, 'un error del código no pasa en silencio');
+  for (const f of [undefined, 'texto', 42]) {
+    const p = normalizePatient({ id: 'p_x', updated: 5, f });
+    assert.deepEqual(p.f, {}, `f = ${f}`);
+    assert.equal(p.created, 5, 'sin fecha de creación usa la de actualización');
+  }
+  // Textos de una versión más nueva se conservan; los inseguros, vacíos o enormes no.
+  const p = normalizePatient({
+    id: 'p_x',
+    f: { ...JSON.parse('{"__proto__": "z"}'), paciente_nombre: 'Ana', campo_nuevo: 'sí', vacio: '  ', numero: 5, enorme: 'x'.repeat(2001) },
+    ft: { 'f.paciente_nombre': 3, 'f.malo': 'ayer', 'otra.ruta': 4 },
+  });
+  assert.equal(p.f.campo_nuevo, 'sí');
+  for (const k of ['vacio', 'numero', 'enorme', '__proto__']) assert.equal(Object.hasOwn(p.f, k), false, k);
+  assert.equal(Object.getPrototypeOf(p.f), Object.prototype);
+  assert.deepEqual(p.ft, { 'f.paciente_nombre': 3 }, 'solo fechas f.<campo> numéricas');
+});
+
+test('ficha recibida con f que no es objeto (respaldo o sincronización manipulados) se normaliza sin romper', () => {
+  for (const f of [null, 'texto', 42, true]) assert.deepEqual(normalizePatient({ id: 'p_x', updated: 5, f })?.f, {}, String(f));
+});
+
+test('patientFromRecord: respeta el vínculo de la atención; sin datos del paciente no inventa ficha', () => {
+  const rec = minimalRecord('a1', { paciente_nombre: 'Ana', paciente_rut: '12.345.678-5' });
+  assert.equal(patientFromRecord({ ...rec, pacienteId: 'p_vinculada' }, 10).id, 'p_vinculada');
+  const p = patientFromRecord(rec, 10);
+  assert.equal(p.id, patientIdFor(rec.f));
+  assert.deepEqual(p.ft, { 'f.paciente_nombre': 10, 'f.paciente_rut': 10 }, 'cada dato fechado con la edición que lo aportó');
+  assert.equal(patientFromRecord(minimalRecord('a2', { plan: 'Control' }), 10), null);
+});
+
+test('patientLabel: nombre, o RUT, o «(sin nombre)»', async () => {
+  const { patientLabel } = await import('../src/core/patient.js');
+  assert.equal(patientLabel({ f: { paciente_nombre: 'Ana Tuki', paciente_rut: '1-9' } }), 'Ana Tuki');
+  assert.equal(patientLabel({ f: { paciente_rut: '1-9' } }), '1-9');
+  assert.equal(patientLabel({ f: {} }), '(sin nombre)');
+  assert.equal(patientLabel(null), '(sin nombre)');
+});
+
+test('missingPatients: gana la atención más reciente aunque llegue primero; acepta fichas como objeto', () => {
+  const recs = [
+    minimalRecord('a2', { paciente_rut: '12.345.678-5', paciente_fono: 'nuevo' }, { updated: 20 }),
+    minimalRecord('a1', { paciente_rut: '12.345.678-5', paciente_fono: 'viejo' }, { updated: 10 }),
+    minimalRecord('a0', { paciente_rut: '12.345.678-5', paciente_fono: 'sin fecha' }, { updated: 0, created: 0 }),
+    minimalRecord('s', { plan: 'Sin paciente' }),
+  ];
+  const [p] = missingPatients(recs, {});
+  assert.equal(p.f.paciente_fono, 'nuevo');
+  assert.equal(p.updated, 20);
+  assert.deepEqual(missingPatients(recs, { [p.id]: p }), [], 'objeto por id, igual que un Map');
+  // Sin `updated`, cuenta la fecha de creación.
+  const onlyCreated = minimalRecord('c', { paciente_nombre: 'Eva' }, { updated: 0, created: 7 });
+  assert.equal(missingPatients([onlyCreated], new Map())[0].updated, 7);
+});
+
+test('attentionsOf: misma fecha de atención → la creada después primero; luego la editada después', () => {
+  const pid = 'p_x';
+  const r = (id, fecha, created, updated) => ({ id, pacienteId: pid, f: fecha ? { fecha_atencion: fecha } : undefined, created, updated });
+  const recs = [
+    r('vieja', '2025-01-01', 1, 1),
+    r('sin_fecha', undefined, 9, 9),
+    r('tarde', '2026-05-01', 5, 5),
+    r('temprano', '2026-05-01', 3, 3),
+    r('editada', '2026-05-01', 3, 8),
+    r('sin_tiempos', '2026-05-01'),
+    r('sin_creacion', '2026-05-01', undefined, 4),
+    { id: 'otro', pacienteId: 'p_y', f: { fecha_atencion: '2027-01-01' } },
+  ];
+  assert.deepEqual(
+    attentionsOf(recs, pid).map((x) => x.id),
+    ['tarde', 'editada', 'temprano', 'sin_creacion', 'sin_tiempos', 'vieja', 'sin_fecha'],
+  );
+});
+
+test('isAttended: catarata o procedimientos cuentan como atención; campos nulos no', () => {
+  assert.equal(isAttended({}), false);
+  assert.equal(isAttended({ f: { plan: null, paciente_nombre: 'Ana' } }), false);
+  assert.equal(isAttended({ cat: 'OD' }), true);
+  assert.equal(isAttended({ proc: { fo: { eye: 'AO' } } }), true);
+});
+
+test('resolvePatientId: una ficha por nombre que ya se unió a otra resuelve a la vigente', () => {
+  const pid = patientIdFor({ paciente_nombre: 'Rosa Pakarati' });
+  const vigente = ficha('p_vigente001', { paciente_nombre: 'Rosa Pakarati', paciente_rut: '12.345.678-5' });
+  const unida = ficha(pid, { paciente_nombre: 'Rosa Pakarati', fusionado_en: vigente.id });
+  assert.equal(resolvePatientId({ paciente_nombre: 'rosa pakarati' }, [unida, vigente]), vigente.id);
+  assert.equal(resolvePatientId({ paciente_nombre: 'Rosa Pakarati' }, null), pid, 'sin fichas: id derivado');
+});
+
+test('findDuplicatePairs: el par sale ordenado por id sin importar el orden de las fichas', () => {
+  const z = ficha('p_zzzzzzzzz1', { paciente_nombre: 'Ana', paciente_rut: '12.345.678-5' });
+  const a = ficha('p_aaaaaaaaa1', { paciente_nombre: 'Ana', paciente_rut: '123456785' });
+  for (const list of [
+    [z, a],
+    [a, z],
+  ]) {
+    assert.deepEqual(
+      findDuplicatePairs(list).map((p) => [p.a.id, p.b.id, p.motivo]),
+      [[a.id, z.id, 'rut']],
+      'un solo par (por RUT, no repetido por nombre)',
+    );
+  }
+});
+
+test('eliminar, restaurar y unir siempre suben la versión, aunque el reloj del equipo vaya atrasado', async () => {
+  const { deletePatient, restorePatient } = await import('../src/core/patient.js');
+  const p = ficha('p_aaaaaaaaa1', { paciente_nombre: 'Ana' }, 1000);
+  const d = deletePatient(p, 500);
+  assert.equal(d.updated, 1001);
+  const r = restorePatient(d, 400);
+  assert.equal(r.updated, 1002);
+  assert.equal(restorePatient(r, 2000), r, 'restaurar una ficha no eliminada no la cambia');
+  const sinFecha = normalizePatient({ id: 'p_bbbbbbbbb1', f: { paciente_nombre: 'Ana' } });
+  assert.equal(deletePatient(sinFecha, 50).updated, 50);
+  const { keep, drop } = mergePatients(p, sinFecha, 10);
+  assert.deepEqual([keep.updated, drop.updated], [1001, 10]);
+  // Fichas sin fecha (versión 0): toman la hora de la operación.
+  assert.equal(mergePatients(sinFecha, p, 10).keep.updated, 10);
+  const borradaSinFecha = normalizePatient({ id: 'p_ccccccccc1', f: { eliminada_en: '2026-01-01T00:00:00Z' } });
+  assert.equal(restorePatient(borradaSinFecha, 30).updated, 30);
+  assert.throws(() => mergePatients(p, p, 10), /misma ficha/);
+});

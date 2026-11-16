@@ -77,6 +77,25 @@ const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 const ROLE_KEYS = ROLES.map((r) => r.key);
 const DAY_MS = 24 * 3600_000;
+
+/**
+ * Evento de lectura informado por la app, ya validado: solo tipos conocidos,
+ * un objeto con id seguro y números dentro de rango (lo demás se descarta).
+ * null si no es un evento válido.
+ * @param {any} e lo que llegó en el cuerpo de la petición
+ * @param {number} t hora del servidor
+ */
+function clientEvent(e, t) {
+  if (!e || !CLIENT_EVENTS.includes(e.ev)) return null;
+  if (e.obj !== undefined && !(typeof e.obj === 'string' && ID_RE.test(e.obj))) return null;
+  return {
+    ev: e.ev,
+    obj: e.obj,
+    n: Number.isSafeInteger(e.n) && e.n >= 0 && e.n < 1e6 ? e.n : undefined,
+    at: Number.isSafeInteger(e.at) && Math.abs(e.at - t) < 90 * DAY_MS ? e.at : undefined,
+    off: e.off === true ? true : undefined,
+  };
+}
 /** @param {number} t */
 const dayOf = (t) => new Date(t).toISOString().slice(0, 10).replace(/-/g, '');
 
@@ -131,10 +150,13 @@ const validCredentials = (c) =>
 const clientIp = (req) =>
   req.headers.get('x-nf-client-connection-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'desconocida';
 
+/** Cuerpo de más de 600 KB: se rechaza con 413 sin leerlo como JSON. */
+const TOO_LARGE = Symbol('demasiado grande');
+
 /** Lee el cuerpo JSON (pequeño). @param {Request} req */
 async function readBody(req) {
   const text = await req.text();
-  if (text.length > 600_000) throw new Error('demasiado_grande');
+  if (text.length > 600_000) return TOO_LARGE;
   try {
     return JSON.parse(text || '{}');
   } catch {
@@ -354,6 +376,19 @@ export function createAccounts({
     return true;
   }
 
+  /**
+   * Antes de activar no hay cuentas, salvo la de una activación que quedó a
+   * medias (se guardó la cuenta y no la configuración). Si es de este RUT, se
+   * descarta para que el reintento pueda crearla de nuevo.
+   * @param {string} rutHash
+   */
+  async function discardUnactivated(rutHash) {
+    const idx = /** @type {{uid?: string} | null} */ (await store.get(K.rut(rutHash), { type: 'json' }));
+    if (!idx) return;
+    if (idx.uid) await store.delete(K.user(idx.uid));
+    await store.delete(K.rut(rutHash));
+  }
+
   /** Administradores activos. @param {Cuenta[]} users */
   const activeAdmins = (users) => users.filter((u) => u.admin && u.estado === 'activo');
 
@@ -437,7 +472,9 @@ export function createAccounts({
     const problem = accountProblem(b.usuario);
     if (problem) return fail(400, 'datos_invalidos', problem);
     const acc = newAccount({ ...b.usuario, admin: true }, null);
+    await discardUnactivated(acc.rutHash);
     if (!(await insertAccount(acc))) return fail(409, 'rut_existe', 'Ya existe una cuenta con ese RUT.');
+    // La configuración va al final: hasta aquí, un error deja las cuentas inactivas y se puede reintentar.
     await store.setJSON(K.config, { activas: true, creado: t });
     await audit({ ev: 'cuentas.activar', obj: acc.id });
     await audit({ ev: 'usuario.crear', obj: acc.id, det: { rol: acc.rol, admin: true } });
@@ -503,17 +540,10 @@ export function createAccounts({
     if (!list || list.length > MAX_EVENTS) return fail(400, 'lote_invalido', `Se esperan hasta ${MAX_EVENTS} eventos`);
     let n = 0;
     for (const e of list) {
-      if (!e || !CLIENT_EVENTS.includes(e.ev)) continue;
-      if (e.obj !== undefined && !(typeof e.obj === 'string' && ID_RE.test(e.obj))) continue;
-      await audit({
-        ev: e.ev,
-        u: me.id,
-        s: a.sid,
-        obj: e.obj,
-        n: Number.isSafeInteger(e.n) && e.n >= 0 && e.n < 1e6 ? e.n : undefined,
-        at: Number.isSafeInteger(e.at) && Math.abs(e.at - t) < 90 * DAY_MS ? e.at : undefined,
-        off: e.off === true ? true : undefined,
-      });
+      const valid = clientEvent(e, t);
+      if (!valid) continue;
+      const { ev, ...rest } = valid;
+      await audit({ ev, u: me.id, s: a.sid, ...rest });
       n++;
     }
     return json(200, { registrados: n });
@@ -679,9 +709,10 @@ export function createAccounts({
     const action = url.pathname.split('/').filter(Boolean).pop() || '';
     const route = Object.hasOwn(ROUTES, action) ? ROUTES[action] : null;
     if (!route) return fail(404, 'ruta', 'Ruta no encontrada');
-    if (req.method !== route.method) return fail(405, 'metodo', `Usa ${route.method} para ${action}`);
-    if (!ready) return fail(503, 'no_configurado', 'Cuentas no configuradas en el servidor (falta SYNC_TOKEN_SHA256).');
+    const refused = refusedBeforeBody(req, route.method, action);
+    if (refused) return refused;
     const b = req.method === 'POST' ? await readBody(req) : null;
+    if (b === TOO_LARGE) return fail(413, 'demasiado_grande', 'La solicitud es demasiado grande');
     if (req.method === 'POST' && (!b || typeof b !== 'object')) return fail(400, 'json_invalido', 'JSON inválido');
     /** @type {Peticion} */
     const p = { req, url, b, t: now() };
@@ -691,9 +722,33 @@ export function createAccounts({
 
     const a = await authenticate(req);
     if ('response' in a) return a.response;
-    if (route.acceso !== 'sesion' && a.mustChange) return fail(403, 'debe_cambiar_clave', 'Primero cambia tu clave inicial.');
-    if (route.acceso === 'admin' && !a.user.admin) return fail(403, 'sin_permiso', 'Solo un administrador puede hacer esto.');
-    return route.run({ ...p, a, me: a.user });
+    return accessDenied(route.acceso, a) || route.run({ ...p, a, me: a.user });
+  }
+
+  /**
+   * Respuesta de error si la petición no puede seguir aunque la ruta exista:
+   * método equivocado (405) o servidor sin configurar (503). null si puede.
+   * @param {Request} req
+   * @param {string} method método de la ruta
+   * @param {string} action
+   */
+  function refusedBeforeBody(req, method, action) {
+    if (req.method !== method) return fail(405, 'metodo', `Usa ${method} para ${action}`);
+    if (!ready) return fail(503, 'no_configurado', 'Cuentas no configuradas en el servidor (falta SYNC_TOKEN_SHA256).');
+    return null;
+  }
+
+  /**
+   * Respuesta 403 si la sesión no alcanza para el acceso de la ruta: con la
+   * clave inicial sin cambiar solo se usan las rutas de `sesion`; las de
+   * `admin`, solo un administrador. null si puede.
+   * @param {Exclude<Acceso, 'publica'>} acceso
+   * @param {{mustChange: boolean, user: {admin?: boolean}}} a
+   */
+  function accessDenied(acceso, a) {
+    if (acceso !== 'sesion' && a.mustChange) return fail(403, 'debe_cambiar_clave', 'Primero cambia tu clave inicial.');
+    if (acceso === 'admin' && !a.user.admin) return fail(403, 'sin_permiso', 'Solo un administrador puede hacer esto.');
+    return null;
   }
 
   /**

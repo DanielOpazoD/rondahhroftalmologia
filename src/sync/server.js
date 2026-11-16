@@ -207,6 +207,31 @@ async function versionsOf(store, esp, id) {
 }
 
 /**
+ * ¿Tiene id seguro, versión (fecha) plausible y huella bien formada?
+ * @param {any} it elemento del cuerpo JSON, sin validar
+ * @param {number} now
+ */
+const validVersion = (it, now) =>
+  ID_RE.test(it.id) &&
+  Number.isSafeInteger(it.u) &&
+  it.u > 0 &&
+  it.u <= now + LIMITS.futureSkewMs &&
+  (it.h === undefined || H_RE.test(it.h));
+
+/**
+ * ¿Trae contenido cifrado válido? iv de 12 bytes y texto cifrado no vacío, dentro del tope.
+ * @param {any} it
+ */
+const validPayload = (it) =>
+  typeof it.iv === 'string' &&
+  B64_RE.test(it.iv) &&
+  it.iv.length === 16 &&
+  typeof it.ct === 'string' &&
+  B64_RE.test(it.ct) &&
+  it.ct.length > 0 &&
+  it.ct.length <= LIMITS.ctMaxChars;
+
+/**
  * ¿Es un elemento válido de `get` (sin contenido) o `put` (con iv y ct)?
  * @param {any} it elemento del cuerpo JSON, sin validar
  * @param {number} now
@@ -214,20 +239,22 @@ async function versionsOf(store, esp, id) {
  * @returns {boolean}
  */
 function validItem(it, now, withPayload) {
-  if (!it || typeof it !== 'object') return false;
-  if (!ID_RE.test(it.id)) return false;
-  if (!Number.isSafeInteger(it.u) || it.u <= 0 || it.u > now + LIMITS.futureSkewMs) return false;
-  if (it.h !== undefined && !H_RE.test(it.h)) return false;
-  if (!withPayload) return true;
-  return (
-    typeof it.iv === 'string' &&
-    B64_RE.test(it.iv) &&
-    it.iv.length === 16 &&
-    typeof it.ct === 'string' &&
-    B64_RE.test(it.ct) &&
-    it.ct.length > 0 &&
-    it.ct.length <= LIMITS.ctMaxChars
-  );
+  if (!it || typeof it !== 'object' || !validVersion(it, now)) return false;
+  return !withPayload || validPayload(it);
+}
+
+/**
+ * Estado del límite de intentos de una red tras un fallo más. La cuenta
+ * empieza de nuevo si no había, si la ventana pasó o si un bloqueo ya venció;
+ * al llegar a `maxFails` la red queda bloqueada `blockMs`.
+ * @param {{first?: number, fails?: number, until?: number} | null} cur
+ * @param {number} t
+ * @param {{maxFails: number, windowMs: number, blockMs: number}} limit
+ */
+function afterFailure(cur, t, limit) {
+  const fresh = !cur?.first || t - cur.first > limit.windowMs || Boolean(cur.until && cur.until <= t);
+  const fails = (fresh ? 0 : cur?.fails || 0) + 1;
+  return { first: fresh ? t : /** @type {number} */ (cur?.first), fails, until: fails >= limit.maxFails ? t + limit.blockMs : 0 };
 }
 
 /**
@@ -301,9 +328,7 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     const t = now();
     const cur = /** @type {{first?: number, fails?: number, until?: number} | null} */ (await store.get(key, { type: 'json' }));
     if (cur?.until && cur.until > t) return cur.until - t;
-    const fresh = !cur?.first || t - cur.first > authLimit.windowMs || (cur.until && cur.until <= t);
-    const next = { first: fresh ? t : /** @type {number} */ (cur?.first), fails: (fresh ? 0 : cur?.fails || 0) + 1, until: 0 };
-    if (next.fails >= authLimit.maxFails) next.until = t + authLimit.blockMs;
+    const next = afterFailure(cur, t, authLimit);
     await store.setJSON(key, next);
     return next.until ? next.until - t : 0;
   }

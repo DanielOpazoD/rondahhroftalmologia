@@ -99,6 +99,8 @@ export function patientFields(f = {}) {
  */
 export function normalizePatient(raw) {
   if (!raw || typeof raw !== 'object' || !isValidId(raw.id) || !raw.id.startsWith('p_')) return null;
+  // Datos que vienen de respaldos o de la sincronización: `f` puede no ser un objeto.
+  const f = raw.f && typeof raw.f === 'object' ? raw.f : {};
   /** @type {Paciente} */
   const p = {
     // Campos que agregue una versión más nueva se conservan (ver core/compat.js).
@@ -108,13 +110,13 @@ export function normalizePatient(raw) {
     v: Math.max(PATIENT_SCHEMA, Number(raw.v) || 0),
     created: Number(raw.created) || Number(raw.updated) || 0,
     updated: Number(raw.updated) || 0,
-    f: { ...unknownTextFields(raw.f), ...patientFields(raw.f) },
+    f: { ...unknownTextFields(f), ...patientFields(f) },
     checks: {},
     proc: {},
   };
   delete p.f[MERGED_FIELD];
   delete p.f[DELETED_FIELD];
-  Object.assign(p.f, systemMarks(raw.f, raw.id));
+  Object.assign(p.f, systemMarks(f, raw.id));
   if (raw.ft && typeof raw.ft === 'object') p.ft = fieldTimes(raw.ft);
   return p;
 }

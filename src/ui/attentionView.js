@@ -252,13 +252,36 @@ export function syncAttentionView(ctx) {
 }
 
 /**
+ * Atención nueva de un paciente (mismo RUT o nombre) que ya tiene una ese
+ * día; null si la abierta ya está guardada o aún no identifica al paciente.
+ * @param {AppContext} ctx
+ */
+function duplicateOf(ctx) {
+  const f = ctx.rec.f;
+  const identified = f.paciente_rut?.trim() || f.paciente_nombre?.trim();
+  return !ctx.rec.id && identified ? findDuplicate(editingOf(ctx), ctx.records) : null;
+}
+
+/**
+ * Estado de guardado para la barra. Con guardado automático, «sin guardar»
+ * solo dura la pausa al escribir, salvo que algo lo impida.
+ * @param {AppContext} ctx
+ * @param {boolean} dup ¿hay otra atención del paciente ese día?
+ */
+function saveState(ctx, dup) {
+  if (!ctx.dirty) return ctx.rec.id ? 'Guardada' : 'Sin datos';
+  const blocking = validateRecord(editingOf(ctx)).errors[0];
+  if (blocking) return `Sin guardar · ${blocking}`;
+  return dup ? 'Sin guardar · continúa en la atención existente' : 'Guardando…';
+}
+
+/**
  * Título y estado de la barra superior: a quién se atiende y si hay cambios sin guardar.
  * @param {AppContext} ctx
  */
 export function renderToolbar(ctx) {
   const f = ctx.rec.f;
-  // Atención nueva de un paciente (mismo RUT o nombre) que ya tiene una ese día.
-  const dup = !ctx.rec.id && (f.paciente_rut?.trim() || f.paciente_nombre?.trim()) ? findDuplicate(editingOf(ctx), ctx.records) : null;
+  const dup = duplicateOf(ctx);
   $('#dupBanner').hidden = !dup;
   if (dup) {
     $('#dupBanner').dataset.id = dup.id;
@@ -266,14 +289,8 @@ export function renderToolbar(ctx) {
       `${dup.f.paciente_nombre || dup.f.paciente_rut} ya tiene una atención este día (en este u otro equipo). Continúa en ella para no duplicar: lo que escribiste se agrega.`;
   }
   $('#tbName').textContent = f.paciente_nombre?.trim() || (ctx.rec.id ? '(sin nombre)' : 'Nueva atención');
-  // Con guardado automático, «sin guardar» solo dura la pausa al escribir, salvo que algo lo impida.
-  let state = ctx.rec.id ? 'Guardada' : 'Sin datos';
-  if (ctx.dirty) {
-    const blocking = validateRecord(editingOf(ctx)).errors[0];
-    state = blocking ? `Sin guardar · ${blocking}` : dup ? 'Sin guardar · continúa en la atención existente' : 'Guardando…';
-  }
   const el = $('#tbState');
-  el.textContent = state;
+  el.textContent = saveState(ctx, Boolean(dup));
   el.className = ctx.dirty ? 'dirty' : ctx.rec.id ? 'saved' : '';
 }
 

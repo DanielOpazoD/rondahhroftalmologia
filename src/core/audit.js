@@ -18,6 +18,15 @@ const CHECK_LABELS = Object.fromEntries([
   ...DIAGNOSTICOS.map((d) => [d.key, 'Dx ' + d.label]),
 ]);
 
+/** Etiqueta de un campo de formulario clínico. @param {RegExpExecArray} form */
+function clinicalFormLabel(form) {
+  const title = form[1] === 'ges' ? 'GES' : form[1] === 'ipd' ? 'IPD' : 'Receta de lentes';
+  const key = form[2];
+  const label =
+    /** @type {Record<string, string>} */ (ETIQUETAS)[key] || key.replaceAll('_', ' ').replace(/\b(od|oi|dp)\b/g, (s) => s.toUpperCase());
+  return `${title} · ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+}
+
 /**
  * Nombre legible de una ruta de campo.
  * @param {string} path p. ej. 'f.od_pio', 'checks.diagnostico_rdp', 'proc.t_aplan.od'
@@ -25,13 +34,7 @@ const CHECK_LABELS = Object.fromEntries([
  */
 export function auditLabel(path, procs = []) {
   const form = /^f\.form_(ges|ipd|receta)_(.+)$/.exec(path);
-  if (form) {
-    const title = form[1] === 'ges' ? 'GES' : form[1] === 'ipd' ? 'IPD' : 'Receta de lentes';
-    const key = form[2];
-    const label =
-      /** @type {Record<string, string>} */ (ETIQUETAS)[key] || key.replaceAll('_', ' ').replace(/\b(od|oi|dp)\b/g, (s) => s.toUpperCase());
-    return `${title} · ${label.charAt(0).toUpperCase() + label.slice(1)}`;
-  }
+  if (form) return clinicalFormLabel(form);
   if (path.startsWith('f.')) return /** @type {Record<string, string>} */ (ETIQUETAS)[path.slice(2)] || path.slice(2);
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';
@@ -124,18 +127,38 @@ export const COALESCE_MS = 10 * 60_000;
  */
 export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
   const last = entries.at(-1);
-  const sameHand =
-    last &&
+  if (!last || !continuesEdit(last, entry, coalesceMs)) return [...entries, entry];
+  return [...entries.slice(0, -1), { ...last, hasta: entry.at, cambios: combineChanges(last.cambios, entry.cambios) }];
+}
+
+/**
+ * ¿`entry` sigue la edición de `last`? Ambas ediciones, de la misma persona y
+ * equipo, y a menos de `coalesceMs` de la anterior.
+ * @param {import('../domain').AuditEntry} last
+ * @param {import('../domain').AuditEntry} entry
+ * @param {number} coalesceMs
+ */
+function continuesEdit(last, entry, coalesceMs) {
+  return (
     entry.tipo === 'editada' &&
     last.tipo === 'editada' &&
     last.equipoId === entry.equipoId &&
     (last.autorId || '') === (entry.autorId || '') &&
     entry.at >= last.at &&
-    entry.at - (last.hasta || last.at) <= coalesceMs;
-  if (!last || !sameHand) return [...entries, entry];
+    entry.at - (last.hasta || last.at) <= coalesceMs
+  );
+}
+
+/**
+ * Cambios juntados: cada campo conserva su valor de antes (`a`) y toma el
+ * nuevo (`d`). Un campo que volvió a su valor original ya no es un cambio.
+ * @param {import('../domain').AuditChange[]} before
+ * @param {import('../domain').AuditChange[]} after
+ */
+function combineChanges(before, after) {
   /** @type {Map<string, import('../domain').AuditChange>} */
-  const byField = new Map(last.cambios.map((c) => [c.c, { ...c }]));
-  for (const c of entry.cambios) {
+  const byField = new Map(before.map((c) => [c.c, { ...c }]));
+  for (const c of after) {
     const prev = byField.get(c.c);
     if (!prev) {
       byField.set(c.c, { ...c });
@@ -144,9 +167,7 @@ export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
     if ('d' in c) prev.d = c.d;
     else delete prev.d;
   }
-  // Un campo que volvió a su valor original ya no es un cambio.
-  const cambios = [...byField.values()].filter((c) => c.a !== c.d).sort((x, y) => (x.c < y.c ? -1 : x.c > y.c ? 1 : 0));
-  return [...entries.slice(0, -1), { ...last, hasta: entry.at, cambios }];
+  return [...byField.values()].filter((c) => c.a !== c.d).sort((x, y) => (x.c < y.c ? -1 : x.c > y.c ? 1 : 0));
 }
 
 /** Hasta cuándo cubre una entrada (si se fue juntando, su última edición). @param {import('../domain').AuditEntry} e */

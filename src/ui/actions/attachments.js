@@ -20,6 +20,29 @@ import { uiConfirm, uiAlert } from '../modal.js';
 import { prepareImage, makeThumbnail } from '../images.js';
 
 /** @typedef {import('../../domain').Adjunto} Adjunto */
+/** @typedef {{bytes: Uint8Array, tipo: string, nombre: string, comprimida: boolean}} Preparado archivo listo para guardar */
+
+/** ¿Es una imagen (según su tipo o nombre)? @param {string} tipo @param {string} nombre */
+const isImage = (tipo, nombre) => kindOf(tipo, nombre).startsWith('imagen');
+
+/**
+ * Lee un archivo para adjuntarlo: las fotos se reducen; el resto queda igual.
+ * @param {File} file
+ * @returns {Promise<Preparado>}
+ */
+async function prepareFile(file) {
+  if (isImage(file.type, file.name)) return prepareImage(file);
+  return { bytes: new Uint8Array(await file.arrayBuffer()), tipo: file.type, nombre: file.name, comprimida: false };
+}
+
+/**
+ * Miniatura para guardar con los metadatos (solo imágenes; si no, null).
+ * @param {Preparado} prepared
+ */
+async function thumbnailOf(prepared) {
+  if (!isImage(prepared.tipo, prepared.nombre)) return null;
+  return makeThumbnail(prepared.bytes, cleanType(prepared.tipo), THUMB_MAX_CHARS);
+}
 
 /**
  * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
@@ -39,6 +62,19 @@ export function attachmentActions(ctx, store) {
     store.addAuditEntry(atencionId, entry);
   };
 
+  /**
+   * Guarda la atención abierta si aún no lo está o tiene cambios (adjuntar
+   * necesita su id). Si no se pudo guardar, avisa.
+   * @returns {Promise<boolean>} true si la atención quedó guardada
+   */
+  const ensureSaved = async () => {
+    if (ctx.rec.id && !ctx.dirty) return true;
+    const saved = await ctx.save({ auto: true });
+    if (saved || ctx.rec.id) return true;
+    toast('Para adjuntar, escribe primero el nombre o RUT del paciente.', 4000);
+    return false;
+  };
+
   return {
     /**
      * Adjunta archivos a la atención abierta. Si aún no está guardada, la
@@ -51,27 +87,17 @@ export function attachmentActions(ctx, store) {
         uiAlert({ title: 'Adjuntos no disponibles', message: 'Este navegador no permite guardar archivos (sin IndexedDB).', tone: 'warn' });
         return;
       }
-      if (!ctx.rec.id || ctx.dirty) {
-        const saved = await ctx.save({ auto: true });
-        if (!saved && !ctx.rec.id) {
-          toast('Para adjuntar, escribe primero el nombre o RUT del paciente.', 4000);
-          return;
-        }
-      }
+      if (!(await ensureSaved())) return;
       const atencionId = ctx.rec.id;
       let added = 0;
       for (const file of files) {
-        const prepared = kindOf(file.type, file.name).startsWith('imagen')
-          ? await prepareImage(file)
-          : { bytes: new Uint8Array(await file.arrayBuffer()), tipo: file.type, nombre: file.name, comprimida: false };
+        const prepared = await prepareFile(file);
         const problem = addProblem(store.loadAttachments(atencionId), prepared.bytes.length);
         if (problem) {
           uiAlert({ title: `No se adjuntó «${safeFileName(file.name)}»`, message: problem, tone: 'warn' });
           continue;
         }
-        const miniatura = kindOf(prepared.tipo, prepared.nombre).startsWith('imagen')
-          ? await makeThumbnail(prepared.bytes, cleanType(prepared.tipo), THUMB_MAX_CHARS)
-          : null;
+        const miniatura = await thumbnailOf(prepared);
         const now = clock.tick();
         const meta = normalizeAttachment({
           ...(miniatura ? { miniatura } : {}),

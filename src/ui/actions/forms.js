@@ -49,7 +49,11 @@ export function formActions(ctx, store) {
       ctx.showTab('t-at');
       return true;
     }
-    if (ctx.dirty) await ctx.save({ auto: true });
+    if (ctx.dirty && !(await ctx.save({ auto: true }))) {
+      ctx.showTab('t-at');
+      toast('Guarda o corrige la atención actual antes de abrir los formularios de otro paciente.', 4000);
+      return false;
+    }
     if (!canContinue(userId)) return false;
     const patientId = ctx.openPatientId;
     const selected = attentionsOf(ctx.records, patientId)[0];

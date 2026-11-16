@@ -72,6 +72,19 @@ function invalidRutError(data) {
   return null;
 }
 
+/**
+ * El representante es opcional, pero si se anotó algún dato suyo, exige nombre y RUT.
+ * @param {DatosGes} data @returns {string | null}
+ */
+function representanteError(data) {
+  const anotado =
+    data.representante_nombre.trim() || data.representante_rut.trim() || data.representante_fono.trim() || data.representante_correo.trim();
+  if (anotado && (!data.representante_nombre.trim() || !data.representante_rut.trim())) {
+    return 'Completa el nombre y RUT del representante.';
+  }
+  return null;
+}
+
 /** @param {DatosGes} data @returns {string | null} */
 export function validateGes(data) {
   if (!data.paciente_nombre.trim() || !data.paciente_rut.trim()) return 'Completa el nombre y RUT del paciente.';
@@ -81,15 +94,7 @@ export function validateGes(data) {
   if (!GES_PATOLOGIAS.includes(data.patologia)) return 'Selecciona una patología GES de la lista.';
   if (!['fonasa', 'isapre'].includes(data.prevision)) return 'Selecciona la previsión del paciente.';
   if (!fmtDate(data.fecha) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.hora)) return 'Revisa la fecha y hora de notificación.';
-  if (
-    data.representante_nombre.trim() ||
-    data.representante_rut.trim() ||
-    data.representante_fono.trim() ||
-    data.representante_correo.trim()
-  ) {
-    if (!data.representante_nombre.trim() || !data.representante_rut.trim()) return 'Completa el nombre y RUT del representante.';
-  }
-  return null;
+  return representanteError(data);
 }
 
 /** @param {DatosGes} data */

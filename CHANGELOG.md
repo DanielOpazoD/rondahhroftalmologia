@@ -1,12 +1,25 @@
 # Cambios
 
-## 2.25.0 — 2026-11-16
+## 2.26.0 — 2026-11-16
 
 ### Nuevo
 - **Botón circular de formularios**, fijo abajo a la derecha: abre Constancia GES, IPD y Receta para lentes para el paciente de la atención. En celular se ubica sobre la navegación.
 - **Guardado automático por atención** de los tres formularios: al cerrar, recargar o volver al paciente se recuperan los datos. Otro paciente y una atención nueva empiezan con sus propios valores. También se conservan los campos borrados expresamente.
 - Los borradores viajan en respaldos y sincronización con fechas por campo, sin reemplazar datos demográficos ni perfiles profesionales. El esquema v6 conserva los datos anteriores y protege los formularios frente a versiones antiguas.
 
+
+## 2.25.0 — 2026-11-16
+
+### Correcciones (encontradas al probar ramas sin cubrir)
+- Si la activación de cuentas se interrumpía a medias, ahora se puede reintentar (antes respondía «ya existe una cuenta con ese RUT» para siempre).
+- «Cambiar mi clave» ya no acepta como nueva la misma clave actual.
+- Una ficha de paciente dañada (sin datos como objeto) en un respaldo o en la sincronización ya no rompe la carga: se limpia.
+- Una solicitud demasiado grande al servidor de cuentas responde 413 en vez de un error interno.
+
+### Cimientos (docs/CALIDAD.md)
+- **Complejidad máxima 15** (antes 18): ninguna función de `src/` ni de `scripts/` pasa de 15. `npm run calidad` muestra la próxima meta (funciones sobre 10).
+- **Cobertura de ramas 87 % → 91 %**: 81 pruebas nuevas del servidor de cuentas, la sesión, las fichas y la bitácora (acceso por rol, clave inicial, bloqueos por intentos, sesiones adulteradas, validación de cada acción). El mínimo exigido sube a 91 %.
+- Sin código repetido entre especialidades en la seudonimización.
 
 ## 2.24.0 — 2026-11-16
 

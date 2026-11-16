@@ -35,11 +35,12 @@ const present = (v) => v !== undefined && v !== null && v !== '';
 export function flatten(rec) {
   /** @type {Map<string, ValorRuta>} */
   const m = new Map();
-  for (const [k, v] of Object.entries(rec?.f || {})) if (isSafeKey(k) && present(v)) m.set('f.' + k, String(v));
-  for (const [k, v] of Object.entries(rec?.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
-  if (rec?.cat) m.set('cat', String(rec.cat));
-  if (rec?.pacienteId) m.set('pacienteId', String(rec.pacienteId));
-  flattenProc(m, rec?.proc);
+  if (!rec) return m;
+  for (const [k, v] of Object.entries(rec.f || {})) if (isSafeKey(k) && present(v)) m.set('f.' + k, String(v));
+  for (const [k, v] of Object.entries(rec.checks || {})) if (isSafeKey(k) && v) m.set('checks.' + k, true);
+  if (rec.cat) m.set('cat', String(rec.cat));
+  if (rec.pacienteId) m.set('pacienteId', String(rec.pacienteId));
+  flattenProc(m, rec.proc);
   return m;
 }
 

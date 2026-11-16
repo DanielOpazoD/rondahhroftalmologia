@@ -178,6 +178,45 @@ export function renderRegistry(ctx) {
 }
 
 /**
+ * Marca de validez del RUT junto al dato ('' si no hay RUT).
+ * @param {string} rut
+ */
+function rutMark(rut) {
+  if (!rut) return '';
+  return isValidRut(rut)
+    ? html` <span class="rutmark inline ok" title="RUT válido">✓</span>`
+    : html` <span class="rutmark inline bad" title="RUT inválido">✗</span>`;
+}
+
+/**
+ * Datos de la ficha que se conocen (RUT, nacimiento, edad, sexo, fono).
+ * @param {Paciente} p
+ * @param {ReturnType<typeof ageNow>} age
+ */
+function patientMeta(p, age) {
+  const f = p.f;
+  return [
+    f.paciente_rut && html`RUT ${f.paciente_rut}${rutMark(f.paciente_rut)}`,
+    f.paciente_fnac && html`Nac. ${fmtDate(f.paciente_fnac)}`,
+    age !== '' && age != null && html`${String(age)} años`,
+    sexLabel(f.paciente_sexo) && html`${sexLabel(f.paciente_sexo)}`,
+    f.paciente_fono && html`Fono ${f.paciente_fono}`,
+  ].filter(Boolean);
+}
+
+/**
+ * Resumen de las atenciones de la ficha («3 atenciones de … · desde …»); '' si no tiene.
+ * @param {AtencionGuardada[]} recs de la más reciente a la más antigua
+ * @param {string} especialidad nombre de la especialidad activa
+ */
+function patientSummary(recs, especialidad) {
+  if (!recs.length) return '';
+  const first = recs[recs.length - 1].f.fecha_atencion;
+  const since = first ? ` · desde ${fmtDate(first)}` : '';
+  return `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'} de ${especialidad}${since}`;
+}
+
+/**
  * Ficha abierta y sus atenciones.
  * @param {AppContext} ctx
  * @param {string} id ficha abierta
@@ -186,24 +225,8 @@ export function renderRegistry(ctx) {
 function renderPatient(ctx, id, recs) {
   const p = ctx.store.getPatient(id);
   if (!p) return showPatient(ctx, null);
-  const f = p.f;
-  const age = ageNow(p, recs[0]?.f.paciente_edad);
-  const rutMark = f.paciente_rut
-    ? isValidRut(f.paciente_rut)
-      ? html` <span class="rutmark inline ok" title="RUT válido">✓</span>`
-      : html` <span class="rutmark inline bad" title="RUT inválido">✗</span>`
-    : '';
-  const meta = [
-    f.paciente_rut && html`RUT ${f.paciente_rut}${rutMark}`,
-    f.paciente_fnac && html`Nac. ${fmtDate(f.paciente_fnac)}`,
-    age !== '' && age != null && html`${String(age)} años`,
-    sexLabel(f.paciente_sexo) && html`${sexLabel(f.paciente_sexo)}`,
-    f.paciente_fono && html`Fono ${f.paciente_fono}`,
-  ].filter(Boolean);
-  const first = recs.length ? recs[recs.length - 1].f.fecha_atencion : '';
-  const summary = recs.length
-    ? `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'} de ${ctx.especialidadNombre}${first ? ` · desde ${fmtDate(first)}` : ''}`
-    : '';
+  const meta = patientMeta(p, ageNow(p, recs[0]?.f.paciente_edad));
+  const summary = patientSummary(recs, ctx.especialidadNombre);
   setHtml(
     $('#patCardInfo'),
     html`<h2>${patientLabel(p)}</h2><div class="patmeta">${join(meta, ' · ')}</div>${summary ? html`<div class="patsum">${summary}</div>` : ''}`,
