@@ -25,7 +25,7 @@ npm run check
 
 1. ESLint, para detectar errores de lógica y reglas de capas;
 2. Prettier, para el formato;
-3. `tsc --checkJs`, que revisa los tipos declarados en JSDoc en **modo estricto en todo `src/`** (`jsconfig.json`: sin `any` implícito, nulos revisados, `this`, firmas de funciones). El modelo de dominio tipado está en `src/domain.d.ts`;
+3. `tsc --checkJs`, que revisa los tipos declarados en JSDoc en **modo estricto en todo el código** (`jsconfig.json`: sin `any` implícito, nulos revisados, `this`, firmas de funciones). La app usa `jsconfig.json`; los scripts y las funciones de Netlify, `jsconfig.node.json`; el service worker, `jsconfig.sw.json`. El modelo de dominio tipado está en `src/domain.d.ts`;
 4. las pruebas;
 5. el build.
 

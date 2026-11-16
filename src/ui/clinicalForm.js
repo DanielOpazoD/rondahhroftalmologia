@@ -204,6 +204,27 @@ export async function openClinicalForm(ctx, opts) {
     };
     form.addEventListener('input', edited);
     form.addEventListener('change', edited);
+    /**
+     * Entrega el PDF generado: vista previa para imprimir o descarga.
+     * @param {Uint8Array} bytes
+     * @param {T} values
+     * @param {HTMLElement | null} submitter botón con que se envió el formulario
+     */
+    const deliver = async (bytes, values, submitter) => {
+      if (opts.id) ctx.accounts?.event('atencion.pdf', opts.id);
+      if (submitter instanceof HTMLButtonElement && submitter.value === 'print') {
+        preview = previewPdf(bytes, opts.filename(values));
+        await preview.closed;
+      } else {
+        download(bytes, opts.filename(values), 'application/pdf');
+        toast(`${opts.title}: PDF descargado`);
+        dismiss();
+      }
+    };
+    /** Muestra por qué no se generó el PDF (si el formulario sigue abierto). @param {unknown} error */
+    const showBuildError = (error) => {
+      if (active) err.textContent = error instanceof Error ? error.message : 'No se pudo generar el PDF.';
+    };
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!sessionValid()) return dismiss();
@@ -232,17 +253,9 @@ export async function openClinicalForm(ctx, opts) {
           err.textContent = 'Los datos cambiaron. Revísalos y vuelve a generar el PDF.';
           return;
         }
-        if (opts.id) ctx.accounts?.event('atencion.pdf', opts.id);
-        if (e.submitter instanceof HTMLButtonElement && e.submitter.value === 'print') {
-          preview = previewPdf(bytes, opts.filename(values));
-          await preview.closed;
-        } else {
-          download(bytes, opts.filename(values), 'application/pdf');
-          toast(`${opts.title}: PDF descargado`);
-          dismiss();
-        }
+        await deliver(bytes, values, e.submitter);
       } catch (error) {
-        if (active) err.textContent = error instanceof Error ? error.message : 'No se pudo generar el PDF.';
+        showBuildError(error);
       } finally {
         building = false;
         controls.forEach((el, i) => {

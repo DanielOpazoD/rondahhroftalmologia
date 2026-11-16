@@ -44,6 +44,43 @@ async function annexFrom(m, bytes) {
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function outputActions(ctx, store) {
+  /**
+   * Descarga la hoja sola y avisa (con las secciones que pasaron a la hoja complementaria).
+   * @param {import('../../domain').Atencion} rec
+   * @param {{bytes: Uint8Array, overflow: string[]}} r PDF de la hoja
+   */
+  function downloadSheet(rec, r) {
+    download(r.bytes, pdfFileName(rec), 'application/pdf');
+    if (rec.id) ctx.accounts?.event('atencion.pdf', rec.id);
+    toast(
+      r.overflow.length ? `PDF descargado (con hoja complementaria: ${r.overflow.join(', ')})` : 'PDF descargado',
+      r.overflow.length ? 4000 : 2200,
+    );
+  }
+
+  /**
+   * Descarga la hoja seguida de los adjuntos en un solo PDF y avisa qué quedó
+   * incrustado o aún no llega a este equipo.
+   * @param {import('../../domain').Atencion} rec
+   * @param {Uint8Array} sheet PDF de la hoja
+   * @param {ReturnType<typeof store.loadAttachments>} metas adjuntos de la atención
+   */
+  async function downloadWithAnnexes(rec, sheet, metas) {
+    const anexos = [];
+    for (const m of metas) {
+      const data = await store.loadAttachmentData(m.id);
+      anexos.push(await annexFrom(m, data?.bytes || null));
+    }
+    const out = await appendAnnexes(sheet, anexos);
+    download(out.bytes, pdfFileName(rec).replace(/\.pdf$/i, '_con_anexos.pdf'), 'application/pdf');
+    if (rec.id) ctx.accounts?.event('atencion.pdf', rec.id, { n: metas.length });
+    const notes = [
+      out.incrustados.length && `${out.incrustados.length} dentro del PDF (panel de adjuntos)`,
+      out.faltantes.length && `${out.faltantes.length} aún no llegan a este equipo`,
+    ].filter(Boolean);
+    toast(`PDF con anexos descargado${notes.length ? ` · ${notes.join(' · ')}` : ''}`, notes.length ? 5000 : 2500);
+  }
+
   return {
     /**
      * Descarga el PDF de la atención: un menú junto al botón ofrece «PDF»
@@ -74,28 +111,8 @@ export function outputActions(ctx, store) {
       const withAnnexes = choice === 'anexos';
       return withBusy(button, async () => {
         const r = await buildAttentionPdf(ctx.templateBytes(), rec, ctx.procs, ctx.pdfOptions());
-        if (!withAnnexes) {
-          download(r.bytes, pdfFileName(rec), 'application/pdf');
-          if (rec.id) ctx.accounts?.event('atencion.pdf', rec.id);
-          toast(
-            r.overflow.length ? `PDF descargado (con hoja complementaria: ${r.overflow.join(', ')})` : 'PDF descargado',
-            r.overflow.length ? 4000 : 2200,
-          );
-          return;
-        }
-        const anexos = [];
-        for (const m of metas) {
-          const data = await store.loadAttachmentData(m.id);
-          anexos.push(await annexFrom(m, data?.bytes || null));
-        }
-        const out = await appendAnnexes(r.bytes, anexos);
-        download(out.bytes, pdfFileName(rec).replace(/\.pdf$/i, '_con_anexos.pdf'), 'application/pdf');
-        if (rec.id) ctx.accounts?.event('atencion.pdf', rec.id, { n: metas.length });
-        const notes = [
-          out.incrustados.length && `${out.incrustados.length} dentro del PDF (panel de adjuntos)`,
-          out.faltantes.length && `${out.faltantes.length} aún no llegan a este equipo`,
-        ].filter(Boolean);
-        toast(`PDF con anexos descargado${notes.length ? ` · ${notes.join(' · ')}` : ''}`, notes.length ? 5000 : 2500);
+        if (withAnnexes) await downloadWithAnnexes(rec, r.bytes, metas);
+        else downloadSheet(rec, r);
       });
     },
 

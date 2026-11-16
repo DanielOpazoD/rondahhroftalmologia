@@ -58,17 +58,13 @@ export function makeMedico(m = {}, now = Date.now()) {
   if (!n) return null;
   const r = String(rut ?? '').trim() ? formatRut(rut) : '';
   const mid = isValidId(id) ? id : medicoId(n, r);
-  // Sin rol (perfiles anteriores a los roles) = médico. Un rol que esta versión
-  // no conoce (agregado por una versión más nueva) se conserva tal cual, y NO
-  // se trata como médico.
-  const role = rol === undefined || rol === null || rol === '' ? 'medico' : isRoleKey(rol) ? rol : 'otro';
   return {
     ...unknownFields(m, MEDICO_FIELDS),
     id: mid,
     nombre: n,
     ...nameParts(m),
     rut: r,
-    rol: role,
+    rol: profileRole(rol),
     created: created || now,
     updated: updated || now,
   };
@@ -77,6 +73,18 @@ const MEDICO_FIELDS = ['id', 'nombre', 'rut', 'rol', 'created', 'updated'];
 /** Clave de rol con forma válida (conocida o de una versión más nueva). */
 /** @type {(r: unknown) => r is string} */
 const isRoleKey = (r) => typeof r === 'string' && /^[a-z][a-z0-9_-]{0,31}$/.test(r);
+
+/**
+ * Rol de un perfil. Sin rol (perfiles anteriores a los roles) = médico. Un rol
+ * que esta versión no conoce (agregado por una versión más nueva) se conserva
+ * tal cual, y NO se trata como médico.
+ * @param {unknown} rol
+ * @returns {string}
+ */
+function profileRole(rol) {
+  if (rol === undefined || rol === null || rol === '') return 'medico';
+  return isRoleKey(rol) ? rol : 'otro';
+}
 
 /** Etiqueta del rol de un perfil. */
 /** @param {string | null | undefined} rol */

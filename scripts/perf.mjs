@@ -61,35 +61,38 @@ export async function dataset() {
     const day = 1 + Math.floor(r() * 27);
     const month = 1 + Math.floor(r() * 12);
     const t = Date.UTC(2026, month - 1, day, 12) + i;
-    return normalizeRecord({
-      id: 'a' + i.toString(36).padStart(6, '0'),
-      created: t,
-      updated: t,
-      f: {
-        operativo: `Operativo ${month}/2026`,
-        fecha_atencion: `2026-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-        paciente_rut: p.rut,
-        paciente_apellido_paterno: p.paterno,
-        paciente_apellido_materno: p.materno,
-        paciente_nombres: p.nombres,
-        paciente_nombre: `${p.paterno} ${p.materno} ${p.nombres}`,
-        paciente_fnac: p.fnac,
-        paciente_sexo: p.sexo,
-        od_av: pick(['20/20', '20/40', '20/80', 'CD']),
-        oi_av: pick(['20/25', '20/30', '20/60']),
-        od_hallazgos: r() < 0.4 ? 'Catarata nuclear N2' : '',
-        plan: r() < 0.5 ? 'Control en 3 meses' : '',
-        medico_nombre: 'Dra. Ejemplo',
-      },
-      checks: Object.fromEntries(dx.filter(() => r() < 0.3).map((k) => [k, true])),
-      proc:
-        r() < 0.6
-          ? {
-              t_aplan: { eye: 'AO', od: String(10 + Math.floor(r() * 20)), oi: String(10 + Math.floor(r() * 20)) },
-              fo: { eye: 'AO', desc_od: 'Papila normal' },
-            }
-          : {},
-    });
+    // Tiene id, así que es una atención guardada.
+    return /** @type {import('../src/domain').AtencionGuardada} */ (
+      normalizeRecord({
+        id: 'a' + i.toString(36).padStart(6, '0'),
+        created: t,
+        updated: t,
+        f: {
+          operativo: `Operativo ${month}/2026`,
+          fecha_atencion: `2026-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+          paciente_rut: p.rut,
+          paciente_apellido_paterno: p.paterno,
+          paciente_apellido_materno: p.materno,
+          paciente_nombres: p.nombres,
+          paciente_nombre: `${p.paterno} ${p.materno} ${p.nombres}`,
+          paciente_fnac: p.fnac,
+          paciente_sexo: p.sexo,
+          od_av: pick(['20/20', '20/40', '20/80', 'CD']),
+          oi_av: pick(['20/25', '20/30', '20/60']),
+          od_hallazgos: r() < 0.4 ? 'Catarata nuclear N2' : '',
+          plan: r() < 0.5 ? 'Control en 3 meses' : '',
+          medico_nombre: 'Dra. Ejemplo',
+        },
+        checks: Object.fromEntries(dx.filter(() => r() < 0.3).map((k) => [k, true])),
+        proc:
+          r() < 0.6
+            ? {
+                t_aplan: { eye: 'AO', od: String(10 + Math.floor(r() * 20)), oi: String(10 + Math.floor(r() * 20)) },
+                fo: { eye: 'AO', desc_od: 'Papila normal' },
+              }
+            : {},
+      })
+    );
   });
   return { records, procs: DEFAULT_PROCS };
 }

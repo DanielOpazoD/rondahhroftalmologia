@@ -138,7 +138,21 @@ export async function backupAttachments({ source, target, now = Date.now(), keep
       copiadas++;
     }
   }
-  // Huérfanas: respaldadas pero ya no en el servidor. Se anota desde cuándo y se borran pasado el plazo.
+  const borradas = await pruneOrphans(target, saved, liveSet, now, keepDays);
+  return { copiadas, pendientes: missing.length - copiadas, borradas };
+}
+
+/**
+ * Huérfanas: partes respaldadas pero ya no en el servidor. Se anota desde
+ * cuándo y se borran pasados `keepDays` días.
+ * @param {BlobStore} target almacén de respaldos
+ * @param {Set<string>} saved partes respaldadas
+ * @param {Set<string>} liveSet partes que hay en el servidor
+ * @param {number} now
+ * @param {number} keepDays
+ * @returns {Promise<number>} cuántas se borraron
+ */
+async function pruneOrphans(target, saved, liveSet, now, keepDays) {
   /** @type {Record<string, string>} */
   const orphans = (await target.get(ORPHANS, { type: 'json' })) || {};
   const today = dayOf(now);
@@ -157,7 +171,7 @@ export async function backupAttachments({ source, target, now = Date.now(), keep
     }
   }
   await target.setJSON(ORPHANS, orphans);
-  return { copiadas, pendientes: missing.length - copiadas, borradas };
+  return borradas;
 }
 
 /**

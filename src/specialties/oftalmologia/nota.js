@@ -22,6 +22,15 @@ function patientLine(f) {
     .join(' | ');
 }
 
+/** Título de la nota, con el operativo si lo hay. @param {Record<string, string>} f */
+const titleLine = (f) => 'ATENCIÓN OFTALMOLÓGICA – RONDAS Y OPERATIVOS' + (t(f.operativo) ? ` (${t(f.operativo)})` : '');
+
+/** Un texto libre como líneas de una sección (ninguna si está vacío). @param {string | undefined} v */
+const textLines = (v) => (t(v) ? [t(v)] : []);
+
+/** Firma: nombre del médico y su RUT si lo hay. @param {Record<string, string>} f */
+const signature = (f) => doctorName(f.medico_nombre) + (t(f.medico_rut) ? ' – RUT ' + t(f.medico_rut) : '');
+
 /**
  * @param {import('../../domain').Atencion} rec registro de atención
  * @param {import('./config.js').ProcDef[]} procs lista de procedimientos
@@ -42,13 +51,13 @@ export function buildNote(rec, procs, opts = {}) {
   };
   const bullets = (/** @type {string[]} */ xs) => xs.map((x) => '- ' + x);
 
-  L.push('ATENCIÓN OFTALMOLÓGICA – RONDAS Y OPERATIVOS' + (t(f.operativo) ? ` (${t(f.operativo)})` : ''));
+  L.push(titleLine(f));
   add('Fecha: ', fmtDate(f.fecha_atencion));
   add('Paciente: ', patientLine(f));
 
   const ant = antecedentsList(rec);
   L.push('', 'ANTECEDENTES: ' + (ant.length ? ant.join(', ') : 'No refiere'));
-  block('MOTIVO DE CONSULTA:', t(f.motivo_consulta) ? [t(f.motivo_consulta)] : []);
+  block('MOTIVO DE CONSULTA:', textLines(f.motivo_consulta));
 
   const exam = [
     ['OD: ', eyeSummary(rec, 'od', procs)],
@@ -67,13 +76,13 @@ export function buildNote(rec, procs, opts = {}) {
   const acc = actionsList(rec);
   if (acc.length) L.push(acc.join(' | '));
 
-  block('PLAN E INDICACIONES:', t(f.plan) ? [t(f.plan)] : []);
+  block('PLAN E INDICACIONES:', textLines(f.plan));
   if (t(f.seguimiento) || t(f.alta)) {
     L.push('');
     add('Seguimiento: ', f.seguimiento);
     add('Alta: ', f.alta);
   }
-  if (t(f.medico_nombre)) L.push('', doctorName(f.medico_nombre) + (t(f.medico_rut) ? ' – RUT ' + t(f.medico_rut) : ''));
+  if (t(f.medico_nombre)) L.push('', signature(f));
   if (opts.pie) L.push(opts.pie);
 
   return L.join('\n')

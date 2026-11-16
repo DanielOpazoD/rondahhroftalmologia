@@ -6,6 +6,28 @@
 import { SyncHttpError } from './client.js';
 
 /**
+ * Opciones de fetch (sin la señal): GET sin cuerpo, POST con JSON; con la sesión si la hay.
+ * @param {unknown} body
+ * @param {string | undefined} token
+ */
+const requestInit = (body, token) => ({
+  method: body === undefined ? 'GET' : 'POST',
+  headers: {
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+  },
+  body: body === undefined ? undefined : JSON.stringify(body),
+  cache: /** @type {const} */ ('no-store'),
+});
+
+/**
+ * Error de una respuesta no exitosa, con el mensaje y el código del servidor si los trae.
+ * @param {Response} res
+ * @param {{error?: string, code?: string}} data cuerpo de la respuesta
+ */
+const httpError = (res, data) => new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`, data.code || '');
+
+/**
  * @param {{baseUrl?: string, fetchFn?: typeof fetch, timeoutMs?: number}} [o]
  */
 export function createAccountsApi({ baseUrl = '/api/cuentas', fetchFn = globalThis.fetch?.bind(globalThis), timeoutMs = 15_000 } = {}) {
@@ -22,18 +44,9 @@ export function createAccountsApi({ baseUrl = '/api/cuentas', fetchFn = globalTh
       ctrl.abort();
     }, timeoutMs);
     try {
-      const res = await fetchFn(`${baseUrl}/${path}${query ? '?' + query : ''}`, {
-        method: body === undefined ? 'GET' : 'POST',
-        headers: {
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
-          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        cache: 'no-store',
-        signal: ctrl.signal,
-      });
+      const res = await fetchFn(`${baseUrl}/${path}${query ? '?' + query : ''}`, { ...requestInit(body, token), signal: ctrl.signal });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`, data.code || '');
+      if (!res.ok) throw httpError(res, data);
       return data;
     } catch (e) {
       if (e instanceof SyncHttpError) throw e;

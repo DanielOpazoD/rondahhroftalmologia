@@ -330,18 +330,20 @@ export async function buildAttentionPdf(templateBytes, rec, procs, opts = {}) {
   form.updateFieldAppearances(font);
   if (flatten) form.flatten();
 
+  const overflow = [...annex.map((a) => a[0]), ...(procsInAnnex ? ['Procedimientos realizados'] : [])];
   // La página 2 de la plantilla está en blanco: se reemplaza por la hoja complementaria si hace falta.
-  while (doc.getPageCount() > 1) doc.removePage(doc.getPageCount() - 1);
-  if (annex.length || procsInAnnex) drawAnnex(doc, { font, bold }, rec, procs, annex, procsInAnnex ? done : []);
+  keepFirstPage(doc);
+  if (overflow.length) drawAnnex(doc, { font, bold }, rec, procs, annex, procsInAnnex ? done : []);
   if (footer) drawFooters(doc, font, rec, now);
   setMetadata(doc, f, now);
 
   const bytes = await doc.save();
-  return {
-    bytes,
-    pages: doc.getPageCount(),
-    overflow: [...annex.map((a) => a[0]), ...(procsInAnnex ? ['Procedimientos realizados'] : [])],
-  };
+  return { bytes, pages: doc.getPageCount(), overflow };
+}
+
+/** Quita las páginas de la plantilla que siguen a la primera. @param {PDFDocument} doc */
+function keepFirstPage(doc) {
+  while (doc.getPageCount() > 1) doc.removePage(doc.getPageCount() - 1);
 }
 
 /* --------------------------------------------------- hoja complementaria */

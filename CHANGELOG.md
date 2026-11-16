@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.27.0 — 2026-11-16
+
+### Correcciones
+- **«¿Quién registra?» ya no se reemplaza a sí misma**: si el guardado automático llegaba mientras la pregunta estaba abierta (por ejemplo, creando un perfil nuevo), abría una segunda que borraba lo que se estaba escribiendo. Ahora los guardados van de a uno y la pregunta se hace una sola vez. (Venía de 2.26.0; la prueba en navegador que lo mostraba fallaba solo a veces.)
+- **Sin conexión y sin nada guardado**, la app ahora recibe un error de red claro en vez de una falla del service worker.
+- Un adjunto con identificadores que no son texto (respaldo o sincronización manipulados) se descarta en vez de romper la carga.
+
+### Cimientos (docs/CALIDAD.md)
+- **Tipos estrictos en todo el código**, no solo en `src/`: también los scripts, las funciones de Netlify (la entrada del servidor) y el service worker (137/137 módulos). Cada uno se revisa con las APIs de donde corre; una prueba impide que quede código fuera.
+- **Complejidad máxima 12** (antes 15): 33 funciones simplificadas; ninguna función del código pasa de 12.
+- **Primeras pruebas del service worker** (`tests/sw.test.js`): con red, sin red, la app guardada y lo que no debe tocar.
+
 ## 2.26.0 — 2026-11-16
 
 ### Nuevo

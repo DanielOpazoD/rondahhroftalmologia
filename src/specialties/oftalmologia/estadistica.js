@@ -151,6 +151,30 @@ function ageSummary(ages) {
   };
 }
 
+/** Sexo para los conteos: F, M, O o 'Sin dato'. @param {string} v */
+const sexKey = (v) => (SEXOS.some((s) => s.key === v) ? v : 'Sin dato');
+
+/**
+ * Suma las gestiones registradas (GES, interconsulta, receta, seguimiento, alta).
+ * @param {Gestiones} gest @param {Record<string, string>} f
+ */
+function countGestiones(gest, f) {
+  for (const k of /** @type {(keyof Gestiones)[]} */ (Object.keys(gest))) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
+}
+
+/**
+ * Suma una atención al conteo de su día.
+ * @param {Record<string, {atenciones: number, pacientes: Set<string>, procedimientos: number, ojos: number}>} porDia
+ * @param {string} fecha @param {string} pk paciente @param {import('./clinica.js').ProcHecho[]} done
+ */
+function countDay(porDia, fecha, pk, done) {
+  const day = (porDia[fecha] ||= { atenciones: 0, pacientes: new Set(), procedimientos: 0, ojos: 0 });
+  day.atenciones++;
+  day.pacientes.add(pk);
+  day.procedimientos += done.length;
+  day.ojos += done.reduce((a, p) => a + p.ojos, 0);
+}
+
 /**
  * Calcula todos los agregados de un conjunto de atenciones.
  * @param {Atencion[]} records
@@ -189,7 +213,7 @@ export function computeStats(records, procs) {
     const pk = patientIdentityKey(r);
     pats.add(pk);
 
-    const sx = SEXOS.some((s) => s.key === f.paciente_sexo) ? f.paciente_sexo : 'Sin dato';
+    const sx = sexKey(f.paciente_sexo);
     sexo[sx]++;
     const age = ageOf(r);
     if (age !== null) ages.push(age);
@@ -199,13 +223,8 @@ export function computeStats(records, procs) {
     ojos += countProcs(proc, done);
     countChecks(r, { dx, sol, ant });
 
-    for (const k of /** @type {(keyof Gestiones)[]} */ (Object.keys(gest))) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
-
-    const day = (porDia[f.fecha_atencion || 'Sin fecha'] ||= { atenciones: 0, pacientes: new Set(), procedimientos: 0, ojos: 0 });
-    day.atenciones++;
-    day.pacientes.add(pk);
-    day.procedimientos += done.length;
-    day.ojos += done.reduce((a, p) => a + p.ojos, 0);
+    countGestiones(gest, f);
+    countDay(porDia, f.fecha_atencion || 'Sin fecha', pk, done);
 
     inc(porMedico, f.medico_nombre?.trim() || 'Sin dato');
     inc(porOperativo, f.operativo?.trim() || 'Sin operativo');

@@ -83,10 +83,23 @@ export function renderUserChip(ctx) {
   chip.classList.toggle('unset', !u);
 }
 
-/** Pregunta quién registra si aún no se eligió en esta sesión (y hay perfiles). @param {import('./context.js').AppContext} ctx */
+/** Pregunta en curso por contexto: quien llega mientras está abierta espera la misma respuesta. */
+const asking = new WeakMap();
+
+/**
+ * Pregunta quién registra si aún no se eligió en esta sesión (y hay perfiles).
+ * Una sola pregunta a la vez: un segundo diálogo reemplazaría al primero.
+ * @param {import('./context.js').AppContext} ctx
+ */
 async function ensureUser(ctx) {
   if (ctx.accounts?.active || ctx.userAsked || !ctx.medicos.length) return;
-  await chooseUser(ctx);
+  if (!asking.has(ctx)) {
+    asking.set(
+      ctx,
+      chooseUser(ctx).finally(() => asking.delete(ctx)),
+    );
+  }
+  await asking.get(ctx);
 }
 
 /**

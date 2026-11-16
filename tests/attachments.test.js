@@ -56,6 +56,10 @@ test('modelo: tipos, límites, nombres seguros y partes', async () => {
   assert.equal(meta.partes, 3);
   assert.equal(normalizeAttachment({ ...meta, id: 'a1' }), null, 'los ids de adjunto empiezan con j');
   assert.equal(normalizeAttachment({ ...meta, sha256: 'x' }), null);
+  // Ids y huella deben ser texto: un dato manipulado con otro tipo se descarta, no rompe la carga.
+  for (const bad of [{ id: 123 }, { id: ['jx1'] }, { atencionId: 42 }, { sha256: [meta.sha256] }]) {
+    assert.equal(normalizeAttachment({ ...meta, ...bad }), null, JSON.stringify(bad));
+  }
 });
 
 test('repositorio: metadatos en memoria; contenido de a uno, solo con IndexedDB', async () => {

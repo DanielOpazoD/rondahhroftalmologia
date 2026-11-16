@@ -94,15 +94,35 @@ export const isThumbnail = (v) => typeof v === 'string' && v.length <= THUMB_MAX
 const SHA_RE = /^[0-9a-f]{64}$/;
 
 /**
+ * ¿Es un texto con esa forma? (`RegExp.test` convierte a texto lo que recibe:
+ * sin revisar el tipo, `123` o `['j1']` pasarían por un id).
+ * @param {RegExp} re @param {unknown} v
+ * @returns {v is string}
+ */
+const matches = (re, v) => typeof v === 'string' && re.test(v);
+
+/**
+ * ¿Trae los identificadores de un adjunto (id, atención y huella del contenido)?
+ * @param {any} raw
+ * @returns {boolean}
+ */
+function hasAttachmentIds(raw) {
+  if (!raw || typeof raw !== 'object' || !matches(ID_RE, raw.id) || !raw.id.startsWith('j')) return false;
+  return matches(ID_RE, raw.atencionId) && matches(SHA_RE, raw.sha256);
+}
+
+/** ¿Es un tamaño de adjunto admisible (entero, de 0 al máximo)? @param {number} n */
+const isAttachmentSize = (n) => Number.isSafeInteger(n) && n >= 0 && n <= ATTACHMENT_LIMITS.fileBytes;
+
+/**
  * Normaliza los metadatos de un adjunto; null si no son válidos. Conserva los
  * campos de versiones más nuevas (ADR 0012).
  * @param {any} raw
  */
 export function normalizeAttachment(raw) {
-  if (!raw || typeof raw !== 'object' || !ID_RE.test(raw.id) || !raw.id.startsWith('j')) return null;
-  if (!ID_RE.test(raw.atencionId) || !SHA_RE.test(raw.sha256)) return null;
+  if (!hasAttachmentIds(raw)) return null;
   const tamano = Number(raw.tamano);
-  if (!Number.isSafeInteger(tamano) || tamano < 0 || tamano > ATTACHMENT_LIMITS.fileBytes) return null;
+  if (!isAttachmentSize(tamano)) return null;
   return {
     ...unknownFields(raw, ['id', 'atencionId', 'nombre', 'tipo', 'tamano', 'sha256', 'partes', 'created', 'updated', 'miniatura']),
     id: raw.id,

@@ -28,6 +28,7 @@ const makeHandlers = () => {
 let handlers = makeHandlers();
 /** Solo para las pruebas en navegador: cada prueba empieza con el servidor vacío. */
 const TEST_RESET = process.env.E2E_RESET === '1';
+/** @type {Readonly<Record<string, string>>} */
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
@@ -35,31 +36,68 @@ const TYPES = {
   '.webmanifest': 'application/manifest+json',
 };
 
+/** @typedef {import('node:http').IncomingMessage} Req @typedef {import('node:http').ServerResponse} Res */
+
+/** Manejador de la API para una ruta, o null si no es de la API. @param {string} pathname */
+function apiFor(pathname) {
+  if (pathname.startsWith('/api/sync/')) return handlers.sync;
+  if (pathname.startsWith('/api/cuentas/')) return handlers.accounts;
+  return null;
+}
+
+/**
+ * Convierte la solicitud de Node en una `Request` estándar (la que reciben las funciones de Netlify).
+ * @param {Req} req @param {URL} url
+ */
+async function toRequest(req, url) {
+  const method = req.method || 'GET';
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(req.headers)) {
+    if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
+  }
+  /** @type {Buffer[]} */
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const body = ['GET', 'HEAD'].includes(method) ? undefined : Buffer.concat(chunks);
+  return new Request(url, { method, headers, body });
+}
+
+/** @param {Res} res @param {Response} r */
+async function sendResponse(res, r) {
+  res.writeHead(r.status, Object.fromEntries(r.headers));
+  res.end(Buffer.from(await r.arrayBuffer()));
+}
+
+/** Sirve un archivo de dist/ (403 si la ruta sale de dist/). @param {Res} res @param {string} pathname */
+async function serveFile(res, pathname) {
+  const path = normalize(resolve(root, '.' + (pathname === '/' ? '/index.html' : decodeURIComponent(pathname))));
+  if (!path.startsWith(root + sep)) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+  const data = await readFile(path);
+  res.writeHead(200, { 'content-type': TYPES[extname(path)] || 'application/octet-stream' });
+  res.end(data);
+}
+
+/** @param {Req} req @param {Res} res */
+async function route(req, res) {
+  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+  if (TEST_RESET && req.method === 'POST' && url.pathname === '/__test__/reset') {
+    handlers = makeHandlers();
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  const api = apiFor(url.pathname);
+  if (api) await sendResponse(res, await api(await toRequest(req, url)));
+  else await serveFile(res, url.pathname);
+}
+
 createServer(async (req, res) => {
   try {
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    if (TEST_RESET && req.method === 'POST' && url.pathname === '/__test__/reset') {
-      handlers = makeHandlers();
-      res.writeHead(204);
-      return res.end();
-    }
-    const api = url.pathname.startsWith('/api/sync/') ? handlers.sync : url.pathname.startsWith('/api/cuentas/') ? handlers.accounts : null;
-    if (api) {
-      const chunks = [];
-      for await (const c of req) chunks.push(c);
-      const body = ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks);
-      const r = await api(new Request(url, { method: req.method, headers: req.headers, body }));
-      res.writeHead(r.status, Object.fromEntries(r.headers));
-      return res.end(Buffer.from(await r.arrayBuffer()));
-    }
-    const path = normalize(resolve(root, '.' + (url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname))));
-    if (!path.startsWith(root + sep)) {
-      res.writeHead(403);
-      return res.end();
-    }
-    const data = await readFile(path);
-    res.writeHead(200, { 'content-type': TYPES[extname(path)] || 'application/octet-stream' });
-    res.end(data);
+    await route(req, res);
   } catch {
     res.writeHead(404);
     res.end('No encontrado');

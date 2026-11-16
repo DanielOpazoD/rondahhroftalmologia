@@ -5,27 +5,29 @@
  * CACHE se reemplaza en cada build por una huella del contenido.
  */
 const CACHE = 'oftalmo-__BUILD_ID__';
+/** El ámbito global de un service worker (TypeScript solo conoce el de un worker genérico). */
+const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
-self.addEventListener('install', (e) => {
+sw.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(CACHE)
       .then((c) => c.addAll(ASSETS))
-      .then(() => self.skipWaiting()),
+      .then(() => sw.skipWaiting()),
   );
 });
 
-self.addEventListener('activate', (e) => {
+sw.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+      .then(() => sw.clients.claim()),
   );
 });
 
-self.addEventListener('fetch', (e) => {
+sw.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (
     e.request.method !== 'GET' ||
@@ -44,6 +46,13 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html'))),
+      // Sin red: la copia guardada, o la app; si tampoco está, un error de red
+      // explícito (respondWith(undefined) es un error del service worker).
+      .catch(() =>
+        caches
+          .match(e.request)
+          .then((r) => r || caches.match('./index.html'))
+          .then((r) => r || Response.error()),
+      ),
   );
 });

@@ -27,6 +27,79 @@ const GRAY = rgb(0.38, 0.42, 0.48);
 const safe = (s) => toWinAnsi(s).replace(/[^\x20-\x7e\xa0-\xff]/g, '?');
 
 /**
+ * «página 5» o «páginas 5 a 7».
+ * @param {number} first primera página
+ * @param {number} count cuántas páginas
+ * @returns {string}
+ */
+const pagesWhere = (first, count) => (count === 1 ? `página ${first}` : `páginas ${first} a ${first + count - 1}`);
+
+/**
+ * Agrega una página con la imagen de un anexo (JPEG/PNG), con su título,
+ * ajustada a los márgenes.
+ * @param {PDFDocument} doc
+ * @param {Anexo} a
+ * @param {Uint8Array} bytes contenido de la imagen
+ * @param {number} n número del anexo
+ * @param {import('pdf-lib').PDFFont} bold
+ */
+async function addImagePage(doc, a, bytes, n, bold) {
+  const img = a.como === 'imagen-jpg' ? await doc.embedJpg(bytes) : await doc.embedPng(bytes);
+  const page = doc.addPage(A4);
+  const top = page.getHeight() - MARGIN - 18;
+  page.drawText(safe(`Anexo ${n}: ${a.nombre}`).slice(0, 90), { x: MARGIN, y: top, size: 11, font: bold });
+  const maxW = page.getWidth() - 2 * MARGIN;
+  const maxH = top - MARGIN - 12;
+  const s = Math.min(maxW / img.width, maxH / img.height, 1.5);
+  const w = img.width * s;
+  const h = img.height * s;
+  page.drawImage(img, { x: (page.getWidth() - w) / 2, y: top - 12 - h, width: w, height: h });
+}
+
+/**
+ * Agrega todas las páginas de un PDF adjunto; la primera lleva un título pequeño arriba.
+ * @param {PDFDocument} doc
+ * @param {Uint8Array} bytes contenido del PDF adjunto
+ * @param {string} title
+ * @param {import('pdf-lib').PDFFont} font
+ * @returns {Promise<number>} cuántas páginas se agregaron
+ */
+async function addPdfPages(doc, bytes, title, font) {
+  const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = await doc.copyPages(src, src.getPageIndices());
+  pages.forEach((p, i) => {
+    doc.addPage(p);
+    if (i === 0) p.drawText(safe(title).slice(0, 110), { x: MARGIN, y: p.getHeight() - 22, size: 8, font, color: GRAY });
+  });
+  return pages.length;
+}
+
+/**
+ * Dibuja el índice de anexos en su página.
+ * @param {import('pdf-lib').PDFPage} page
+ * @param {string} titulo
+ * @param {{n: number, nombre: string, donde: string}[]} index
+ * @param {boolean} hasEmbedded ¿hay archivos incrustados? (se explica dónde abrirlos)
+ * @param {{font: import('pdf-lib').PDFFont, bold: import('pdf-lib').PDFFont}} fonts
+ */
+function drawIndex(page, titulo, index, hasEmbedded, { font, bold }) {
+  let y = page.getHeight() - MARGIN - 10;
+  page.drawText(safe(titulo), { x: MARGIN, y, size: 15, font: bold });
+  y -= 26;
+  for (const it of index) {
+    if (y < MARGIN + 20) break; // con 30 adjuntos como máximo, cabe en una página
+    page.drawText(safe(`${it.n}. ${it.nombre}`).slice(0, 95), { x: MARGIN, y, size: 10.5, font: bold });
+    y -= 14;
+    page.drawText(safe(it.donde), { x: MARGIN + 14, y, size: 9.5, font, color: GRAY });
+    y -= 20;
+  }
+  if (hasEmbedded) {
+    const note = 'Los archivos «dentro del PDF» se abren desde el panel de adjuntos del visor (clip o «Adjuntos»).';
+    page.drawText(safe(note), { x: MARGIN, y: MARGIN, size: 8.5, font, color: GRAY });
+  }
+}
+
+/**
  * @param {Uint8Array} baseBytes PDF de la hoja de la atención
  * @param {Anexo[]} anexos
  * @param {{titulo?: string, now?: Date}} [o]
@@ -45,10 +118,6 @@ export async function appendAnnexes(baseBytes, anexos, { titulo = 'Anexos', now 
   const faltantes = [];
   /** @type {string[]} */
   const ilegibles = [];
-
-  /** Título pequeño arriba de la página de un anexo. @param {import('pdf-lib').PDFPage} page @param {string} text */
-  const label = (page, text) =>
-    page.drawText(safe(text).slice(0, 110), { x: MARGIN, y: page.getHeight() - 22, size: 8, font, color: GRAY });
 
   /** @param {Anexo} a @param {number} n */
   const embed = async (a, n) => {
@@ -74,29 +143,11 @@ export async function appendAnnexes(baseBytes, anexos, { titulo = 'Anexos', now 
     const first = doc.getPageCount() + 2;
     try {
       if (a.como === 'imagen-jpg' || a.como === 'imagen-png') {
-        const img = a.como === 'imagen-jpg' ? await doc.embedJpg(a.bytes) : await doc.embedPng(a.bytes);
-        const page = doc.addPage(A4);
-        const top = page.getHeight() - MARGIN - 18;
-        page.drawText(safe(`Anexo ${n}: ${a.nombre}`).slice(0, 90), { x: MARGIN, y: top, size: 11, font: bold });
-        const maxW = page.getWidth() - 2 * MARGIN;
-        const maxH = top - MARGIN - 12;
-        const s = Math.min(maxW / img.width, maxH / img.height, 1.5);
-        const w = img.width * s;
-        const h = img.height * s;
-        page.drawImage(img, { x: (page.getWidth() - w) / 2, y: top - 12 - h, width: w, height: h });
-        index.push({ n, nombre: a.nombre, donde: `página ${first}` });
+        await addImagePage(doc, a, a.bytes, n, bold);
+        index.push({ n, nombre: a.nombre, donde: pagesWhere(first, 1) });
       } else if (a.como === 'pdf') {
-        const src = await PDFDocument.load(a.bytes, { ignoreEncryption: true });
-        const pages = await doc.copyPages(src, src.getPageIndices());
-        pages.forEach((p, i) => {
-          doc.addPage(p);
-          if (i === 0) label(p, `Anexo ${n}: ${a.nombre}`);
-        });
-        index.push({
-          n,
-          nombre: a.nombre,
-          donde: pages.length === 1 ? `página ${first}` : `páginas ${first} a ${first + pages.length - 1}`,
-        });
+        const count = await addPdfPages(doc, a.bytes, `Anexo ${n}: ${a.nombre}`, font);
+        index.push({ n, nombre: a.nombre, donde: pagesWhere(first, count) });
       } else {
         await embed(a, n);
       }
@@ -108,20 +159,6 @@ export async function appendAnnexes(baseBytes, anexos, { titulo = 'Anexos', now 
   }
 
   // Índice de anexos, justo después de la hoja.
-  const page = doc.insertPage(basePages, A4);
-  let y = page.getHeight() - MARGIN - 10;
-  page.drawText(safe(titulo), { x: MARGIN, y, size: 15, font: bold });
-  y -= 26;
-  for (const it of index) {
-    if (y < MARGIN + 20) break; // con 30 adjuntos como máximo, cabe en una página
-    page.drawText(safe(`${it.n}. ${it.nombre}`).slice(0, 95), { x: MARGIN, y, size: 10.5, font: bold });
-    y -= 14;
-    page.drawText(safe(it.donde), { x: MARGIN + 14, y, size: 9.5, font, color: GRAY });
-    y -= 20;
-  }
-  if (incrustados.length) {
-    const note = 'Los archivos «dentro del PDF» se abren desde el panel de adjuntos del visor (clip o «Adjuntos»).';
-    page.drawText(safe(note), { x: MARGIN, y: MARGIN, size: 8.5, font, color: GRAY });
-  }
+  drawIndex(doc.insertPage(basePages, A4), titulo, index, incrustados.length > 0, { font, bold });
   return { bytes: await doc.save(), paginas: doc.getPageCount(), incrustados, faltantes, ilegibles };
 }

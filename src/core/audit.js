@@ -40,15 +40,22 @@ export function auditLabel(path, procs = []) {
   if (path === 'cat') return 'Catarata (ojo)';
   if (path === 'pacienteId') return 'Paciente (vínculo)';
   if (path.startsWith('adjunto.')) return 'Adjunto';
-  if (path.startsWith('proc.')) {
-    const rest = path.slice(5);
-    const dot = rest.lastIndexOf('.');
-    const id = rest.slice(0, dot);
-    const name = procs.find((p) => p.id === id)?.n || id;
-    const part = /** @type {Record<string, string>} */ (ETIQUETAS_PROC)[rest.slice(dot + 1)];
-    return part ? `${name} ${part}` : name;
-  }
+  if (path.startsWith('proc.')) return procPathLabel(path.slice(5), procs);
   return path;
+}
+
+/**
+ * Nombre legible de una parte de un procedimiento: «Tonometría OD».
+ * @param {string} rest ruta sin el prefijo `proc.` (`<id>.<parte>`)
+ * @param {{id: string, n: string}[]} procs
+ * @returns {string}
+ */
+function procPathLabel(rest, procs) {
+  const dot = rest.lastIndexOf('.');
+  const id = rest.slice(0, dot);
+  const name = procs.find((p) => p.id === id)?.n || id;
+  const part = /** @type {Record<string, string>} */ (ETIQUETAS_PROC)[rest.slice(dot + 1)];
+  return part ? `${name} ${part}` : name;
 }
 
 /**

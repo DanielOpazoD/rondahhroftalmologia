@@ -26,6 +26,15 @@ function patientParts(f) {
   );
 }
 
+/** Título de la nota, con el operativo si lo hay. @param {Record<string, string>} f */
+const titleLine = (f) => 'ATENCIÓN OTORRINOLARINGOLÓGICA – RONDAS Y OPERATIVOS' + (t(f.operativo) ? ` (${t(f.operativo)})` : '');
+
+/** Líneas de cierre (seguimiento y alta), solo las que hay. @param {Record<string, string>} f @returns {string[]} */
+const closingLines = (f) => [t(f.seguimiento) && 'Seguimiento: ' + t(f.seguimiento), t(f.alta) && 'Alta: ' + t(f.alta)].filter(Boolean);
+
+/** Firma: nombre del médico y su RUT si lo hay. @param {Record<string, string>} f */
+const signature = (f) => doctorName(f.medico_nombre) + (t(f.medico_rut) ? ' – RUT ' + t(f.medico_rut) : '');
+
 /**
  * @param {import('../../domain').Atencion} rec registro de atención
  * @param {import('./config.js').ProcDef[]} procs lista de procedimientos
@@ -41,7 +50,7 @@ export function buildNote(rec, procs, opts = {}) {
   /** Sección con título y líneas, solo si hay líneas. @param {string} title @param {string[]} lines */
   const list = (title, lines) => lines.length && section(title, lines);
 
-  L.push('ATENCIÓN OTORRINOLARINGOLÓGICA – RONDAS Y OPERATIVOS' + (t(f.operativo) ? ` (${t(f.operativo)})` : ''));
+  L.push(titleLine(f));
   if (f.fecha_atencion) L.push('Fecha: ' + fmtDate(f.fecha_atencion));
   const paciente = patientParts(f);
   if (paciente.length) L.push('Paciente: ' + paciente.join(' | '));
@@ -72,9 +81,9 @@ export function buildNote(rec, procs, opts = {}) {
   if (acc.length) L.push(acc.join(' | '));
 
   list('PLAN E INDICACIONES:', [t(f.plan)].filter(Boolean));
-  const cierre = [t(f.seguimiento) && 'Seguimiento: ' + t(f.seguimiento), t(f.alta) && 'Alta: ' + t(f.alta)].filter(Boolean);
+  const cierre = closingLines(f);
   if (cierre.length) section(cierre[0], cierre.slice(1));
-  if (t(f.medico_nombre)) section(doctorName(f.medico_nombre) + (t(f.medico_rut) ? ' – RUT ' + t(f.medico_rut) : ''));
+  if (t(f.medico_nombre)) section(signature(f));
   if (opts.pie) L.push(opts.pie);
 
   return L.join('\n')

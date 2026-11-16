@@ -106,6 +106,17 @@ function patientStamps(rec, fields) {
 }
 
 /**
+ * Fecha de la restauración de una ficha eliminada: posterior a su eliminación,
+ * para que la restauración gane.
+ * @param {import('../domain').Paciente} current ficha eliminada
+ * @param {number} now
+ * @returns {number}
+ */
+function restoreStamp(current, now) {
+  return Math.max(now, current.ft?.['f.' + DELETED_FIELD] || 0) + 1;
+}
+
+/**
  * Ficha del paciente actualizada con los datos de una atención, fusionada
  * campo a campo con la existente (gana lo editado más recientemente).
  * @param {import('../domain').Atencion} rec
@@ -118,7 +129,7 @@ export function patientUpdateFromRecord(rec, current, now) {
   const fields = patientFields(rec.f);
   const ft = patientStamps(rec, fields);
   // Una atención que vuelve a usar una ficha eliminada la restaura (la restauración gana a la eliminación).
-  if (current && isDeletedPatient(current)) ft['f.' + DELETED_FIELD] = Math.max(now, current.ft?.['f.' + DELETED_FIELD] || 0) + 1;
+  if (current && isDeletedPatient(current)) ft['f.' + DELETED_FIELD] = restoreStamp(current, now);
   const candidate = { id: rec.pacienteId, created: rec.created || rec.updated, updated: rec.updated, f: fields, ft, checks: {}, proc: {} };
   const next = current ? mergeRecords(current, candidate) : candidate;
   if (current && sameContent(next, current)) return null;
@@ -140,6 +151,26 @@ export function rutOwner(patients, rut, exceptId) {
   return patients.find((p) => p.id !== exceptId && !isDeletedPatient(p) && !p.f?.fusionado_en && rutKey(p.f?.paciente_rut) === k) || null;
 }
 
+/** Valor de un campo editado, sin espacios en los extremos ('' si no hay). @param {unknown} v */
+const cleanValue = (v) => String(v ?? '').trim();
+
+/**
+ * Escribe los campos corregidos (un valor vacío borra el dato) y fecha cada uno.
+ * @param {Record<string, string>} f datos a corregir
+ * @param {Record<string, number>} ft fechas por campo
+ * @param {string[]} changed campos corregidos
+ * @param {Record<string, string>} fields valores nuevos
+ * @param {number} at fecha de la corrección
+ */
+function writeEdits(f, ft, changed, fields, at) {
+  for (const k of changed) {
+    const v = cleanValue(fields[k]);
+    if (v) f[k] = v;
+    else delete f[k];
+    ft['f.' + k] = at;
+  }
+}
+
 /**
  * Corrige los datos personales de un paciente (RUT, nombre, nacimiento, sexo,
  * fono) en su ficha y en todas sus atenciones, SIN cambiar el id de la ficha:
@@ -151,29 +182,18 @@ export function rutOwner(patients, rut, exceptId) {
  * @returns {{patient: import('../domain').Paciente, records: {before: import('../domain').Atencion, after: AtencionGuardada}[], changed: string[]}}
  */
 export function editPatientData({ patient, fields, records, now }) {
-  const clean = (/** @type {unknown} */ v) => String(v ?? '').trim();
-  const changed = PATIENT_FIELDS.filter((k) => k in fields && clean(fields[k]) !== clean(patient.f?.[k]));
+  const changed = PATIENT_FIELDS.filter((k) => k in fields && cleanValue(fields[k]) !== cleanValue(patient.f?.[k]));
   if (!changed.length) return { patient, records: [], changed };
   const p = structuredClone(patient);
   p.ft = { ...(p.ft || {}) };
-  for (const k of changed) {
-    const v = clean(fields[k]);
-    if (v) p.f[k] = v;
-    else delete p.f[k];
-    p.ft['f.' + k] = now;
-  }
+  writeEdits(p.f, p.ft, changed, fields, now);
   p.updated = Math.max(now, (patient.updated || 0) + 1);
   const out = [];
   for (const r of records) {
     if (r.pacienteId !== patient.id) continue;
     const next = ensureFt(structuredClone(r));
     const u = Math.max(now, (r.updated || 0) + 1);
-    for (const k of changed) {
-      const v = clean(fields[k]);
-      if (v) next.f[k] = v;
-      else delete next.f[k];
-      next.ft['f.' + k] = u;
-    }
+    writeEdits(next.f, next.ft, changed, fields, u);
     // La edad de cada atención se recalcula con la fecha de nacimiento corregida.
     if (changed.includes('paciente_fnac') && applyBirthDate(next)) next.ft['f.paciente_edad'] = u;
     next.updated = u;

@@ -37,6 +37,41 @@ const ADMIN_OPTIONS = [
  * @typedef {Omit<UsuarioVista, 'nombre' | 'rut' | 'apellido_paterno' | 'apellido_materno' | 'nombres'> & {perfil: {iv: string, ct: string}}} UsuarioServidor
  */
 
+/**
+ * Etiquetas de estado de una cuenta (administrador, desactivada, clave inicial, bloqueada).
+ * @param {UsuarioVista} u
+ * @param {number} now
+ */
+function userTags(u, now) {
+  return [
+    u.admin && html`<span class="tag">Administrador/a</span>`,
+    u.estado !== 'activo' && html`<span class="state bad">Desactivada</span>`,
+    u.estado === 'activo' && u.debeCambiar && initialPasswordTag(u.tempExpira, now),
+    u.bloqueadaHasta > now && html`<span class="state bad">Bloqueada por intentos</span>`,
+  ].filter(Boolean);
+}
+
+/**
+ * Etiqueta de la clave inicial sin cambiar: vencida o hasta cuándo vale.
+ * @param {number | null} tempExpira
+ * @param {number} now
+ */
+function initialPasswordTag(tempExpira, now) {
+  if (tempExpira && tempExpira < now) return html`<span class="state bad">Clave inicial vencida</span>`;
+  return html`<span class="state pend">Clave inicial · vence ${fmtDate(new Date(tempExpira || now).toISOString().slice(0, 10))}</span>`;
+}
+
+/** «RUT · profesión · último ingreso». @param {UsuarioVista} u */
+function userMeta(u) {
+  return [
+    formatRut(u.rut),
+    rolLabel(u.rol),
+    u.ultimoIngreso ? `último ingreso ${fmtDate(new Date(u.ultimoIngreso).toISOString().slice(0, 10))}` : 'nunca ha entrado',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 /** @param {import('./context.js').AppContext} ctx */
 export function initUsersView(ctx) {
   const api = createAccountsApi();
@@ -86,23 +121,8 @@ export function initUsersView(ctx) {
       $('#usersList'),
       users.length
         ? html`${users.map((u) => {
-            const tags = [
-              u.admin && html`<span class="tag">Administrador/a</span>`,
-              u.estado !== 'activo' && html`<span class="state bad">Desactivada</span>`,
-              u.estado === 'activo' &&
-                u.debeCambiar &&
-                (u.tempExpira && u.tempExpira < now
-                  ? html`<span class="state bad">Clave inicial vencida</span>`
-                  : html`<span class="state pend">Clave inicial · vence ${fmtDate(new Date(u.tempExpira || now).toISOString().slice(0, 10))}</span>`),
-              u.bloqueadaHasta > now && html`<span class="state bad">Bloqueada por intentos</span>`,
-            ].filter(Boolean);
-            const meta = [
-              formatRut(u.rut),
-              rolLabel(u.rol),
-              u.ultimoIngreso ? `último ingreso ${fmtDate(new Date(u.ultimoIngreso).toISOString().slice(0, 10))}` : 'nunca ha entrado',
-            ]
-              .filter(Boolean)
-              .join(' · ');
+            const tags = userTags(u, now);
+            const meta = userMeta(u);
             const me = u.id === ctx.accounts?.user?.id;
             return html`<div class="prow${u.estado !== 'activo' ? ' off' : ''}">
               <div class="pmain static">

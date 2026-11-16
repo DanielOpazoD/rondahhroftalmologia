@@ -126,16 +126,26 @@ function grayOf(raw) {
 }
 
 /**
+ * ¿Imagen RGB de 8 bits sin máscara ni parámetros de decodificación? (la única
+ * forma que grayOf sabe convertir).
+ * @param {PDFDict} dict
+ */
+function isPlainRgb8(dict) {
+  return (
+    dict.get(N('ColorSpace')) === N('DeviceRGB') &&
+    dict.get(N('BitsPerComponent'))?.toString() === '8' &&
+    !dict.get(N('SMask')) &&
+    !dict.get(N('DecodeParms'))
+  );
+}
+
+/**
  * Imagen binaria (sin ASCII85) y en gris si no tiene color; null si ya está bien.
  * @param {PDFContext} ctx @param {PDFRawStream} obj
  */
 function slimImage(ctx, obj) {
   const ascii = String(obj.dict.get(N('Filter'))).includes('ASCII85');
-  const rgb =
-    obj.dict.get(N('ColorSpace')) === N('DeviceRGB') &&
-    obj.dict.get(N('BitsPerComponent'))?.toString() === '8' &&
-    !obj.dict.get(N('SMask')) &&
-    !obj.dict.get(N('DecodeParms'));
+  const rgb = isPlainRgb8(obj.dict);
   if (!ascii && !rgb) return null;
   const raw = decodePDFRawStream(obj).decode();
   const gray = rgb ? grayOf(raw) : null;

@@ -107,12 +107,18 @@ export function proceduresDone(rec, procs) {
  */
 export function procLabel(p, { desc = true } = {}) {
   const vals = [p.pioOd && 'OD ' + p.pioOd, p.pioOi && 'OI ' + p.pioOi].filter(Boolean);
-  const descs = !desc
-    ? ''
-    : p.ojo === 'AO'
-      ? [p.descOd && 'OD ' + p.descOd, p.descOi && 'OI ' + p.descOi].filter(Boolean).join('; ')
-      : p.descOd || p.descOi || '';
+  const descs = desc ? procDescText(p) : '';
   return `${p.nombre} ${p.ojo}` + (vals.length ? ` (${vals.join(' / ')} mmHg)` : '') + (descs ? `: ${descs}` : '');
+}
+
+/**
+ * Descripción de un procedimiento: la de cada ojo si es AO («OD …; OI …»), si no la del ojo tratado.
+ * @param {{ojo: string, descOd?: string, descOi?: string}} p
+ * @returns {string}
+ */
+function procDescText(p) {
+  if (p.ojo === 'AO') return [p.descOd && 'OD ' + p.descOd, p.descOi && 'OI ' + p.descOi].filter(Boolean).join('; ');
+  return p.descOd || p.descOi || '';
 }
 
 /**

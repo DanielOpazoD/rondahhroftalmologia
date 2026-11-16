@@ -92,15 +92,25 @@ export function patientFields(f = {}) {
 }
 
 /**
+ * ¿Es un objeto (no null)? Los datos sin validar pueden traer cualquier cosa.
+ * @template T
+ * @param {T} v
+ * @returns {v is T & object}
+ */
+function isObject(v) {
+  return Boolean(v) && typeof v === 'object';
+}
+
+/**
  * Normaliza una ficha de paciente; null si no es válida.
  * @param {{id?: unknown, v?: unknown, created?: unknown, updated?: unknown, f?: Record<string, unknown>, ft?: Record<string, unknown>, [campo: string]: unknown} | null | undefined} raw
  *   ficha guardada, recibida de otro equipo o de un respaldo (sin validar)
  * @returns {Paciente|null}
  */
 export function normalizePatient(raw) {
-  if (!raw || typeof raw !== 'object' || !isValidId(raw.id) || !raw.id.startsWith('p_')) return null;
+  if (!isObject(raw) || !isValidId(raw.id) || !raw.id.startsWith('p_')) return null;
   // Datos que vienen de respaldos o de la sincronización: `f` puede no ser un objeto.
-  const f = raw.f && typeof raw.f === 'object' ? raw.f : {};
+  const f = isObject(raw.f) ? raw.f : {};
   /** @type {Paciente} */
   const p = {
     // Campos que agregue una versión más nueva se conservan (ver core/compat.js).
@@ -117,7 +127,7 @@ export function normalizePatient(raw) {
   delete p.f[MERGED_FIELD];
   delete p.f[DELETED_FIELD];
   Object.assign(p.f, systemMarks(f, raw.id));
-  if (raw.ft && typeof raw.ft === 'object') p.ft = fieldTimes(raw.ft);
+  if (isObject(raw.ft)) p.ft = fieldTimes(raw.ft);
   return p;
 }
 

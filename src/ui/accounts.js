@@ -325,22 +325,32 @@ export function createAccountsController(ctx) {
 
   /* ------------------------------------------------------------ Ajustes */
 
+  /** ¿Se ofrece activar las cuentas? (servidor sin activar y PC con la contraseña del equipo) */
+  function canActivate() {
+    const cfg = store.loadSyncConfig();
+    return usable() && !session.on && ui.serverOn === false && Boolean(cfg?.token) && cfg?.mode !== 'cuenta';
+  }
+
+  /** Quién está en la sesión: nombre, RUT, profesión y estado. @param {NonNullable<typeof session.user>} u */
+  function renderWho(u) {
+    setHtml(
+      $('#acctWho'),
+      html`Sesión de <b>${u.nombre}</b> (${formatRut(u.rut)}) · ${rolLabel(u.rol)}${u.admin ? ' · Administrador/a' : ''}${u.offline ? html` · <span class="state pend">sin conexión</span>` : ''}`,
+    );
+  }
+
   function render() {
     const u = session.user;
-    const cfg = store.loadSyncConfig();
-    const canActivate = usable() && !session.on && ui.serverOn === false && Boolean(cfg?.token) && cfg?.mode !== 'cuenta';
-    $('#acctCard').hidden = !(u || canActivate);
-    $('#acctActivate').hidden = !canActivate;
+    const canActivateHere = canActivate();
+    $('#acctCard').hidden = !(u || canActivateHere);
+    $('#acctActivate').hidden = !canActivateHere;
     $('#acctSession').hidden = !u;
     $('#acctState').textContent = session.on ? 'Activas' : 'Sin activar';
     $('#medHint').textContent = u
       ? 'Profesionales que aparecen en el campo Médico. Con cuentas de usuario, cada persona se agrega sola al entrar; aquí puedes sumar a quien no tiene cuenta.'
       : 'Médicos y otros profesionales. Cada uno elige su perfil al registrar: el historial de cambios guarda quién hizo cada cambio.';
     if (u) {
-      setHtml(
-        $('#acctWho'),
-        html`Sesión de <b>${u.nombre}</b> (${formatRut(u.rut)}) · ${rolLabel(u.rol)}${u.admin ? ' · Administrador/a' : ''}${u.offline ? html` · <span class="state pend">sin conexión</span>` : ''}`,
-      );
+      renderWho(u);
       $('#acctLockMin').value = String(store.loadSessionLockMinutes());
     }
   }
