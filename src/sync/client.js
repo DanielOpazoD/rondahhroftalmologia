@@ -258,6 +258,19 @@ export async function listRemote(api, cache, nowMs = Date.now()) {
   // Se pidió solo lo cambiado, pero mientras tanto otra sincronización descartó
   // la copia: esa respuesta parcial no sirve como lista completa. Se pide la completa.
   if (partial && !cache.snapshot) return listRemote(api, cache, nowMs);
+  return updateCache(cache, res, got, partial, nowMs);
+}
+
+/**
+ * Anota en la copia de las versiones la lista recibida (suma los cambios de una
+ * respuesta parcial o la reemplaza por la completa) y devuelve las versiones remotas.
+ * @param {SyncCache} cache
+ * @param {{now?: number}} res respuesta del servidor
+ * @param {Map<string, {u: number, h?: string}>} got versiones recibidas
+ * @param {boolean} partial ¿se recibió solo lo cambiado?
+ * @param {number} nowMs
+ */
+function updateCache(cache, res, got, partial, nowMs) {
   if (partial && cache.snapshot) addChanges(cache.snapshot, got);
   else {
     // Lista completa (o servidor antiguo sin cursor). Las huellas verificadas
@@ -298,6 +311,20 @@ function fingerprintKey(encKey) {
  */
 export function contentHash(encKey, id, u, kind, fingerprint) {
   return toHex(hmacSha256(fingerprintKey(encKey), `${id}\n${u}\n${kind}\n${fingerprint}`)).slice(0, 16);
+}
+
+/**
+ * Huella de un elemento local en la versión `u`, o la de su eliminación si no
+ * hay elemento vigente.
+ * @param {string} encKey
+ * @param {(kind: string, data: Record<string, unknown>) => string} fingerprint
+ * @param {string} id
+ * @param {number} u
+ * @param {ElementoSync | null | undefined} live elemento vigente (null o undefined = eliminado)
+ */
+function localHash(encKey, fingerprint, id, u, live) {
+  if (!live) return contentHash(encKey, id, u, 'eliminado', '');
+  return contentHash(encKey, id, u, live.kind, fingerprint(live.kind, live.data));
 }
 
 /** @type {Map<string, Uint8Array>} */
@@ -455,15 +482,12 @@ async function preparePass(deps) {
   const hashOf =
     encKey && fingerprint
       ? (id, v) => {
-          const rec = byId.get(id);
-          const r = remote.get(id);
-          const mark = `${v.u}|${v.deleted || !rec ? 'd' : 'r'}|${r?.h}`;
-          if (cache && r?.h && cache.verified.get(id) === mark) return r.h;
-          const h =
-            v.deleted || !rec
-              ? contentHash(encKey, id, v.u, 'eliminado', '')
-              : contentHash(encKey, id, v.u, rec.kind, fingerprint(rec.kind, rec.data));
-          if (cache && h === r?.h) cache.verified.set(id, mark);
+          const live = v.deleted ? undefined : byId.get(id);
+          const remoteHash = remote.get(id)?.h;
+          const mark = `${v.u}|${live ? 'r' : 'd'}|${remoteHash}`;
+          if (cache && remoteHash && cache.verified.get(id) === mark) return remoteHash;
+          const h = localHash(encKey, fingerprint, id, v.u, live);
+          if (cache && h === remoteHash) cache.verified.set(id, mark);
           return h;
         }
       : undefined;
@@ -516,25 +540,52 @@ async function fetchItems(p, list, { fromLegacy = false } = {}) {
     for (const it of res.items || []) {
       if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
       const content = await decryptPayload(key, it.id, it.u, it);
-      let id = it.id;
-      if (lids && wire) {
-        const ids = resolveLocalId(content, it.id, wire, fromLegacy);
-        if (!ids) continue;
-        id = ids.id;
-        lids.set(id, ids.lid);
-      }
-      // `record` = formato de la v2.1 (solo atenciones)
-      const data = content.data ?? content.record;
-      out.push({
-        id,
-        u: it.u,
-        deleted: !!content.deleted,
-        kind: content.kind || 'atencion',
-        data: data && fromLegacy ? { ...data, id, updated: it.u } : data,
-      });
+      const id = pulledId(lids, wire, content, it.id, fromLegacy);
+      if (id === null) continue;
+      out.push(pulledItem(content, id, it.u, fromLegacy));
     }
   }
   return out;
+}
+
+/**
+ * Id local con que se aplica un elemento bajado (anota su correspondencia con
+ * el id del servidor), o null si no corresponde y se descarta. Sin ids
+ * opacos, el mismo id del servidor.
+ * @param {Map<string, string> | null} lids
+ * @param {((lid: string) => string) | null} wire
+ * @param {{lid?: unknown}} content contenido descifrado
+ * @param {string} sid id del elemento en el servidor
+ * @param {boolean} fromLegacy
+ * @returns {string | null}
+ */
+function pulledId(lids, wire, content, sid, fromLegacy) {
+  if (!lids || !wire) return sid;
+  const ids = resolveLocalId(content, sid, wire, fromLegacy);
+  if (!ids) return null;
+  lids.set(ids.id, ids.lid);
+  return ids.id;
+}
+
+/**
+ * Elemento bajado a partir de su contenido descifrado. Lo que viene de un id
+ * antiguo lleva en sus datos el id nuevo y la versión.
+ * @param {any} content contenido descifrado
+ * @param {string} id id con que se aplica
+ * @param {number} u versión
+ * @param {boolean} fromLegacy
+ * @returns {ElementoBajado}
+ */
+function pulledItem(content, id, u, fromLegacy) {
+  // `record` = formato de la v2.1 (solo atenciones)
+  const data = content.data ?? content.record;
+  return {
+    id,
+    u,
+    deleted: !!content.deleted,
+    kind: content.kind || 'atencion',
+    data: data && fromLegacy ? { ...data, id, updated: u } : data,
+  };
 }
 
 /**
@@ -621,32 +672,44 @@ async function pushChanges(p) {
     const payload = await Promise.all(
       ids.map(async (id) => {
         const rec = byId.get(id);
-        const tomb = local0.tombstones[id];
-        const u = rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb;
+        const u = pushVersion(rec, local0.tombstones[id]);
         // Sube el elemento si su versión es la vigente; si no, su eliminación.
         const live = rec && u === rec.updated ? rec : null;
         /** @type {{kind?: string, data?: Record<string, unknown>, deleted?: boolean, lid?: string}} */
         const content = live ? { kind: live.kind, data: live.data } : { deleted: true };
         if (lids && lids.get(id) !== id) content.lid = lids.get(id);
-        const h =
-          encKey && fingerprint
-            ? live
-              ? contentHash(encKey, id, u, live.kind, fingerprint(live.kind, live.data))
-              : contentHash(encKey, id, u, 'eliminado', '')
-            : undefined;
+        const h = encKey && fingerprint ? localHash(encKey, fingerprint, id, u, live) : undefined;
         return { id, u, ...(h ? { h } : {}), ...(await encryptPayload(key, id, u, content)) };
       }),
     );
     const res = await api.put(payload);
-    // Lo subido ya está en el servidor: se anota para no volver a compararlo.
-    if (cache?.snapshot) {
-      const saved = new Set(res.saved || []);
-      for (const it of payload) if (saved.has(it.id)) cache.snapshot.set(it.id, it.h ? { u: it.u, h: it.h } : { u: it.u });
-    }
+    rememberPushed(cache, payload, res.saved);
     pushed += res.saved?.length || 0;
     skipped += res.skipped?.length || 0;
   }
   return { pushed, skipped };
+}
+
+/**
+ * Versión que se sube de un id: la del elemento si es más nueva que su
+ * eliminación; si no, la de la eliminación.
+ * @param {ElementoSync | undefined} rec
+ * @param {number} tomb
+ * @returns {number}
+ */
+const pushVersion = (rec, tomb) => (rec && (!tomb || rec.updated > tomb) ? rec.updated : tomb);
+
+/**
+ * Lo subido ya está en el servidor: se anota en la copia de las versiones para
+ * no volver a compararlo.
+ * @param {SyncCache | undefined} cache
+ * @param {{id: string, u: number, h?: string}[]} payload lo subido
+ * @param {string[] | undefined} saved ids que el servidor guardó
+ */
+function rememberPushed(cache, payload, saved) {
+  if (!cache?.snapshot) return;
+  const ok = new Set(saved || []);
+  for (const it of payload) if (ok.has(it.id)) cache.snapshot.set(it.id, it.h ? { u: it.u, h: it.h } : { u: it.u });
 }
 
 /**

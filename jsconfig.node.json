@@ -1,0 +1,9 @@
+{
+  "extends": "./jsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": ["scripts/**/*.mjs", "netlify/**/*.mjs", "src/types.d.ts", "src/domain.d.ts"]
+}

@@ -85,13 +85,14 @@ export function ensureFt(rec) {
 const rank = (v) => (v === undefined ? '' : JSON.stringify(v));
 
 /**
- * Fusiona dos versiones de la MISMA atención (mismo id, o una atención nueva
- * que se combina con una existente). Devuelve un registro nuevo.
+ * Fusión campo a campo: en cada ruta gana el valor editado más recientemente
+ * (a igual fecha, desempate determinista por valor).
  * @param {RegistroFusionable} a
  * @param {RegistroFusionable} b
- * @returns {RegistroFusionable}
+ * @returns {{values: Map<string, import('./fields.js').ValorRuta>, ft: Record<string, number>}}
+ *   `values`: ruta -> valor ganador; `ft`: ruta -> fecha más reciente
  */
-export function mergeRecords(a, b) {
+function mergeFields(a, b) {
   const fa = flatten(a);
   const fb = flatten(b);
   const paths = new Set([...fa.keys(), ...fb.keys(), ...Object.keys(a.ft || {}), ...Object.keys(b.ft || {})]);
@@ -108,6 +109,18 @@ export function mergeRecords(a, b) {
     const t = Math.max(ta, tb);
     if (t) ft[p] = t;
   }
+  return { values, ft };
+}
+
+/**
+ * Fusiona dos versiones de la MISMA atención (mismo id, o una atención nueva
+ * que se combina con una existente). Devuelve un registro nuevo.
+ * @param {RegistroFusionable} a
+ * @param {RegistroFusionable} b
+ * @returns {RegistroFusionable}
+ */
+export function mergeRecords(a, b) {
+  const { values, ft } = mergeFields(a, b);
   const merged = unflatten(values);
   refreshNames(merged.f);
   const created = [a.created, b.created].flatMap((t) => (t ? [t] : []));

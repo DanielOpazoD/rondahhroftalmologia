@@ -5,7 +5,8 @@
  *   npm run calidad
  *
  * Reúne en un lugar las cifras que el resto de las herramientas hace cumplir:
- *  - tipos: módulos con verificación estricta (jsconfig.json);
+ *  - tipos: módulos con verificación estricta (jsconfig*.json: la app, el
+ *    código de Node y el service worker);
  *  - complejidad: la más alta y cuántas funciones pasan de 10, la próxima meta
  *    (ESLint `complexity`, con tope en eslint.config.js);
  *  - capas, dependencias y exportaciones sin uso (scripts/deps.mjs);
@@ -25,13 +26,36 @@ const WATCH = 10;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const rel = (/** @type {string} */ f) => f.replace(ROOT + '/', '');
 
-/** Módulos de src/ verificados en modo estricto (todos, si jsconfig.json es estricto e incluye src/). */
+/**
+ * Cada configuración de tipos y el código que debe cubrir: la app (navegador),
+ * el código de Node (scripts y funciones de Netlify) y el service worker.
+ */
+const TYPED = [
+  { config: 'jsconfig.json', label: 'src/', files: ['src/**/*.js'] },
+  { config: 'jsconfig.node.json', label: 'scripts/ y netlify/', files: ['scripts/**/*.mjs', 'netlify/**/*.mjs'] },
+  { config: 'jsconfig.sw.json', label: 'public/', files: ['public/**/*.js'] },
+];
+
+/**
+ * Opciones de una configuración de tipos, con las que hereda (`extends`).
+ * @param {string} file
+ * @returns {{compilerOptions: Record<string, unknown>, include: string[]}}
+ */
+function readTypeConfig(file) {
+  const cfg = JSON.parse(readFileSync(resolve(ROOT, file), 'utf8'));
+  const base = cfg.extends ? readTypeConfig(cfg.extends) : { compilerOptions: {}, include: [] };
+  return { compilerOptions: { ...base.compilerOptions, ...cfg.compilerOptions }, include: cfg.include ?? base.include };
+}
+
+/** Módulos verificados en modo estricto, por configuración (todos, si es estricta y los incluye). */
 function strictCoverage() {
-  const cfg = JSON.parse(readFileSync(resolve(ROOT, 'jsconfig.json'), 'utf8'));
-  const all = globSync('src/**/*.js', { cwd: ROOT });
-  if (!cfg.compilerOptions?.strict) return { strict: 0, total: all.length };
-  const included = new Set(cfg.include.flatMap((/** @type {string} */ p) => globSync(p, { cwd: ROOT })));
-  return { strict: all.filter((f) => included.has(f)).length, total: all.length };
+  return TYPED.map(({ config, label, files }) => {
+    const cfg = readTypeConfig(config);
+    const all = files.flatMap((p) => globSync(p, { cwd: ROOT }));
+    if (!cfg.compilerOptions.strict) return { label, strict: 0, total: all.length };
+    const included = new Set(cfg.include.flatMap((p) => globSync(p, { cwd: ROOT })));
+    return { label, strict: all.filter((f) => included.has(f)).length, total: all.length };
+  });
 }
 
 /**
@@ -45,7 +69,7 @@ function catchKind(body) {
   return 'alternativa';
 }
 
-/** Complejidad por función y clase de cada `catch`, en una pasada de ESLint sobre src/. */
+/** Complejidad por función y clase de cada `catch`, en una pasada de ESLint sobre el código (no las pruebas). */
 async function scan() {
   const plugin = {
     rules: {
@@ -66,7 +90,7 @@ async function scan() {
   const cx = [];
   /** @type {Record<string, number>} */
   const kinds = { relanza: 0, informa: 0, alternativa: 0, 'ignora (con motivo)': 0 };
-  for (const f of await eslint.lintFiles(['src/**/*.js'])) {
+  for (const f of await eslint.lintFiles(['src/**/*.js', 'scripts/**/*.mjs', 'netlify/**/*.mjs', 'public/**/*.js'])) {
     for (const m of f.messages) {
       const where = `${rel(f.filePath)}:${m.line}`;
       if (m.ruleId === 'complexity') cx.push({ n: Number(/complexity of (\d+)/.exec(m.message)?.[1]), where });
@@ -80,7 +104,10 @@ const t = strictCoverage();
 const { cx, kinds: c } = await scan();
 const d = analyze();
 const e = exportUsage();
-console.log(`Tipos estrictos:   ${t.strict}/${t.total} módulos de src/ (${Math.round((t.strict / t.total) * 100)} %)`);
+const sum = (/** @type {'strict' | 'total'} */ k) => t.reduce((n, x) => n + x[k], 0);
+console.log(
+  `Tipos estrictos:   ${sum('strict')}/${sum('total')} módulos (${t.map((x) => `${x.label} ${x.strict}/${x.total}`).join(', ')})`,
+);
 console.log(
   `Complejidad:       máxima ${cx[0]?.n ?? `≤${WATCH}`}${cx[0] ? ` (${cx[0].where})` : ''}; ${cx.length} funciones sobre ${WATCH}`,
 );

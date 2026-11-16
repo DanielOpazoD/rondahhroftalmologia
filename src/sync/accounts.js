@@ -706,14 +706,13 @@ export function createAccounts({
    */
   async function handle(req) {
     const url = new URL(req.url);
-    const action = url.pathname.split('/').filter(Boolean).pop() || '';
-    const route = Object.hasOwn(ROUTES, action) ? ROUTES[action] : null;
+    const { action, route } = routeOf(url);
     if (!route) return fail(404, 'ruta', 'Ruta no encontrada');
     const refused = refusedBeforeBody(req, route.method, action);
     if (refused) return refused;
     const b = req.method === 'POST' ? await readBody(req) : null;
-    if (b === TOO_LARGE) return fail(413, 'demasiado_grande', 'La solicitud es demasiado grande');
-    if (req.method === 'POST' && (!b || typeof b !== 'object')) return fail(400, 'json_invalido', 'JSON inválido');
+    const badBody = bodyProblem(req, b);
+    if (badBody) return badBody;
     /** @type {Peticion} */
     const p = { req, url, b, t: now() };
     if (route.acceso === 'publica') return route.run(p);
@@ -723,6 +722,27 @@ export function createAccounts({
     const a = await authenticate(req);
     if ('response' in a) return a.response;
     return accessDenied(route.acceso, a) || route.run({ ...p, a, me: a.user });
+  }
+
+  /**
+   * Acción pedida (último tramo de la ruta) y su definición; `route` null si no existe.
+   * @param {URL} url
+   */
+  function routeOf(url) {
+    const action = url.pathname.split('/').filter(Boolean).pop() || '';
+    return { action, route: Object.hasOwn(ROUTES, action) ? ROUTES[action] : null };
+  }
+
+  /**
+   * Respuesta de error si el cuerpo leído no sirve: demasiado grande (413) o,
+   * en un POST, JSON que no es un objeto (400). null si sirve.
+   * @param {Request} req
+   * @param {unknown} b cuerpo leído (null si no es POST)
+   */
+  function bodyProblem(req, b) {
+    if (b === TOO_LARGE) return fail(413, 'demasiado_grande', 'La solicitud es demasiado grande');
+    if (req.method === 'POST' && (!b || typeof b !== 'object')) return fail(400, 'json_invalido', 'JSON inválido');
+    return null;
   }
 
   /**

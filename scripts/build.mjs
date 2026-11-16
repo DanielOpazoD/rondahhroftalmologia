@@ -36,6 +36,8 @@ export const especialidadActiva = () => process.env.ESPECIALIDAD || 'oftalmologi
  * (por defecto oftalmologia). Así la plataforma no conoce la especialidad.
  * La plantilla PDF es opcional: una especialidad que dibuja su PDF desde cero
  * (p. ej. orl) no la tiene y recibe una plantilla vacía.
+ * @param {string} id
+ * @returns {import('esbuild').Plugin}
  */
 const especialidadPlugin = (id) => ({
   name: 'especialidad',
@@ -57,7 +59,7 @@ const especialidadPlugin = (id) => ({
  */
 export const PDF_FONTS = Object.freeze(['Helvetica', 'Helvetica-Bold', 'Symbol', 'ZapfDingbats']);
 
-/** Deja fuera las medidas de las fuentes estándar que no se usan. */
+/** Deja fuera las medidas de las fuentes estándar que no se usan. @returns {import('esbuild').Plugin} */
 const fuentesPlugin = () => ({
   name: 'fuentes-pdf',
   setup(b) {
@@ -69,7 +71,11 @@ const fuentesPlugin = () => ({
   },
 });
 
-/** Verifica el contrato de la especialidad antes de construir (falla si está mal configurada). */
+/**
+ * Verifica el contrato de la especialidad antes de construir (falla si está mal configurada).
+ * @param {string} id
+ * @returns {Promise<string>} el HTML de su formulario
+ */
 async function checkSpecialty(id) {
   const dir = resolve(root, 'src/specialties', id);
   const mod = await import(pathToFileURL(resolve(dir, 'index.js')).href);
@@ -80,12 +86,13 @@ async function checkSpecialty(id) {
   return formHtml;
 }
 
-/** Hash CSP (sha256, base64) del contenido exacto de un bloque inline. */
+/** Hash CSP (sha256, base64) del contenido exacto de un bloque inline. @param {string} content */
 export const cspHash = (content) => `'sha256-${createHash('sha256').update(content, 'utf8').digest('base64')}'`;
 
 /**
  * Política de seguridad de contenido. El único script permitido es el de la
  * app, identificado por su hash: un script inyectado (XSS) no se ejecuta.
+ * @param {string} scriptHash @param {string} styleHash
  */
 export function contentSecurityPolicy(scriptHash, styleHash) {
   return [
@@ -103,10 +110,10 @@ export function contentSecurityPolicy(scriptHash, styleHash) {
   ].join('; ');
 }
 
-/** Huella del contenido de la app (código, estilos y HTML), sin depender de sí misma. */
+/** Huella del contenido de la app (código, estilos y HTML), sin depender de sí misma. @param {...string} parts */
 export const buildIdOf = (...parts) => createHash('sha256').update(parts.join('\n')).digest('hex').slice(0, 12);
 
-/** Compilación que contiene un HTML ya construido (la escribe el build en APP.build). */
+/** Compilación que contiene un HTML ya construido (la escribe el build en APP.build). @param {string} html */
 export const appBuildOf = (html) => /data-build="([0-9a-f]{12})"/.exec(html)?.[1] || '';
 
 /** @returns {Promise<string>} el HTML final de la app */
@@ -173,7 +180,7 @@ export async function buildHtml() {
     .replace('<!-- @SCRIPT -->', () => `<script>${scriptBody}</script>`);
 }
 
-/** Extrae la CSP del HTML construido (para repetirla como cabecera HTTP). */
+/** Extrae la CSP del HTML construido (para repetirla como cabecera HTTP). @param {string} html */
 export function cspOf(html) {
   return /http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1] || '';
 }

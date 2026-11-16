@@ -18,6 +18,12 @@ import { html, setHtml } from './html.js';
 
 const MAX_ROWS = 500;
 
+/** ¿Es un evento sobre cuentas de usuario? @param {string} ev */
+const isAccountEvent = (ev) => ev.startsWith('usuario.') || ev === 'cuentas.activar';
+
+/** «1 atención», «3 atenciones». @param {number} n */
+const attentionCount = (n) => `${n} ${n === 1 ? 'atención' : 'atenciones'}`;
+
 /** @param {import('./context.js').AppContext} ctx */
 export function initAuditView(ctx) {
   const api = createAccountsApi();
@@ -69,10 +75,10 @@ export function initAuditView(ctx) {
     if (e.ev.startsWith('atencion.')) return recordLabel(id);
     if (e.ev === 'ficha.ver') return fileLabel(id);
     if (e.ev === 'adjunto.ver') return attachmentLabel(id);
-    if (e.ev.startsWith('usuario.') || e.ev === 'cuentas.activar') return accountLabel(e);
+    if (isAccountEvent(e.ev)) return accountLabel(e);
     if (e.ev === 'sync.escribir') return syncLabel(e.esp);
     if (e.ev === 'sesion.fin' && e.det?.motivo) return String(e.det.motivo);
-    if (e.n !== undefined) return `${e.n} ${e.n === 1 ? 'atención' : 'atenciones'}`;
+    if (e.n !== undefined) return attentionCount(e.n);
     return '';
   }
 

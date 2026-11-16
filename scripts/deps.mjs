@@ -20,6 +20,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * Capas y de qué capas puede depender cada una (además de sí misma).
  * `main` (el punto de entrada) puede usarlas todas.
+ * @type {Readonly<Record<string, {desc: string, allow: string[]}>>}
  */
 export const LAYERS = Object.freeze({
   lib: { desc: 'utilidades sin dominio (sha256, zip, xlsx)', allow: [] },
@@ -32,7 +33,10 @@ export const LAYERS = Object.freeze({
   ui: { desc: 'pantallas, acciones y servicios de la interfaz', allow: ['app', 'sync', 'core', 'storage', 'lib', 'config', 'specialties'] },
 });
 
-/** Paquetes externos: para qué se usan (cada uno debe estar aquí y en package.json). */
+/**
+ * Paquetes externos: para qué se usan (cada uno debe estar aquí y en package.json).
+ * @type {Readonly<Record<string, {uso: string, donde: string}>>}
+ */
 export const EXTERNAL = Object.freeze({
   'pdf-lib': {
     uso: 'Llenar la plantilla PDF de la atención y armar el PDF con anexos.',
@@ -178,7 +182,7 @@ function layerDeps(graph) {
       const to = layerOf(d);
       if (from === to || !graph.has(d)) continue;
       layerEdges.set(`${from}→${to}`, (layerEdges.get(`${from}→${to}`) || 0) + 1);
-      const rule = /** @type {Record<string, {allow: string[]}>} */ (LAYERS)[from];
+      const rule = LAYERS[from];
       if (from !== 'main' && !rule?.allow.includes(to)) violations.push(`${file} → ${d} (${from} no puede depender de ${to})`);
     }
   }
@@ -340,10 +344,7 @@ export function renderDoc(a) {
     '',
     '| Capa | Qué contiene | Puede depender de |',
     '|---|---|---|',
-    ...layers.map(
-      (l) =>
-        `| \`${l}/\` | ${/** @type {any} */ (LAYERS)[l].desc} | ${/** @type {any} */ (LAYERS)[l].allow.map((x) => `\`${x}\``).join(', ') || '— (nada)'} |`,
-    ),
+    ...layers.map((l) => `| \`${l}/\` | ${LAYERS[l].desc} | ${LAYERS[l].allow.map((x) => `\`${x}\``).join(', ') || '— (nada)'} |`),
     '| `main.js` | punto de entrada | todas |',
     '',
     'Además: `core/`, `app/`, `lib/`, `sync/` y `config/` no tocan el DOM ni el almacenamiento del navegador (lo impide ESLint), y la plataforma ve la especialidad solo a través de `specialties/activa/`.',
@@ -369,8 +370,7 @@ export function renderDoc(a) {
     ...[...a.external.keys()]
       .sort()
       .map(
-        (p) =>
-          `| \`${p}\` | ${pkgVersion(p)} | ${kind(p)} | ${/** @type {any} */ (EXTERNAL)[p]?.uso || '**sin documentar**'} | ${/** @type {any} */ (EXTERNAL)[p]?.donde || ''} |`,
+        (p) => `| \`${p}\` | ${pkgVersion(p)} | ${kind(p)} | ${EXTERNAL[p]?.uso || '**sin documentar**'} | ${EXTERNAL[p]?.donde || ''} |`,
       ),
     '',
     'Herramientas de desarrollo que no se importan desde el código: ' +

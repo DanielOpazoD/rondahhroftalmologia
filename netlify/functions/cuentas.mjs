@@ -6,6 +6,7 @@
 import { getStore } from '@netlify/blobs';
 import { createAccounts } from '../../src/sync/accounts.js';
 
+/** @param {Request} req */
 export default async (req) =>
   createAccounts({
     store: getStore({ name: 'hhr-rondas', consistency: 'strong' }),

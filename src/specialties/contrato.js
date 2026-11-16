@@ -116,15 +116,21 @@ function checkFields(mod, html, p) {
   const fields = Array.isArray(mod.TEXT_FIELDS) ? mod.TEXT_FIELDS : [];
   if (!fields.length) p.push('TEXT_FIELDS no puede estar vacío');
   for (const f of PLATFORM_FIELDS) if (!fields.includes(f)) p.push(`TEXT_FIELDS debe incluir "${f}" (lo usa la plataforma)`);
-  for (const f of fields) {
-    if (!SAFE_KEY.test(f)) p.push(`Campo inválido: ${f}`);
-    if (!mod.ETIQUETAS?.[f]) p.push(`Falta la etiqueta (ETIQUETAS) del campo "${f}"`);
-    // Los de la plataforma están en la parte común del formulario.
-    if (html !== undefined && !PLATFORM_FIELDS.includes(f) && !html.includes(`id="${f}"`)) {
-      p.push(`formulario.html no tiene el campo id="${f}"`);
-    }
-  }
+  for (const f of fields) checkField(mod, html, f, p);
   for (const f of mod.FREE_TEXT_FIELDS || []) if (!fields.includes(f)) p.push(`FREE_TEXT_FIELDS: "${f}" no está en TEXT_FIELDS`);
+}
+
+/**
+ * Un campo de texto: clave válida, con etiqueta y (si se da el HTML) en el formulario.
+ * @param {ModuloEspecialidad} mod @param {string | undefined} html @param {string} f @param {string[]} p
+ */
+function checkField(mod, html, f, p) {
+  if (!SAFE_KEY.test(f)) p.push(`Campo inválido: ${f}`);
+  if (!mod.ETIQUETAS?.[f]) p.push(`Falta la etiqueta (ETIQUETAS) del campo "${f}"`);
+  // Los de la plataforma están en la parte común del formulario.
+  if (html !== undefined && !PLATFORM_FIELDS.includes(f) && !html.includes(`id="${f}"`)) {
+    p.push(`formulario.html no tiene el campo id="${f}"`);
+  }
 }
 
 /**

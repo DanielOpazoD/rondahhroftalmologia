@@ -17,6 +17,13 @@ import { toast } from '../dom.js';
 
 const HAS_CLINICAL_FORMS = !!(GES_PATOLOGIAS.length || recetaTemplate);
 
+/** Qué abre cada opción del menú de formularios. */
+const FORM_OPENERS = new Map([
+  ['ges', downloadGes],
+  ['ipd', downloadIpd],
+  ['receta', downloadReceta],
+]);
+
 const FORM_CHOICES = [
   ...(GES_PATOLOGIAS.length
     ? [
@@ -39,6 +46,12 @@ export function formActions(ctx, store) {
   /** @param {string | undefined} id */
   const canContinue = (id) => allowed() && accountId() === id;
   const hasPatient = () => !!(ctx.rec.f.paciente_nombre?.trim() || ctx.rec.f.paciente_rut?.trim());
+  /**
+   * ¿Sigue la misma persona en la misma atención y paciente? (mientras el menú estaba abierto pudo cambiar)
+   * @param {string | undefined} userId @param {string} attentionId @param {string} patient
+   */
+  const stillSame = (userId, attentionId, patient) =>
+    canContinue(userId) && ctx.rec.id === attentionId && patientIdentityKey(ctx.rec) === patient;
 
   /** Abre la atención de la ficha seleccionada sin descartar cambios pendientes.
    * @param {string | undefined} userId
@@ -83,13 +96,9 @@ export function formActions(ctx, store) {
       const attentionId = ctx.rec.id;
       const patient = patientIdentityKey(ctx.rec);
       const choice = await openMenu(button, FORM_CHOICES, { label: 'Formularios del paciente' });
-      if (!canContinue(userId) || ctx.rec.id !== attentionId || patientIdentityKey(ctx.rec) !== patient) {
-        return;
-      }
-      const rec = ctx.rec;
-      if (choice === 'ges') return downloadGes(ctx, rec, button);
-      if (choice === 'ipd') return downloadIpd(ctx, rec, button);
-      if (choice === 'receta') return downloadReceta(ctx, rec, button);
+      if (!stillSame(userId, attentionId, patient)) return;
+      const open = choice === null ? undefined : FORM_OPENERS.get(choice);
+      if (open) return open(ctx, ctx.rec, button);
     },
 
     /** Persiste sin esperar al autoguardado ni reemplazar correcciones remotas de otros campos.

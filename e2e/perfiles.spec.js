@@ -113,3 +113,28 @@ test('quién registra: «Nuevo perfil…» desde la pregunta crea el perfil y lo
   await expect(page.locator('#userChip')).toHaveText('Enf. Nueva');
   await expect(page.locator('#histList')).toContainText('Enf. Nueva');
 });
+
+test('quién registra: el guardado automático no reemplaza la pregunta abierta', async ({ page }) => {
+  // Antes: al guardar, el guardado automático pendiente (1,2 s tras escribir)
+  // abría una segunda pregunta que reemplazaba al formulario «Nuevo perfil».
+  await openApp(page);
+  await addProfile(page, { nombre: 'Dr. Existente', rol: 'medico' });
+  await tab(page, 'Atención');
+  await fillPatient(page, { nombre: 'Paciente Espera' });
+  await save(page);
+  const dlg = page.locator('#dlg');
+  await dlg.locator('#dlg_perfil').selectOption({ label: '＋ Nuevo perfil…' });
+  await dlg.getByRole('button', { name: 'Continuar' }).click();
+  await expect(dlg.locator('#dlgTitle')).toHaveText('Nuevo perfil');
+  await page.waitForTimeout(2000); // más que la pausa del guardado automático
+  await expect(dlg.locator('#dlgTitle')).toHaveText('Nuevo perfil');
+  await dlg.locator('#dlg_nombres').fill('Enf. Paciente');
+  await dlg.locator('#dlg_rol').selectOption('enfermeria');
+  await dlg.getByRole('button', { name: 'Guardar' }).click();
+  await expect(dlg).toBeHidden();
+  await expect(page.locator('#userChip')).toHaveText('Enf. Paciente');
+  await expect(page.locator('#histList')).toContainText('Enf. Paciente');
+  // Una sola atención guardada (el guardado automático no creó otra).
+  await showPatientRecord(page, 'Paciente Espera');
+  await expect(page.locator('#patAttentions .prow')).toHaveCount(1);
+});

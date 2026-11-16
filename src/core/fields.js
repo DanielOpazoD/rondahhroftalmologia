@@ -72,18 +72,25 @@ export function unflatten(m) {
       if (isSafeKey(k)) out.checks[k] = true;
     } else if (path === 'cat') out.cat = /** @type {string} */ (v);
     else if (path === 'pacienteId') out.pacienteId = /** @type {string} */ (v);
-    else if (path.startsWith('proc.')) {
-      const rest = path.slice(5);
-      const dot = rest.lastIndexOf('.');
-      const id = rest.slice(0, dot);
-      const key = rest.slice(dot + 1);
-      if (!isSafeKey(id) || !PROC_KEYS.includes(key)) continue;
-      // Se arma por partes: el que quede sin `eye` se descarta abajo.
-      if (!Object.hasOwn(out.proc, id)) out.proc[id] = /** @type {import('../domain').ProcRealizado} */ ({});
-      /** @type {Record<string, string>} */ (out.proc[id])[key] = /** @type {string} */ (v);
-    }
+    else if (path.startsWith('proc.')) unflattenProcPart(out.proc, path.slice(5), /** @type {string} */ (v));
   }
   // Un procedimiento sin ojo no existe (p. ej. se quitó el ojo pero quedó una PIO).
   for (const [id, p] of Object.entries(out.proc)) if (!p.eye) delete out.proc[id];
   return out;
+}
+
+/**
+ * Agrega a `proc` una parte de un procedimiento (se ignora si la ruta no es válida).
+ * Se arma por partes: el que quede sin `eye` lo descarta `unflatten`.
+ * @param {Record<string, import('../domain').ProcRealizado>} proc
+ * @param {string} rest ruta sin el prefijo `proc.` (`<id>.<parte>`)
+ * @param {string} v
+ */
+function unflattenProcPart(proc, rest, v) {
+  const dot = rest.lastIndexOf('.');
+  const id = rest.slice(0, dot);
+  const key = rest.slice(dot + 1);
+  if (!isSafeKey(id) || !PROC_KEYS.includes(key)) return;
+  if (!Object.hasOwn(proc, id)) proc[id] = /** @type {import('../domain').ProcRealizado} */ ({});
+  /** @type {Record<string, string>} */ (proc[id])[key] = v;
 }

@@ -60,64 +60,99 @@ function toastSaved(warnings) {
 }
 
 /**
+ * Atención guardada del mismo paciente y día que la atención NUEVA en edición
+ * (p. ej. creada en otro equipo); ninguna si la atención ya existe.
+ * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @returns {AtencionGuardada | false | undefined} false o undefined si no hay
+ */
+const duplicateOfNew = (ctx) => !ctx.rec.id && findDuplicate(ctx.rec, /** @type {AtencionGuardada[]} */ (ctx.records));
+
+/**
+ * Refresca la vista tras guardar y avisa. El guardado automático no re-dibuja
+ * el formulario mientras se escribe (solo estado e historial) ni muestra mensajes.
+ * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @param {boolean} auto
+ * @param {string[]} warnings
+ */
+function refreshAfterSave(ctx, auto, warnings) {
+  if (auto) {
+    renderToolbar(ctx);
+    renderHistory(ctx);
+  } else syncAttentionView(ctx);
+  ctx.emit('datos');
+  ctx.sync?.schedule();
+  if (!auto) toastSaved(warnings);
+}
+
+/**
  * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
  *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function attentionActions(ctx, store) {
+  /** Guardado en curso (o el último): cada guardado espera al anterior. */
+  let saving = Promise.resolve(true);
+
+  /**
+   * Guarda la atención en edición.
+   * `auto`: guardado automático tras una pausa al escribir. Es silencioso:
+   * no muestra errores ni mensajes, y si la atención aún no se puede guardar
+   * (falta nombre/RUT o fecha) o duplicaría otra del mismo día, espera (la
+   * barra de estado dice por qué).
+   * @param {{auto?: boolean}} [o]
+   */
+  async function saveNow({ auto = false } = {}) {
+    const v = validateRecord(ctx.rec);
+    if (v.errors.length) {
+      if (auto) return false;
+      showValidation(ctx, { showErrors: true });
+      toast(v.errors[0]);
+      return false;
+    }
+    // Atención NUEVA de un paciente que ya tiene una ese día (p. ej. creada en otro equipo).
+    const dup = duplicateOfNew(ctx);
+    if (dup && auto) return false; // la barra ofrece continuar en la existente
+    await ctx.ensureUser();
+    if (dup && !(await resolveDuplicate(ctx, dup))) return false;
+    const stored = ctx.records.find((/** @type {Atencion} */ r) => r.id === ctx.rec.id) || null;
+    const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: clock.tick() });
+    const ok = ctx.persist(() => {
+      ctx.records = store.upsertRecord(rec);
+      ctx.syncPatientFromRecord(rec);
+      // Bitácora: qué cambió, cuándo y desde qué equipo.
+      const entry = makeAuditEntry({
+        tipo: stored ? 'editada' : 'creada',
+        before: stored,
+        after: rec,
+        at: rec.updated,
+        ...ctx.author(),
+      });
+      if (entry) store.addAuditEntry(rec.id, entry);
+      store.saveMedico({ n: rec.f.medico_nombre, r: rec.f.medico_rut, op: rec.f.operativo, ...nameParts(rec.f, 'medico_') });
+      store.saveDraft(rec);
+    });
+    if (!ok) return false;
+    ctx.rec = rec;
+    ctx.snap = structuredClone(rec);
+    ctx.dirty = false;
+    refreshAfterSave(ctx, auto, v.warnings);
+    return true;
+  }
+
   return {
     /**
-     * Guarda la atención en edición.
-     * `auto`: guardado automático tras una pausa al escribir. Es silencioso:
-     * no muestra errores ni mensajes, y si la atención aún no se puede guardar
-     * (falta nombre/RUT o fecha) o duplicaría otra del mismo día, espera (la
-     * barra de estado dice por qué).
+     * Guarda la atención en edición (ver saveNow). Los guardados van de a uno:
+     * si llega otro mientras uno espera (p. ej. el automático mientras se
+     * pregunta quién registra), espera su turno, y el automático ya no hace
+     * nada si no quedó nada pendiente. Antes, dos guardados a la vez abrían dos
+     * veces la pregunta y el segundo diálogo reemplazaba al primero.
      * @param {{auto?: boolean}} [o]
+     * @returns {Promise<boolean>}
      */
-    async save({ auto = false } = {}) {
-      const v = validateRecord(ctx.rec);
-      if (v.errors.length) {
-        if (auto) return false;
-        showValidation(ctx, { showErrors: true });
-        toast(v.errors[0]);
-        return false;
-      }
-      // Atención NUEVA de un paciente que ya tiene una ese día (p. ej. creada en otro equipo).
-      const dup = !ctx.rec.id && findDuplicate(ctx.rec, /** @type {AtencionGuardada[]} */ (ctx.records));
-      if (dup && auto) return false; // la barra ofrece continuar en la existente
-      await ctx.ensureUser();
-      if (dup && !(await resolveDuplicate(ctx, dup))) return false;
-      const stored = ctx.records.find((/** @type {Atencion} */ r) => r.id === ctx.rec.id) || null;
-      const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: clock.tick() });
-      const ok = ctx.persist(() => {
-        ctx.records = store.upsertRecord(rec);
-        ctx.syncPatientFromRecord(rec);
-        // Bitácora: qué cambió, cuándo y desde qué equipo.
-        const entry = makeAuditEntry({
-          tipo: stored ? 'editada' : 'creada',
-          before: stored,
-          after: rec,
-          at: rec.updated,
-          ...ctx.author(),
-        });
-        if (entry) store.addAuditEntry(rec.id, entry);
-        store.saveMedico({ n: rec.f.medico_nombre, r: rec.f.medico_rut, op: rec.f.operativo, ...nameParts(rec.f, 'medico_') });
-        store.saveDraft(rec);
-      });
-      if (!ok) return false;
-      ctx.rec = rec;
-      ctx.snap = structuredClone(rec);
-      ctx.dirty = false;
-      if (auto) {
-        // Sin re-dibujar el formulario mientras se escribe: solo estado e historial.
-        renderToolbar(ctx);
-        renderHistory(ctx);
-      } else syncAttentionView(ctx);
-      ctx.emit('datos');
-      ctx.sync?.schedule();
-      if (auto) return true;
-      toastSaved(v.warnings);
-      return true;
+    save(o = {}) {
+      const run = saving.then(() => (o.auto && ctx.rec.id && !ctx.dirty ? true : saveNow(o)));
+      saving = run.catch(() => false);
+      return run;
     },
 
     async newAttention() {
