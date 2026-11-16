@@ -38,7 +38,7 @@ export const ACCEPT = 'image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.odt,.
  * binario genérico, nunca se abre: un adjunto no debe poder ejecutar código
  * en el origen de la app.
  */
-export const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
+const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
 
 /** Tipo MIME normalizado (minúsculas, sin parámetros). @param {unknown} tipo */
 export const cleanType = (tipo) =>
@@ -73,9 +73,12 @@ export const chunkCount = (size) => Math.max(1, Math.ceil(size / CHUNK_BYTES));
 
 /** Nombre de archivo legible y seguro (sin rutas ni caracteres de control). @param {unknown} name */
 export function safeFileName(name) {
-  const base = String(name ?? '')
-    .split(/[\\/]/)
-    .pop()
+  // `split` siempre devuelve al menos un trozo: el `?? ''` solo satisface al tipo de `pop`.
+  const base = (
+    String(name ?? '')
+      .split(/[\\/]/)
+      .pop() ?? ''
+  )
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f<>:"|?*]/g, '')
     .trim();

@@ -22,9 +22,6 @@ import { flatten, unflatten, isSafeKey } from './fields.js';
 import { isFutureVersion } from './migrations.js';
 import { mergeAuditDocs } from './audit.js';
 
-// Se re-exportan: muchos módulos las toman de aquí (ver core/fields.js).
-export { flatten, unflatten, isSafeKey };
-
 /** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
 
 /**
@@ -62,23 +59,25 @@ export function ftOf(rec, path) {
 export function stampChanges(rec, before, now = Date.now()) {
   const paths = changedPaths(before, rec);
   if (!paths.length) return rec;
-  ensureFt(rec);
-  for (const p of paths) rec.ft[p] = now;
+  const { ft } = ensureFt(rec);
+  for (const p of paths) ft[p] = now;
   return rec;
 }
 
 /**
  * Da `ft` a un registro antiguo: todos sus campos con su fecha `updated`.
+ * Modifica y devuelve `rec`, ya con `ft` garantizado.
  * @template {RegistroFusionable} T
  * @param {T} rec
- * @returns {T}
+ * @returns {T & {ft: import('../domain').FechasPorCampo}}
  */
 export function ensureFt(rec) {
-  if (rec.ft) return rec;
-  const t = rec.updated || 0;
-  rec.ft = {};
-  if (t) for (const p of flatten(rec).keys()) rec.ft[p] = t;
-  return rec;
+  const ft = rec.ft ?? {};
+  if (!rec.ft) {
+    const t = rec.updated || 0;
+    if (t) for (const p of flatten(rec).keys()) ft[p] = t;
+  }
+  return Object.assign(rec, { ft });
 }
 
 /** Compara valores de forma determinista (para desempates). */
@@ -111,7 +110,7 @@ export function mergeRecords(a, b) {
   }
   const merged = unflatten(values);
   refreshNames(merged.f);
-  const created = [a.created, b.created].filter(Boolean);
+  const created = [a.created, b.created].flatMap((t) => (t ? [t] : []));
   return {
     ...b,
     ...a,
@@ -156,6 +155,27 @@ export function syncMerge(kind, local, remote) {
   return { data, sameAsRemote: sameContent(data, /** @type {RegistroFusionable} */ (remote)) };
 }
 
+/** @param {[string, unknown]} a @param {[string, unknown]} b */
+const byPath = (a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+
+/**
+ * Qué cuenta como contenido en cada tipo de elemento (ver syncFingerprint).
+ * @type {Record<string, (data: Record<string, unknown>) => unknown>}
+ */
+const CONTENT_OF = {
+  atencion: (data) => [...flatten(/** @type {RegistroFusionable} */ (data))].sort(byPath),
+  paciente: (data) => [...flatten(/** @type {RegistroFusionable} */ (data))].sort(byPath),
+  medico: (data) => [
+    data?.nombre || '',
+    data?.rut || '',
+    data?.apellido_paterno ?? null,
+    data?.apellido_materno ?? null,
+    data?.nombres ?? null,
+  ],
+  operativo: (data) => [data?.nombre || ''],
+  bitacora: (data) => /** @type {{id: string}[]} */ (data?.entries || []).map((e) => e.id).sort(),
+};
+
 /**
  * Representación canónica del CONTENIDO de un elemento sincronizado (sin
  * fechas de edición): dos versiones con igual huella tienen los mismos datos.
@@ -165,19 +185,5 @@ export function syncMerge(kind, local, remote) {
  * @param {Record<string, unknown>} data datos descifrados del elemento (forma según `kind`)
  */
 export function syncFingerprint(kind, data) {
-  if (kind === 'atencion' || kind === 'paciente') {
-    return JSON.stringify([...flatten(/** @type {RegistroFusionable} */ (data))].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
-  }
-  if (kind === 'medico') {
-    return JSON.stringify([
-      data?.nombre || '',
-      data?.rut || '',
-      data?.apellido_paterno ?? null,
-      data?.apellido_materno ?? null,
-      data?.nombres ?? null,
-    ]);
-  }
-  if (kind === 'operativo') return JSON.stringify([data?.nombre || '']);
-  if (kind === 'bitacora') return JSON.stringify(/** @type {{id: string}[]} */ (data?.entries || []).map((e) => e.id).sort());
-  return JSON.stringify(data ?? null);
+  return JSON.stringify(Object.hasOwn(CONTENT_OF, kind) ? CONTENT_OF[kind](data) : (data ?? null));
 }

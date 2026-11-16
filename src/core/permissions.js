@@ -12,7 +12,7 @@
  */
 
 /** Profesiones que editan atenciones clínicas. */
-export const CLINICAL_ROLES = Object.freeze(['medico', 'enfermeria', 'tens', 'tecnologo']);
+const CLINICAL_ROLES = Object.freeze(['medico', 'enfermeria', 'tens', 'tecnologo']);
 
 /** Permisos que la app distingue. */
 export const PERMISSIONS = Object.freeze({
@@ -29,7 +29,7 @@ export const PERMISSIONS = Object.freeze({
 });
 
 /** ¿Es una profesión clínica? @param {unknown} rol */
-export const isClinicalRole = (rol) => CLINICAL_ROLES.includes(/** @type {string} */ (rol));
+const isClinicalRole = (rol) => CLINICAL_ROLES.includes(/** @type {string} */ (rol));
 
 /**
  * ¿Puede esta cuenta hacer esto? Sin cuenta (cuentas no activadas, o modo

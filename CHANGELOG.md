@@ -1,12 +1,34 @@
 # Cambios
 
-## 2.23.0 — 2026-11-16
+## 2.25.0 — 2026-11-16
 
 ### Nuevo
 - **Botón circular de formularios**, fijo abajo a la derecha: abre Constancia GES, IPD y Receta para lentes para el paciente de la atención. En celular se ubica sobre la navegación.
 - **Guardado automático por atención** de los tres formularios: al cerrar, recargar o volver al paciente se recuperan los datos. Otro paciente y una atención nueva empiezan con sus propios valores. También se conservan los campos borrados expresamente.
 - Los borradores viajan en respaldos y sincronización con fechas por campo, sin reemplazar datos demográficos ni perfiles profesionales. El esquema v6 conserva los datos anteriores y protege los formularios frente a versiones antiguas.
 
+
+## 2.24.0 — 2026-11-16
+
+### Cimientos (docs/CALIDAD.md)
+- **Sin código muerto**: una prueba exige que cada `export` del código lo use otro archivo. Sobraban 37 exportaciones (526 → 489): 34 se usaban solo dentro de su propio archivo y 3 eran una re-exportación duplicada.
+- **HTML seguro, más estricto**: la función que marca un texto como HTML sin escapar ya no se puede usar fuera de su módulo.
+- **Funciones más simples**: la complejidad máxima bajó de 25 a 18 (sincronización, huella de contenido, bitácora, estadísticas ORL, ajustes, apertura de datos…); funciones sobre 15: de 35 a 23. El tope ahora también rige para `scripts/`.
+- **Cobertura mínima más alta**: líneas 97 %, ramas 87 %, funciones 92 % (antes 95 / 85 / 87).
+- Sin cambios de comportamiento: salidas (PDF, nota, Excel) idénticas y 200 escenarios de sincronización concurrente sin diferencias.
+
+## 2.23.0 — 2026-11-16
+
+### Correcciones (encontradas al revisar los tipos)
+- Ingresar un paciente con un RUT incompleto y sin nombre ya no guarda una atención sin ficha: pide el nombre o un RUT completo.
+- Desactivar la sincronización mientras sincroniza ya no la reactiva al terminar.
+- Dos sincronizaciones que se cruzan ya no pueden tomar una lista parcial del servidor como completa.
+
+### Cimientos (docs/CALIDAD.md)
+- **Tipos estrictos en todo el código** (120 de 120 módulos, antes 41): sin `any` implícito y con revisión de nulos. Una prueba impide desactivarlos o silenciarlos con `@ts-ignore`.
+- **Funciones simples**: la más compleja bajó de 108 a 25 (servidor de cuentas, sincronización, respaldo, PDF, nota, seudonimización, chequeo del equipo…). ESLint ahora pone tope a la complejidad y al anidamiento.
+- `npm run calidad`: informe de tipos, complejidad, capas y manejo de errores.
+- Salidas idénticas: PDF, nota y Excel verificados con las pruebas «golden».
 
 ## 2.22.0 — 2026-11-16
 

@@ -31,10 +31,51 @@ import { attachmentActions } from './actions/attachments.js';
 import { formActions } from './actions/forms.js';
 
 /** Pausa al escribir tras la que se guarda solo (ms). */
-export const AUTOSAVE_MS = 1200;
+const AUTOSAVE_MS = 1200;
 
 /**
  * @typedef {ReturnType<typeof createContext>} AppContext
+ */
+
+/**
+ * Sincronización tal como la usan las vistas (la crea createSyncController en
+ * syncController.js). Se describe aquí y no con ReturnType porque ese
+ * controlador recibe el contexto: el tipo sería circular. main.js comprueba
+ * al asignarlo que el controlador cumple esta forma.
+ * @typedef {object} SyncService
+ * @property {() => void} init al arrancar: consulta el servidor y escucha la conexión
+ * @property {() => void} start
+ * @property {() => void} schedule sincroniza pronto (agrupa cambios seguidos)
+ * @property {() => Promise<{got: number} | {error: string} | undefined>} syncNow
+ * @property {(passphrase: string) => Promise<SyncActivation | undefined>} activate
+ * @property {() => void} deactivate
+ * @property {boolean} enabled
+ * @property {(pass: string) => Promise<boolean>} verifyTeamPassword
+ * @property {SyncState} state
+ */
+
+/**
+ * Resultado de activar la sincronización: `wrong`, el servidor ya tiene otra
+ * contraseña; `serverReady: false`, falta configurar el servidor. Un miembro
+ * por estado para que comparar `status` distinga los casos.
+ * @typedef {{status: 'ok', serverReady: boolean} | {status: 'invalid', message: string} | {status: 'wrong', message: string} | {status: 'error', message: string}} SyncActivation
+ */
+
+/**
+ * @typedef {object} SyncState
+ * @property {boolean} available
+ * @property {boolean} configured
+ * @property {string} status off | idle | syncing | offline | error
+ * @property {string} message
+ * @property {number | null} lastSync
+ * @property {number} skewMin
+ * @property {string} server configured | unconfigured | unknown
+ * @property {string} hash valor para SYNC_TOKEN_SHA256
+ */
+
+/**
+ * Acciones que se agregan al contexto con Object.assign (ver ui/actions/).
+ * @typedef {ReturnType<typeof attentionActions> & ReturnType<typeof patientActions> & ReturnType<typeof catalogActions> & ReturnType<typeof outputActions> & ReturnType<typeof attachmentActions> & ReturnType<typeof formActions>} ContextActions
  */
 
 /**
@@ -42,6 +83,7 @@ export const AUTOSAVE_MS = 1200;
  * @param {string} templateB64 plantilla PDF en base64
  */
 export function createContext(store, templateB64) {
+  /** @type {Uint8Array | null} */
   let templateCache = null;
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let autosaveTimer;
@@ -49,20 +91,21 @@ export function createContext(store, templateB64) {
 
   /** Dibuja el contenido de una pestaña que depende de los datos. @param {string} id */
   function renderTab(id) {
-    if (id === 't-reg') renderRegistry(ctx);
-    else if (id === 't-ing') renderIntake(ctx);
+    if (id === 't-reg') renderRegistry(app);
+    else if (id === 't-ing') renderIntake(app);
     else if (id === 't-est') {
-      renderStats(ctx);
-      renderExportView(ctx);
+      renderStats(app);
+      renderExportView(app);
     }
   }
 
+  /** @typedef {typeof ctx & ContextActions} FullContext contexto con las acciones ya agregadas (Object.assign, abajo) */
   const ctx = {
     store,
     /** Atención en edición. */
     rec: blankRecord(store.loadMedico()),
     /** Copia de `rec` tras la última edición: sirve para saber qué campos cambian (sellos por campo). */
-    snap: null,
+    snap: /** @type {import('../core/record.js').AtencionEnBlanco | null} */ (null),
     /** Hay cambios no guardados. */
     dirty: false,
     records: store.loadRecords(),
@@ -78,7 +121,7 @@ export function createContext(store, templateB64) {
     filtered: () => filterRecords(ctx.records, ctx.filter),
     templateBytes: () => (templateCache ||= base64ToBytes(templateB64)),
     pdfOptions: () => ({ flatten: !!ctx.settings.pdfFlatten, footer: !!ctx.settings.pdfFooter }),
-    note: (rec) => buildNote(rec, ctx.procs, { pie: ctx.settings.notaPie }),
+    note: (/** @type {import('../domain').Atencion} */ rec) => buildNote(rec, ctx.procs, { pie: ctx.settings.notaPie }),
     /** Muestra el aviso de versión nueva (lo asigna updateNotice.js). */
     showUpdate: /** @type {(version?: string) => void} */ (() => {}),
     /** Modo práctica (datos de ejemplo, sin sincronización; ver practice.js). */
@@ -89,7 +132,7 @@ export function createContext(store, templateB64) {
     storageHealth: () => ({ pending: 0 }),
     /** Lleva a un elemento de Ajustes, abriendo su sección (lo asigna settingsSections.js). @type {(selector: string) => HTMLElement | null} */
     showSettings: (/** @type {string} */ _selector) => /** @type {HTMLElement | null} */ (null),
-    /** Cuentas con nombre (lo asigna usersView.js; solo administradores). @type {() => Promise<any[]>} */
+    /** Cuentas con nombre (lo asigna usersView.js; solo administradores). @type {() => Promise<import('./usersView.js').UsuarioVista[]>} */
     loadAccountUsers: async () => [],
     /** Aplica los permisos de la sesión a la interfaz (lo asigna main.js; ver permissionsView.js). */
     applyPermissions: /** @type {() => void} */ (() => {}),
@@ -101,6 +144,8 @@ export function createContext(store, templateB64) {
     openPatientId: null,
     /** Sexo elegido en el formulario de Ingreso. */
     intakeSexo: '',
+    /** Ficha elegida en el formulario de Ingreso (lo asigna intakeView.js; null: paciente nuevo). */
+    intakePatientId: /** @type {string | null} */ (null),
 
     /* ---------------------------------------------------------------
      * SERVICIOS: se declaran aquí y los asigna main.js al arrancar (en este
@@ -132,7 +177,11 @@ export function createContext(store, templateB64) {
     /** Nombre de este equipo en la bitácora. */
     deviceName: () => ctx.settings.deviceName?.trim() || 'Equipo ' + store.loadDeviceId().slice(-4).toUpperCase(),
 
-    /** Guarda en localStorage informando al usuario si falla. Devuelve true si funcionó. */
+    /**
+     * Guarda en localStorage informando al usuario si falla. Devuelve true si funcionó.
+     * @param {() => void} fn
+     * @returns {boolean}
+     */
     persist(fn) {
       try {
         fn();
@@ -154,13 +203,13 @@ export function createContext(store, templateB64) {
       ctx.persist(() => store.saveDraft(ctx.rec));
       ctx.scheduleAutosave();
       if (silent) {
-        showValidation(ctx);
-        renderToolbar(ctx);
-      } else syncAttentionView(ctx);
+        showValidation(app);
+        renderToolbar(app);
+      } else syncAttentionView(app);
     },
 
     onFilterChange() {
-      renderFilter(ctx);
+      renderFilter(app);
       if (ctx.currentTab === 't-est') renderTab('t-est');
     },
 
@@ -171,18 +220,19 @@ export function createContext(store, templateB64) {
     scheduleAutosave() {
       clearTimeout(autosaveTimer);
       autosaveTimer = setTimeout(() => {
-        if (ctx.dirty) void ctx.save({ auto: true });
+        if (ctx.dirty) void app.save({ auto: true });
       }, AUTOSAVE_MS);
     },
     /** Guarda ya lo pendiente (al ocultar o cerrar la página). */
     flushAutosave() {
       clearTimeout(autosaveTimer);
-      if (ctx.dirty) void ctx.save({ auto: true });
+      if (ctx.dirty) void app.save({ auto: true });
     },
 
     /** Anuncia un cambio (ver ui/events.js): las vistas suscritas se re-dibujan una vez. */
-    emit: (topic) => bus.emit(topic),
-    on: (topic, fn) => bus.on(topic, fn),
+    emit: (/** @type {string} */ topic) => bus.emit(topic),
+    /** Se suscribe a un tema; devuelve la función para desuscribirse. */
+    on: (/** @type {string} */ topic, /** @type {(topics: string[]) => void} */ fn) => bus.on(topic, fn),
 
     /**
      * Re-dibuja lo que depende de los registros guardados. Solo la pestaña
@@ -190,7 +240,7 @@ export function createContext(store, templateB64) {
      * llega por sincronización no re-dibuja listas ocultas.
      */
     refreshLists() {
-      renderFilter(ctx);
+      renderFilter(app);
       renderTab(ctx.currentTab);
     },
 
@@ -201,15 +251,16 @@ export function createContext(store, templateB64) {
       ctx.settings = store.loadSettings();
       ctx.medicos = store.loadMedicos();
       ctx.operativos = store.loadOperativos();
-      ctx.seedCatalogs();
-      ctx.ensurePatients(); // respaldos anteriores a la 2.9.0 no traen fichas
-      renderCatalogSettings(ctx);
-      renderProcList(ctx);
-      renderSettings(ctx);
-      syncAttentionView(ctx);
+      app.seedCatalogs();
+      app.ensurePatients(); // respaldos anteriores a la 2.9.0 no traen fichas
+      renderCatalogSettings(app);
+      renderProcList(app);
+      renderSettings(app);
+      syncAttentionView(app);
       ctx.emit(TOPICS.DATOS);
     },
 
+    /** @param {string} id pestaña ('t-at', 't-reg', …) */
     showTab(id) {
       ctx.currentTab = id;
       // Ajustes no es una pestaña: se abre con el logo, que queda marcado.
@@ -225,7 +276,7 @@ export function createContext(store, templateB64) {
       ctx.emit('tab:' + id);
       if (id === 't-est') {
         placeFilter(id);
-        renderFilter(ctx);
+        renderFilter(app);
       }
       renderTab(id);
     },
@@ -243,8 +294,11 @@ export function createContext(store, templateB64) {
     version: APP.version,
     especialidadNombre: ESPECIALIDAD.nombre,
     /** Controlador de sincronización (se asigna en main.js). */
-    sync: null,
+    sync: /** @type {SyncService | null} */ (null),
   };
+  // El mismo objeto, con el tipo que ya incluye las acciones (se agregan abajo
+  // con Object.assign, antes de que se use cualquiera de sus métodos).
+  const app = /** @type {FullContext} */ (ctx);
   Object.assign(
     ctx,
     attentionActions(ctx, store),
@@ -257,7 +311,5 @@ export function createContext(store, templateB64) {
   // Las listas se re-dibujan cuando cambian los datos (agrupado por el bus).
   bus.on(TOPICS.DATOS, () => ctx.refreshLists());
   ctx.snap = structuredClone(ctx.rec);
-  return /** @type {typeof ctx & ReturnType<typeof attentionActions> & ReturnType<typeof patientActions> & ReturnType<typeof catalogActions> & ReturnType<typeof outputActions> & ReturnType<typeof formActions>} */ (
-    ctx
-  );
+  return app;
 }

@@ -10,11 +10,11 @@ import { fetchPublishedVersion } from './version.js';
 const EVERY_MS = 30 * 60_000;
 const MIN_GAP_MS = 5 * 60_000;
 
-/** @param {any} ctx contexto de la aplicación */
+/** @param {import('./context.js').AppContext} ctx */
 export function startUpdateWatcher(ctx) {
   let last = Date.now(); // recién abierta: ya es la versión publicada
   const bar = $('#updateBar');
-  const show = (version) => {
+  const show = (/** @type {string | undefined} */ version) => {
     $('#updateText').textContent = version ? `Hay una versión nueva de la app (${version}).` : 'Hay una versión nueva de la app.';
     bar.hidden = false;
   };

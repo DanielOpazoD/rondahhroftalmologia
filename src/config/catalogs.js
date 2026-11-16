@@ -95,7 +95,12 @@ export const SEXOS = [
 /** Rangos plausibles de datos demográficos. */
 export const LIMITS = Object.freeze({ edadMax: 120 });
 
-/** Ajustes por defecto de la app. */
+/**
+ * Ajustes de la app en este equipo.
+ * @typedef {{deviceName: string, pdfFlatten: boolean, pdfFooter: boolean, notaPie: string}} Ajustes
+ */
+
+/** Ajustes por defecto de la app. @type {Readonly<Ajustes>} */
 export const DEFAULT_SETTINGS = Object.freeze({
   /** Nombre de este equipo en la bitácora (p. ej. «Box 1»). */
   deviceName: '',

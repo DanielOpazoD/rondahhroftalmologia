@@ -18,8 +18,30 @@ import { readPatientItems, writePatientItems, readSpecialtyItems, writeSpecialty
 
 const INTERVAL_MS = 2 * 60 * 1000;
 /** Espacio del servidor con las fichas de pacientes, compartido por todas las especialidades. */
-export const PATIENTS_SPACE = 'pacientes';
+const PATIENTS_SPACE = 'pacientes';
 const DEBOUNCE_MS = 4000;
+
+/** @typedef {import('../domain').ElementoSync} ElementoSync */
+
+/**
+ * Estado interno del motor.
+ * @typedef {{
+ *   config: ReturnType<import('./context.js').AppContext['store']['loadSyncConfig']>,
+ *   key: CryptoKey | null,
+ *   running: boolean,
+ *   server: string,
+ *   again: boolean,
+ *   status: string,
+ *   message: string,
+ *   timer: ReturnType<typeof setTimeout> | undefined,
+ *   interval: ReturnType<typeof setInterval> | undefined,
+ *   caches: {pacientes: import('../sync/client.js').SyncCache, especialidad: import('../sync/client.js').SyncCache},
+ *   skewMin?: number,
+ *   skewWarned?: boolean,
+ *   newerWarned?: boolean,
+ * }} EstadoSync
+ *   `skewMin`: minutos de desfase del reloj con el servidor; `skewWarned` / `newerWarned`: ya se avisó.
+ */
 
 export const STATUS_LABELS = Object.freeze({
   off: 'Desactivada',
@@ -36,6 +58,7 @@ export const STATUS_LABELS = Object.freeze({
  */
 export function createSyncController(ctx, { onChange = () => {}, notify = () => {} } = {}) {
   const { store } = ctx;
+  /** @type {EstadoSync} */
   const st = {
     config: store.loadSyncConfig(),
     key: null,
@@ -44,8 +67,8 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
     again: false,
     status: 'off', // off | idle | syncing | offline | error
     message: '',
-    timer: null,
-    interval: null,
+    timer: undefined,
+    interval: undefined,
     /** Estado entre sincronizaciones por espacio (solo cambios, huellas verificadas). */
     caches: { pacientes: createSyncCache(), especialidad: createSyncCache() },
   };
@@ -56,14 +79,19 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
   // En modo práctica nunca se sincroniza: los datos de ejemplo no salen del equipo.
   const available = () => !ctx.practice && cryptoAvailable() && /^https?:$/.test(location.protocol);
 
+  /**
+   * @param {string} status off | idle | syncing | offline | error
+   * @param {string} [message]
+   */
   const setStatus = (status, message = '') => {
     st.status = status;
     st.message = message;
     onChange();
   };
 
-  async function getKey() {
-    st.key ||= await importEncKey(st.config.encKey);
+  /** @param {string} encKey clave del equipo (de la configuración vigente) @returns {Promise<CryptoKey>} */
+  async function getKey(encKey) {
+    st.key ||= await importEncKey(encKey);
     return st.key;
   }
 
@@ -71,6 +99,7 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
    * Compara la hora del PC con la del servidor. Un reloj desajustado no rompe
    * la sincronización (ver core/clock.js), pero puede decidir mal qué edición
    * simultánea es la más reciente: se avisa para corregirlo.
+   * @param {string | null} serverDate cabecera Date de la última respuesta (null si aún no hay)
    */
   function checkClock(serverDate) {
     const server = Date.parse(serverDate || '');
@@ -88,6 +117,7 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
 
   /** Fichas de pacientes (espacio común). */
   const readPatients = () => readPatientItems(store);
+  /** @param {ElementoSync[]} items */
   function writePatients(items) {
     writePatientItems(store, items);
     for (const i of items) clock.observe(i.updated);
@@ -97,7 +127,11 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
   /** Todo lo que se sincroniza de la especialidad (ver app/syncData.js). */
   const readLocal = () => readSpecialtyItems(store);
 
-  /** Aplica cambios que llegaron de otros equipos al estado de la app. */
+  /**
+   * Aplica cambios que llegaron de otros equipos al estado de la app.
+   * @param {ElementoSync[]} items
+   * @param {Record<string, number>} tombstones
+   */
   function writeLocal(items, tombstones) {
     writeSpecialtyItems(store, items, tombstones);
     // Reloj lógico: las ediciones siguientes quedarán después de todo lo recibido.
@@ -117,6 +151,8 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
   /**
    * Contenido de los adjuntos (espacio `<especialidad>-adjuntos`): solo si hay
    * algo que subir, bajar o borrar. Ver sync/attachments.js.
+   * @param {CryptoKey} key
+   * @param {string} token
    */
   async function syncAttachments(key, token) {
     if (!store.supportsAttachments()) return;
@@ -125,7 +161,10 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
     const uploaded = store.loadAttachmentsUploaded();
     if (!attachmentsPending(metas, await store.attachmentDataIds(), (id) => uploaded.has(id), purges)) return;
     const r = await syncAttachmentContent({
-      api: createSyncApi({ token, esp: `${ESPECIALIDAD.id}-adjuntos` }),
+      // sync/attachments.js describe `put` con object[]; el cliente pide SyncBlob[] (lo que esa capa le pasa).
+      api: /** @type {import('../sync/attachments.js').AttSyncDeps['api']} */ (
+        createSyncApi({ token, esp: `${ESPECIALIDAD.id}-adjuntos` })
+      ),
       key,
       metas,
       purges,
@@ -156,6 +195,80 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
   }
 
   /**
+   * Las dos pasadas de una sincronización: fichas de pacientes (espacio común a
+   * todas las especialidades) y luego lo de la especialidad.
+   * @param {string} token
+   * @param {string} encKey
+   */
+  async function syncSpaces(token, encKey) {
+    const key = await getKey(encKey);
+    const common = { key, mergeFn: syncMerge, fingerprint: syncFingerprint, encKey };
+    // 1) Fichas de pacientes: espacio COMÚN a todas las especialidades.
+    const resP = await syncOnce({
+      ...common,
+      api: createSyncApi({ token, esp: PATIENTS_SPACE }),
+      // El id de una ficha es la huella del RUT: el servidor ve solo un id opaco.
+      opaqueIds: true,
+      cache: st.caches.pacientes,
+      readLocal: readPatients,
+      writeLocal: writePatients,
+    });
+    // 2) Atenciones, catálogos y bitácora: espacio de la especialidad.
+    const api = createSyncApi({ token, esp: ESPECIALIDAD.id });
+    // El id de un perfil de médico es la huella de su RUT: el servidor ve un id opaco.
+    const resE = await syncOnce({
+      ...common,
+      api,
+      readLocal,
+      writeLocal,
+      opaqueIds: opaqueInSpecialty,
+      cache: st.caches.especialidad,
+    });
+    const got = resP.added + resP.updated + resP.deleted + resE.added + resE.updated + resE.deleted;
+    return { key, api, got };
+  }
+
+  /**
+   * Lo que el servidor dijo de paso: hora (reloj del PC) y versión de protocolo
+   * (si es más nueva, hay una app más nueva publicada).
+   * @param {{serverDate: string | null, serverProtocol: number}} api
+   */
+  function checkServer(api) {
+    checkClock(api.serverDate);
+    if (api.serverProtocol > PROTOCOL_VERSION && !st.newerWarned) {
+      st.newerWarned = true;
+      ctx.showUpdate();
+    }
+  }
+
+  /**
+   * Estado y mensaje según el error de una sincronización.
+   * @param {unknown} e
+   * @returns {{error: string}}
+   */
+  function syncFailed(e) {
+    const authCodes = ['sesion_invalida', 'cuenta_desactivada', 'debe_cambiar_clave'];
+    if (e instanceof SyncHttpError && authCodes.includes(e.code)) {
+      // La sesión ya no sirve, o (con la contraseña del equipo) las cuentas se activaron: hay que entrar.
+      setStatus('off', e.message);
+      ctx.accounts?.onAuthError(e.code);
+      return { error: e.message };
+    }
+    const offline = e instanceof SyncHttpError && e.status === 0;
+    if (offline) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
+    else if (e instanceof SyncHttpError && e.status === 426) {
+      setStatus('error', 'Esta versión de la app es antigua para el servidor: recarga la página para actualizarla.');
+    } else if (e instanceof DecryptError) {
+      setStatus(
+        'error',
+        'Hay datos en el servidor que no se pueden descifrar con esta contraseña. Revisa que sea la misma en todos los PC.',
+      );
+    } else setStatus('error', /** @type {Error} */ (e).message || String(e));
+    if (!offline) logError('sincronización', e);
+    return { error: st.message };
+  }
+
+  /**
    * Sincroniza ahora. Devuelve qué pasó (para «Sincronizar ahora»): cuántos
    * cambios llegaron, o el error; undefined si no se pudo empezar.
    * @returns {Promise<{got: number} | {error: string} | undefined>}
@@ -172,66 +285,26 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
       if (ctx.accounts?.user) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
       return;
     }
+    // Pudo desactivarse mientras se obtenía la sesión.
+    if (!st.config) return;
     st.running = true;
     setStatus('syncing');
     try {
-      const key = await getKey();
-      const common = { key, mergeFn: syncMerge, fingerprint: syncFingerprint, encKey: st.config.encKey };
-      // 1) Fichas de pacientes: espacio COMÚN a todas las especialidades.
-      const resP = await syncOnce({
-        ...common,
-        api: createSyncApi({ token, esp: PATIENTS_SPACE }),
-        // El id de una ficha es la huella del RUT: el servidor ve solo un id opaco.
-        opaqueIds: true,
-        cache: st.caches.pacientes,
-        readLocal: readPatients,
-        writeLocal: writePatients,
-      });
-      // 2) Atenciones, catálogos y bitácora: espacio de la especialidad.
-      const api = createSyncApi({ token, esp: ESPECIALIDAD.id });
-      // El id de un perfil de médico es la huella de su RUT: el servidor ve un id opaco.
-      const resE = await syncOnce({
-        ...common,
-        api,
-        readLocal,
-        writeLocal,
-        opaqueIds: opaqueInSpecialty,
-        cache: st.caches.especialidad,
-      });
-      const res = { added: resP.added + resE.added, updated: resP.updated + resE.updated, deleted: resP.deleted + resE.deleted };
+      const { key, api, got } = await syncSpaces(token, st.config.encKey);
       ctx.ensurePatients();
       await syncAttachments(key, token);
       void ctx.accounts?.flushEvents();
-      checkClock(api.serverDate);
-      // El servidor habla una versión de protocolo más nueva: hay una app más nueva publicada.
-      if (api.serverProtocol > PROTOCOL_VERSION && !st.newerWarned) {
-        st.newerWarned = true;
-        ctx.showUpdate();
+      checkServer(api);
+      // Si se desactivó durante la sincronización, sigue desactivada: no se guarda una configuración incompleta.
+      if (st.config) {
+        st.config = { ...st.config, lastSync: Date.now() };
+        store.saveSyncConfig(st.config);
+        setStatus('idle');
       }
-      st.config = { ...st.config, lastSync: Date.now() };
-      store.saveSyncConfig(st.config);
-      setStatus('idle');
       // Silenciosa: lo que cambie en la atención abierta se avisa en ella (absorbRemote).
-      return { got: res.added + res.updated + res.deleted };
+      return { got };
     } catch (e) {
-      const authCodes = ['sesion_invalida', 'cuenta_desactivada', 'debe_cambiar_clave'];
-      if (e instanceof SyncHttpError && authCodes.includes(e.code)) {
-        // La sesión ya no sirve, o (con la contraseña del equipo) las cuentas se activaron: hay que entrar.
-        setStatus('off', e.message);
-        ctx.accounts?.onAuthError(e.code);
-        return { error: e.message };
-      }
-      if (e instanceof SyncHttpError && e.status === 0) setStatus('offline', 'Sin conexión: se sincronizará al volver internet.');
-      else if (e instanceof SyncHttpError && e.status === 426) {
-        setStatus('error', 'Esta versión de la app es antigua para el servidor: recarga la página para actualizarla.');
-      } else if (e instanceof DecryptError) {
-        setStatus(
-          'error',
-          'Hay datos en el servidor que no se pueden descifrar con esta contraseña. Revisa que sea la misma en todos los PC.',
-        );
-      } else setStatus('error', e.message || String(e));
-      if (!(e instanceof SyncHttpError && e.status === 0)) logError('sincronización', e);
-      return { error: st.message };
+      return syncFailed(e);
     } finally {
       st.running = false;
       if (st.again) {
@@ -283,13 +356,15 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
       let serverReady = true;
       try {
         await createSyncApi({ token: keys.token, esp: ESPECIALIDAD.id }).list();
-      } catch (e) {
+      } catch (err) {
+        // Error de la API (SyncHttpError): `status` 0 = sin conexión.
+        const e = /** @type {{status?: number}} */ (err);
         if (e.status === 401) {
           st.server = 'configured';
           setStatus('off');
           return { status: 'wrong', message: 'Contraseña del equipo incorrecta' };
         }
-        if (e.status !== 503 && e.status !== 0 && e.status !== 404) throw e;
+        if (e.status !== 503 && e.status !== 0 && e.status !== 404) throw err;
         // 503/404: servidor aún sin configurar; 0: sin conexión. Se activa igual.
         serverReady = e.status === 0;
       }
@@ -300,8 +375,9 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
       start();
       return { status: 'ok', serverReady };
     } catch (e) {
-      setStatus('error', e.message || String(e));
-      return { status: 'error', message: e.message || String(e) };
+      const message = /** @type {Error} */ (e).message || String(e);
+      setStatus('error', message);
+      return { status: 'error', message };
     }
   }
 
@@ -347,7 +423,10 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
     get enabled() {
       return !!st.config;
     },
-    /** ¿Es la contraseña del equipo? (desbloquear si se olvidó el PIN). */
+    /**
+     * ¿Es la contraseña del equipo? (desbloquear si se olvidó el PIN).
+     * @param {string} pass
+     */
     async verifyTeamPassword(pass) {
       if (!st.config || passphraseProblem(pass)) return false;
       const keys = await deriveTeamKeys(pass);

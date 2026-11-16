@@ -29,16 +29,29 @@ const shift = (iso, days) => {
 };
 
 /**
+ * Los datos de ejemplo son fijos y válidos: si makeMedico/makeOperativo los
+ * rechazara (null), es un error del código, no de los datos.
+ * @template T
+ * @param {T | null} v
+ * @param {string} que
+ * @returns {T}
+ */
+function valido(v, que) {
+  if (v === null) throw new Error(`Dato de ejemplo inválido: ${que}`);
+  return v;
+}
+
+/**
  * @param {{today: string, now: number, casos: import('../domain').CasoEjemplo[]}} o
  *   `casos`: parte clínica de ejemplo que aporta la especialidad.
  */
 export function buildPracticeData({ today, now, casos }) {
-  const operativo = makeOperativo({ nombre: 'Operativo de práctica' }, now);
+  const operativo = valido(makeOperativo({ nombre: 'Operativo de práctica' }, now), 'operativo');
   const medicos = [
     makeMedico({ nombre: 'Dra. Ejemplo', rut: rut('7777777'), rol: 'medico' }, now),
     makeMedico({ nombre: 'Enf. Ejemplo', rol: 'enfermeria' }, now),
     makeMedico({ nombre: 'Admisión Ejemplo', rol: 'admision' }, now),
-  ];
+  ].map((m) => valido(m, 'perfil'));
   let seq = 0;
   /** @type {(p: string[], fecha: string, caso: import('../domain').CasoEjemplo | null) => import('../domain').Atencion} */
   const record = (p, fecha, caso) => {

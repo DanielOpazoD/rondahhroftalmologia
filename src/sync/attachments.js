@@ -16,7 +16,7 @@ import { remoteVersions, chunks as batches } from './protocol.js';
 import { chunkId, splitChunks, joinChunks, sha256Hex } from '../core/attachments.js';
 
 /** Partes por solicitud: ~350.000 caracteres cada una cifrada, bajo el límite de 5,5 MB por solicitud. */
-export const CHUNKS_PER_REQUEST = 12;
+const CHUNKS_PER_REQUEST = 12;
 
 /** @param {Uint8Array} bytes */
 const toB64 = (bytes) => {
@@ -60,23 +60,12 @@ export function attachmentsPending(metas, localIds, isUploaded, purges) {
 }
 
 /**
- * Sube, baja y borra contenido de adjuntos.
- * @param {AttSyncDeps} deps
- * @returns {Promise<{subidos: number, bajados: number, borrados: string[], fallidos: string[]}>}
+ * 1. Subir: el contenido de este equipo que el servidor no tiene completo (en lotes).
+ * @param {AttSyncDeps} deps @param {Set<string>} localIds @param {(m: AttMeta) => boolean} complete
+ * @returns {Promise<number>} adjuntos subidos
  */
-export async function syncAttachmentContent({ api, key, metas, purges, local, batchSize = CHUNKS_PER_REQUEST }) {
-  const remote = remoteVersions((await api.list()).items || []);
-  const localIds = new Set(await local.ids());
-  /** ¿Están todas las partes de este adjunto en el servidor (con contenido)? */
-  const complete = (/** @type {AttMeta} */ m) => {
-    for (let n = 0; n < m.partes; n++) if (!remote.has(chunkId(m.id, n)) || remote.get(chunkId(m.id, n))?.u !== m.created) return false;
-    return true;
-  };
+async function uploadContent({ api, key, metas, local, batchSize = CHUNKS_PER_REQUEST }, localIds, complete) {
   let subidos = 0;
-  let bajados = 0;
-  const fallidos = [];
-
-  // 1. Subir: contenido de este equipo que el servidor no tiene completo.
   /** @type {object[]} */
   let pending = [];
   /** @type {string[]} */
@@ -106,34 +95,39 @@ export async function syncAttachmentContent({ api, key, metas, purges, local, ba
     pendingAtts.push(m.id);
   }
   await flush();
+  return subidos;
+}
 
-  // 2. Bajar: adjuntos con metadatos pero sin contenido en este equipo, si el servidor ya lo tiene completo.
-  for (const m of metas) {
-    if (localIds.has(m.id) || !complete(m)) continue;
-    /** @type {Uint8Array[]} */
-    const parts = new Array(m.partes);
-    const wanted = Array.from({ length: m.partes }, (_, n) => ({ id: chunkId(m.id, n), u: m.created }));
-    for (const batch of batches(wanted, batchSize)) {
-      const res = await api.get(batch);
-      for (const it of res.items || []) {
-        if (it.missing) continue;
-        const content = await decryptPayload(key, it.id, it.u, it);
-        if (typeof content?.b !== 'string') continue;
-        parts[Number(it.id.slice(m.id.length + 1))] = b64ToBytes(content.b);
-      }
+/**
+ * Baja y une las partes de un adjunto. Devuelve el contenido solo si tiene
+ * exactamente el tamaño y la huella de sus metadatos (integridad); si no, null.
+ * @param {AttSyncDeps} deps @param {AttMeta} m
+ * @returns {Promise<Uint8Array | null>}
+ */
+async function downloadOne({ api, key, batchSize = CHUNKS_PER_REQUEST }, m) {
+  /** @type {Uint8Array[]} */
+  const parts = new Array(m.partes);
+  const wanted = Array.from({ length: m.partes }, (_, n) => ({ id: chunkId(m.id, n), u: m.created }));
+  for (const batch of batches(wanted, batchSize)) {
+    const res = await api.get(batch);
+    for (const it of res.items || []) {
+      if (it.missing) continue;
+      const content = await decryptPayload(key, it.id, it.u, it);
+      if (typeof content?.b !== 'string') continue;
+      parts[Number(it.id.slice(m.id.length + 1))] = b64ToBytes(content.b);
     }
-    const bytes = parts.every(Boolean) ? joinChunks(parts) : null;
-    // Integridad: el contenido debe tener exactamente la huella de sus metadatos.
-    if (!bytes || bytes.length !== m.tamano || (await sha256Hex(bytes)) !== m.sha256) {
-      fallidos.push(m.id);
-      continue;
-    }
-    await local.save(m.id, bytes);
-    local.markUploaded(m.id); // ya está en el servidor
-    bajados++;
   }
+  const bytes = parts.every(Boolean) ? joinChunks(parts) : null;
+  if (!bytes || bytes.length !== m.tamano || (await sha256Hex(bytes)) !== m.sha256) return null;
+  return bytes;
+}
 
-  // 3. Borrar del servidor el contenido de los adjuntos eliminados (se reemplaza por una lápida pequeña).
+/**
+ * 3. Borrar del servidor el contenido de los adjuntos eliminados (cada parte se reemplaza por una lápida pequeña).
+ * @param {AttSyncDeps} deps @param {Map<string, {u: number}>} remote
+ * @returns {Promise<string[]>} ids borrados
+ */
+async function purgeContent({ api, key, purges, batchSize = CHUNKS_PER_REQUEST }, remote) {
   const borrados = [];
   for (const id of purges) {
     const tombs = [];
@@ -145,5 +139,41 @@ export async function syncAttachmentContent({ api, key, metas, purges, local, ba
     for (const batch of batches(tombs, batchSize)) await api.put(batch);
     borrados.push(id);
   }
+  return borrados;
+}
+
+/**
+ * Sube, baja y borra contenido de adjuntos.
+ * @param {AttSyncDeps} deps
+ * @returns {Promise<{subidos: number, bajados: number, borrados: string[], fallidos: string[]}>}
+ */
+export async function syncAttachmentContent(deps) {
+  const { api, metas, local } = deps;
+  const remote = remoteVersions((await api.list()).items || []);
+  const localIds = new Set(await local.ids());
+  /** ¿Están todas las partes de este adjunto en el servidor (con contenido)? */
+  const complete = (/** @type {AttMeta} */ m) => {
+    for (let n = 0; n < m.partes; n++) if (remote.get(chunkId(m.id, n))?.u !== m.created) return false;
+    return true;
+  };
+  const subidos = await uploadContent(deps, localIds, complete);
+
+  // 2. Bajar: adjuntos con metadatos pero sin contenido en este equipo, si el servidor ya lo tiene completo.
+  let bajados = 0;
+  /** @type {string[]} */
+  const fallidos = [];
+  for (const m of metas) {
+    if (localIds.has(m.id) || !complete(m)) continue;
+    const bytes = await downloadOne(deps, m);
+    if (!bytes) {
+      fallidos.push(m.id);
+      continue;
+    }
+    await local.save(m.id, bytes);
+    local.markUploaded(m.id); // ya está en el servidor
+    bajados++;
+  }
+
+  const borrados = await purgeContent(deps, remote);
   return { subidos, bajados, borrados, fallidos };
 }

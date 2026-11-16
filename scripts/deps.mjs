@@ -2,8 +2,9 @@
 /**
  * Mapa de dependencias del código (ver docs/DEPENDENCIAS.md).
  *
- *   npm run deps            → revisa: ciclos, dependencias entre capas no permitidas
- *                             y paquetes externos sin documentar (falla si hay alguno)
+ *   npm run deps            → revisa: ciclos, dependencias entre capas no permitidas,
+ *                             paquetes externos sin documentar y exportaciones que
+ *                             nadie usa (falla si hay alguno)
  *   npm run deps -- --write → además vuelve a generar docs/DEPENDENCIAS.md
  *
  * Lee los `import` reales de src/ (no los de comentarios ni los tipos JSDoc).
@@ -42,6 +43,10 @@ export const EXTERNAL = Object.freeze({
     donde: 'Solo en el servidor (funciones de Netlify) y en los scripts de operación.',
   },
   esbuild: { uso: 'Empaquetar la app en un solo archivo HTML.', donde: 'Solo al construir (scripts/build.mjs).' },
+  eslint: {
+    uso: 'Revisión del código (npm run lint) e informe de calidad (npm run calidad).',
+    donde: 'Solo en desarrollo y en la integración continua; nunca va dentro de la app.',
+  },
   '@playwright/test': {
     uso: 'Pruebas de punta a punta (e2e/) y medir la app en un navegador real (npm run perf).',
     donde: 'Solo en desarrollo y en la integración continua; nunca va dentro de la app.',
@@ -78,40 +83,10 @@ function specifiers(code) {
 export const layerOf = (rel) => (rel.includes('/') ? rel.split('/')[0] : 'main');
 
 /**
- * Analiza el código.
- * @param {string} [root]
+ * Ciclos (Tarjan): componentes fuertemente conexos de más de un módulo.
+ * @param {Map<string, {deps: string[]}>} graph
  */
-export function analyze(root = ROOT) {
-  const src = join(root, 'src');
-  /** @type {Map<string, {deps: string[], lines: number}>} */
-  const graph = new Map();
-  /** @type {Map<string, Set<string>>} paquete externo → archivos que lo usan */
-  const external = new Map();
-  const note = (/** @type {string} */ spec, /** @type {string} */ file) => {
-    if (spec.startsWith('node:') || spec.endsWith('package.json')) return;
-    const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
-    if (!external.has(pkg)) external.set(pkg, new Set());
-    external.get(pkg)?.add(file);
-  };
-  for (const f of walk(src)) {
-    const rel = relative(src, f);
-    const code = readFileSync(f, 'utf8');
-    const deps = [];
-    for (const spec of specifiers(code)) {
-      if (spec.startsWith('.')) {
-        const target = relative(src, resolve(dirname(f), spec));
-        if (!target.startsWith('..')) deps.push(target);
-      } else note(spec, `src/${rel}`);
-    }
-    graph.set(rel, { deps, lines: code.split('\n').length });
-  }
-  for (const dir of ['netlify/functions', 'scripts']) {
-    for (const f of walk(join(root, dir))) {
-      for (const spec of specifiers(readFileSync(f, 'utf8'))) if (!spec.startsWith('.')) note(spec, relative(root, f));
-    }
-  }
-
-  // Ciclos (Tarjan): componentes fuertemente conexos de más de un módulo.
+function findCycles(graph) {
   let index = 0;
   /** @type {string[]} */
   const stack = [];
@@ -147,6 +122,44 @@ export function analyze(root = ROOT) {
     }
   };
   for (const v of graph.keys()) if (!idx.has(v)) visit(v);
+  return cycles;
+}
+
+/**
+ * Analiza el código.
+ * @param {string} [root]
+ */
+export function analyze(root = ROOT) {
+  const src = join(root, 'src');
+  /** @type {Map<string, {deps: string[], lines: number}>} */
+  const graph = new Map();
+  /** @type {Map<string, Set<string>>} paquete externo → archivos que lo usan */
+  const external = new Map();
+  const note = (/** @type {string} */ spec, /** @type {string} */ file) => {
+    if (spec.startsWith('node:') || spec.endsWith('package.json')) return;
+    const pkg = spec.startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0];
+    if (!external.has(pkg)) external.set(pkg, new Set());
+    external.get(pkg)?.add(file);
+  };
+  for (const f of walk(src)) {
+    const rel = relative(src, f);
+    const code = readFileSync(f, 'utf8');
+    const deps = [];
+    for (const spec of specifiers(code)) {
+      if (spec.startsWith('.')) {
+        const target = relative(src, resolve(dirname(f), spec));
+        if (!target.startsWith('..')) deps.push(target);
+      } else note(spec, `src/${rel}`);
+    }
+    graph.set(rel, { deps, lines: code.split('\n').length });
+  }
+  for (const dir of ['netlify/functions', 'scripts']) {
+    for (const f of walk(join(root, dir))) {
+      for (const spec of specifiers(readFileSync(f, 'utf8'))) if (!spec.startsWith('.')) note(spec, relative(root, f));
+    }
+  }
+
+  const cycles = findCycles(graph);
 
   // Dependencias entre capas.
   /** @type {Map<string, number>} */
@@ -169,6 +182,126 @@ export function analyze(root = ROOT) {
   const undocumented = [...external.keys()].filter((p) => !Object.hasOwn(EXTERNAL, p));
   const undeclared = [...external.keys()].filter((p) => !Object.hasOwn(declared, p));
   return { graph, cycles, violations, layerEdges, external, undocumented, undeclared, pkg };
+}
+
+/** Nombres que declara un `export` (sin `default`). @param {string} code */
+function declaredExports(code) {
+  const names = [...code.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([\w$]+)/gm)].map((m) => m[1]);
+  for (const m of code.matchAll(/^export\s*\{([^}]*)\}(?!\s*from)/gm)) {
+    for (const part of m[1].split(',')) {
+      const name = part
+        .trim()
+        .split(/\s+as\s+/)
+        .pop();
+      if (name) names.push(name);
+    }
+  }
+  return names.filter((n) => n && n !== 'default');
+}
+
+/**
+ * Lo que un archivo usa de otros módulos: `import {a, b as c} from`,
+ * `export {a} from`, `const {a} = await import()` (por nombre) e
+ * `import * as`, `export * from`, `const m = await import()` (todo el módulo).
+ * @param {string} code sin comentarios
+ * @returns {{spec: string, names: string[] | '*'}[]}
+ */
+function importedNames(code) {
+  /** @param {string} list */
+  const split = (list) =>
+    list
+      .split(',')
+      .map((p) => p.trim().split(/\s+as\s+|\s*:\s*/)[0])
+      .filter(Boolean);
+  const out = [];
+  for (const m of code.matchAll(/(?:^|\n)\s*(import|export)\s([^;]*?)from\s+['"]([^'"]+)['"]/g)) {
+    const clause = m[2];
+    const braces = /\{([^}]*)\}/.exec(clause);
+    if (/\*/.test(clause) && !braces) out.push({ spec: m[3], names: /** @type {'*'} */ ('*') });
+    else out.push({ spec: m[3], names: braces ? split(braces[1]) : [] });
+  }
+  for (const m of code.matchAll(/\b(?:const|let|var)\s+(?:(\{[^}]*\})|([\w$]+))\s*=\s*await\s+import\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+    out.push({ spec: m[3], names: m[1] ? split(m[1].slice(1, -1)) : /** @type {'*'} */ ('*') });
+  }
+  return out;
+}
+
+/**
+ * Exportaciones de src/ que nadie usa. Una exportación es parte de la interfaz
+ * de un módulo: si ningún otro archivo la importa, sobra (se borra o deja de
+ * exportarse). Las que solo usan las pruebas se cuentan aparte: son válidas
+ * (probar una pieza interna), pero conviene que sean pocas.
+ *
+ * `specialties/activa/` apunta en el build a cualquier especialidad: lo que se
+ * importa de `activa/x.js` cuenta como usado en `x.js` de todas.
+ * @param {string} [root]
+ */
+export function exportUsage(root = ROOT) {
+  const src = join(root, 'src');
+  const read = (/** @type {string} */ f) => stripComments(readFileSync(f, 'utf8'));
+  const srcFiles = walk(src).filter((f) => !f.endsWith('.d.ts'));
+  /** @type {Map<string, {names: string[], stars: string[]}>} */
+  const modules = new Map();
+  for (const f of srcFiles) {
+    const code = read(f);
+    const stars = [...code.matchAll(/^export\s*\*\s*from\s+['"]([^'"]+)['"]/gm)].map((m) => resolve(dirname(f), m[1]));
+    modules.set(f, { names: declaredExports(code), stars });
+  }
+  const specialties = readdirSync(join(src, 'specialties')).filter(
+    (d) => d !== 'activa' && statSync(join(src, 'specialties', d)).isDirectory(),
+  );
+  /** Archivos a los que apunta un import (activa/x.js → x.js de cada especialidad). @param {string} file */
+  const targets = (file) => {
+    const m = /\/specialties\/activa\/(.+)$/.exec(file);
+    return m ? specialties.map((s) => join(src, 'specialties', s, m[1])) : [file];
+  };
+  /** @type {Map<string, Set<string>>} archivo → nombres usados */
+  const used = new Map();
+  /** @type {Map<string, Set<string>>} */
+  const usedByTests = new Map();
+  /**
+   * @param {Map<string, Set<string>>} into
+   * @param {string} file
+   * @param {string[] | '*'} names
+   * @param {Set<string>} [seen]
+   */
+  const mark = (into, file, names, seen = new Set()) => {
+    for (const t of targets(file)) {
+      const mod = modules.get(t);
+      if (!mod || seen.has(t)) continue;
+      seen.add(t);
+      const set = into.get(t) || new Set();
+      into.set(t, set);
+      for (const n of names === '*' ? mod.names : names) set.add(n);
+      // Lo que no declara el módulo puede venir de un `export * from`.
+      for (const s of mod.stars) mark(into, s, names === '*' ? '*' : names.filter((n) => !mod.names.includes(n)), seen);
+    }
+  };
+  const consumers = [
+    ...srcFiles.map((f) => ({ f, into: used })),
+    ...['netlify/functions', 'scripts'].flatMap((d) => walk(join(root, d)).map((f) => ({ f, into: used }))),
+    ...['tests', 'e2e'].flatMap((d) => walk(join(root, d)).map((f) => ({ f, into: usedByTests }))),
+  ];
+  for (const { f, into } of consumers) {
+    for (const { spec, names } of importedNames(read(f))) {
+      if (spec.startsWith('.')) mark(into, resolve(dirname(f), spec), names);
+    }
+  }
+  /** @type {string[]} */
+  const unused = [];
+  /** @type {string[]} */
+  const testOnly = [];
+  let total = 0;
+  for (const [f, { names }] of modules) {
+    for (const n of names) {
+      total++;
+      const where = `${relative(root, f)} ${n}`;
+      if (used.get(f)?.has(n)) continue;
+      if (usedByTests.get(f)?.has(n)) testOnly.push(where);
+      else unused.push(where);
+    }
+  }
+  return { total, unused: unused.sort(), testOnly: testOnly.sort() };
 }
 
 /** docs/DEPENDENCIAS.md a partir del análisis. @param {ReturnType<typeof analyze>} a */
@@ -247,7 +380,9 @@ export function renderDoc(a) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = analyze();
+  const exp = exportUsage();
   const problems = [
+    ...exp.unused.map((e) => `Exportación sin uso: ${e}`),
     ...a.cycles.map((c) => `Ciclo: ${c.join(' → ')}`),
     ...a.violations.map((v) => `Capa: ${v}`),
     ...a.undocumented.map((p) => `Paquete sin documentar en scripts/deps.mjs (EXTERNAL): ${p}`),

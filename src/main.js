@@ -49,8 +49,12 @@ function getStorage() {
 /**
  * Abre el almacenamiento de datos clínicos: IndexedDB (preferido) o, si no
  * está disponible, localStorage. La primera vez migra los datos antiguos.
+ * El motor elegido queda en `repo.backendName` ('indexeddb' | 'localstorage').
+ * @param {import('./storage/store.js').KeyValueStorage} storage
+ * @param {boolean} practice
  */
 async function openRepo(storage, practice) {
+  /** @param {Error} e */
   const onError = (e) => {
     toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
     logError('almacenamiento', e);
@@ -58,7 +62,6 @@ async function openRepo(storage, practice) {
   };
   try {
     const repo = createRepo(await idbBackend(dbName(practice)), { onError });
-    repo.kind = 'indexeddb';
     const { migrated } = await repo.init(practice ? {} : { legacy: readLegacyData(storage), clearLegacy: () => clearLegacyData(storage) });
     if (migrated) toast(`Datos actualizados al nuevo almacenamiento (${migrated} atenciones).`, 4000);
     return repo;
@@ -77,7 +80,6 @@ async function openRepo(storage, practice) {
       },
     );
     await repo.init();
-    repo.kind = 'localstorage';
     return repo;
   }
 }
@@ -112,7 +114,7 @@ async function main() {
   setClock(createClock({ load: () => store.loadClock(), save: (t) => ctx.persist(() => store.saveClock(t)) }));
   const ctx = createContext(store, TEMPLATE_PDF_B64);
   ctx.practice = practice;
-  ctx.storageKind = repo.kind;
+  ctx.storageKind = repo.backendName;
   // Pide al navegador no borrar los datos si le falta espacio (sin preguntar al usuario).
   if (!practice) void navigator.storage?.persist?.().catch(() => {});
   // Escrituras que fallaron (p. ej. disco lleno un momento): se reintentan cada minuto.
@@ -133,10 +135,11 @@ async function main() {
   initErrorLog(ctx);
   // Cuentas de usuario (ADR 0014) y bloqueo: antes de mostrar datos.
   ctx.accounts = createAccountsController(ctx);
-  ctx.lock = createLock(ctx);
+  const lock = createLock(ctx);
+  ctx.lock = lock;
   ctx.accounts.start(); // con cuentas activadas, muestra el ingreso (o recupera la sesión de la pestaña)
   // Con PIN: abrir una pestaña nueva no bloquea las otras. Con cuentas, el ingreso ya protege.
-  if (!ctx.accounts.active) ctx.lock.lock({ broadcast: false });
+  if (!ctx.accounts.active) lock.lock({ broadcast: false });
   $('#practiceEnter').addEventListener('click', () => location.assign(practiceUrl(true)));
   $('#appVersion').textContent = 'v' + ctx.version;
   $('#appVersionAj').textContent = ctx.version;
@@ -163,11 +166,13 @@ async function main() {
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
   // Teclado en las pestañas (patrón WAI-ARIA): flechas, Inicio y Fin.
-  $('nav').addEventListener('keydown', (e) => {
+  $('nav').addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
     const tabs = $$('nav button');
     const i = tabs.indexOf(document.activeElement);
     if (i < 0) return;
-    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    /** @type {Record<string, number | undefined>} */
+    const keys = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 };
+    const next = keys[e.key];
     if (next === undefined) return;
     e.preventDefault();
     const t = tabs[(next + tabs.length) % tabs.length];
@@ -177,9 +182,13 @@ async function main() {
   $('#bNew').addEventListener('click', () => ctx.newAttention());
   $('#bSave').addEventListener('click', () => ctx.save());
   $('#bCopy').addEventListener('click', () => ctx.copyNote(ctx.rec));
-  $('#bPdf').addEventListener('click', (e) => ctx.downloadPdf(ctx.rec, e.currentTarget));
+  $('#bPdf').addEventListener('click', (/** @type {MouseEvent} */ e) =>
+    ctx.downloadPdf(ctx.rec, /** @type {HTMLButtonElement} */ (e.currentTarget)),
+  );
   $('#brandBtn').addEventListener('click', () => ctx.showTab('t-aj'));
-  $('#bForms').addEventListener('click', (e) => ctx.openForms(e.currentTarget));
+  $('#bForms').addEventListener('click', (/** @type {MouseEvent} */ e) =>
+    ctx.openForms(/** @type {HTMLButtonElement} */ (e.currentTarget)),
+  );
 
   // Ctrl/Cmd + S guarda la atención.
   document.addEventListener('keydown', (e) => {
@@ -211,7 +220,7 @@ async function main() {
   registerServiceWorker();
   if (location.protocol !== 'file:') startUpdateWatcher(ctx);
   // Primero quién registra (si hay perfiles), luego el chequeo si hace días que no se usa.
-  ctx.accounts.whenReady(() => ctx.lock.whenUnlocked(() => void ctx.askUserAtStart().then(() => autoCheck(ctx))));
+  ctx.accounts.whenReady(() => lock.whenUnlocked(() => void ctx.askUserAtStart().then(() => autoCheck(ctx))));
   // Termina de escribir lo pendiente al ocultar o cerrar la página.
   window.addEventListener('pagehide', () => {
     ctx.flushAutosave();

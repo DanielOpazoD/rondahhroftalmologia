@@ -6,70 +6,104 @@ import { SEXOS } from '../config/catalogs.js';
 import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut, compareCode, compareEs } from '../core/format.js';
 import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs, isDeletedPatient, patientsById } from '../core/patient.js';
 import { diagnosesList, proceduresDone } from '../specialties/activa/index.js';
-import { $ } from './dom.js';
+import { $, dataOf } from './dom.js';
 import { html, setHtml, join } from './html.js';
 import { icon } from './icons.js';
 
-/** @param {import('./context.js').AppContext} ctx */
+/** @typedef {import('./context.js').AppContext} AppContext */
+/** @typedef {import('../domain').AtencionGuardada} AtencionGuardada */
+/** @typedef {import('../domain').Paciente} Paciente */
+/** Atenciones de cada paciente (por id de ficha), de la más reciente a la más antigua. @typedef {Map<string, AtencionGuardada[]>} PorPaciente */
+
+/**
+ * Elemento más cercano al destino del evento que cumple `sel` (o null).
+ * @param {Event} e
+ * @param {string} sel
+ */
+const closestTo = (e, sel) => /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(sel));
+
+/** @param {AppContext} ctx */
 export function initRegistryView(ctx) {
   ctx.openPatientId = null;
   $('#regSearch').addEventListener('input', () => renderRegistry(ctx));
   $('#regOp').addEventListener('change', () => renderRegistry(ctx));
-  $('#regList').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-p]');
-    if (b) showPatient(ctx, b.dataset.p);
+  $('#regList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = closestTo(e, 'button[data-p]');
+    if (b) showPatient(ctx, dataOf(b, 'p'));
   });
   $('#patBack').addEventListener('click', () => showPatient(ctx, null));
-  $('#dupList').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-a]');
+  $('#dupList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = closestTo(e, 'button[data-a]');
     if (!b) return;
-    if (b.dataset.a === 'merge') ctx.mergePatients(b.dataset.keep, b.dataset.drop);
-    if (b.dataset.a === 'distinct') ctx.notDuplicates(b.dataset.keep, b.dataset.drop);
-    if (b.dataset.a === 'view') showPatient(ctx, b.dataset.p);
+    if (b.dataset.a === 'merge') ctx.mergePatients(dataOf(b, 'keep'), dataOf(b, 'drop'));
+    if (b.dataset.a === 'distinct') ctx.notDuplicates(dataOf(b, 'keep'), dataOf(b, 'drop'));
+    if (b.dataset.a === 'view') showPatient(ctx, dataOf(b, 'p'));
   });
-  $('#orphList').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-a]');
-    if (b?.dataset.a === 'delp') void ctx.deletePatient(b.dataset.p);
+  $('#orphList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = closestTo(e, 'button[data-a]');
+    if (b?.dataset.a === 'delp') void ctx.deletePatient(dataOf(b, 'p'));
   });
   $('#patNew').addEventListener('click', () => ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId));
   $('#patEdit').addEventListener('click', () => ctx.openPatientId && ctx.editPatient(ctx.openPatientId));
-  $('#patAttentions').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-a]');
+  $('#patAttentions').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = /** @type {HTMLButtonElement | null} */ (closestTo(e, 'button[data-a]'));
     if (!b) return;
     const rec = ctx.records.find((r) => r.id === b.dataset.id);
     if (!rec) return;
-    ({
+    /** @type {Record<string, () => unknown>} */
+    const actions = {
       open: () => ctx.openRecord(rec.id),
       pdf: () => ctx.downloadPdf(rec, b),
       copy: () => ctx.copyNote(rec),
       del: () => ctx.deleteRecord(rec.id),
-    })[b.dataset.a]?.();
+    };
+    actions[dataOf(b, 'a')]?.();
   });
 }
 
-/** Coincide por nombre (sin tildes) o RUT (sin puntos ni guion). */
-export function matchesQuery(p, q) {
+/**
+ * Coincide por nombre (sin tildes) o RUT (sin puntos ni guion).
+ * @param {{f?: Record<string, string>}} p ficha (o atención)
+ * @param {string} q
+ */
+function matchesQuery(p, q) {
   if (!q) return true;
   const nq = normalizeText(q);
   const rq = cleanRut(q);
   return normalizeText(p.f?.paciente_nombre).includes(nq) || (rq.length >= 3 && cleanRut(p.f?.paciente_rut).includes(rq));
 }
 
-/** Atenciones agrupadas por paciente (una pasada). */
+/**
+ * Atenciones agrupadas por paciente (una pasada).
+ * @param {AtencionGuardada[]} records
+ * @returns {PorPaciente}
+ */
 function byPatient(records) {
+  /** @type {PorPaciente} */
   const map = new Map();
   for (const r of records) {
     if (!r.pacienteId) continue;
-    if (!map.has(r.pacienteId)) map.set(r.pacienteId, []);
-    map.get(r.pacienteId).push(r);
+    const list = map.get(r.pacienteId);
+    if (list) list.push(r);
+    else map.set(r.pacienteId, [r]);
   }
   for (const list of map.values()) list.sort((a, b) => compareCode(b.f.fecha_atencion || '', a.f.fecha_atencion || ''));
   return map;
 }
 
+/**
+ * Edad de hoy si hay fecha de nacimiento; si no, `fallback`.
+ * @param {Paciente} p
+ * @param {string | undefined} fallback
+ */
 const ageNow = (p, fallback) => (isIsoDate(p.f.paciente_fnac) ? ageAt(p.f.paciente_fnac, todayIso()) : fallback);
+/** @param {string | undefined} k */
 const sexLabel = (k) => SEXOS.find((s) => s.key === k)?.label || '';
 
+/**
+ * @param {AppContext} ctx
+ * @param {string | null} id ficha a mostrar; null: la lista
+ */
 function showPatient(ctx, id) {
   ctx.openPatientId = id;
   if (id) ctx.accounts?.event('ficha.ver', id);
@@ -79,6 +113,7 @@ function showPatient(ctx, id) {
   scrollTo(0, 0);
 }
 
+/** @param {AppContext} ctx */
 export function renderRegistry(ctx) {
   const future = ctx.store.loadFutureRecords().length;
   $('#futureBanner').hidden = !future;
@@ -86,7 +121,7 @@ export function renderRegistry(ctx) {
     ? `Hay ${future} atención(es) guardadas con una versión más nueva de la app. Recarga la página para verlas y editarlas.`
     : '';
   const groups = byPatient(ctx.records);
-  if (ctx.openPatientId) return renderPatient(ctx, groups.get(ctx.openPatientId) || []);
+  if (ctx.openPatientId) return renderPatient(ctx, ctx.openPatientId, groups.get(ctx.openPatientId) || []);
 
   const sel = $('#regOp');
   const ops = ctx.operativos.map((o) => o.nombre);
@@ -142,8 +177,14 @@ export function renderRegistry(ctx) {
   setHtml($('#regList'), html`<section class="pgroup">${rows}</section>${more}`);
 }
 
-function renderPatient(ctx, recs) {
-  const p = ctx.store.getPatient(ctx.openPatientId);
+/**
+ * Ficha abierta y sus atenciones.
+ * @param {AppContext} ctx
+ * @param {string} id ficha abierta
+ * @param {AtencionGuardada[]} recs
+ */
+function renderPatient(ctx, id, recs) {
+  const p = ctx.store.getPatient(id);
   if (!p) return showPatient(ctx, null);
   const f = p.f;
   const age = ageNow(p, recs[0]?.f.paciente_edad);
@@ -204,6 +245,10 @@ function renderPatient(ctx, recs) {
 /**
  * Fichas sin atenciones en esta especialidad (p. ej. creadas por error, o
  * cuya única atención se eliminó): se pueden eliminar.
+ * @param {AppContext} ctx
+ * @param {Paciente[]} all
+ * @param {Map<string, Paciente>} byId
+ * @param {PorPaciente} groups
  */
 function renderOrphans(ctx, all, byId, groups) {
   // `all` ya viene ordenada por nombre.
@@ -230,13 +275,18 @@ function renderOrphans(ctx, all, byId, groups) {
 /**
  * Posibles duplicados: pares de fichas que parecen la misma persona. Se
  * propone conservar la que tiene RUT; si ninguna o ambas, la de más atenciones.
+ * @param {AppContext} ctx
+ * @param {Map<string, Paciente>} all
+ * @param {PorPaciente} groups
  */
 function renderDuplicates(ctx, all, groups) {
   const pairs = findDuplicatePairs(all, ctx.store.loadNotDuplicates());
   $('#dupBox').hidden = !pairs.length;
   if (!pairs.length) return;
   $('#dupTitle').textContent = `${pairs.length} ${pairs.length === 1 ? 'posible duplicado' : 'posibles duplicados'}`;
+  /** @param {Paciente} p */
   const count = (p) => (groups.get(p.id) || []).length;
+  /** @param {Paciente} p */
   const card = (p) =>
     html`<button type="button" class="pmain" data-a="view" data-p="${p.id}" title="Ver ficha">
       <span class="pname">${patientLabel(p)}</span>
@@ -245,6 +295,7 @@ function renderDuplicates(ctx, all, groups) {
   setHtml(
     $('#dupList'),
     html`${pairs.map(({ a, b, motivo }) => {
+      /** @param {Paciente} p */
       const score = (p) => (p.f.paciente_rut ? 1e6 : 0) + count(p) * 10 - (p.created || 0) / 1e13;
       const [keep, drop] = score(a) >= score(b) ? [a, b] : [b, a];
       return html`<div class="duprow">

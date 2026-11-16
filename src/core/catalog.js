@@ -144,7 +144,8 @@ export function seedCatalogs({ records = [], recordado = {}, medicos = [], opera
   const meds = [...medicos];
   const ops = [...operativos];
   let added = 0;
-  /** @type {(nombre: string, rut?: string) => void} */
+  // Las atenciones antiguas pueden no traer médico ni operativo: makeMedico/makeOperativo devuelven null.
+  /** @type {(nombre?: string, rut?: string) => void} */
   const addMed = (nombre, rut) => {
     const m = makeMedico({ nombre, rut }, now);
     if (m && !meds.some((x) => x.id === m.id)) {
@@ -152,7 +153,7 @@ export function seedCatalogs({ records = [], recordado = {}, medicos = [], opera
       added++;
     }
   };
-  /** @param {string} nombre */
+  /** @param {string} [nombre] */
   const addOp = (nombre) => {
     const o = makeOperativo({ nombre }, now);
     if (o && !ops.some((x) => x.id === o.id)) {

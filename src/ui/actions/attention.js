@@ -14,7 +14,13 @@ import { toast } from '../dom.js';
 import { syncAttentionView, showValidation, renderToolbar, renderHistory, flashFields, showRemoteNotice } from '../attentionView.js';
 import { uiConfirm, uiChoose } from '../modal.js';
 
-/** Pregunta antes de descartar cambios sin guardar. */
+/** @typedef {import('../../domain').Atencion} Atencion */
+/** @typedef {import('../../domain').AtencionGuardada} AtencionGuardada */
+
+/**
+ * Pregunta antes de descartar cambios sin guardar.
+ * @param {string} what qué se hará después («abrir otra atención»…)
+ */
 export const confirmDiscard = (what) =>
   uiConfirm({
     title: 'Cambios sin guardar',
@@ -24,7 +30,38 @@ export const confirmDiscard = (what) =>
   });
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * Atención NUEVA de un paciente que ya tiene otra ese día: pregunta si
+ * combinarlas (continúa en la existente) o guardarla aparte.
+ * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @param {AtencionGuardada} dup la atención existente
+ * @returns {Promise<boolean>} false si se canceló (no se guarda)
+ */
+async function resolveDuplicate(ctx, dup) {
+  const name = dup.f.paciente_nombre || dup.f.paciente_rut;
+  const choice = await uiChoose({
+    title: 'Este paciente ya tiene una atención ese día',
+    message: `${name} ya tiene una atención el ${fmtDate(dup.f.fecha_atencion)}, quizás registrada en otro equipo. Combinar junta los datos de ambas en una sola atención, sin perder lo que cada una tiene.`,
+    tone: 'warn',
+    okLabel: 'Combinar',
+    altLabel: 'Guardar aparte',
+  });
+  if (!choice) return false;
+  if (choice === 'ok') ctx.joinExisting(dup.id, { silent: true });
+  return true;
+}
+
+/**
+ * Avisa que se guardó (con la primera advertencia, si las hay).
+ * @param {string[]} warnings
+ */
+function toastSaved(warnings) {
+  if (warnings.length) toast(`Guardada con ${warnings.length} advertencia(s): ${warnings[0]}`, 3500);
+  else toast('Atención guardada', 2200);
+}
+
+/**
+ * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
+ *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function attentionActions(ctx, store) {
@@ -46,22 +83,11 @@ export function attentionActions(ctx, store) {
         return false;
       }
       // Atención NUEVA de un paciente que ya tiene una ese día (p. ej. creada en otro equipo).
-      const dup = !ctx.rec.id && findDuplicate(ctx.rec, ctx.records);
+      const dup = !ctx.rec.id && findDuplicate(ctx.rec, /** @type {AtencionGuardada[]} */ (ctx.records));
       if (dup && auto) return false; // la barra ofrece continuar en la existente
       await ctx.ensureUser();
-      if (dup) {
-        const name = dup.f.paciente_nombre || dup.f.paciente_rut;
-        const choice = await uiChoose({
-          title: 'Este paciente ya tiene una atención ese día',
-          message: `${name} ya tiene una atención el ${fmtDate(dup.f.fecha_atencion)}, quizás registrada en otro equipo. Combinar junta los datos de ambas en una sola atención, sin perder lo que cada una tiene.`,
-          tone: 'warn',
-          okLabel: 'Combinar',
-          altLabel: 'Guardar aparte',
-        });
-        if (!choice) return false;
-        if (choice === 'ok') ctx.joinExisting(dup.id, { silent: true });
-      }
-      const stored = ctx.records.find((r) => r.id === ctx.rec.id) || null;
+      if (dup && !(await resolveDuplicate(ctx, dup))) return false;
+      const stored = ctx.records.find((/** @type {Atencion} */ r) => r.id === ctx.rec.id) || null;
       const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: clock.tick() });
       const ok = ctx.persist(() => {
         ctx.records = store.upsertRecord(rec);
@@ -90,10 +116,7 @@ export function attentionActions(ctx, store) {
       ctx.emit('datos');
       ctx.sync?.schedule();
       if (auto) return true;
-      toast(
-        v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada',
-        v.warnings.length ? 3500 : 2200,
-      );
+      toastSaved(v.warnings);
       return true;
     },
 
@@ -109,8 +132,10 @@ export function attentionActions(ctx, store) {
       scrollTo(0, 0);
     },
 
+    /** @param {string} id */
     async openRecord(id) {
-      const r = ctx.records.find((x) => x.id === id);
+      /** @type {Atencion | undefined} */
+      const r = ctx.records.find((/** @type {Atencion} */ x) => x.id === id);
       if (!r) return;
       if (ctx.dirty && ctx.rec.id !== id && !(await confirmDiscard('abrir otra atención'))) return;
       ctx.loadIntoForm(r);
@@ -131,9 +156,12 @@ export function attentionActions(ctx, store) {
     /**
      * Continúa en la atención existente `id` del mismo paciente, llevándose lo
      * escrito en la atención actual (fusión campo a campo; queda sin guardar).
+     * @param {string} id
+     * @param {{silent?: boolean}} [o] `silent`: sin re-dibujar ni avisar (lo hace quien llama)
      */
     joinExisting(id, { silent = false } = {}) {
-      const existing = ctx.records.find((r) => r.id === id);
+      /** @type {Atencion | undefined} */
+      const existing = ctx.records.find((/** @type {Atencion} */ r) => r.id === id);
       if (!existing) return;
       ctx.rec = normalizeRecord(mergeRecords(existing, { ...ctx.rec, id: existing.id, created: existing.created }));
       ctx.snap = structuredClone(ctx.rec);
@@ -149,6 +177,7 @@ export function attentionActions(ctx, store) {
      * Llegaron cambios de otro equipo para la atención abierta: se incorporan
      * sin perder lo que se está escribiendo (lo local editado después gana).
      * Se avisa QUÉ cambió (y quién) y se resaltan esos campos un momento.
+     * @param {Atencion} fresh la versión recién llegada
      */
     absorbRemote(fresh) {
       const before = ctx.rec;
@@ -169,7 +198,10 @@ export function attentionActions(ctx, store) {
       flashFields(cambios.map((c) => c.c));
     },
 
-    /** Carga una atención guardada en el formulario (sin cambios pendientes). */
+    /**
+     * Carga una atención guardada en el formulario (sin cambios pendientes).
+     * @param {Atencion} r
+     */
     loadIntoForm(r) {
       ctx.rec = normalizeRecord(r);
       ctx.snap = structuredClone(ctx.rec);
@@ -178,8 +210,10 @@ export function attentionActions(ctx, store) {
       syncAttentionView(ctx);
     },
 
+    /** @param {string} id */
     async deleteRecord(id) {
-      const r = ctx.records.find((x) => x.id === id);
+      /** @type {Atencion | undefined} */
+      const r = ctx.records.find((/** @type {Atencion} */ x) => x.id === id);
       if (!r) return;
       const ok = await uiConfirm({
         title: 'Eliminar atención',
@@ -192,7 +226,9 @@ export function attentionActions(ctx, store) {
       const done = ctx.persist(() => {
         ctx.records = store.deleteRecord(id);
         const at = clock.tick();
-        store.addAuditEntry(id, makeAuditEntry({ tipo: 'eliminada', at, ...ctx.author() }));
+        // (null solo en una edición sin cambios: aquí no ocurre, pero se revisa como en las demás.)
+        const entry = makeAuditEntry({ tipo: 'eliminada', at, ...ctx.author() });
+        if (entry) store.addAuditEntry(id, entry);
         // La "lápida" permite propagar la eliminación a los otros equipos.
         store.addTombstone(id, Math.max(clock.tick(), (r.updated || 0) + 1));
       });

@@ -3,12 +3,12 @@
  * Compatible con respaldos de versiones anteriores (`{app, v:1|2, procs, atenciones}`).
  */
 import { APP } from '../config/catalogs.js';
-import { normalizeRecord, sortRecords, isValidId } from './record.js';
+import { normalizeRecord, sortRecords, isValidId, isSavedRecord } from './record.js';
 import { isFutureVersion, versionOf } from './migrations.js';
 import { SCHEMA_VERSION } from '../config/catalogs.js';
 
 /** Cuántas versiones de esquema por delante se aceptan en un respaldo. */
-export const MAX_FUTURE_STEPS = 3;
+const MAX_FUTURE_STEPS = 3;
 import { mergeRecords, sameContent } from './merge.js';
 import { mergeAuditDocs } from './audit.js';
 import { normalizePatient } from './patient.js';
@@ -18,11 +18,23 @@ import { createZip, readZip, isZip } from '../lib/zip.js';
 /**
  * Datos que se respaldan o se unen (los locales y los leídos de un respaldo).
  * `futureRecords`: atenciones de versiones más nuevas de la app, intactas.
- * @typedef {{records: import('../domain').Atencion[], futureRecords?: import('../domain').RegistroFusionable[],
+ * @typedef {{records: import('../domain').AtencionGuardada[], futureRecords?: RegistroFuturo[],
  *   procs: import('../domain').Procedimiento[], auditDocs?: import('../domain').AuditDoc[], patients?: import('../domain').Paciente[],
  *   attachments?: any[]}} DatosRespaldo
  *   `attachments`: metadatos de los adjuntos (su contenido va en el ZIP: ver packBackup).
  */
+
+/**
+ * Atención de una versión más nueva leída de un respaldo: solo se sabe que su id es válido.
+ * @typedef {import('../domain').RegistroFusionable & {id: string}} RegistroFuturo
+ */
+
+/**
+ * ¿Es una atención de versión futura plausible (con id válido)? Un archivo manipulado no puede declarar v999.
+ * @param {Record<string, unknown>} r
+ * @returns {r is RegistroFuturo}
+ */
+const isPlausibleFuture = (r) => isFutureVersion(r) && versionOf(r) <= SCHEMA_VERSION + MAX_FUTURE_STEPS && isValidId(r.id);
 
 /**
  * Crea el objeto de respaldo.
@@ -85,9 +97,9 @@ export function parseBackup(text) {
     records: objects
       .filter((r) => !isFutureVersion(r))
       .map(normalizeRecord)
-      .filter((r) => r.id),
-    // Solo versiones futuras plausibles (un archivo manipulado no puede declarar v999).
-    futureRecords: objects.filter((r) => isFutureVersion(r) && versionOf(r) <= SCHEMA_VERSION + MAX_FUTURE_STEPS && isValidId(r.id)),
+      .filter(isSavedRecord),
+    // Solo versiones futuras plausibles.
+    futureRecords: objects.filter(isPlausibleFuture),
     procs: Array.isArray(data.procs)
       ? data.procs
           .filter((/** @type {any} */ p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())
@@ -99,6 +111,93 @@ export function parseBackup(text) {
     practica: data.practica === true,
     anonSecret: typeof data.anonSecret === 'string' && /^[0-9a-f]{64}$/.test(data.anonSecret) ? data.anonSecret : null,
   };
+}
+
+/** Versión nueva tras fusionar dos copias distintas (mayor que ambas). @param {{updated?: number}} a @param {{updated?: number}} b */
+const bumped = (a, b) => Math.max(a.updated || 0, b.updated || 0) + 1;
+
+/** @typedef {import('../domain').AtencionGuardada} AtencionGuardada */
+
+/**
+ * Atenciones: las nuevas se agregan; las que existen en ambos se fusionan campo a campo.
+ * @param {AtencionGuardada[]} local @param {AtencionGuardada[]} incoming
+ */
+function mergeRecordsById(local, incoming) {
+  const map = new Map(local.map((r) => [r.id, r]));
+  const count = { added: 0, updated: 0, unchanged: 0 };
+  for (const r of incoming) {
+    const cur = map.get(r.id);
+    if (!cur) {
+      map.set(r.id, r);
+      count.added++;
+      continue;
+    }
+    const m = normalizeRecord(mergeRecords(cur, r));
+    if (sameContent(m, cur)) count.unchanged++;
+    else {
+      map.set(r.id, { ...m, id: r.id, updated: bumped(cur, r) });
+      count.updated++;
+    }
+  }
+  return { map, ...count };
+}
+
+/**
+ * Versiones futuras: se conservan intactas; entre dos, la más nueva. Una que
+ * reemplazaría una atención actual (en `current`) solo se aplica con
+ * `allowOverride`, y entonces sale de `current`.
+ * @param {RegistroFuturo[]} local @param {RegistroFuturo[]} incoming
+ * @param {Map<string, AtencionGuardada>} current @param {boolean} allowOverride
+ */
+function mergeFuture(local, incoming, current, allowOverride) {
+  const future = new Map(local.map((r) => [r.id, r]));
+  /** @type {string[]} */
+  const conflicts = [];
+  for (const r of incoming) {
+    if (current.has(r.id)) {
+      conflicts.push(r.id);
+      if (!allowOverride) continue;
+      current.delete(r.id);
+    }
+    const cur = future.get(r.id);
+    if (!cur || (r.updated || 0) > (cur.updated || 0)) future.set(r.id, r);
+  }
+  return { future, conflicts };
+}
+
+/**
+ * Bitácoras: se unen las entradas. Si el respaldo trae entradas que este equipo
+ * no tenía, es una versión nueva (si no, la sincronización no sabría que cambió).
+ * @param {import('../domain').AuditDoc[]} local @param {import('../domain').AuditDoc[]} incoming
+ */
+function mergeAuditById(local, incoming) {
+  const audit = new Map(local.map((d) => [d.id, d]));
+  for (const d of incoming) {
+    const cur = audit.get(d.id);
+    if (!cur) {
+      audit.set(d.id, d);
+      continue;
+    }
+    const m = mergeAuditDocs(cur, d);
+    if (m.entries.length > (cur.entries?.length || 0)) m.updated = bumped(cur, d);
+    audit.set(d.id, m);
+  }
+  return [...audit.values()];
+}
+
+/** Fichas de pacientes: se fusionan campo a campo. @param {import('../domain').Paciente[]} local @param {import('../domain').Paciente[]} incoming */
+function mergePatientsById(local, incoming) {
+  const patients = new Map(local.map((p) => [p.id, p]));
+  for (const p of incoming) {
+    const cur = patients.get(p.id);
+    if (!cur) {
+      patients.set(p.id, p);
+      continue;
+    }
+    const m = normalizePatient(mergeRecords(cur, p));
+    if (m && !sameContent(m, cur)) patients.set(p.id, { ...m, updated: bumped(cur, p) });
+  }
+  return [...patients.values()];
 }
 
 /**
@@ -115,76 +214,25 @@ export function parseBackup(text) {
  * @returns {Required<Omit<DatosRespaldo, 'attachments'>> & {added: number, updated: number, unchanged: number, futureConflicts: string[]}}
  */
 export function mergeBackup(local, incoming, opts = {}) {
-  const { allowFutureOverride = false } = opts;
-  const map = new Map(local.records.map((r) => [r.id, r]));
-  let added = 0;
-  let updated = 0;
-  let unchanged = 0;
-  for (const r of incoming.records) {
-    const cur = map.get(r.id);
-    if (!cur) {
-      map.set(r.id, r);
-      added++;
-      continue;
-    }
-    const m = normalizeRecord(mergeRecords(cur, r));
-    if (sameContent(m, cur)) {
-      unchanged++;
-    } else {
-      m.updated = Math.max(cur.updated || 0, r.updated || 0) + 1;
-      map.set(r.id, m);
-      updated++;
-    }
-  }
-  // Versiones futuras: se conservan intactas; entre dos, la más nueva.
-  const future = new Map((local.futureRecords || []).map((r) => [r.id, r]));
-  /** @type {string[]} */
-  const futureConflicts = [];
-  for (const r of incoming.futureRecords || []) {
-    if (map.has(r.id)) {
-      // Reemplazaría una atención actual: solo con autorización explícita.
-      futureConflicts.push(r.id);
-      if (!allowFutureOverride) continue;
-      map.delete(r.id);
-    }
-    if (!future.has(r.id) || (r.updated || 0) > (future.get(r.id).updated || 0)) future.set(r.id, r);
-  }
-  const audit = new Map((local.auditDocs || []).map((d) => [d.id, d]));
-  for (const d of incoming.auditDocs || []) {
-    const cur = audit.get(d.id);
-    if (!cur) {
-      audit.set(d.id, d);
-      continue;
-    }
-    const m = mergeAuditDocs(cur, d);
-    // Si el respaldo trae entradas que este equipo no tenía, es una versión
-    // nueva (si no, la sincronización no sabría que cambió).
-    if (m.entries.length > (cur.entries?.length || 0)) m.updated = Math.max(cur.updated || 0, d.updated || 0) + 1;
-    audit.set(d.id, m);
-  }
-
-  const patients = new Map((local.patients || []).map((p) => [p.id, p]));
-  for (const p of incoming.patients || []) {
-    const cur = patients.get(p.id);
-    if (!cur) patients.set(p.id, p);
-    else {
-      const m = normalizePatient(mergeRecords(cur, p));
-      if (m && !sameContent(m, cur)) patients.set(p.id, { ...m, updated: Math.max(cur.updated || 0, p.updated || 0) + 1 });
-    }
-  }
-
+  const { map, added, updated, unchanged } = mergeRecordsById(local.records, incoming.records);
+  const { future, conflicts } = mergeFuture(
+    local.futureRecords || [],
+    incoming.futureRecords || [],
+    map,
+    Boolean(opts.allowFutureOverride),
+  );
   const procs = [...local.procs];
   for (const p of incoming.procs) if (!procs.some((x) => x.id === p.id)) procs.push(p);
   return {
     records: sortRecords([...map.values()]),
     futureRecords: [...future.values()],
     procs,
-    auditDocs: [...audit.values()],
-    patients: [...patients.values()],
+    auditDocs: mergeAuditById(local.auditDocs || [], incoming.auditDocs || []),
+    patients: mergePatientsById(local.patients || [], incoming.patients || []),
     added,
     updated,
     unchanged,
-    futureConflicts,
+    futureConflicts: conflicts,
   };
 }
 

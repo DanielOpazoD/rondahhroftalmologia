@@ -6,16 +6,24 @@ import { NAME_PARTS, personName, hasNameParts } from '../core/names.js';
 import { ageAt, isIsoDate } from '../core/format.js';
 import { SEXOS } from '../config/catalogs.js';
 import { html, setHtml } from './html.js';
-import { base64ToBytes } from './dom.js';
+import { base64ToBytes, required } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
 import { clinicalFormValues } from '../core/clinicalForms.js';
 
-/** @param {import('./context.js').AppContext} ctx @param {import('../domain').Atencion} rec @param {HTMLElement} anchor */
+/**
+ * @param {import('./context.js').AppContext} ctx
+ * @param {import('../domain').Atencion} rec
+ * @param {HTMLElement} anchor botón que recupera el foco al cerrar
+ * @returns {Promise<void>}
+ */
 export function downloadIpd(ctx, rec, anchor) {
   const initial = clinicalFormValues(rec, 'ipd', ipdDefaults(rec));
+  /** @param {string} key @param {string} label @param {string} [type] */
   const input = (key, label, type = 'text') => clinicalInput(initial, key, label, type);
+  /** Apellidos y nombres de una persona. @param {string} prefix 'paciente_' o 'profesional_' */
   const names = (prefix) =>
     html`<div class="clinical-names">${NAME_PARTS.map((k, i) => input(prefix + k, ['Apellido paterno', 'Apellido materno', 'Nombres'][i]))}</div>`;
+  /** Nombre antiguo, aún sin separar. @param {string} prefix 'paciente_' o 'medico_' */
   const legacy = (prefix) =>
     !hasNameParts(rec.f, prefix) && personName(rec.f, prefix)
       ? html`<p class="hint">Nombre anterior: ${personName(rec.f, prefix)}. Completa sus campos separados.</p>`
@@ -71,12 +79,16 @@ export function downloadIpd(ctx, rec, anchor) {
       const problemSelect = form.elements.namedItem('problema');
       const sub = form.elements.namedItem('subgrupo');
       if (!(problemSelect instanceof HTMLSelectElement) || !(sub instanceof HTMLInputElement)) return;
-      const updateSubgroups = (reset) => {
+      const updateSubgroups = (/** @type {boolean} */ reset) => {
         const selected = problemSelect.value;
         const subgroups = GES_SUBGRUPOS.find((s) => s.problemaId === selected);
         if (reset) sub.value = '';
-        setHtml(form.querySelector('datalist'), html`${(subgroups?.opciones || []).map((s) => html`<option value="${s}"></option>`)}`);
-        form.querySelector('[data-subgroup-hint]').textContent = subgroups
+        // Elementos del cuerpo de este formulario (arriba): siempre están.
+        setHtml(
+          required(form.querySelector('datalist'), 'la lista de subgrupos'),
+          html`${(subgroups?.opciones || []).map((s) => html`<option value="${s}"></option>`)}`,
+        );
+        required(form.querySelector('[data-subgroup-hint]'), 'la ayuda de subgrupos').textContent = subgroups
           ? 'Opciones del manual SIGGES MINSAL. Selecciona o escribe el subgrupo.'
           : 'Sin subdivisiones verificadas en el catálogo local. Puedes escribir el subgrupo si corresponde.';
       };

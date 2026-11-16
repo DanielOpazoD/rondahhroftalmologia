@@ -8,12 +8,24 @@ import { parseNumber } from '../../core/format.js';
 import { patientIdentityKey } from '../../core/record.js';
 import { proceduresDone } from './clinica.js';
 
+/** @import { Atencion } from '../../domain' */
+
 /**
  * @typedef {{operativo?: string, desde?: string, hasta?: string}} RecordFilter
  * Fechas en ISO (YYYY-MM-DD), ambos extremos inclusive.
  */
 
-/** Aplica un filtro por operativo y rango de fechas. */
+/** Conteo de un procedimiento realizado: atenciones (`pac`), por ojo y ojos en total. @typedef {{pac: number, od: number, oi: number, ojos: number}} ConteoProc */
+
+/** Atenciones con al menos una gestión de cada tipo. @typedef {{ges: number, ic: number, receta: number, seguimiento: number, alta: number}} Gestiones */
+
+/** Agregados de computeStats() (los lee ui/statsView.js y los reportes Excel). @typedef {ReturnType<typeof computeStats>} Estadistica */
+
+/**
+ * Aplica un filtro por operativo y rango de fechas.
+ * @param {Atencion[]} records
+ * @param {RecordFilter} [filter]
+ */
 export function filterRecords(records, filter = {}) {
   const { operativo, desde, hasta } = filter;
   return records.filter((r) => {
@@ -22,25 +34,39 @@ export function filterRecords(records, filter = {}) {
   });
 }
 
-/** Descripción legible del filtro, para títulos de reportes. */
+/**
+ * Descripción legible del filtro, para títulos de reportes.
+ * @param {RecordFilter} [filter]
+ * @param {(iso: string) => string} [fmt]
+ */
 export function describeFilter(filter = {}, fmt = (x) => x) {
   const parts = [filter.operativo || 'Todos los operativos'];
   if (filter.desde || filter.hasta) parts.push(`${filter.desde ? fmt(filter.desde) : '…'} a ${filter.hasta ? fmt(filter.hasta) : '…'}`);
   return parts.join(' · ');
 }
 
-/** Operativos distintos presentes en los registros, ordenados. */
+/**
+ * Operativos distintos presentes en los registros, ordenados.
+ * @param {Atencion[]} records
+ */
 export function operativosOf(records) {
   return [...new Set(records.map((r) => (r.f?.operativo || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
 }
 
-/** Edad como entero o null. */
+/**
+ * Edad como entero o null.
+ * @param {Atencion} rec
+ */
 export function ageOf(rec) {
   const n = parseNumber(rec.f?.paciente_edad);
   return n !== null && n >= 0 && n <= 120 ? Math.floor(n) : null;
 }
 
-/** Etiqueta del grupo etario: "0-14", "15-19", …, "80+" o "Sin dato". */
+/**
+ * Etiqueta del grupo etario: "0-14", "15-19", …, "80+" o "Sin dato".
+ * @param {number | null | undefined} age
+ * @param {number[]} [groups] límites inferiores (el último es abierto)
+ */
 export function ageGroup(age, groups = AGE_GROUPS) {
   if (age === null || age === undefined) return 'Sin dato';
   for (let i = groups.length - 1; i >= 0; i--) {
@@ -49,20 +75,33 @@ export function ageGroup(age, groups = AGE_GROUPS) {
   return 'Sin dato';
 }
 
-/** Todas las etiquetas de grupo etario, en orden. */
+/**
+ * Todas las etiquetas de grupo etario, en orden.
+ * @param {number[]} [groups]
+ */
 export function ageGroupLabels(groups = AGE_GROUPS) {
   return [...groups.map((g) => ageGroup(g, groups)), 'Sin dato'];
 }
 
+/**
+ * Suma `by` al contador `obj[k]`.
+ * @param {Record<string, number>} obj
+ * @param {string} k
+ */
 const inc = (obj, k, by = 1) => {
   obj[k] = (obj[k] || 0) + by;
 };
 
-/** Ordena un objeto {clave: n} de mayor a menor. */
+/**
+ * Ordena un objeto {clave: n} de mayor a menor.
+ * @param {Record<string, number>} obj
+ * @returns {[string, number][]}
+ */
 export function sortedEntries(obj) {
   return Object.entries(obj).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'));
 }
 
+/** @param {number[]} nums */
 function median(nums) {
   if (!nums.length) return null;
   const s = [...nums].sort((a, b) => a - b);
@@ -71,24 +110,78 @@ function median(nums) {
 }
 
 /**
+ * Suma los procedimientos de una atención a `proc` (por nombre). Devuelve los ojos tratados.
+ * @param {Record<string, ConteoProc>} proc @param {import('./clinica.js').ProcHecho[]} done
+ */
+function countProcs(proc, done) {
+  let ojos = 0;
+  for (const p of done) {
+    const o = (proc[p.nombre] ||= { pac: 0, od: 0, oi: 0, ojos: 0 });
+    o.pac++;
+    if (p.ojo === 'OD' || p.ojo === 'AO') o.od++;
+    if (p.ojo === 'OI' || p.ojo === 'AO') o.oi++;
+    o.ojos += p.ojos;
+    ojos += p.ojos;
+  }
+  return ojos;
+}
+
+/**
+ * Suma las casillas marcadas (diagnósticos, solicitados, antecedentes) y los «otros» con texto.
+ * @param {Atencion} r @param {{dx: Record<string, number>, sol: Record<string, number>, ant: Record<string, number>}} c
+ */
+function countChecks(r, { dx, sol, ant }) {
+  const f = r.f || {};
+  DIAGNOSTICOS.forEach((d) => r.checks?.[d.key] && inc(dx, d.label));
+  if (f.diagnosticos_otros?.trim()) inc(dx, 'Otros diagnósticos');
+  SOLICITADOS.forEach((d) => r.checks?.[d.key] && inc(sol, d.label));
+  if (f.procedimientos_otros?.trim()) inc(sol, 'Otros');
+  ANTECEDENTES.forEach((d) => r.checks?.[d.key] && inc(ant, d.label));
+}
+
+/** Promedio, mediana y rango de edades (null si no hay). @param {number[]} ages */
+function ageSummary(ages) {
+  const n = ages.length;
+  return {
+    n,
+    promedio: n ? ages.reduce((a, b) => a + b, 0) / n : null,
+    mediana: median(ages),
+    min: n ? Math.min(...ages) : null,
+    max: n ? Math.max(...ages) : null,
+  };
+}
+
+/**
  * Calcula todos los agregados de un conjunto de atenciones.
- * @param {object[]} records
+ * @param {Atencion[]} records
  * @param {import('./config.js').ProcDef[]} procs
  */
 export function computeStats(records, procs) {
+  /** @type {Record<string, ConteoProc>} */
   const proc = {}; // nombre -> {pac, od, oi, ojos}
+  /** @type {Record<string, number>} */
   const dx = {};
+  /** @type {Record<string, number>} */
   const sol = {};
+  /** @type {Record<string, number>} */
   const ant = {};
+  /** Atenciones por sexo: F, M, O y 'Sin dato'. @type {Record<string, number>} */
   const sexo = { F: 0, M: 0, O: 0, 'Sin dato': 0 };
   const groups = ageGroupLabels();
+  /** Grupo etario -> conteo por sexo. @type {Record<string, Record<string, number>>} */
   const edadSexo = Object.fromEntries(groups.map((g) => [g, { F: 0, M: 0, O: 0, 'Sin dato': 0 }]));
+  /** @type {Record<string, {atenciones: number, pacientes: Set<string>, procedimientos: number, ojos: number}>} */
   const porDia = {};
+  /** @type {Record<string, number>} */
   const porMedico = {};
+  /** @type {Record<string, number>} */
   const porOperativo = {};
+  /** @type {Set<string>} */
   const pats = new Set();
+  /** @type {number[]} */
   const ages = [];
   let ojos = 0;
+  /** @type {Gestiones} */
   const gest = { ges: 0, ic: 0, receta: 0, seguimiento: 0, alta: 0 };
 
   for (const r of records) {
@@ -103,22 +196,10 @@ export function computeStats(records, procs) {
     edadSexo[ageGroup(age)][sx]++;
 
     const done = proceduresDone(r, procs);
-    for (const p of done) {
-      const o = (proc[p.nombre] ||= { pac: 0, od: 0, oi: 0, ojos: 0 });
-      o.pac++;
-      if (p.ojo === 'OD' || p.ojo === 'AO') o.od++;
-      if (p.ojo === 'OI' || p.ojo === 'AO') o.oi++;
-      o.ojos += p.ojos;
-      ojos += p.ojos;
-    }
+    ojos += countProcs(proc, done);
+    countChecks(r, { dx, sol, ant });
 
-    DIAGNOSTICOS.forEach((d) => r.checks?.[d.key] && inc(dx, d.label));
-    if (f.diagnosticos_otros?.trim()) inc(dx, 'Otros diagnósticos');
-    SOLICITADOS.forEach((d) => r.checks?.[d.key] && inc(sol, d.label));
-    if (f.procedimientos_otros?.trim()) inc(sol, 'Otros');
-    ANTECEDENTES.forEach((d) => r.checks?.[d.key] && inc(ant, d.label));
-
-    for (const k of Object.keys(gest)) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
+    for (const k of /** @type {(keyof Gestiones)[]} */ (Object.keys(gest))) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
 
     const day = (porDia[f.fecha_atencion || 'Sin fecha'] ||= { atenciones: 0, pacientes: new Set(), procedimientos: 0, ojos: 0 });
     day.atenciones++;
@@ -143,13 +224,7 @@ export function computeStats(records, procs) {
     gest,
     sexo,
     edadSexo,
-    edad: {
-      n: ages.length,
-      promedio: ages.length ? ages.reduce((a, b) => a + b, 0) / ages.length : null,
-      mediana: median(ages),
-      min: ages.length ? Math.min(...ages) : null,
-      max: ages.length ? Math.max(...ages) : null,
-    },
+    edad: ageSummary(ages),
     porDia: Object.entries(porDia)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([fecha, d]) => ({

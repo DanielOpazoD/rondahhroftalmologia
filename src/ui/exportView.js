@@ -20,14 +20,25 @@ import { uiConfirm } from './modal.js';
 import { openMenu } from './menu.js';
 import { html, setHtml } from './html.js';
 
-/** Sufijo de archivo según el filtro: _OperativoNov_2026-11-14. */
+/** @typedef {import('./context.js').AppContext} AppContext */
+/** @typedef {import('../domain').Atencion} Atencion */
+
+/**
+ * Sufijo de archivo según el filtro: _OperativoNov_2026-11-14.
+ * @param {AppContext} ctx
+ */
 function suffix(ctx) {
   const f = ctx.filter;
   return [f.operativo && fileSafe(f.operativo, 30), f.desde, f.hasta].filter(Boolean).join('_') || todayIso();
 }
 
-/** @param {import('./context.js').AppContext} ctx */
+/** @param {AppContext} ctx */
 export function initExportView(ctx) {
+  /**
+   * @param {string} sel
+   * @param {string[][]} opts pares [valor, etiqueta]
+   * @param {string} value elegido
+   */
   const fill = (sel, opts, value) => {
     setHtml($(sel), html`${opts.map(([v, l]) => html`<option value="${v}">${l}</option>`)}`);
     $(sel).value = value;
@@ -37,8 +48,8 @@ export function initExportView(ctx) {
   fill('#anTexto', ANON_OPTIONS.texto, ANON_DEFAULTS.texto);
   ['#anFechas', '#anEdad', '#anTexto'].forEach((s) => $(s).addEventListener('change', () => ($('#anPre').hidden = true)));
 
-  $('#repDownload').addEventListener('click', async (e) => {
-    const button = e.currentTarget;
+  $('#repDownload').addEventListener('click', async (/** @type {MouseEvent} */ e) => {
+    const button = /** @type {HTMLButtonElement} */ (e.currentTarget);
     const n = ctx.filtered().length;
     const choice = await openMenu(
       button,
@@ -56,17 +67,24 @@ export function initExportView(ctx) {
     if (choice === 'anJson') exportAnon(ctx, 'json', button);
   });
   $('#anPreview').addEventListener('click', () => preview(ctx));
-  $('#anXlsx').addEventListener('click', (e) => exportAnon(ctx, 'xlsx', e.currentTarget));
-  $('#anJson').addEventListener('click', (e) => exportAnon(ctx, 'json', e.currentTarget));
-  $('#anKey').addEventListener('click', (e) => exportKeyTable(ctx, e.currentTarget));
+  /** Botón que recibió el clic. @param {MouseEvent} e */
+  const target = (e) => /** @type {HTMLButtonElement} */ (e.currentTarget);
+  $('#anXlsx').addEventListener('click', (/** @type {MouseEvent} */ e) => exportAnon(ctx, 'xlsx', target(e)));
+  $('#anJson').addEventListener('click', (/** @type {MouseEvent} */ e) => exportAnon(ctx, 'json', target(e)));
+  $('#anKey').addEventListener('click', (/** @type {MouseEvent} */ e) => exportKeyTable(ctx, target(e)));
 }
 
+/** @param {AppContext} ctx */
 export function renderExportView(ctx) {
   const s = ctx.store.loadSecret();
   $('#anFp').textContent = s ? secretFingerprint(s) : 'se crea en la primera exportación';
 }
 
-/** Verifica que haya datos en el filtro; avisa si no. */
+/**
+ * Verifica que haya datos en el filtro; avisa si no.
+ * @param {AppContext} ctx
+ * @returns {Atencion[] | null}
+ */
 function requireData(ctx) {
   const list = ctx.filtered();
   if (!list.length) {
@@ -76,8 +94,12 @@ function requireData(ctx) {
   return list;
 }
 
-/** Excel de estadística (también lo usa la pestaña Estadística). */
-export function exportStatsXlsx(ctx, button) {
+/**
+ * Excel de estadística (también lo usa la pestaña Estadística).
+ * @param {AppContext} ctx
+ * @param {HTMLButtonElement} button
+ */
+function exportStatsXlsx(ctx, button) {
   const list = requireData(ctx);
   if (!list) return;
   return withBusy(button, async () => {
@@ -91,13 +113,19 @@ export function exportStatsXlsx(ctx, button) {
   });
 }
 
+/**
+ * @param {AppContext} ctx
+ * @param {HTMLButtonElement} button
+ */
 async function exportPdfZip(ctx, button) {
   const list = requireData(ctx);
   if (!list) return;
   const prog = $('#expPdfProg');
   await withBusy(button, async () => {
     const tpl = ctx.templateBytes();
+    /** @type {{name: string, data: Uint8Array}[]} */
     const entries = [];
+    /** @type {Atencion[]} */
     const withAnnex = [];
     for (let i = 0; i < list.length; i++) {
       prog.textContent = `Generando ${i + 1} de ${list.length}…`;
@@ -112,7 +140,10 @@ async function exportPdfZip(ctx, button) {
   });
 }
 
-/** Clave del equipo; se crea al primer uso. */
+/**
+ * Clave del equipo; se crea al primer uso.
+ * @param {AppContext} ctx
+ */
 function secret(ctx) {
   return ctx.ensureSecret();
 }
@@ -121,7 +152,11 @@ function anonOptions() {
   return { fechas: $('#anFechas').value, edad: $('#anEdad').value, texto: $('#anTexto').value };
 }
 
-/** Seudonimiza y verifica fugas. Muestra el resultado de la verificación. */
+/**
+ * Seudonimiza y verifica fugas. Muestra el resultado de la verificación.
+ * @param {AppContext} ctx
+ * @param {Atencion[]} list
+ */
 function runAnon(ctx, list) {
   const result = anonymizeRecords(list, ctx.procs, { ...anonOptions(), secret: secret(ctx) });
   const leaks = findLeaks(JSON.stringify(result.registros), list);
@@ -144,6 +179,7 @@ function runAnon(ctx, list) {
   return { result, leaks };
 }
 
+/** @param {AppContext} ctx */
 function preview(ctx) {
   const list = requireData(ctx);
   if (!list) return;
@@ -154,6 +190,11 @@ function preview(ctx) {
     JSON.stringify(result.registros.slice(0, 3), null, 2) + (result.registros.length > 3 ? `\n… y ${result.registros.length - 3} más` : '');
 }
 
+/**
+ * @param {AppContext} ctx
+ * @param {'xlsx' | 'json'} format
+ * @param {HTMLButtonElement} button
+ */
 function exportAnon(ctx, format, button) {
   const list = requireData(ctx);
   if (!list) return;
@@ -181,6 +222,10 @@ function exportAnon(ctx, format, button) {
   });
 }
 
+/**
+ * @param {AppContext} ctx
+ * @param {HTMLButtonElement} button
+ */
 async function exportKeyTable(ctx, button) {
   const list = requireData(ctx);
   if (!list) return;

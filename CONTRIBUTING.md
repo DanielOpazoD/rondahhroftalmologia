@@ -25,7 +25,7 @@ npm run check
 
 1. ESLint, para detectar errores de lógica y reglas de capas;
 2. Prettier, para el formato;
-3. `tsc --checkJs`, que revisa los tipos declarados en JSDoc. Las capas puras (`core`, `sync`, `lib`, `app`) se revisan además en **modo estricto** (`jsconfig.strict.json`: nulos, `this`, firmas de funciones). El modelo de dominio tipado está en `src/domain.d.ts`;
+3. `tsc --checkJs`, que revisa los tipos declarados en JSDoc en **modo estricto en todo `src/`** (`jsconfig.json`: sin `any` implícito, nulos revisados, `this`, firmas de funciones). El modelo de dominio tipado está en `src/domain.d.ts`;
 4. las pruebas;
 5. el build.
 
@@ -39,7 +39,7 @@ npm run test:e2e
 npm run test:stress
 ```
 
-`test:e2e` corre las pruebas en un navegador real. Cada prueba empieza con el servidor de sincronización local vacío (`e2e/fixtures.js`): importa `test` desde ahí, no desde `@playwright/test`. La CI exige además una **cobertura mínima** de la lógica (`npm run test:coverage`: líneas 95 %, ramas 85 %, funciones 87 %) y que las dependencias de producción no tengan vulnerabilidades altas (`npm audit`).
+`test:e2e` corre las pruebas en un navegador real. Cada prueba empieza con el servidor de sincronización local vacío (`e2e/fixtures.js`): importa `test` desde ahí, no desde `@playwright/test`. La CI exige además una **cobertura mínima** de la lógica (`npm run test:coverage`: líneas 97 %, ramas 87 %, funciones 92 %; el mínimo solo sube) y que las dependencias de producción no tengan vulnerabilidades altas (`npm audit`).
 
  `test:stress` corre 200 escenarios de varios PC sincronizando a la vez.
 

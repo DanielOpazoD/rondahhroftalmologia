@@ -32,10 +32,12 @@ export const PROTOCOL_HEADER = 'x-hhr-protocol';
  * @returns {Map<string, {u: number, deleted: boolean}>}
  */
 export function localVersions(records, tombstones = {}) {
+  /** @type {Map<string, {u: number, deleted: boolean}>} */
   const map = new Map();
   for (const r of records) if (r.id && r.updated) map.set(r.id, { u: r.updated, deleted: false });
   for (const [id, u] of Object.entries(tombstones)) {
-    if (!map.has(id) || map.get(id).u < u) map.set(id, { u, deleted: true });
+    const cur = map.get(id);
+    if (!cur || cur.u < u) map.set(id, { u, deleted: true });
   }
   return map;
 }
@@ -61,22 +63,58 @@ export function remoteVersions(items) {
  * - pull: el servidor tiene una versión más nueva;
  * - conflicts: mismo número de versión pero distinta huella de contenido
  *   (dos equipos fusionaron a la vez): hay que bajar y fusionar.
- * @param {Map<string, {u: number}>} local
+ * @template {{u: number}} L
+ * @param {Map<string, L>} local
  * @param {Map<string, {u: number, h?: string}>} remote
- * @param {(id: string) => string} [localHash] huella del contenido local (solo se calcula si hace falta)
+ * @param {(id: string, local: L) => string} [localHash] huella del contenido local de `id`, con su versión local
+ *   (solo se calcula si hace falta)
  * @returns {{push: string[], pull: {id: string, u: number, h?: string}[], conflicts: {id: string, u: number, h: string}[]}}
  */
 export function planSync(local, remote, localHash) {
   const push = [];
   const pull = [];
   const conflicts = [];
-  for (const [id, { u }] of local) if (!remote.has(id) || remote.get(id).u < u) push.push(id);
+  for (const [id, { u }] of local) {
+    const r = remote.get(id);
+    if (!r || r.u < u) push.push(id);
+  }
   for (const [id, r] of remote) {
     const l = local.get(id);
     if (!l || l.u < r.u) pull.push(r.h ? { id, u: r.u, h: r.h } : { id, u: r.u });
-    else if (l.u === r.u && r.h && localHash && localHash(id) !== r.h) conflicts.push({ id, u: r.u, h: r.h });
+    else if (l.u === r.u && r.h && localHash && localHash(id, l) !== r.h) conflicts.push({ id, u: r.u, h: r.h });
   }
   return { push, pull, conflicts };
+}
+
+/**
+ * ¿La versión bajada reemplaza a lo local? Sí si es más nueva que lo local
+ * (o que su eliminación), o si es `adopt`: la versión del servidor con el
+ * mismo número que la local tras resolver un conflicto.
+ * @param {import('../domain').ElementoBajado} item
+ * @param {import('../domain').ElementoSync | undefined} cur
+ * @param {Record<string, number>} tomb
+ */
+function replacesLocal(item, cur, tomb) {
+  const localU = Math.max(cur?.updated || 0, tomb[item.id] || 0);
+  return item.u > localU || !!item.adopt;
+}
+
+/**
+ * Datos y versión que quedan al recibir `item` sobre `cur`: fusionados si el
+ * tipo tiene fusión. Si la fusión agregó algo local que el servidor no tiene,
+ * es una versión nueva que hay que subir.
+ * @param {import('../domain').ElementoSync | undefined} cur
+ * @param {import('../domain').ElementoBajado & {data: Record<string, unknown>}} item
+ * @param {string} kind
+ * @param {MergeFn | undefined} mergeFn
+ * @returns {{data: Record<string, unknown>, u: number, needsPush: boolean}}
+ */
+function resolvePulled(cur, item, kind, mergeFn) {
+  const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
+  if (!cur || !m) return { data: item.data, u: item.u, needsPush: false };
+  const data = /** @type {Record<string, unknown>} */ (m.data);
+  if (m.sameAsRemote) return { data, u: item.u, needsPush: false };
+  return { data, u: Math.max(cur.updated || 0, item.u) + 1, needsPush: true };
 }
 
 /**
@@ -92,43 +130,29 @@ export function planSync(local, remote, localHash) {
 export function applyPulled(items, tombstones, pulled, mergeFn) {
   const byId = new Map(items.map((r) => [r.id, r]));
   const tomb = { ...tombstones };
-  let added = 0;
-  let updated = 0;
-  let deleted = 0;
+  const count = { added: 0, updated: 0, deleted: 0 };
   let needsPush = false;
   for (const item of pulled) {
     if (!isValidId(item.id)) continue;
     const cur = byId.get(item.id);
-    const localU = Math.max(cur?.updated || 0, tomb[item.id] || 0);
-    // `adopt`: versión del servidor con el mismo número que la local tras resolver un conflicto.
-    if (item.u <= localU && !item.adopt) continue; // lo local es igual o más nuevo
+    if (!replacesLocal(item, cur, tomb)) continue; // lo local es igual o más nuevo
     if (item.deleted) {
       if (cur) {
         byId.delete(item.id);
-        deleted++;
+        count.deleted++;
       }
       tomb[item.id] = item.u;
-    } else {
-      if (!item.data || typeof item.data !== 'object') continue;
-      const kind = item.kind || 'atencion';
-      let data = item.data;
-      let u = item.u;
-      const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
-      if (m) {
-        data = /** @type {Record<string, unknown>} */ (m.data);
-        // Si la fusión agregó algo local que el servidor no tiene, es una versión nueva que hay que subir.
-        if (!m.sameAsRemote) {
-          u = Math.max(cur.updated || 0, item.u) + 1;
-          needsPush = true;
-        }
-      }
-      if (cur) updated++;
-      else added++;
-      byId.set(item.id, { id: item.id, updated: u, kind, data: { ...data, id: item.id, updated: u } });
-      delete tomb[item.id];
+      continue;
     }
+    if (!item.data || typeof item.data !== 'object') continue;
+    const kind = item.kind || 'atencion';
+    const v = resolvePulled(cur, { ...item, data: item.data }, kind, mergeFn);
+    needsPush ||= v.needsPush;
+    count[cur ? 'updated' : 'added']++;
+    byId.set(item.id, { id: item.id, updated: v.u, kind, data: { ...v.data, id: item.id, updated: v.u } });
+    delete tomb[item.id];
   }
-  return { items: [...byId.values()], tombstones: tomb, added, updated, deleted, needsPush };
+  return { items: [...byId.values()], tombstones: tomb, ...count, needsPush };
 }
 
 /**

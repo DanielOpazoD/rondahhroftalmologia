@@ -51,10 +51,10 @@ export const PATIENT_FIELDS = [
   'paciente_fono',
 ];
 
-export const PATIENT_SCHEMA = 1;
+const PATIENT_SCHEMA = 1;
 
 /** Campo de sistema: id de la ficha en que se unió esta (no es dato del paciente). */
-export const MERGED_FIELD = 'fusionado_en';
+const MERGED_FIELD = 'fusionado_en';
 /** Campo de sistema: cuándo se eliminó la ficha (ISO-8601). */
 export const DELETED_FIELD = 'eliminada_en';
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
@@ -114,15 +114,49 @@ export function normalizePatient(raw) {
   };
   delete p.f[MERGED_FIELD];
   delete p.f[DELETED_FIELD];
-  const into = raw.f?.[MERGED_FIELD];
-  if (isValidId(into) && into.startsWith('p_') && into !== raw.id) p.f[MERGED_FIELD] = into;
-  const deletedAt = raw.f?.[DELETED_FIELD];
-  if (typeof deletedAt === 'string' && ISO_RE.test(deletedAt)) p.f[DELETED_FIELD] = deletedAt;
-  if (raw.ft && typeof raw.ft === 'object') {
-    p.ft = {};
-    for (const [k, v] of Object.entries(raw.ft)) if (k.startsWith('f.') && Number.isFinite(v)) p.ft[k] = /** @type {number} */ (v);
-  }
+  Object.assign(p.f, systemMarks(raw.f, raw.id));
+  if (raw.ft && typeof raw.ft === 'object') p.ft = fieldTimes(raw.ft);
   return p;
+}
+
+/**
+ * Marcas de sistema válidas de la ficha (unida a otra, eliminada); las inválidas se descartan.
+ * @param {Record<string, unknown> | undefined} f
+ * @param {string} id id de la ficha (no puede quedar unida a sí misma)
+ * @returns {Record<string, string>}
+ */
+function systemMarks(f, id) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  const into = f?.[MERGED_FIELD];
+  if (isValidId(into) && into.startsWith('p_') && into !== id) out[MERGED_FIELD] = into;
+  const deletedAt = f?.[DELETED_FIELD];
+  if (typeof deletedAt === 'string' && ISO_RE.test(deletedAt)) out[DELETED_FIELD] = deletedAt;
+  return out;
+}
+
+/**
+ * Fechas por campo válidas: solo rutas `f.<campo>` con un número finito.
+ * @param {Record<string, unknown>} ft
+ * @returns {import('../domain').FechasPorCampo}
+ */
+function fieldTimes(ft) {
+  /** @type {import('../domain').FechasPorCampo} */
+  const out = {};
+  for (const [k, v] of Object.entries(ft)) if (k.startsWith('f.') && Number.isFinite(v)) out[k] = /** @type {number} */ (v);
+  return out;
+}
+
+/**
+ * Vuelve a normalizar una ficha ya válida tras modificarla. Su id no cambia,
+ * así que normalizePatient no puede rechazarla; si lo hiciera, es un error del código.
+ * @param {Paciente} p
+ * @returns {Paciente}
+ */
+export function renormalizePatient(p) {
+  const out = normalizePatient(p);
+  if (!out) throw new Error('Ficha de paciente con id inválido');
+  return out;
 }
 
 /**
@@ -190,9 +224,12 @@ export function missingPatients(records, patients) {
     if (!id || has(id)) continue;
     const at = r.updated || r.created || 0;
     const cur = out.get(id);
-    if (!cur || at > cur.updated) out.set(id, patientFromRecord({ ...r, pacienteId: id }, at));
+    if (cur && at <= cur.updated) continue;
+    // Un pacienteId inválido (p. ej. recibido de otro equipo) no da ficha.
+    const p = patientFromRecord({ ...r, pacienteId: id }, at);
+    if (p) out.set(id, p);
   }
-  return [...out.values()].filter(Boolean);
+  return [...out.values()];
 }
 
 /**
@@ -360,8 +397,9 @@ export function findDuplicatePairs(patients, dismissed = new Set()) {
     for (const p of live) {
       const k = keyOf(p);
       if (!k) continue;
-      if (!g.has(k)) g.set(k, []);
-      g.get(k).push(p);
+      const same = g.get(k);
+      if (same) same.push(p);
+      else g.set(k, [p]);
     }
     return [...g.values()].filter((list) => list.length > 1);
   };
@@ -369,7 +407,7 @@ export function findDuplicatePairs(patients, dismissed = new Set()) {
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) add(list[i], list[j], 'rut');
   }
   /** @type {(a: Paciente, b: Paciente, k: string) => boolean} */
-  const differ = (a, b, k) => a.f[k] && b.f[k] && (k === 'paciente_rut' ? rutKey(a.f[k]) !== rutKey(b.f[k]) : a.f[k] !== b.f[k]);
+  const differ = (a, b, k) => Boolean(a.f[k] && b.f[k]) && (k === 'paciente_rut' ? rutKey(a.f[k]) !== rutKey(b.f[k]) : a.f[k] !== b.f[k]);
   for (const list of group((p) => normalizeText(p.f.paciente_nombre))) {
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
@@ -409,5 +447,5 @@ export function mergePatients(keep, drop, at) {
   d.f[MERGED_FIELD] = keep.id;
   d.ft['f.' + MERGED_FIELD] = at;
   d.updated = Math.max(at, (drop.updated || 0) + 1);
-  return { keep: normalizePatient(k), drop: normalizePatient(d) };
+  return { keep: renormalizePatient(k), drop: renormalizePatient(d) };
 }

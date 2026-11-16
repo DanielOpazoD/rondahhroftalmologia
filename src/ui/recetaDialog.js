@@ -6,9 +6,15 @@ import { base64ToBytes } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
 import { clinicalFormValues } from '../core/clinicalForms.js';
 
-/** @param {import('./context.js').AppContext} ctx @param {import('../domain').Atencion} rec @param {HTMLElement} anchor */
+/**
+ * @param {import('./context.js').AppContext} ctx
+ * @param {import('../domain').Atencion} rec
+ * @param {HTMLElement} anchor botón que recupera el foco al cerrar
+ * @returns {Promise<void>}
+ */
 export function downloadReceta(ctx, rec, anchor) {
   const initial = clinicalFormValues(rec, 'receta', recetaDefaults(rec));
+  /** @param {keyof typeof RECETA_LABELS} key @param {string} [type] */
   const input = (key, type = 'text') => clinicalInput(initial, key, RECETA_LABELS[key], type);
   return openClinicalForm(ctx, {
     title: 'Receta para lentes',

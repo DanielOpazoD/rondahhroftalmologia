@@ -11,8 +11,8 @@ import { cleanRut, isValidRut, rutKey } from './format.js';
 
 /** Días que dura la clave inicial sin usarse. */
 export const INITIAL_PASSWORD_DAYS = 7;
-export const PASSWORD_MIN = 6;
-export const PASSWORD_MAX = 128;
+const PASSWORD_MIN = 6;
+const PASSWORD_MAX = 128;
 /** Intentos fallidos seguidos que bloquean la cuenta, y por cuánto tiempo. */
 export const ACCOUNT_LOCK = Object.freeze({ maxFails: 5, lockMs: 15 * 60_000 });
 /** Duración de una sesión. */

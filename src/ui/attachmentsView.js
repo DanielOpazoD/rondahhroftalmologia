@@ -3,14 +3,14 @@
  * tamaño), adjuntar con el botón o arrastrando archivos, abrir y eliminar.
  */
 import { ACCEPT, kindOf, fmtSize, isInlineType, cleanType } from '../core/attachments.js';
-import { $ } from './dom.js';
+import { $, dataOf } from './dom.js';
 import { html, setHtml } from './html.js';
 import { icon } from './icons.js';
 
 /** URLs de miniaturas vigentes (se liberan al re-dibujar). @type {string[]} */
 let thumbs = [];
 
-/** @param {any} ctx contexto de la aplicación */
+/** @param {import('./context.js').AppContext} ctx */
 export function initAttachmentsView(ctx) {
   const input = $('#attInput');
   input.setAttribute('accept', ACCEPT);
@@ -22,27 +22,27 @@ export function initAttachmentsView(ctx) {
   });
   // Arrastrar y soltar sobre la tarjeta.
   const card = $('#attCard');
-  card.addEventListener('dragover', (e) => {
+  card.addEventListener('dragover', (/** @type {DragEvent} */ e) => {
     if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
     e.preventDefault();
     card.classList.add('drop');
   });
   card.addEventListener('dragleave', () => card.classList.remove('drop'));
-  card.addEventListener('drop', (e) => {
+  card.addEventListener('drop', (/** @type {DragEvent} */ e) => {
     e.preventDefault();
     card.classList.remove('drop');
     void ctx.addAttachments([...(e.dataTransfer?.files || [])]);
   });
-  $('#attList').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-a]');
+  $('#attList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('button[data-a]'));
     if (!b) return;
-    if (b.dataset.a === 'open') void ctx.openAttachment(b.dataset.id);
-    if (b.dataset.a === 'del') void ctx.deleteAttachment(b.dataset.id);
+    if (b.dataset.a === 'open') void ctx.openAttachment(dataOf(b, 'id'));
+    if (b.dataset.a === 'del') void ctx.deleteAttachment(dataOf(b, 'id'));
   });
   ctx.on('adjuntos', () => renderAttachments(ctx));
 }
 
-/** Dibuja los adjuntos de la atención abierta. */
+/** Dibuja los adjuntos de la atención abierta. @param {import('./context.js').AppContext} ctx */
 export async function renderAttachments(ctx) {
   const { store } = ctx;
   const id = ctx.rec.id;
@@ -68,7 +68,7 @@ export async function renderAttachments(ctx) {
       missingThumbs = true;
       const data = await store.loadAttachmentData(a.id);
       if (data) {
-        const url = URL.createObjectURL(new Blob([data.bytes], { type: cleanType(a.tipo) }));
+        const url = URL.createObjectURL(new Blob([/** @type {BlobPart} */ (data.bytes)], { type: cleanType(a.tipo) }));
         thumbs.push(url);
         preview = html`<img class="attthumb" src="${url}" alt="">`;
       }

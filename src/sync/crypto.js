@@ -16,7 +16,7 @@
 import { sha256, toHex, utf8 } from '../lib/sha256.js';
 
 const SALT = 'hhr-oftalmo-sync-v2';
-export const PBKDF2_ITERATIONS = 310_000;
+const PBKDF2_ITERATIONS = 310_000;
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 export class DecryptError extends Error {}

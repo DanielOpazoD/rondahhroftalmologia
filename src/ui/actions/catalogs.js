@@ -8,12 +8,18 @@ import { renderSettings } from '../settingsView.js';
 import { renderCatalogSelects, renderCatalogSettings } from '../catalogView.js';
 import { renderUserChip } from '../userView.js';
 
+/** @typedef {import('../../domain').Perfil} Medico */
+/** @typedef {import('../../domain').Operativo} Operativo */
+/** @typedef {'medico' | 'operativo'} TipoCatalogo */
+
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
+ *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
  */
 export function catalogActions(ctx, store) {
   return {
+    /** @param {import('../../domain').Procedimiento[]} procs */
     setProcs(procs) {
       if (!ctx.persist(() => store.saveProcs(procs))) return;
       ctx.procs = procs;
@@ -42,7 +48,13 @@ export function catalogActions(ctx, store) {
       renderUserChip(ctx);
     },
 
-    /** Crea o actualiza un médico u operativo y lo comparte. Devuelve el elemento guardado. */
+    /**
+     * Crea o actualiza un médico u operativo y lo comparte. Devuelve el elemento guardado.
+     * @template {Medico | Operativo} T
+     * @param {TipoCatalogo} kind
+     * @param {T} item
+     * @returns {T | undefined} undefined si no se pudo guardar
+     */
     saveCatalog(kind, item) {
       const key = kind === 'medico' ? 'medicos' : 'operativos';
       const list = byName(upsert(ctx[key], item));
@@ -61,10 +73,16 @@ export function catalogActions(ctx, store) {
       return item;
     },
 
+    /**
+     * @param {TipoCatalogo} kind
+     * @param {string} id
+     */
     deleteCatalog(kind, id) {
       const key = kind === 'medico' ? 'medicos' : 'operativos';
-      const item = ctx[key].find((x) => x.id === id);
-      const list = ctx[key].filter((x) => x.id !== id);
+      /** @type {(Medico | Operativo)[]} */
+      const current = ctx[key];
+      const item = current.find((x) => x.id === id);
+      const list = current.filter((x) => x.id !== id);
       ctx.persist(() => {
         if (kind === 'medico') store.saveMedicos(list);
         else store.saveOperativos(list);

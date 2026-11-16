@@ -10,7 +10,7 @@ import { resolvePatientId, isAttended, attentionsOf } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
 import { initSexSelector, renderSexSelector, renderLegacyName } from './patientFields.js';
 import { NAME_PARTS, refreshNames } from '../core/names.js';
-import { $ } from './dom.js';
+import { $, dataOf } from './dom.js';
 import { updateRutMark } from './rut.js';
 import { html, setHtml } from './html.js';
 import { icon } from './icons.js';
@@ -66,19 +66,20 @@ export function initIntakeView(ctx) {
   $('#ingOp').addEventListener('change', () => renderIntake(ctx));
   $('#ingAdd').addEventListener('click', () => admit(ctx));
   for (const id of Object.keys(FIELDS)) {
-    $('#' + id).addEventListener('keydown', (e) => {
+    $('#' + id).addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
       if (e.key === 'Enter') admit(ctx);
     });
   }
 
-  $('#ingList').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-a]');
+  $('#ingList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
+    const b = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest('button[data-a]'));
     if (!b) return;
-    if (b.dataset.a === 'open') ctx.openRecord(b.dataset.id);
-    if (b.dataset.a === 'del') ctx.deleteRecord(b.dataset.id);
+    if (b.dataset.a === 'open') ctx.openRecord(dataOf(b, 'id'));
+    if (b.dataset.a === 'del') ctx.deleteRecord(dataOf(b, 'id'));
   });
 }
 
+/** @param {import('./context.js').AppContext} ctx */
 function renderSexo(ctx) {
   renderSexSelector($('#ingSexo'), ctx.intakeSexo);
 }
@@ -91,7 +92,7 @@ function updateAge() {
   if (isIsoDate(fnac)) $('#ing_edad').value = age === null ? '' : String(age);
 }
 
-/** Completa los campos vacíos con la ficha existente del paciente (si la hay). */
+/** Completa los campos vacíos con la ficha existente del paciente (si la hay). @param {import('./context.js').AppContext} ctx */
 function fillFromRegistry(ctx) {
   const id = resolvePatientId({ paciente_rut: $('#ing_rut').value, paciente_nombre: $('#ing_nombre').value }, ctx.store.loadPatients());
   const p = id && ctx.store.getPatient(id);
@@ -116,6 +117,7 @@ function fillFromRegistry(ctx) {
     `Paciente ya registrado · ${prev.length} ${prev.length === 1 ? 'atención' : 'atenciones'} en ${ctx.especialidadNombre}${prev[0] ? ` (última: ${fmtDate(prev[0].f.fecha_atencion)})` : ''}.`;
 }
 
+/** @param {import('./context.js').AppContext} ctx */
 function clearForm(ctx) {
   ctx.intakePatientId = null;
   for (const id of [...Object.keys(FIELDS), 'ing_edad']) $('#' + id).value = '';
@@ -128,6 +130,7 @@ function clearForm(ctx) {
   $('#ing_rut').focus();
 }
 
+/** Agrega a la lista del día el paciente del formulario. @param {import('./context.js').AppContext} ctx */
 async function admit(ctx) {
   const data = {
     paciente_rut: $('#ing_rut').value.trim() ? formatRut($('#ing_rut').value) : '',
@@ -143,19 +146,19 @@ async function admit(ctx) {
   const result = await ctx.admitPatient(data, {
     fecha: $('#ingFecha').value || todayIso(),
     operativo: $('#ingOp').value,
-    pacienteId: ctx.intakePatientId,
+    pacienteId: ctx.intakePatientId ?? undefined,
   });
   if (result.ok) clearForm(ctx);
 }
 
-/** "Viernes 14 de noviembre". */
+/** "Viernes 14 de noviembre". @param {string} iso fecha AAAA-MM-DD */
 function dayTitle(iso) {
   const [y, m, d] = iso.split('-').map(Number);
   const s = new Date(y, m - 1, d).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Lista del día. */
+/** Lista del día. @param {import('./context.js').AppContext} ctx */
 export function renderIntake(ctx) {
   if (!$('#ingFecha').value) $('#ingFecha').value = todayIso();
   const sel = $('#ingOp');

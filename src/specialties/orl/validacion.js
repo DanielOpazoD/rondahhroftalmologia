@@ -5,7 +5,7 @@ import { parseNumber } from '../../core/format.js';
 import { LIMITES_CLINICOS } from './config.js';
 
 /**
- * @param {object} rec atención
+ * @param {import('../../domain').Atencion} rec atención
  * @param {(field: string, msg: string) => void} warn marca una advertencia en un campo
  * @param {(msg: string) => void} note advertencia general (sin campo)
  */

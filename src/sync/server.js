@@ -42,7 +42,7 @@ import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protoc
  * }} BlobStore
  */
 
-export const LIMITS = Object.freeze({
+const LIMITS = Object.freeze({
   itemsPerRequest: 200,
   ctMaxChars: 400_000,
   futureSkewMs: 24 * 3600 * 1000,
@@ -119,8 +119,8 @@ const ESP_RE = /^[a-z][a-z0-9-]{1,39}$/;
  * `m_` + 8, paciente: `p_` + 10). Hoy viajan con id opaco; `purge` solo puede
  * borrar ids con esta forma (nunca atenciones ni ids opacos).
  */
-export const LEGACY_ID_RE = /^(?:m_[0-9a-z]{8}|p_[0-9a-z]{10})$/;
-export const DEFAULT_ESP = 'oftalmologia';
+const LEGACY_ID_RE = /^(?:m_[0-9a-z]{8}|p_[0-9a-z]{10})$/;
+const DEFAULT_ESP = 'oftalmologia';
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 const H_RE = /^[0-9a-f]{16}$/;
@@ -199,9 +199,10 @@ async function versionsOf(store, esp, id) {
   const { blobs } = await store.list({ prefix: `${esp}/r/${id}/` });
   const re = keyRe(esp);
   return blobs
-    .map((b) => /** @type {[string, RegExpExecArray | null]} */ ([b.key, re.exec(b.key)]))
-    .filter(([, m]) => m && m[1] === id)
-    .map(([key, m]) => ({ key, u: Number(m[2]), h: m[3] }))
+    .flatMap(({ key }) => {
+      const m = re.exec(key);
+      return m && m[1] === id ? [{ key, u: Number(m[2]), h: m[3] }] : [];
+    })
     .sort((a, b) => (newer(a, b) ? -1 : newer(b, a) ? 1 : 0));
 }
 
@@ -360,6 +361,150 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
   }
 
   /**
+   * Una solicitud autorizada.
+   * @typedef {{req: Request, url: URL, esp: string, session: import('./accounts.js').Autenticado | null}} Peticion
+   */
+
+  /** Versiones vigentes por id (la más nueva de cada uno). */
+  function latestVersions() {
+    /** @type {Map<string, {u: number, h?: string}>} */
+    const latest = new Map();
+    return {
+      /** @param {string} id @param {{u: number, h?: string}} v */
+      keep(id, v) {
+        const cur = latest.get(id);
+        if (!cur || newer(v, cur)) latest.set(id, v);
+      },
+      items: () => [...latest].map(([id, { u, h }]) => (h ? { id, u, h } : { id, u })),
+    };
+  }
+
+  /**
+   * Lista incremental: solo las marcas del índice de cambios de los días desde
+   * `since` (pocas claves aunque haya años de datos).
+   * @param {string} esp @param {number} since @param {number} t0
+   */
+  async function listSince(esp, since, t0) {
+    const v = latestVersions();
+    const cre = changeRe(esp);
+    for (let d = since - (since % DAY_MS); d <= t0; d += DAY_MS) {
+      const { blobs } = await store.list({ prefix: `${esp}/c/${dayOf(d)}/` });
+      for (const b of blobs) {
+        const m = cre.exec(b.key);
+        if (m && Number(m[2]) >= since) v.keep(m[3], { u: Number(m[4]), h: m[5] });
+      }
+    }
+    return json(200, { items: v.items(), now: t0, full: false });
+  }
+
+  /** Lista completa, y limpieza del índice de cambios antiguo. @param {string} esp @param {number} t0 */
+  async function listAll(esp, t0) {
+    const v = latestVersions();
+    const re = keyRe(esp);
+    const { blobs } = await store.list({ prefix: `${esp}/r/` });
+    for (const b of blobs) {
+      const m = re.exec(b.key);
+      if (m) v.keep(m[1], { u: Number(m[2]), h: m[3] });
+    }
+    // Limpieza del índice de cambios antiguo (pocas claves: solo la actividad reciente).
+    const cutoff = dayOf(t0 - (CHANGE_LOG_DAYS + 2) * DAY_MS);
+    const { blobs: marks } = await store.list({ prefix: `${esp}/c/` });
+    const old = marks.filter((b) => b.key.slice(esp.length + 3, esp.length + 11) < cutoff);
+    await mapLimit(old, 8, (b) => store.delete(b.key));
+    return json(200, { items: v.items(), now: t0, full: true });
+  }
+
+  /** GET list: incremental si `since` es reciente; si no, completa. @param {Peticion} p */
+  async function list({ url, esp }) {
+    const t0 = now();
+    const since = Number(url.searchParams.get('since'));
+    const incremental = Number.isSafeInteger(since) && since > 0 && since <= t0 && t0 - since < CHANGE_LOG_DAYS * DAY_MS;
+    return incremental ? listSince(esp, since, t0) : listAll(esp, t0);
+  }
+
+  /**
+   * Lote de `items` validado (get: sin iv ni ct; put: completos), o la respuesta de error.
+   * @param {Request} req @param {boolean} withContent
+   * @returns {Promise<SyncBlob[] | Response>}
+   */
+  async function readItems(req, withContent) {
+    const body = await readJson(req);
+    /** @type {SyncBlob[] | null} validados abajo con validItem */
+    const items = Array.isArray(body?.items) ? body.items : null;
+    if (!items || items.length > LIMITS.itemsPerRequest) {
+      return fail(400, 'lote_invalido', `Se esperan entre 0 y ${LIMITS.itemsPerRequest} elementos en "items"`);
+    }
+    const t = now();
+    if (!items.every((it) => validItem(it, t, withContent))) return fail(400, 'elemento_invalido', 'Elemento inválido');
+    return items;
+  }
+
+  /** POST get: el contenido cifrado de las versiones pedidas. @param {Peticion} p */
+  async function getItems({ req, esp }) {
+    const items = await readItems(req, false);
+    if (items instanceof Response) return items;
+    const out = await mapLimit(items, 16, async ({ id, u, h }) => {
+      const v = /** @type {{iv?: string, ct?: string} | null} */ (await store.get(keyOf(esp, id, u, h), { type: 'json' }));
+      return v && v.iv && v.ct ? { id, u, ...(h ? { h } : {}), iv: v.iv, ct: v.ct } : { id, u, missing: true };
+    });
+    return json(200, { items: out });
+  }
+
+  /**
+   * Guarda una versión si es más nueva que la del servidor. Devuelve si se guardó.
+   * @param {string} esp @param {SyncBlob} item
+   */
+  async function putOne(esp, { id, u, h, iv, ct }) {
+    const existing = await versionsOf(store, esp, id);
+    // El servidor ya tiene este número de versión o uno mayor: el equipo lo
+    // detectará (por número o por huella distinta) y fusionará.
+    if (existing.length && existing[0].u >= u) return false;
+    // Primero la marca del índice: si falla lo siguiente, el reintento la
+    // reescribe; al revés, una versión podría quedar sin marca.
+    // Hora de la marca: la del momento de escribirla (no la del inicio de la
+    // solicitud), para que el margen del cursor de los clientes la cubra
+    // aunque la solicitud haya tardado.
+    await store.setJSON(changeKey(esp, now(), id, u, h), 1);
+    await store.setJSON(keyOf(esp, id, u, h), { iv, ct });
+    await Promise.all(existing.map((old) => store.delete(old.key)));
+    return true;
+  }
+
+  /** POST put: guarda versiones nuevas; informa cuáles se guardaron y cuáles no. @param {Peticion} p */
+  async function putItems({ req, esp, session }) {
+    const items = await readItems(req, true);
+    if (items instanceof Response) return items;
+    /** @type {string[]} */
+    const saved = [];
+    /** @type {string[]} */
+    const skipped = [];
+    await mapLimit(items, 8, async (it) => ((await putOne(esp, it)) ? saved : skipped).push(it.id));
+    // Registro de accesos: quién escribió, cuántos elementos y dónde (el servidor no ve qué).
+    if (session && saved.length) {
+      await accounts?.audit({ ev: 'sync.escribir', u: session.user.id, s: session.sid, n: saved.length, esp });
+    }
+    return json(200, { saved, skipped });
+  }
+
+  /** POST purge: borra ids antiguos en claro (migración al cifrado). @param {Peticion} p */
+  async function purge({ req, esp }) {
+    const body = await readJson(req);
+    /** @type {unknown[] | null} */
+    const ids = Array.isArray(body?.ids) ? body.ids : null;
+    if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every((id) => typeof id === 'string' && LEGACY_ID_RE.test(id))) {
+      return fail(400, 'purga_invalida', 'Solo se pueden borrar ids antiguos en claro');
+    }
+    /** @type {string[]} */
+    const purged = [];
+    await mapLimit(/** @type {string[]} */ (ids), 8, async (id) => {
+      const existing = await versionsOf(store, esp, id);
+      await Promise.all(existing.map((old) => store.delete(old.key)));
+      if (existing.length) purged.push(id);
+    });
+    return json(200, { purged });
+  }
+
+  /**
    * @param {Request} req
    * @param {URL} url
    * @param {string} esp
@@ -370,114 +515,16 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
   async function route(req, url, esp, session, reqId) {
     const action = url.pathname.split('/').filter(Boolean).pop() || '';
     if (!Object.hasOwn(ROUTES, action)) return fail(404, 'ruta', 'Ruta no encontrada');
-    if (req.method !== ROUTES[action]) {
-      const r = fail(405, 'metodo', `Usa ${ROUTES[action]} para ${action}`);
-      r.headers.set('allow', ROUTES[action]);
+    const method = ROUTES[/** @type {keyof typeof ROUTES} */ (action)];
+    if (req.method !== method) {
+      const r = fail(405, 'metodo', `Usa ${method} para ${action}`);
+      r.headers.set('allow', method);
       return r;
     }
-    const re = keyRe(esp);
+    /** Acción de cada ruta (el método de cada una está en ROUTES). @type {Record<keyof typeof ROUTES, (p: Peticion) => Promise<Response>>} */
+    const actions = { list, get: getItems, put: putItems, purge };
     try {
-      if (req.method === 'GET' && action === 'list') {
-        const t0 = now();
-        /** @type {Map<string, {u: number, h?: string}>} */
-        const latest = new Map();
-        /** @type {(id: string, v: {u: number, h?: string}) => void} */
-        const keep = (id, v) => {
-          if (!latest.has(id) || newer(v, latest.get(id))) latest.set(id, v);
-        };
-        const items = () => [...latest].map(([id, { u, h }]) => (h ? { id, u, h } : { id, u }));
-        const since = Number(url.searchParams.get('since'));
-        if (Number.isSafeInteger(since) && since > 0 && since <= t0 && t0 - since < CHANGE_LOG_DAYS * DAY_MS) {
-          // Solo los días desde `since`: pocas claves aunque haya años de datos.
-          const cre = changeRe(esp);
-          for (let d = since - (since % DAY_MS); d <= t0; d += DAY_MS) {
-            const { blobs } = await store.list({ prefix: `${esp}/c/${dayOf(d)}/` });
-            for (const b of blobs) {
-              const m = cre.exec(b.key);
-              if (m && Number(m[2]) >= since) keep(m[3], { u: Number(m[4]), h: m[5] });
-            }
-          }
-          return json(200, { items: items(), now: t0, full: false });
-        }
-        const { blobs } = await store.list({ prefix: `${esp}/r/` });
-        for (const b of blobs) {
-          const m = re.exec(b.key);
-          if (m) keep(m[1], { u: Number(m[2]), h: m[3] });
-        }
-        // Limpieza del índice de cambios antiguo (pocas claves: solo la actividad reciente).
-        const cutoff = dayOf(t0 - (CHANGE_LOG_DAYS + 2) * DAY_MS);
-        const { blobs: marks } = await store.list({ prefix: `${esp}/c/` });
-        const old = marks.filter((b) => b.key.slice(esp.length + 3, esp.length + 11) < cutoff);
-        await mapLimit(old, 8, (b) => store.delete(b.key));
-        return json(200, { items: items(), now: t0, full: true });
-      }
-
-      if (req.method === 'POST' && (action === 'get' || action === 'put')) {
-        const body = await readJson(req);
-        /** @type {SyncBlob[] | null} validados abajo con validItem (en `get`, sin iv ni ct) */
-        const items = Array.isArray(body?.items) ? body.items : null;
-        if (!items || items.length > LIMITS.itemsPerRequest) {
-          return fail(400, 'lote_invalido', `Se esperan entre 0 y ${LIMITS.itemsPerRequest} elementos en "items"`);
-        }
-        const t = now();
-        if (!items.every((it) => validItem(it, t, action === 'put'))) return fail(400, 'elemento_invalido', 'Elemento inválido');
-
-        if (action === 'get') {
-          const out = await mapLimit(items, 16, async ({ id, u, h }) => {
-            const v = /** @type {{iv?: string, ct?: string} | null} */ (await store.get(keyOf(esp, id, u, h), { type: 'json' }));
-            return v && v.iv && v.ct ? { id, u, ...(h ? { h } : {}), iv: v.iv, ct: v.ct } : { id, u, missing: true };
-          });
-          return json(200, { items: out });
-        }
-
-        // put
-        /** @type {string[]} */
-        const saved = [];
-        /** @type {string[]} */
-        const skipped = [];
-        await mapLimit(items, 8, async ({ id, u, h, iv, ct }) => {
-          const existing = await versionsOf(store, esp, id);
-          if (existing.length && existing[0].u >= u) {
-            // El servidor ya tiene este número de versión o uno mayor. El equipo
-            // lo detectará (por número o por huella distinta) y fusionará.
-            skipped.push(id);
-            return;
-          }
-          // Primero la marca del índice: si falla lo siguiente, el reintento la
-          // reescribe; al revés, una versión podría quedar sin marca.
-          // Hora de la marca: la del momento de escribirla (no la del inicio de la
-          // solicitud), para que el margen del cursor de los clientes la cubra
-          // aunque la solicitud haya tardado.
-          await store.setJSON(changeKey(esp, now(), id, u, h), 1);
-          await store.setJSON(keyOf(esp, id, u, h), { iv, ct });
-          await Promise.all(existing.map((old) => store.delete(old.key)));
-          saved.push(id);
-        });
-        // Registro de accesos: quién escribió, cuántos elementos y dónde (el servidor no ve qué).
-        if (session && saved.length) {
-          await accounts?.audit({ ev: 'sync.escribir', u: session.user.id, s: session.sid, n: saved.length, esp });
-        }
-        return json(200, { saved, skipped });
-      }
-
-      if (req.method === 'POST' && action === 'purge') {
-        const body = await readJson(req);
-        /** @type {unknown[] | null} */
-        const ids = Array.isArray(body?.ids) ? body.ids : null;
-        if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every((id) => typeof id === 'string' && LEGACY_ID_RE.test(id))) {
-          return fail(400, 'purga_invalida', 'Solo se pueden borrar ids antiguos en claro');
-        }
-        /** @type {string[]} */
-        const purged = [];
-        await mapLimit(/** @type {string[]} */ (ids), 8, async (id) => {
-          const existing = await versionsOf(store, esp, id);
-          await Promise.all(existing.map((old) => store.delete(old.key)));
-          if (existing.length) purged.push(id);
-        });
-        return json(200, { purged });
-      }
-
-      return fail(404, 'ruta', 'Ruta no encontrada');
+      return await actions[/** @type {keyof typeof ROUTES} */ (action)]({ req, url, esp, session });
     } catch (e) {
       if (e instanceof BodyError) return fail(e.status, e.code, e.message);
       console.error('sync error', reqId, e);
@@ -500,7 +547,8 @@ export function memoryBlobStore() {
     },
     /** @param {string} key */
     async get(key) {
-      return m.has(key) ? JSON.parse(m.get(key)) : null;
+      const stored = m.get(key);
+      return stored === undefined ? null : JSON.parse(stored);
     },
     /**
      * @param {string} key

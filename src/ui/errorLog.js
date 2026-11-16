@@ -9,20 +9,28 @@
 import { APP } from '../config/catalogs.js';
 import { errorEntry, pushEntry, formatLog } from '../core/errlog.js';
 
-/** @type {((e: object) => void) | null} */
+/** @typedef {import('../core/errlog.js').ErrorEntry} ErrorEntry */
+
+/** @type {((e: ErrorEntry) => void) | null} */
 let sink = null;
+/** @type {ErrorEntry[]} */
 const pending = [];
 
-/** Registra un error (antes de iniciar la app, queda en espera). */
+/**
+ * Registra un error (antes de iniciar la app, queda en espera).
+ * @param {string} where dónde ocurrió (acción, sincronización, almacenamiento…)
+ * @param {unknown} err
+ */
 export function logError(where, err) {
   const e = errorEntry(where, err, Date.now(), APP.version);
   if (sink) sink(e);
   else pending.push(e);
 }
 
+/** Como `$` de dom.js (aquí no se importa para evitar el ciclo); `any` por la misma razón que `$`. @param {string} sel */
 const q = (sel) => /** @type {any} */ (document.querySelector(sel));
 
-/** @param {any} ctx contexto de la aplicación */
+/** @param {import('./context.js').AppContext} ctx */
 export function initErrorLog(ctx) {
   const { store } = ctx;
   const render = () => {
