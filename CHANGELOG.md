@@ -1,5 +1,24 @@
 # Cambios
 
+## 2.21.0 — 2026-11-16
+
+### Nuevo
+- **Editar los datos personales de un paciente** (Pacientes → ficha → «Editar datos»): RUT, apellidos, nombres, fecha de nacimiento, sexo y teléfono.
+  - La ficha **conserva su identidad**, así que no se pierde la continuidad: sigue con todas sus atenciones, y una atención nueva con el RUT corregido llega a la misma ficha.
+  - La corrección se aplica también a cada atención de ese paciente; la edad se recalcula con la fecha de cada atención y el cambio queda en su historial.
+  - Si el RUT nuevo ya es de otra ficha, ofrece **unir** las dos.
+  - Se sincroniza campo a campo, sin pisar otros cambios.
+- **Reportes**: Estadística y Exportar en **una sola pestaña**, con un mismo filtro arriba y un menú **Descargar** con:
+  - Excel de estadística;
+  - PDF de cada atención (ZIP);
+  - datos seudonimizados (Excel o JSON).
+  - Las opciones de seudonimización quedan en una tarjeta plegable al final.
+- **Ajustes se abre tocando el logo del hospital**, con un pequeño engranaje como pista. Las pestañas quedan en cuatro: Ingreso, Atención, Pacientes y Reportes.
+
+### Visual
+- En el celular, el filtro de Reportes ordenado: operativo arriba, fechas lado a lado y «Descargar» a la derecha.
+- Decimales con coma (por ejemplo, edad promedio «68,4»).
+
 ## 2.20.0 — 2026-11-15
 
 ### Nuevo

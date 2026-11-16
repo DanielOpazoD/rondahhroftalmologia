@@ -56,7 +56,8 @@ export function renderStats(ctx) {
   const tot = rows.reduce((a, [, o]) => ({ od: a.od + o.od, oi: a.oi + o.oi }), { od: 0, oi: 0 });
   const groups = ageGroupLabels();
   const sexKeys = ['F', 'M', 'O', 'Sin dato'];
-  const fmt1 = (x) => (x === null ? '—' : Math.round(x * 10) / 10);
+  // Decimales con coma (es-CL): «68,4».
+  const fmt1 = (x) => (x === null ? '—' : (Math.round(x * 10) / 10).toLocaleString('es-CL', { maximumFractionDigits: 1 }));
   const gest = [
     ['GES', S.gest.ges],
     ['Interconsulta', S.gest.ic],

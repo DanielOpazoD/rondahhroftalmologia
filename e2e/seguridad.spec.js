@@ -18,7 +18,7 @@ test('CSP estricta: ninguna pantalla viola la política y un estilo inyectado se
   await fillPatient(page, { nombre: 'Ana Segura', rut: '12.345.678-5' });
   await page.locator('#dxChips .chip').first().click();
   await save(page);
-  for (const t of ['Ingreso', 'Atención', 'Pacientes', 'Estadística', 'Exportar', 'Ajustes']) await tab(page, t);
+  for (const t of ['Ingreso', 'Atención', 'Pacientes', 'Reportes', 'Ajustes']) await tab(page, t);
   // Las barras de Estadística tienen ancho (por CSSOM, sin atributos style).
   await tab(page, 'Estadística');
   const width = await page

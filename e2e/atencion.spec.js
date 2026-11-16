@@ -98,10 +98,25 @@ test('estadística y exportar Excel', async ({ page }) => {
   await fillPatient(page, { nombre: 'Estad Uno' });
   await page.locator('#dxChips .chip[data-k="diagnostico_miopia"]').click();
   await save(page);
-  await tab(page, 'Estadística');
+  await tab(page, 'Reportes');
   await expect(page.locator('#stOut .kpi').first()).toContainText('1');
-  const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#stXlsx').click()]);
+  // Reportes: un solo menú «Descargar» con todas las salidas.
+  await page.locator('#repDownload').click();
+  const menu = page.getByRole('menu', { name: 'Descargar' });
+  await expect(menu.getByRole('menuitem')).toHaveCount(4);
+  await expect(menu.getByRole('menuitem', { name: /PDF de cada atención/ })).toContainText('1 hoja');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    menu.getByRole('menuitem', { name: /Estadística \(Excel\)/ }).click(),
+  ]);
   expect(download.suggestedFilename()).toMatch(/^estadistica_oftalmo_.*\.xlsx$/);
+  // Seudonimizados desde la misma pestaña (Excel).
+  await page.locator('#repDownload').click();
+  const [anon] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('menuitem', { name: /seudonimizados \(Excel\)/ }).click(),
+  ]);
+  expect(anon.suggestedFilename()).toMatch(/seudonimizado.*\.xlsx$/);
 });
 
 test('la política de seguridad bloquea scripts inyectados', async ({ page }) => {
@@ -208,4 +223,43 @@ test('examen: AVcc por ojo y descripción del fondo de ojo y la BMC; el PDF los 
   expect(text('od_hallazgos')).toBe('Catarata\nFO: Papila normal\nBMC: Cámara formada');
   expect(text('oi_hallazgos')).toBe('FO: Excavación 0,5');
   expect(form.getFields().some((f) => /_otro_(examen|resultado)$/.test(f.getName()))).toBe(false);
+});
+
+test('editar datos del paciente: corrige RUT y nombre en la ficha y sus atenciones, sin perder la continuidad', async ({ page }) => {
+  await fillPatient(page, { nombre: 'Jaun', rut: '11.111.111-1' });
+  await page.locator('#paciente_apellido_paterno').fill('Peres');
+  await save(page);
+  await showPatientRecord(page, 'Peres Jaun');
+  await page.locator('#patEdit').click();
+  await expect(page.locator('#dlgTitle')).toHaveText('Editar datos del paciente');
+  // Un RUT inválido no se acepta.
+  await page.locator('#dlg_paciente_rut').fill('12.345.678-9');
+  await page.locator('#dlgOk').click();
+  await expect(page.locator('#dlgErr')).toContainText('RUT inválido');
+  await page.locator('#dlg_paciente_rut').fill('12.345.678-5');
+  await page.locator('#dlg_apellido_paterno').fill('Pérez');
+  await page.locator('#dlg_nombres').fill('Juan');
+  await page.locator('#dlg_paciente_fono').fill('+56 9 1111 2222');
+  await page.locator('#dlgOk').click();
+  await expect(page.locator('#toast')).toContainText('en 1 atención');
+  await expect(page.locator('#patCard h2')).toHaveText('Pérez Juan');
+  await expect(page.locator('#patCard')).toContainText('12.345.678-5');
+  await expect(page.locator('#patAttentions .prow')).toHaveCount(1);
+  // La atención muestra los datos corregidos y su historial lo registra.
+  await page.locator('#patAttentions .pmain').first().click();
+  await expect(page.locator('#paciente_rut')).toHaveValue('12.345.678-5');
+  await expect(page.locator('#paciente_apellido_paterno')).toHaveValue('Pérez');
+  await page.locator('#histCard summary').click();
+  await expect(page.locator('#histList')).toContainText('12.345.678-5');
+  // Continuidad: una atención nueva con el RUT corregido llega a la MISMA ficha.
+  await page.locator('#bNew').click();
+  await page.locator('#fecha_atencion').fill('2026-12-01');
+  await page.locator('#paciente_rut').fill('12.345.678-5');
+  await page.locator('#paciente_rut').blur();
+  // Al escribir el RUT corregido, la app completa los datos desde la ficha.
+  await expect(page.locator('#paciente_apellido_paterno')).toHaveValue('Pérez');
+  await expect(page.locator('#paciente_nombres')).toHaveValue('Juan');
+  await save(page);
+  await showPatientRecord(page, 'Pérez Juan');
+  await expect(page.locator('#patAttentions .prow')).toHaveCount(2);
 });

@@ -35,7 +35,7 @@ test('accesibilidad: pestañas, diálogos, bloqueo y modo práctica sin infracci
   // Datos para que las listas no estén vacías.
   await fillPatient(page, { nombre: 'Ana Accesible', rut: '12.345.678-5' });
   await save(page);
-  for (const t of ['Ingreso', 'Atención', 'Pacientes', 'Estadística', 'Exportar', 'Ajustes']) {
+  for (const t of ['Ingreso', 'Atención', 'Pacientes', 'Reportes', 'Ajustes']) {
     await tab(page, t);
     all.push(...(await audit(page, t)));
   }
@@ -73,7 +73,7 @@ test('accesibilidad: tema oscuro y celular sin infracciones WCAG A/AA', async ({
   await fillPatient(page, { nombre: 'Ana Oscura', rut: '12.345.678-5' });
   await save(page);
   const all = [];
-  for (const t of ['Ingreso', 'Atención', 'Pacientes', 'Estadística', 'Exportar', 'Ajustes']) {
+  for (const t of ['Ingreso', 'Atención', 'Pacientes', 'Reportes', 'Ajustes']) {
     await tab(page, t);
     all.push(...(await audit(page, 'oscuro ' + t)));
   }
@@ -101,7 +101,7 @@ test('teclado: saltar al contenido, flechas entre pestañas y errores asociados 
   await expect(page.locator('#tab-t-reg')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#t-reg')).toBeVisible();
   await page.keyboard.press('End');
-  await expect(page.locator('#tab-t-aj')).toBeFocused();
+  await expect(page.locator('#tab-t-est')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#tab-t-ing')).toBeFocused();
   await tab(page, 'Atención');

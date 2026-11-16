@@ -54,9 +54,8 @@ La app se usa de forma ocasional, así que conviene revisar los equipos antes de
   - con el candado del encabezado.
 
   Al configurarlo se entrega un **código de recuperación**: guárdalo con la contraseña del equipo. Si se olvida el PIN, desbloquea con ese código o, con la sincronización activa, con la contraseña del equipo. Tras 5 intentos fallidos hay que esperar, cada vez más. Es una protección de pantalla: evita que otra persona vea los pacientes, pero no cifra los datos guardados en el navegador.
-| Estadística | Indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día. |
-| Exportar | ZIP con todos los PDF, Excel de estadística, datos seudonimizados para IA. |
-| Ajustes | Chequeo del equipo, modo práctica, bloqueo con PIN, perfiles y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
+| Reportes | Con un solo filtro (operativo y fechas): indicadores, procedimientos por ojo, diagnósticos, solicitados, gestiones, edad y sexo, por día; y **Descargar**: Excel de estadística, ZIP con todos los PDF y datos seudonimizados para IA. |
+| Ajustes (tocando el logo del hospital) | Chequeo del equipo, modo práctica, bloqueo con PIN, perfiles y operativos (compartidos entre PC), nombre de este equipo y sincronización, lista de procedimientos, opciones del PDF y respaldo. |
 
 Cada atención guardada muestra al final su **Historial de cambios**: quién (qué equipo), cuándo, y qué campo cambió de qué valor a cuál.
 

@@ -90,3 +90,67 @@ test('patientUpdateFromRecord: crea, fusiona por campo y no reescribe si nada ca
   assert.equal(patientUpdateFromRecord(rec, newer, 400), null, 'un dato más nuevo de la ficha no se pisa con uno viejo');
   assert.equal(patientUpdateFromRecord({ ...rec, pacienteId: undefined }, null, 1), null);
 });
+
+test('editar datos del paciente: la ficha conserva su id y sus atenciones se corrigen (continuidad)', async () => {
+  const { editPatientData, rutOwner } = await import('../src/app/attentions.js');
+  const { normalizePatient, resolvePatientId } = await import('../src/core/patient.js');
+  const T = 1_800_000_000_000;
+  const patient = normalizePatient({
+    id: 'p_x',
+    created: T,
+    updated: T,
+    f: { paciente_nombre: 'Jaun Peres', paciente_rut: '11.111.111-1', paciente_fono: '1' },
+  });
+  const a1 = {
+    id: 'a1',
+    pacienteId: 'p_x',
+    updated: T,
+    f: { paciente_nombre: 'Jaun Peres', paciente_rut: '11.111.111-1', fecha_atencion: '2026-01-10', plan: 'x' },
+    checks: {},
+    proc: {},
+  };
+  const a2 = {
+    id: 'a2',
+    pacienteId: 'p_x',
+    updated: T,
+    f: { paciente_nombre: 'Jaun Peres', fecha_atencion: '2026-06-10' },
+    checks: {},
+    proc: {},
+  };
+  const otro = { id: 'a3', pacienteId: 'p_y', updated: T, f: { paciente_nombre: 'Otra' }, checks: {}, proc: {} };
+  const r = editPatientData({
+    patient,
+    fields: { paciente_nombre: 'Juan Pérez', paciente_rut: '12.345.678-5', paciente_fnac: '1950-03-01', paciente_fono: '' },
+    records: [a1, a2, otro],
+    now: T + 10,
+  });
+  assert.equal(r.patient.id, 'p_x', 'la ficha conserva su id');
+  assert.deepEqual(r.changed.sort(), ['paciente_fnac', 'paciente_fono', 'paciente_nombre', 'paciente_rut']);
+  assert.equal(r.patient.f.paciente_rut, '12.345.678-5');
+  assert.equal(r.patient.f.paciente_fono, undefined, 'un valor vacío borra el dato');
+  assert.equal(r.patient.ft['f.paciente_fono'], T + 10, 'el borrado queda fechado (se sincroniza)');
+  assert.deepEqual(
+    r.records.map((x) => x.after.id),
+    ['a1', 'a2'],
+    'solo las atenciones de este paciente',
+  );
+  const after1 = r.records[0].after;
+  assert.equal(after1.pacienteId, 'p_x');
+  assert.equal(after1.f.paciente_nombre, 'Juan Pérez');
+  assert.equal(after1.f.plan, 'x', 'lo clínico no cambia');
+  assert.equal(after1.f.paciente_edad, '75', 'la edad se recalcula a la fecha de cada atención');
+  assert.equal(r.records[1].after.f.paciente_edad, '76');
+  assert.ok(after1.updated > a1.updated);
+  // Continuidad: una atención nueva con el RUT corregido llega a la MISMA ficha.
+  assert.equal(resolvePatientId({ paciente_rut: '12345678-5' }, [r.patient]), 'p_x');
+  // Sin cambios: nada que hacer.
+  assert.equal(
+    editPatientData({ patient: r.patient, fields: { paciente_nombre: 'Juan Pérez' }, records: [], now: T + 20 }).changed.length,
+    0,
+  );
+  // RUT ya usado por otra ficha: hay que unirlas, no duplicar.
+  const other = normalizePatient({ id: 'p_z', f: { paciente_nombre: 'Juan P.', paciente_rut: '12.345.678-5' } });
+  assert.equal(rutOwner([r.patient, other], '12345678-5', 'p_x')?.id, 'p_z');
+  assert.equal(rutOwner([r.patient, other], '12.345.678-5', 'p_z')?.id, 'p_x');
+  assert.equal(rutOwner([r.patient], '11.111.111-1', 'p_x'), null);
+});

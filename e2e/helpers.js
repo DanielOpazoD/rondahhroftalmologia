@@ -10,7 +10,10 @@ export async function openApp(page) {
 
 /** Va a una pestaña por su nombre visible. */
 export async function tab(page, name) {
-  await page.getByRole('tab', { name }).click();
+  // Ajustes se abre con el logo; Estadística y Exportar son ahora «Reportes».
+  if (name === 'Ajustes') return page.locator('#brandBtn').click();
+  const target = name === 'Estadística' || name === 'Exportar' ? 'Reportes' : name;
+  await page.getByRole('tab', { name: target }).click();
 }
 
 /** Va a una sección de Ajustes: «Este equipo», «Listas», «Datos» o «Administración». */

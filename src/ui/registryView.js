@@ -32,6 +32,7 @@ export function initRegistryView(ctx) {
     if (b?.dataset.a === 'delp') void ctx.deletePatient(b.dataset.p);
   });
   $('#patNew').addEventListener('click', () => ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId));
+  $('#patEdit').addEventListener('click', () => ctx.openPatientId && ctx.editPatient(ctx.openPatientId));
   $('#patAttentions').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;

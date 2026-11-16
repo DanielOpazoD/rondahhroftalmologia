@@ -6,7 +6,8 @@
  */
 import { blankRecord, normalizeRecord, newRecordId, applyBirthDate } from '../core/record.js';
 import { mergeRecords, sameContent, stampChanges, ensureFt } from '../core/merge.js';
-import { resolvePatientId, patientFields, PATIENT_FIELDS, isDeletedPatient, DELETED_FIELD } from '../core/patient.js';
+import { resolvePatientId, patientFields, PATIENT_FIELDS, isDeletedPatient, DELETED_FIELD, normalizePatient } from '../core/patient.js';
+import { rutKey } from '../core/format.js';
 
 /**
  * Atención lista para guardar: normalizada, fusionada con la versión guardada
@@ -98,4 +99,60 @@ export function patientUpdateFromRecord(rec, current, now) {
   if (current && sameContent(next, current)) return null;
   next.updated = Math.max(current?.updated || 0, rec.updated || 0, now);
   return next;
+}
+
+/**
+ * Otra ficha (vigente) que ya tiene este RUT; null si no hay. Antes de
+ * corregir el RUT de un paciente: si el RUT ya es de otra ficha, son la misma
+ * persona y lo que corresponde es unirlas.
+ * @param {import('../domain').Paciente[]} patients
+ * @param {string} rut
+ * @param {string} exceptId
+ */
+export function rutOwner(patients, rut, exceptId) {
+  const k = rutKey(rut);
+  if (!k) return null;
+  return patients.find((p) => p.id !== exceptId && !isDeletedPatient(p) && !p.f?.fusionado_en && rutKey(p.f?.paciente_rut) === k) || null;
+}
+
+/**
+ * Corrige los datos personales de un paciente (RUT, nombre, nacimiento, sexo,
+ * fono) en su ficha y en todas sus atenciones, SIN cambiar el id de la ficha:
+ * el historial y la continuidad de cada caso se mantienen. Cada campo queda
+ * fechado (se sincroniza campo a campo sin pisar otros cambios). Un valor
+ * vacío borra el dato.
+ * @param {{patient: import('../domain').Paciente, fields: Record<string, string>, records: import('../domain').Atencion[], now: number}} o
+ *   `records`: las atenciones de este equipo (se corrigen las de este paciente).
+ * @returns {{patient: import('../domain').Paciente, records: {before: import('../domain').Atencion, after: import('../domain').Atencion}[], changed: string[]}}
+ */
+export function editPatientData({ patient, fields, records, now }) {
+  const clean = (/** @type {unknown} */ v) => String(v ?? '').trim();
+  const changed = PATIENT_FIELDS.filter((k) => k in fields && clean(fields[k]) !== clean(patient.f?.[k]));
+  if (!changed.length) return { patient, records: [], changed };
+  const p = structuredClone(patient);
+  p.ft = { ...(p.ft || {}) };
+  for (const k of changed) {
+    const v = clean(fields[k]);
+    if (v) p.f[k] = v;
+    else delete p.f[k];
+    p.ft['f.' + k] = now;
+  }
+  p.updated = Math.max(now, (patient.updated || 0) + 1);
+  const out = [];
+  for (const r of records) {
+    if (r.pacienteId !== patient.id) continue;
+    const next = ensureFt(structuredClone(r));
+    const u = Math.max(now, (r.updated || 0) + 1);
+    for (const k of changed) {
+      const v = clean(fields[k]);
+      if (v) next.f[k] = v;
+      else delete next.f[k];
+      next.ft['f.' + k] = u;
+    }
+    // La edad de cada atención se recalcula con la fecha de nacimiento corregida.
+    if (changed.includes('paciente_fnac') && applyBirthDate(next)) next.ft['f.paciente_edad'] = u;
+    next.updated = u;
+    out.push({ before: r, after: normalizeRecord(next) });
+  }
+  return { patient: /** @type {import('../domain').Paciente} */ (normalizePatient(p)), records: out, changed };
 }

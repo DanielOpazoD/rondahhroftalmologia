@@ -26,7 +26,7 @@ Cada flecha es una capa que usa a otra (el número: cuántos `import` hay).
 
 ```mermaid
 flowchart TD
-  app -->|5| core
+  app -->|6| core
   config -->|1| specialties
   core -->|6| config
   core -->|7| lib
@@ -46,8 +46,8 @@ flowchart TD
   sync -->|6| core
   sync -->|6| lib
   ui -->|3| app
-  ui -->|15| config
-  ui -->|82| core
+  ui -->|16| config
+  ui -->|83| core
   ui -->|3| lib
   ui -->|15| specialties
   ui -->|1| storage
@@ -80,7 +80,7 @@ Para cada módulo: cuántos módulos usa (→) y cuántos lo usan (←).
 
 ### config/ (2)
 
-`config/catalogs.js` →1 ←32 · `config/gesCatalog.js` →0 ←2
+`config/catalogs.js` →1 ←33 · `config/gesCatalog.js` →0 ←2
 
 ### specialties/ (28)
 
@@ -88,11 +88,11 @@ Para cada módulo: cuántos módulos usa (→) y cuántos lo usan (←).
 
 ### core/ (26)
 
-`core/accessLog.js` →0 ←1 · `core/accounts.js` →1 ←4 · `core/attachments.js` →2 ←7 · `core/audit.js` →2 ←7 · `core/backup.js` →9 ←1 · `core/catalog.js` →6 ←9 · `core/clock.js` →0 ←9 · `core/compat.js` →0 ←3 · `core/demo.js` →4 ←1 · `core/errlog.js` →0 ←1 · `core/estadistica.js` →1 ←3 · `core/fields.js` →1 ←2 · `core/format.js` →0 ←40 · `core/ges.js` →3 ←3 · `core/ipd.js` →5 ←1 · `core/merge.js` →5 ←5 · `core/migrations.js` →2 ←4 · `core/names.js` →0 ←19 · `core/patient.js` →4 ←12 · `core/pdfAnexos.js` →1 ←1 · `core/pdfTexto.js` →1 ←2 · `core/permissions.js` →0 ←3 · `core/pin.js` →1 ←1 · `core/pseudonym.js` →3 ←5 · `core/receta.js` →3 ←1 · `core/record.js` →6 ←18
+`core/accessLog.js` →0 ←1 · `core/accounts.js` →1 ←4 · `core/attachments.js` →2 ←7 · `core/audit.js` →2 ←7 · `core/backup.js` →9 ←1 · `core/catalog.js` →6 ←9 · `core/clock.js` →0 ←9 · `core/compat.js` →0 ←3 · `core/demo.js` →4 ←1 · `core/errlog.js` →0 ←1 · `core/estadistica.js` →1 ←3 · `core/fields.js` →1 ←2 · `core/format.js` →0 ←42 · `core/ges.js` →3 ←3 · `core/ipd.js` →5 ←1 · `core/merge.js` →5 ←5 · `core/migrations.js` →2 ←4 · `core/names.js` →0 ←19 · `core/patient.js` →4 ←12 · `core/pdfAnexos.js` →1 ←1 · `core/pdfTexto.js` →1 ←2 · `core/permissions.js` →0 ←3 · `core/pin.js` →1 ←1 · `core/pseudonym.js` →3 ←5 · `core/receta.js` →3 ←1 · `core/record.js` →6 ←18
 
 ### app/ (2)
 
-`app/attentions.js` →3 ←2 · `app/syncData.js` →2 ←1
+`app/attentions.js` →4 ←2 · `app/syncData.js` →2 ←1
 
 ### storage/ (3)
 
@@ -104,5 +104,5 @@ Para cada módulo: cuántos módulos usa (→) y cuántos lo usan (←).
 
 ### ui/ (45)
 
-`ui/accounts.js` →17 ←1 · `ui/actions/attachments.js` →6 ←1 · `ui/actions/attention.js` →11 ←2 · `ui/actions/catalogs.js` →6 ←1 · `ui/actions/outputs.js` →15 ←1 · `ui/actions/patients.js` →10 ←1 · `ui/attachmentsView.js` →4 ←2 · `ui/attentionView.js` →12 ←6 · `ui/auditView.js` →9 ←1 · `ui/busy.js` →2 ←3 · `ui/catalogView.js` →11 ←5 · `ui/checkView.js` →6 ←1 · `ui/clinicalForm.js` →3 ←3 · `ui/context.js` →21 ←1 · `ui/dialog.js` →2 ←5 · `ui/dom.js` →0 ←31 · `ui/errorLog.js` →2 ←5 · `ui/events.js` →1 ←1 · `ui/exportView.js` →9 ←2 · `ui/gesDialog.js` →6 ←1 · `ui/guard.js` →0 ←2 · `ui/headerFit.js` →0 ←1 · `ui/html.js` →1 ←24 · `ui/icons.js` →1 ←5 · `ui/images.js` →0 ←2 · `ui/intakeView.js` →9 ←2 · `ui/ipdDialog.js` →9 ←1 · `ui/lock.js` →6 ←1 · `ui/menu.js` →1 ←2 · `ui/modal.js` →2 ←13 · `ui/patientFields.js` →3 ←5 · `ui/permissionsView.js` →3 ←1 · `ui/practice.js` →4 ←3 · `ui/recetaDialog.js` →5 ←1 · `ui/registryView.js` →7 ←2 · `ui/rut.js` →2 ←3 · `ui/settingsSections.js` →1 ←1 · `ui/settingsView.js` →8 ←3 · `ui/statsView.js` →4 ←2 · `ui/syncController.js` →9 ←2 · `ui/syncView.js` →6 ←1 · `ui/updateNotice.js` →2 ←1 · `ui/usersView.js` →14 ←1 · `ui/userView.js` →11 ←2 · `ui/version.js` →1 ←2
+`ui/accounts.js` →17 ←1 · `ui/actions/attachments.js` →6 ←1 · `ui/actions/attention.js` →11 ←2 · `ui/actions/catalogs.js` →6 ←1 · `ui/actions/outputs.js` →15 ←1 · `ui/actions/patients.js` →14 ←1 · `ui/attachmentsView.js` →4 ←2 · `ui/attentionView.js` →12 ←6 · `ui/auditView.js` →9 ←1 · `ui/busy.js` →2 ←3 · `ui/catalogView.js` →11 ←5 · `ui/checkView.js` →6 ←1 · `ui/clinicalForm.js` →3 ←3 · `ui/context.js` →21 ←1 · `ui/dialog.js` →2 ←6 · `ui/dom.js` →0 ←31 · `ui/errorLog.js` →2 ←5 · `ui/events.js` →1 ←1 · `ui/exportView.js` →10 ←2 · `ui/gesDialog.js` →6 ←1 · `ui/guard.js` →0 ←2 · `ui/headerFit.js` →0 ←1 · `ui/html.js` →1 ←24 · `ui/icons.js` →1 ←5 · `ui/images.js` →0 ←2 · `ui/intakeView.js` →9 ←2 · `ui/ipdDialog.js` →9 ←1 · `ui/lock.js` →6 ←1 · `ui/menu.js` →1 ←3 · `ui/modal.js` →2 ←13 · `ui/patientFields.js` →3 ←6 · `ui/permissionsView.js` →3 ←1 · `ui/practice.js` →4 ←3 · `ui/recetaDialog.js` →5 ←1 · `ui/registryView.js` →7 ←2 · `ui/rut.js` →2 ←3 · `ui/settingsSections.js` →1 ←1 · `ui/settingsView.js` →8 ←3 · `ui/statsView.js` →4 ←2 · `ui/syncController.js` →9 ←2 · `ui/syncView.js` →6 ←1 · `ui/updateNotice.js` →2 ←1 · `ui/usersView.js` →14 ←1 · `ui/userView.js` →11 ←2 · `ui/version.js` →1 ←2
 

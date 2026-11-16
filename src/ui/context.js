@@ -13,7 +13,7 @@ import { buildNote, filterRecords } from '../specialties/activa/index.js';
 import { StorageError } from '../storage/store.js';
 import { stampChanges } from '../core/merge.js';
 import { clock } from '../core/clock.js';
-import { $$, toast, base64ToBytes } from './dom.js';
+import { $, $$, toast, base64ToBytes } from './dom.js';
 import { logError } from './errorLog.js';
 import { createBus, TOPICS } from './events.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
@@ -150,8 +150,10 @@ export function createContext(store, templateB64) {
 
     onFilterChange() {
       renderFilter(ctx);
-      if (ctx.currentTab === 't-est') renderStats(ctx);
-      if (ctx.currentTab === 't-exp') renderExportView(ctx);
+      if (ctx.currentTab === 't-est') {
+        renderStats(ctx);
+        renderExportView(ctx);
+      }
     },
 
     /**
@@ -179,8 +181,10 @@ export function createContext(store, templateB64) {
       renderFilter(ctx);
       renderRegistry(ctx);
       renderIntake(ctx);
-      if (ctx.currentTab === 't-est') renderStats(ctx);
-      if (ctx.currentTab === 't-exp') renderExportView(ctx);
+      if (ctx.currentTab === 't-est') {
+        renderStats(ctx);
+        renderExportView(ctx);
+      }
     },
 
     /** Recarga todo desde el almacenamiento (tras importar o borrar). */
@@ -201,6 +205,9 @@ export function createContext(store, templateB64) {
 
     showTab(id) {
       ctx.currentTab = id;
+      // Ajustes no es una pestaña: se abre con el logo, que queda marcado.
+      $('#brandBtn').classList.toggle('on', id === 't-aj');
+      $('#brandBtn').setAttribute('aria-current', id === 't-aj' ? 'page' : 'false');
       $$('nav button').forEach((b) => {
         b.classList.toggle('on', b.dataset.tab === id);
         b.setAttribute('aria-selected', String(b.dataset.tab === id));
@@ -211,12 +218,12 @@ export function createContext(store, templateB64) {
       ctx.emit('tab:' + id);
       if (id === 't-reg') renderRegistry(ctx);
       if (id === 't-ing') renderIntake(ctx);
-      if (id === 't-est' || id === 't-exp') {
+      if (id === 't-est') {
         placeFilter(id);
         renderFilter(ctx);
       }
       if (id === 't-est') renderStats(ctx);
-      if (id === 't-exp') renderExportView(ctx);
+      if (id === 't-est') renderExportView(ctx);
     },
 
     /** Restaura el borrador que quedó al cerrar la página. */
