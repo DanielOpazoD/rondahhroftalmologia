@@ -6,8 +6,8 @@
  *
  * Reúne en un lugar las cifras que el resto de las herramientas hace cumplir:
  *  - tipos: módulos con verificación estricta (jsconfig.json);
- *  - complejidad: la más alta y cuántas funciones pasan de 15 (ESLint `complexity`,
- *    con tope en eslint.config.js);
+ *  - complejidad: la más alta y cuántas funciones pasan de 10, la próxima meta
+ *    (ESLint `complexity`, con tope en eslint.config.js);
  *  - capas, dependencias y exportaciones sin uso (scripts/deps.mjs);
  *  - manejo de errores: cada `catch` relanza, informa, sigue con una
  *    alternativa o explica en un comentario por qué se ignora (un bloque vacío
@@ -18,6 +18,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
 import { analyze, exportUsage } from './deps.mjs';
+
+/** Complejidad desde la que se cuenta una función en el informe (bajo el tope de ESLint). */
+const WATCH = 10;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const rel = (/** @type {string} */ f) => f.replace(ROOT + '/', '');
@@ -57,7 +60,7 @@ async function scan() {
   };
   const eslint = new ESLint({
     cwd: ROOT,
-    overrideConfig: { plugins: { calidad: plugin }, rules: { complexity: ['warn', 15], 'calidad/catch': 'warn' } },
+    overrideConfig: { plugins: { calidad: plugin }, rules: { complexity: ['warn', WATCH], 'calidad/catch': 'warn' } },
   });
   /** @type {{n: number, where: string}[]} */
   const cx = [];
@@ -78,7 +81,9 @@ const { cx, kinds: c } = await scan();
 const d = analyze();
 const e = exportUsage();
 console.log(`Tipos estrictos:   ${t.strict}/${t.total} módulos de src/ (${Math.round((t.strict / t.total) * 100)} %)`);
-console.log(`Complejidad:       máxima ${cx[0]?.n ?? '≤15'}${cx[0] ? ` (${cx[0].where})` : ''}; ${cx.length} funciones sobre 15`);
+console.log(
+  `Complejidad:       máxima ${cx[0]?.n ?? `≤${WATCH}`}${cx[0] ? ` (${cx[0].where})` : ''}; ${cx.length} funciones sobre ${WATCH}`,
+);
 for (const x of cx.slice(0, 5)) console.log(`                   ${String(x.n).padStart(3)}  ${x.where}`);
 console.log(
   `Capas:             ${d.cycles.length} ciclos, ${d.violations.length} dependencias no permitidas, ${d.external.size} paquetes externos`,

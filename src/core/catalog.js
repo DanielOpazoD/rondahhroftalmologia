@@ -133,6 +133,38 @@ export function upsert(list, item) {
 }
 
 /**
+ * Médicos (nombre y RUT) y operativos distintos que aparecen en las
+ * atenciones, en el orden en que aparecen por primera vez.
+ * @param {import('../domain').RegistroFusionable[]} records
+ */
+function distinctOrigins(records) {
+  /** @type {Map<string, [string | undefined, string | undefined]>} */
+  const meds = new Map();
+  /** @type {Set<string | undefined>} */
+  const ops = new Set();
+  for (const r of records) {
+    const f = r.f || {};
+    const key = `${f.medico_nombre ?? ''}\u0000${f.medico_rut ?? ''}`;
+    if (!meds.has(key)) meds.set(key, [f.medico_nombre, f.medico_rut]);
+    ops.add(f.operativo);
+  }
+  return { meds: [...meds.values()], ops: [...ops] };
+}
+
+/**
+ * Agrega al catálogo una entrada nueva (si `entry` existe y su id no está).
+ * @template {{id: string}} T
+ * @param {T[]} list
+ * @param {T | null} entry
+ * @returns {number} 1 si se agregó, 0 si no
+ */
+function addMissing(list, entry) {
+  if (!entry || list.some((x) => x.id === entry.id)) return 0;
+  list.push(entry);
+  return 1;
+}
+
+/**
  * Siembra los catálogos a partir de atenciones ya guardadas y del último
  * médico/operativo recordado (migración desde versiones sin catálogos).
  * Solo agrega lo que falta; no modifica entradas existentes.
@@ -143,39 +175,11 @@ export function upsert(list, item) {
 export function seedCatalogs({ records = [], recordado = {}, medicos = [], operativos = [] }, now = Date.now()) {
   const meds = [...medicos];
   const ops = [...operativos];
+  const seen = distinctOrigins(records);
   let added = 0;
   // Las atenciones antiguas pueden no traer médico ni operativo: makeMedico/makeOperativo devuelven null.
-  /** @type {(nombre?: string, rut?: string) => void} */
-  const addMed = (nombre, rut) => {
-    const m = makeMedico({ nombre, rut }, now);
-    if (m && !meds.some((x) => x.id === m.id)) {
-      meds.push(m);
-      added++;
-    }
-  };
-  /** @param {string} [nombre] */
-  const addOp = (nombre) => {
-    const o = makeOperativo({ nombre }, now);
-    if (o && !ops.some((x) => x.id === o.id)) {
-      ops.push(o);
-      added++;
-    }
-  };
-  const seenMed = new Set();
-  const seenOp = new Set();
-  for (const r of records) {
-    const mk = `${r.f?.medico_nombre ?? ''}\u0000${r.f?.medico_rut ?? ''}`;
-    if (!seenMed.has(mk)) {
-      seenMed.add(mk);
-      addMed(r.f?.medico_nombre, r.f?.medico_rut);
-    }
-    if (!seenOp.has(r.f?.operativo)) {
-      seenOp.add(r.f?.operativo);
-      addOp(r.f?.operativo);
-    }
-  }
-  addMed(recordado.n, recordado.r);
-  addOp(recordado.op);
+  for (const [nombre, rut] of [...seen.meds, [recordado.n, recordado.r]]) added += addMissing(meds, makeMedico({ nombre, rut }, now));
+  for (const nombre of [...seen.ops, recordado.op]) added += addMissing(ops, makeOperativo({ nombre }, now));
   return { medicos: byName(meds), operativos: byName(ops), added };
 }
 

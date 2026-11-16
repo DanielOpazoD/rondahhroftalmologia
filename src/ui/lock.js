@@ -22,6 +22,25 @@ const ACTIVITY = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'
 /** Cada cuánto se revisa la inactividad y se comparte la actividad entre pestañas. */
 const TICK_MS = 5_000;
 
+/**
+ * Textos y campo de la pantalla de bloqueo: la clave de la persona (sesión de
+ * una cuenta) o el PIN del equipo.
+ * @param {{nombre: string} | null | undefined} user persona en la sesión (si hay)
+ */
+function showLockMode(user) {
+  const acc = Boolean(user);
+  $('#lockTitle').textContent = acc ? 'Sesión bloqueada' : 'Equipo bloqueado';
+  $('#lockHint').textContent = user ? `Ingresa tu clave, ${user.nombre}, para continuar.` : 'Ingresa el PIN de este equipo para continuar.';
+  const input = $('#lockPin');
+  input.inputMode = acc ? 'text' : 'numeric';
+  input.maxLength = acc ? 128 : 8;
+  input.placeholder = acc ? 'Clave' : 'PIN';
+  if (acc) input.removeAttribute('pattern');
+  else input.setAttribute('pattern', '[0-9]*');
+  $('#lockPinLabel').textContent = acc ? 'Clave' : 'PIN';
+  $('#lockForgot').textContent = acc ? 'Cerrar sesión (entrar con otra cuenta)' : 'Olvidé el PIN';
+}
+
 /** @param {import('./context.js').AppContext} ctx */
 export function createLock(ctx) {
   const { store } = ctx;
@@ -52,20 +71,7 @@ export function createLock(ctx) {
   function lock({ broadcast = true } = {}) {
     if (!cfg() || ctx.practice || st.locked) return;
     st.locked = true;
-    const user = ctx.accounts?.user;
-    const acc = Boolean(user);
-    $('#lockTitle').textContent = acc ? 'Sesión bloqueada' : 'Equipo bloqueado';
-    $('#lockHint').textContent = user
-      ? `Ingresa tu clave, ${user.nombre}, para continuar.`
-      : 'Ingresa el PIN de este equipo para continuar.';
-    const input = $('#lockPin');
-    input.inputMode = acc ? 'text' : 'numeric';
-    input.maxLength = acc ? 128 : 8;
-    input.placeholder = acc ? 'Clave' : 'PIN';
-    if (acc) input.removeAttribute('pattern');
-    else input.setAttribute('pattern', '[0-9]*');
-    $('#lockPinLabel').textContent = acc ? 'Clave' : 'PIN';
-    $('#lockForgot').textContent = acc ? 'Cerrar sesión (entrar con otra cuenta)' : 'Olvidé el PIN';
+    showLockMode(ctx.accounts?.user);
     session()?.event('sesion.bloqueo');
     // Oculta TODO lo demás, también al imprimir (Ctrl+P) y aunque el diálogo se cierre un instante.
     root.classList.add('locked');

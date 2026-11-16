@@ -61,6 +61,32 @@ export function createSyncApi({
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
 }) {
   const qs = esp ? `?esp=${encodeURIComponent(esp)}` : '';
+  /** @param {string} path @param {string} extra parámetros adicionales («a=1&b=2») */
+  const urlOf = (path, extra) => `${baseUrl}/${path}${qs}${extra ? (qs ? '&' : '?') + extra : ''}`;
+
+  /**
+   * Opciones de fetch: GET sin cuerpo, POST con JSON.
+   * @param {unknown} body
+   * @param {AbortSignal | undefined} signal
+   * @returns {RequestInit}
+   */
+  const requestInit = (body, signal) => ({
+    method: body ? 'POST' : 'GET',
+    headers: {
+      authorization: `Bearer ${token}`,
+      [PROTOCOL_HEADER]: String(PROTOCOL_VERSION),
+      ...(body ? { 'content-type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+    ...(signal ? { signal } : {}),
+  });
+
+  /** Hora y versión de protocolo que informa el servidor (se conserva lo anterior si no viene). @param {Response} res */
+  const rememberServer = (res) => {
+    api.serverDate = res.headers.get('date') || api.serverDate;
+    api.serverProtocol = Number(res.headers.get(PROTOCOL_HEADER)) || api.serverProtocol;
+  };
 
   /**
    * Una solicitud, con tiempo máximo.
@@ -79,19 +105,8 @@ export function createSyncApi({
       : null;
     let res;
     try {
-      res = await fetchFn(`${baseUrl}/${path}${qs}${extra ? (qs ? '&' : '?') + extra : ''}`, {
-        method: body ? 'POST' : 'GET',
-        headers: {
-          authorization: `Bearer ${token}`,
-          [PROTOCOL_HEADER]: String(PROTOCOL_VERSION),
-          ...(body ? { 'content-type': 'application/json' } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        cache: 'no-store',
-        ...(ctrl ? { signal: ctrl.signal } : {}),
-      });
-      api.serverDate = res.headers.get('date') || api.serverDate;
-      api.serverProtocol = Number(res.headers.get(PROTOCOL_HEADER)) || api.serverProtocol;
+      res = await fetchFn(urlOf(path, extra), requestInit(body, ctrl?.signal));
+      rememberServer(res);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new SyncHttpError(res.status, data.error || `Error del servidor (${res.status})`, data.code || '');
       return data;

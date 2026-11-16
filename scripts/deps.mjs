@@ -126,10 +126,11 @@ function findCycles(graph) {
 }
 
 /**
- * Analiza el código.
- * @param {string} [root]
+ * Grafo de módulos de src/ (a qué módulos importa cada uno) y paquetes
+ * externos usados en src/, netlify/functions/ y scripts/.
+ * @param {string} root
  */
-export function analyze(root = ROOT) {
+function readImports(root) {
   const src = join(root, 'src');
   /** @type {Map<string, {deps: string[], lines: number}>} */
   const graph = new Map();
@@ -158,10 +159,15 @@ export function analyze(root = ROOT) {
       for (const spec of specifiers(readFileSync(f, 'utf8'))) if (!spec.startsWith('.')) note(spec, relative(root, f));
     }
   }
+  return { graph, external };
+}
 
-  const cycles = findCycles(graph);
-
-  // Dependencias entre capas.
+/**
+ * Dependencias entre capas (cuántos `import` de cada capa a otra) y las que
+ * LAYERS no permite.
+ * @param {Map<string, {deps: string[]}>} graph
+ */
+function layerDeps(graph) {
   /** @type {Map<string, number>} */
   const layerEdges = new Map();
   /** @type {string[]} */
@@ -176,7 +182,17 @@ export function analyze(root = ROOT) {
       if (from !== 'main' && !rule?.allow.includes(to)) violations.push(`${file} → ${d} (${from} no puede depender de ${to})`);
     }
   }
+  return { layerEdges, violations };
+}
 
+/**
+ * Analiza el código.
+ * @param {string} [root]
+ */
+export function analyze(root = ROOT) {
+  const { graph, external } = readImports(root);
+  const cycles = findCycles(graph);
+  const { layerEdges, violations } = layerDeps(graph);
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   const declared = { ...pkg.dependencies, ...pkg.devDependencies };
   const undocumented = [...external.keys()].filter((p) => !Object.hasOwn(EXTERNAL, p));

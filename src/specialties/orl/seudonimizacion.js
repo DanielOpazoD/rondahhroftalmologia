@@ -7,7 +7,16 @@ import { SEXOS, APP } from '../../config/catalogs.js';
 import { DIAGNOSTICOS, ANTECEDENTES, SOLICITADOS, ESPECIALIDAD } from './config.js';
 import { normalizeText, rutKey, fmtDateTime } from '../../core/format.js';
 import { patientKey } from '../../core/record.js';
-import { pseudonym, scrubText, generalizeAge, generalizeDate, ANON_DEFAULTS, ANON_OPTIONS } from '../../core/pseudonym.js';
+import {
+  pseudonym,
+  scrubText,
+  generalizeAge,
+  generalizeDate,
+  countAttention,
+  trimmed,
+  ANON_DEFAULTS,
+  ANON_OPTIONS,
+} from '../../core/pseudonym.js';
 import { ageOf } from '../../core/estadistica.js';
 import { STYLE } from '../../lib/xlsx.js';
 import { proceduresDone } from './clinica.js';
@@ -102,27 +111,19 @@ export function anonymizeRecords(records, procs, options) {
     /** @param {string | undefined} v */
     const txt = (v) => (opt.texto === 'excluir' ? undefined : scrubText((v || '').trim(), { names }) || undefined);
 
-    const entry = correspondencia.get(codigo) || {
-      codigo_paciente: codigo,
-      nombre: f.paciente_nombre || '',
-      rut: f.paciente_rut || '',
-      base_codigo: pk.basis,
-      atenciones: 0,
-    };
-    entry.atenciones++;
-    correspondencia.set(codigo, entry);
+    countAttention(correspondencia, codigo, f, pk.basis);
 
     /** @type {AtencionSeudonimizada} */
     const out = {
       codigo_paciente: codigo,
       codigo_atencion: pseudonym(opt.secret, 'atencion:' + r.id, 'A'),
       base_codigo: pk.basis,
-      operativo: (f.operativo || '').trim() || undefined,
+      operativo: trimmed(f.operativo),
       edad: generalizeAge(ageOf(r), opt.edad),
       sexo: SEXOS.find((s) => s.key === f.paciente_sexo)?.label || '',
       antecedentes: ANTECEDENTES.filter((d) => r.checks?.[d.key]).map((d) => d.label),
-      audiometria_od_db: (f.audiometria_od || '').trim() || undefined,
-      audiometria_oi_db: (f.audiometria_oi || '').trim() || undefined,
+      audiometria_od_db: trimmed(f.audiometria_od),
+      audiometria_oi_db: trimmed(f.audiometria_oi),
       procedimientos_realizados: proceduresDone(r, procs).map((p) => ({ procedimiento: p.nombre, oido: p.lado })),
       examenes_solicitados: SOLICITADOS.filter((d) => r.checks?.[d.key]).map((d) => d.label),
       diagnosticos: DIAGNOSTICOS.filter((d) => r.checks?.[d.key]).map((d) => d.label),

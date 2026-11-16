@@ -224,3 +224,25 @@ export function correspondenciaSheets(result, now = new Date()) {
     },
   ];
 }
+
+/**
+ * Suma una atención al paciente en la tabla de correspondencia (lo agrega si es nuevo).
+ * @param {Map<string, FilaCorrespondencia>} correspondencia por código de paciente
+ * @param {string} codigo del paciente
+ * @param {Record<string, string>} f campos de la atención
+ * @param {FilaCorrespondencia['base_codigo']} basis dato con que se calculó el código
+ */
+export function countAttention(correspondencia, codigo, f, basis) {
+  const entry = correspondencia.get(codigo) || {
+    codigo_paciente: codigo,
+    nombre: f.paciente_nombre || '',
+    rut: f.paciente_rut || '',
+    base_codigo: basis,
+    atenciones: 0,
+  };
+  entry.atenciones++;
+  correspondencia.set(codigo, entry);
+}
+
+/** Texto sin espacios sobrantes; undefined si queda vacío. @param {string | undefined} v */
+export const trimmed = (v) => (v || '').trim() || undefined;

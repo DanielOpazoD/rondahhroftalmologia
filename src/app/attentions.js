@@ -89,6 +89,23 @@ export function relinkRecord(r, pacienteId, at) {
 }
 
 /**
+ * Fecha de edición de cada dato del paciente en la atención: la del campo o,
+ * si la atención es antigua y no la trae, la de la atención (si el dato está).
+ * @param {import('../domain').Atencion} rec
+ * @param {Record<string, string>} fields datos del paciente en la atención
+ * @returns {import('../domain').FechasPorCampo}
+ */
+function patientStamps(rec, fields) {
+  /** @type {import('../domain').FechasPorCampo} */
+  const ft = {};
+  for (const k of PATIENT_FIELDS) {
+    const t = rec.ft?.['f.' + k] ?? (fields[k] ? rec.updated : undefined);
+    if (t) ft['f.' + k] = t;
+  }
+  return ft;
+}
+
+/**
  * Ficha del paciente actualizada con los datos de una atención, fusionada
  * campo a campo con la existente (gana lo editado más recientemente).
  * @param {import('../domain').Atencion} rec
@@ -99,12 +116,7 @@ export function relinkRecord(r, pacienteId, at) {
 export function patientUpdateFromRecord(rec, current, now) {
   if (!rec.pacienteId) return null;
   const fields = patientFields(rec.f);
-  /** @type {import('../domain').FechasPorCampo} */
-  const ft = {};
-  for (const k of PATIENT_FIELDS) {
-    const t = rec.ft?.['f.' + k] ?? (fields[k] ? rec.updated : undefined);
-    if (t) ft['f.' + k] = t;
-  }
+  const ft = patientStamps(rec, fields);
   // Una atención que vuelve a usar una ficha eliminada la restaura (la restauración gana a la eliminación).
   if (current && isDeletedPatient(current)) ft['f.' + DELETED_FIELD] = Math.max(now, current.ft?.['f.' + DELETED_FIELD] || 0) + 1;
   const candidate = { id: rec.pacienteId, created: rec.created || rec.updated, updated: rec.updated, f: fields, ft, checks: {}, proc: {} };

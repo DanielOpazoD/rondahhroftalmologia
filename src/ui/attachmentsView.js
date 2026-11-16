@@ -42,37 +42,60 @@ export function initAttachmentsView(ctx) {
   ctx.on('adjuntos', () => renderAttachments(ctx));
 }
 
+/**
+ * Texto de ayuda bajo la lista de adjuntos.
+ * @param {boolean} supported ¿el navegador permite guardar archivos?
+ * @param {string | null} id de la atención abierta (null si aún no está guardada)
+ */
+function attachmentsHint(supported, id) {
+  if (!supported) return 'Este navegador no permite guardar archivos.';
+  return id
+    ? 'Imágenes, PDF o Word. Arrástralos aquí o usa «Adjuntar». Las fotos se reducen solas.'
+    : 'Escribe el nombre o RUT del paciente para poder adjuntar archivos.';
+}
+
+/**
+ * ¿Imagen sin miniatura guardada cuyo contenido está en este equipo? (se
+ * muestra desde el contenido y se le crea la miniatura).
+ * @param {import('../domain').Adjunto} a
+ * @param {Set<string>} have ids con contenido en este equipo
+ */
+function lacksThumbnail(a, have) {
+  return !a.miniatura && kindOf(a.tipo, a.nombre).startsWith('imagen') && isInlineType(a.tipo) && have.has(a.id);
+}
+
+/**
+ * Vista previa de un adjunto: su miniatura, la imagen leída del contenido
+ * (si le falta la miniatura) o un ícono según el tipo.
+ * @param {import('./context.js').AppContext['store']} store
+ * @param {import('../domain').Adjunto} a
+ * @param {Set<string>} have ids con contenido en este equipo
+ */
+async function attachmentPreview(store, a, have) {
+  // Miniatura guardada con los metadatos (validada en normalizeAttachment).
+  if (a.miniatura) return html`<img class="attthumb" src="${a.miniatura}" alt="">`;
+  const data = lacksThumbnail(a, have) ? await store.loadAttachmentData(a.id) : null;
+  if (data) {
+    const url = URL.createObjectURL(new Blob([/** @type {BlobPart} */ (data.bytes)], { type: cleanType(a.tipo) }));
+    thumbs.push(url);
+    return html`<img class="attthumb" src="${url}" alt="">`;
+  }
+  return html`<span class="attico">${icon(kindOf(a.tipo, a.nombre) === 'pdf' ? 'pdf' : 'file')}</span>`;
+}
+
 /** Dibuja los adjuntos de la atención abierta. @param {import('./context.js').AppContext} ctx */
 export async function renderAttachments(ctx) {
   const { store } = ctx;
   const id = ctx.rec.id;
   const list = id ? store.loadAttachments(id) : [];
   $('#attCount').textContent = String(list.length);
-  $('#attHint').textContent = !store.supportsAttachments()
-    ? 'Este navegador no permite guardar archivos.'
-    : id
-      ? 'Imágenes, PDF o Word. Arrástralos aquí o usa «Adjuntar». Las fotos se reducen solas.'
-      : 'Escribe el nombre o RUT del paciente para poder adjuntar archivos.';
+  $('#attHint').textContent = attachmentsHint(store.supportsAttachments(), id);
   for (const u of thumbs) URL.revokeObjectURL(u);
   thumbs = [];
   const have = new Set(list.length ? await store.attachmentDataIds() : []);
   const items = [];
-  let missingThumbs = false;
   for (const a of list) {
-    const kind = kindOf(a.tipo, a.nombre);
-    let preview = html`<span class="attico">${icon(kind === 'pdf' ? 'pdf' : 'file')}</span>`;
-    if (a.miniatura) {
-      // Miniatura guardada con los metadatos (validada en normalizeAttachment).
-      preview = html`<img class="attthumb" src="${a.miniatura}" alt="">`;
-    } else if (kind.startsWith('imagen') && isInlineType(a.tipo) && have.has(a.id)) {
-      missingThumbs = true;
-      const data = await store.loadAttachmentData(a.id);
-      if (data) {
-        const url = URL.createObjectURL(new Blob([/** @type {BlobPart} */ (data.bytes)], { type: cleanType(a.tipo) }));
-        thumbs.push(url);
-        preview = html`<img class="attthumb" src="${url}" alt="">`;
-      }
-    }
+    const preview = await attachmentPreview(store, a, have);
     const status = have.has(a.id) ? fmtSize(a.tamano) : `${fmtSize(a.tamano)} · llega al sincronizar`;
     items.push(html`<li class="attrow">
       <button type="button" class="attmain" data-a="open" data-id="${a.id}" title="Abrir ${a.nombre}">
@@ -86,5 +109,6 @@ export async function renderAttachments(ctx) {
   setHtml($('#attList'), html`${items}`);
   $('#attAdd').disabled = !id || !store.supportsAttachments();
   // Adjuntos anteriores sin miniatura: se crea una vez (y se re-dibuja).
+  const missingThumbs = list.some((a) => lacksThumbnail(a, have));
   if (missingThumbs && (await ctx.addMissingThumbnails(list))) ctx.emit('adjuntos');
 }

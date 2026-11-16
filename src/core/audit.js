@@ -116,18 +116,38 @@ export const COALESCE_MS = 10 * 60_000;
  */
 export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
   const last = entries.at(-1);
-  const sameHand =
-    last &&
+  if (!last || !continuesEdit(last, entry, coalesceMs)) return [...entries, entry];
+  return [...entries.slice(0, -1), { ...last, hasta: entry.at, cambios: combineChanges(last.cambios, entry.cambios) }];
+}
+
+/**
+ * ¿`entry` sigue la edición de `last`? Ambas ediciones, de la misma persona y
+ * equipo, y a menos de `coalesceMs` de la anterior.
+ * @param {import('../domain').AuditEntry} last
+ * @param {import('../domain').AuditEntry} entry
+ * @param {number} coalesceMs
+ */
+function continuesEdit(last, entry, coalesceMs) {
+  return (
     entry.tipo === 'editada' &&
     last.tipo === 'editada' &&
     last.equipoId === entry.equipoId &&
     (last.autorId || '') === (entry.autorId || '') &&
     entry.at >= last.at &&
-    entry.at - (last.hasta || last.at) <= coalesceMs;
-  if (!last || !sameHand) return [...entries, entry];
+    entry.at - (last.hasta || last.at) <= coalesceMs
+  );
+}
+
+/**
+ * Cambios juntados: cada campo conserva su valor de antes (`a`) y toma el
+ * nuevo (`d`). Un campo que volvió a su valor original ya no es un cambio.
+ * @param {import('../domain').AuditChange[]} before
+ * @param {import('../domain').AuditChange[]} after
+ */
+function combineChanges(before, after) {
   /** @type {Map<string, import('../domain').AuditChange>} */
-  const byField = new Map(last.cambios.map((c) => [c.c, { ...c }]));
-  for (const c of entry.cambios) {
+  const byField = new Map(before.map((c) => [c.c, { ...c }]));
+  for (const c of after) {
     const prev = byField.get(c.c);
     if (!prev) {
       byField.set(c.c, { ...c });
@@ -136,9 +156,7 @@ export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
     if ('d' in c) prev.d = c.d;
     else delete prev.d;
   }
-  // Un campo que volvió a su valor original ya no es un cambio.
-  const cambios = [...byField.values()].filter((c) => c.a !== c.d).sort((x, y) => (x.c < y.c ? -1 : x.c > y.c ? 1 : 0));
-  return [...entries.slice(0, -1), { ...last, hasta: entry.at, cambios }];
+  return [...byField.values()].filter((c) => c.a !== c.d).sort((x, y) => (x.c < y.c ? -1 : x.c > y.c ? 1 : 0));
 }
 
 /** Hasta cuándo cubre una entrada (si se fue juntando, su última edición). @param {import('../domain').AuditEntry} e */
