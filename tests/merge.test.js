@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { flatten, unflatten, changedPaths, stampChanges, ensureFt, mergeRecords, sameContent, ftOf } from '../src/core/merge.js';
+import { flatten, unflatten } from '../src/core/fields.js';
+import { changedPaths, stampChanges, ensureFt, mergeRecords, sameContent, ftOf } from '../src/core/merge.js';
 import { normalizeRecord } from '../src/core/record.js';
 import { minimalRecord } from './fixtures.js';
 

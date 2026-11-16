@@ -141,6 +141,25 @@ export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
   return [...entries.slice(0, -1), { ...last, hasta: entry.at, cambios }];
 }
 
+/** Hasta cuándo cubre una entrada (si se fue juntando, su última edición). @param {import('../domain').AuditEntry} e */
+const coveredUntil = (e) => e.hasta || e.at;
+
+/**
+ * Una entrada por id, ordenadas por fecha. Una entrada que se fue juntando
+ * (ver appendAuditEntry) tiene varias versiones: gana la más completa.
+ * @param {import('../domain').AuditEntry[]} all
+ */
+function newestById(all) {
+  /** @type {Map<string, import('../domain').AuditEntry>} */
+  const byId = new Map();
+  for (const e of all) {
+    if (!e || typeof e.id !== 'string') continue;
+    const cur = byId.get(e.id);
+    if (!cur || coveredUntil(e) >= coveredUntil(cur)) byId.set(e.id, e);
+  }
+  return [...byId.values()].sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1));
+}
+
 /**
  * Unión de dos documentos de bitácora de la misma atención (sin duplicar entradas).
  * @param {Partial<import('../domain').AuditDoc> | null | undefined} a
@@ -148,22 +167,15 @@ export function appendAuditEntry(entries, entry, coalesceMs = COALESCE_MS) {
  * @returns {import('../domain').AuditDoc}
  */
 export function mergeAuditDocs(a, b) {
-  /** @type {Map<string, import('../domain').AuditEntry>} */
-  const byId = new Map();
-  for (const e of [...(a?.entries || []), ...(b?.entries || [])]) {
-    if (!e || typeof e.id !== 'string') continue;
-    // Una entrada que se fue juntando (ver appendAuditEntry) tiene varias versiones: gana la más completa.
-    const cur = byId.get(e.id);
-    if (!cur || (e.hasta || e.at) >= (cur.hasta || cur.at)) byId.set(e.id, e);
-  }
-  const entries = [...byId.values()].sort((x, y) => x.at - y.at || (x.id < y.id ? -1 : 1));
+  const x = a || {};
+  const y = b || {};
   // Los dos documentos son de la misma atención; si a ninguno le llega el id (dato dañado),
   // queda vacío: un id inválido que la sincronización y el respaldo descartan.
   return {
-    id: a?.id || b?.id || '',
-    atencionId: a?.atencionId || b?.atencionId || '',
-    updated: Math.max(a?.updated || 0, b?.updated || 0),
-    entries,
+    id: x.id || y.id || '',
+    atencionId: x.atencionId || y.atencionId || '',
+    updated: Math.max(x.updated || 0, y.updated || 0),
+    entries: newestById([...(x.entries || []), ...(y.entries || [])]),
   };
 }
 

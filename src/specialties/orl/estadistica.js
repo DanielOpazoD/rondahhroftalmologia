@@ -36,6 +36,68 @@ export const ageGroupLabels = (groups = AGE_GROUPS) => base.ageGroupLabels(group
 /** Contador por sexo: F, M, O y 'Sin dato'. @returns {Record<string, number>} */
 const sexos = () => ({ F: 0, M: 0, O: 0, 'Sin dato': 0 });
 
+/** Atenciones, pacientes, procedimientos y oídos de un día. @typedef {{atenciones: number, pacientes: Set<string>, procedimientos: number, ojos: number}} ConteoDia */
+
+/**
+ * Suma los procedimientos realizados de una atención a sus conteos.
+ * @param {Record<string, ConteoProc>} proc conteos por nombre de procedimiento
+ * @param {import('./clinica.js').ProcHecho[]} done
+ * @returns {number} oídos tratados en la atención
+ */
+function tallyProcs(proc, done) {
+  let oidos = 0;
+  for (const p of done) {
+    const o = (proc[p.nombre] ||= { pac: 0, od: 0, oi: 0, ojos: 0 });
+    o.pac++;
+    if (p.lado === 'OD' || p.lado === 'AO') o.od++;
+    if (p.lado === 'OI' || p.lado === 'AO') o.oi++;
+    o.ojos += p.oidos;
+    oidos += p.oidos;
+  }
+  return oidos;
+}
+
+/**
+ * Cuenta las casillas marcadas (y los «otros» escritos) de diagnósticos, solicitados y antecedentes.
+ * @param {Atencion} r
+ * @param {Record<string, string>} f datos de la atención
+ * @param {Record<string, number>} dx
+ * @param {Record<string, number>} sol
+ * @param {Record<string, number>} ant
+ */
+function tallyChecklists(r, f, dx, sol, ant) {
+  const { inc } = base;
+  DIAGNOSTICOS.forEach((d) => r.checks?.[d.key] && inc(dx, d.label));
+  if (f.diagnosticos_otros?.trim()) inc(dx, 'Otros diagnósticos');
+  SOLICITADOS.forEach((d) => r.checks?.[d.key] && inc(sol, d.label));
+  if (f.procedimientos_otros?.trim()) inc(sol, 'Otros');
+  ANTECEDENTES.forEach((d) => r.checks?.[d.key] && inc(ant, d.label));
+}
+
+/**
+ * Cuenta las gestiones escritas de una atención (la interconsulta se guarda como `interconsulta`).
+ * @param {Record<string, string>} f datos de la atención
+ * @param {Gestiones} gest
+ */
+function tallyGestiones(f, gest) {
+  for (const k of /** @type {(keyof Gestiones)[]} */ (Object.keys(gest))) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
+}
+
+/**
+ * Suma una atención al conteo de su día ('Sin fecha' si no la tiene).
+ * @param {Record<string, ConteoDia>} porDia
+ * @param {Record<string, string>} f datos de la atención
+ * @param {string} pk llave de identidad del paciente
+ * @param {import('./clinica.js').ProcHecho[]} done
+ */
+function tallyDay(porDia, f, pk, done) {
+  const day = (porDia[f.fecha_atencion || 'Sin fecha'] ||= { atenciones: 0, pacientes: new Set(), procedimientos: 0, ojos: 0 });
+  day.atenciones++;
+  day.pacientes.add(pk);
+  day.procedimientos += done.length;
+  day.ojos += done.reduce((a, p) => a + p.oidos, 0);
+}
+
 /**
  * Agregados de un conjunto de atenciones.
  * @param {Atencion[]} records
@@ -50,7 +112,7 @@ export function computeStats(records, procs) {
   /** @type {Record<string, number>} */ const ant = {};
   const sexo = sexos();
   const edadSexo = Object.fromEntries(ageGroupLabels().map((g) => [g, sexos()]));
-  /** @type {Record<string, {atenciones: number, pacientes: Set<string>, procedimientos: number, ojos: number}>} */
+  /** @type {Record<string, ConteoDia>} */
   const porDia = {};
   /** @type {Record<string, number>} */ const porMedico = {};
   /** @type {Record<string, number>} */ const porOperativo = {};
@@ -73,27 +135,10 @@ export function computeStats(records, procs) {
     edadSexo[ageGroup(age)][sx]++;
 
     const done = proceduresDone(r, procs);
-    for (const p of done) {
-      const o = (proc[p.nombre] ||= { pac: 0, od: 0, oi: 0, ojos: 0 });
-      o.pac++;
-      if (p.lado === 'OD' || p.lado === 'AO') o.od++;
-      if (p.lado === 'OI' || p.lado === 'AO') o.oi++;
-      o.ojos += p.oidos;
-      oidos += p.oidos;
-    }
-
-    DIAGNOSTICOS.forEach((d) => r.checks?.[d.key] && inc(dx, d.label));
-    if (f.diagnosticos_otros?.trim()) inc(dx, 'Otros diagnósticos');
-    SOLICITADOS.forEach((d) => r.checks?.[d.key] && inc(sol, d.label));
-    if (f.procedimientos_otros?.trim()) inc(sol, 'Otros');
-    ANTECEDENTES.forEach((d) => r.checks?.[d.key] && inc(ant, d.label));
-    for (const k of /** @type {(keyof Gestiones)[]} */ (Object.keys(gest))) if (f[k === 'ic' ? 'interconsulta' : k]?.trim()) gest[k]++;
-
-    const day = (porDia[f.fecha_atencion || 'Sin fecha'] ||= { atenciones: 0, pacientes: new Set(), procedimientos: 0, ojos: 0 });
-    day.atenciones++;
-    day.pacientes.add(pk);
-    day.procedimientos += done.length;
-    day.ojos += done.reduce((a, p) => a + p.oidos, 0);
+    oidos += tallyProcs(proc, done);
+    tallyChecklists(r, f, dx, sol, ant);
+    tallyGestiones(f, gest);
+    tallyDay(porDia, f, pk, done);
 
     inc(porMedico, f.medico_nombre?.trim() || 'Sin dato');
     inc(porOperativo, f.operativo?.trim() || 'Sin operativo');

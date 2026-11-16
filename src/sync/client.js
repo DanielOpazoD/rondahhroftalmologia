@@ -29,7 +29,7 @@ export class SyncHttpError extends Error {
 }
 
 /** Estados HTTP transitorios: se reintenta (el resto, p. ej. 401 o 400, no). */
-export const RETRYABLE_STATUS = new Set([0, 408, 429, 502, 504]);
+const RETRYABLE_STATUS = new Set([0, 408, 429, 502, 504]);
 
 /**
  * Espera antes del reintento `attempt` (0, 1, 2…): retroceso exponencial con
@@ -37,7 +37,7 @@ export const RETRYABLE_STATUS = new Set([0, 408, 429, 502, 504]);
  * vuelvan a pedir todos en el mismo instante.
  */
 /** @type {(attempt: number, rand?: () => number) => number} */
-export const backoffMs = (attempt, rand = Math.random) => Math.min(8000, 500 * 2 ** attempt) + Math.floor(rand() * 250);
+const backoffMs = (attempt, rand = Math.random) => Math.min(8000, 500 * 2 ** attempt) + Math.floor(rand() * 250);
 
 /**
  * Cliente HTTP del servidor de sincronización.
@@ -194,7 +194,7 @@ export async function syncOnce(deps) {
 /** Margen al pedir cambios (cubre escrituras en curso al momento de listar). */
 export const CURSOR_MARGIN_MS = 10 * 60 * 1000;
 /** Cada cuánto se vuelve a pedir la lista completa (autocorrección). */
-export const FULL_LIST_EVERY_MS = 30 * 60 * 1000;
+const FULL_LIST_EVERY_MS = 30 * 60 * 1000;
 
 /**
  * Estado entre sincronizaciones de un espacio: copia de las versiones del
@@ -210,26 +210,41 @@ export function createSyncCache() {
 const vNewer = (a, b) => a.u > b.u || (a.u === b.u && (a.h || '') > (b.h || ''));
 
 /**
+ * Desde cuándo pedir solo lo cambiado; null = pedir la lista completa. Es
+ * incremental si hay copia de las versiones y la lista completa es reciente.
+ * @param {SyncCache} cache
+ * @param {number} nowMs
+ */
+const changesSince = (cache, nowMs) => (cache.snapshot && nowMs - cache.fullAt < FULL_LIST_EVERY_MS ? cache.cursor : null);
+
+/**
+ * Suma a la copia de las versiones lo que cambió (sin retroceder ninguna).
+ * @param {Map<string, {u: number, h?: string}>} snapshot
+ * @param {Map<string, {u: number, h?: string}>} changed
+ */
+function addChanges(snapshot, changed) {
+  for (const [id, v] of changed) {
+    const known = snapshot.get(id);
+    if (!known || vNewer(v, known)) snapshot.set(id, v);
+  }
+}
+
+/**
  * Pide la lista al servidor (completa o solo cambios) y devuelve las versiones remotas.
  * @param {SyncDeps['api']} api
  * @param {SyncCache | undefined} cache
  */
 export async function listRemote(api, cache, nowMs = Date.now()) {
-  // Incremental (solo lo cambiado desde el cursor): hay copia de las versiones y la lista completa es reciente.
-  const cursor = cache?.snapshot && nowMs - cache.fullAt < FULL_LIST_EVERY_MS ? cache.cursor : null;
+  const cursor = cache ? changesSince(cache, nowMs) : null;
   const res = await api.list(cursor ? cursor - CURSOR_MARGIN_MS : undefined);
   const got = remoteVersions(res.items || []);
   if (!cache) return got;
-  const snapshot = cursor ? cache.snapshot : null;
+  const partial = Boolean(cursor) && res.full === false;
   // Se pidió solo lo cambiado, pero mientras tanto otra sincronización descartó
   // la copia: esa respuesta parcial no sirve como lista completa. Se pide la completa.
-  if (cursor && res.full === false && !snapshot) return listRemote(api, cache, nowMs);
-  if (snapshot && res.full === false) {
-    for (const [id, v] of got) {
-      const known = snapshot.get(id);
-      if (!known || vNewer(v, known)) snapshot.set(id, v);
-    }
-  } else {
+  if (partial && !cache.snapshot) return listRemote(api, cache, nowMs);
+  if (partial && cache.snapshot) addChanges(cache.snapshot, got);
+  else {
     // Lista completa (o servidor antiguo sin cursor). Las huellas verificadas
     // se vuelven a comprobar: acota cualquier cambio local que no haya subido
     // la versión (autocorrección cada FULL_LIST_EVERY_MS).

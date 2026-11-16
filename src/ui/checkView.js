@@ -14,7 +14,7 @@ import { html, setHtml } from './html.js';
 
 const DAY = 24 * 3600 * 1000;
 /** Días sin uso a partir de los cuales el chequeo aparece solo al abrir. */
-export const AUTO_CHECK_DAYS = 7;
+const AUTO_CHECK_DAYS = 7;
 
 /** @typedef {{state: 'ok' | 'warn' | 'bad' | 'info', title: string, text: string, action?: string, actionLabel?: string}} CheckItem */
 
@@ -66,7 +66,7 @@ export function autoCheck(ctx) {
  * @param {{auto?: boolean}} [o] `auto`: se abrió solo, tras días sin uso
  * @returns {Promise<CheckItem[]>}
  */
-export function openCheck(ctx, { auto = false } = {}) {
+function openCheck(ctx, { auto = false } = {}) {
   $('#checkTitle').textContent = auto ? 'Antes de empezar: chequeo del equipo' : 'Chequeo del equipo';
   if (!$('#checkDlg').open) $('#checkDlg').showModal();
   return runChecks(ctx);
@@ -102,7 +102,7 @@ async function runChecks(ctx) {
  * @param {Ctx} ctx
  * @returns {Promise<CheckItem[]>}
  */
-export async function collectChecks(ctx) {
+async function collectChecks(ctx) {
   return [
     await checkVersion(),
     ...(await checkSync(ctx)),

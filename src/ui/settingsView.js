@@ -122,14 +122,7 @@ export function initSettingsView(ctx) {
     try {
       const { text, contents } = unpackBackup(new Uint8Array(await file.arrayBuffer()));
       const incoming = parseBackup(text);
-      // Los datos de ejemplo nunca entran a los datos reales (ni al revés).
-      if (incoming.practica !== Boolean(ctx.practice)) {
-        throw new Error(
-          incoming.practica
-            ? 'Es un respaldo del modo práctica (datos de ejemplo): no se importa a los datos reales.'
-            : 'En el modo práctica solo se importan respaldos del modo práctica.',
-        );
-      }
+      assertSameMode(incoming, Boolean(ctx.practice));
       const localData = {
         records: ctx.records,
         futureRecords: ctx.store.loadFutureRecords(),
@@ -137,38 +130,13 @@ export function initSettingsView(ctx) {
         auditDocs: ctx.store.loadAuditDocs(),
         patients: ctx.store.loadPatients(),
       };
-      let merged = mergeBackup(localData, incoming);
-      if (merged.futureConflicts.length) {
-        const replace = await uiConfirm({
-          title: 'Atenciones de una versión más nueva',
-          message: `El respaldo trae ${merged.futureConflicts.length} atención(es) de una versión más nueva de la app que reemplazarían atenciones existentes en este equipo. Si no reconoces este archivo, no las reemplaces.`,
-          tone: 'warn',
-          okLabel: 'Reemplazar',
-          cancelLabel: 'Mantener las actuales',
-        });
-        if (replace) merged = mergeBackup(localData, incoming, { allowFutureOverride: true });
-      }
+      const merged = await mergeWithConfirm(localData, incoming);
       ctx.store.saveRecords([...merged.records, ...merged.futureRecords]);
       ctx.store.saveAuditDocs(merged.auditDocs);
       ctx.store.savePatients(merged.patients);
       ctx.store.saveProcs(merged.procs);
-      // Adjuntos: primero el contenido (verificado), luego sus metadatos.
-      let attMsg = '';
-      if (incoming.attachments?.length && ctx.store.supportsAttachments()) {
-        const att = await attachmentsToImport(incoming.attachments, contents, (id) => Boolean(ctx.store.getAttachment(id)));
-        for (const [id, bytes] of att.contents) await ctx.store.saveAttachmentData(id, bytes);
-        ctx.store.saveAttachments(att.metas);
-        if (att.metas.length) attMsg = `\n\n${att.metas.length} adjunto(s) nuevo(s).`;
-        if (att.rechazados.length) attMsg += ` No se importó el contenido dañado de: ${att.rechazados.join(', ')}.`;
-      }
-      let keyMsg = '';
-      const local = ctx.store.loadSecret();
-      if (incoming.anonSecret && !local) {
-        ctx.store.saveSecret(incoming.anonSecret);
-        keyMsg = '\n\nSe adoptó la clave de seudonimización del respaldo.';
-      } else if (incoming.anonSecret && local && incoming.anonSecret !== local) {
-        keyMsg = '\n\nOjo: el respaldo trae otra clave de seudonimización; se mantiene la de este equipo.';
-      }
+      const attMsg = await importAttachments(ctx, incoming, contents);
+      const keyMsg = adoptSecret(ctx, incoming);
       ctx.reload();
       ctx.sync?.schedule();
       ctx.accounts?.event('respaldo.importar', undefined, { n: merged.added + merged.updated });
@@ -212,6 +180,79 @@ export function initSettingsView(ctx) {
       ctx.reload();
     }
   });
+}
+
+/** Respaldo leído y validado (ver parseBackup). @typedef {ReturnType<typeof parseBackup>} RespaldoEntrante */
+
+/**
+ * Los datos de ejemplo nunca entran a los datos reales (ni al revés).
+ * @param {RespaldoEntrante} incoming
+ * @param {boolean} practice si la app está en modo práctica
+ */
+function assertSameMode(incoming, practice) {
+  if (incoming.practica !== practice) {
+    throw new Error(
+      incoming.practica
+        ? 'Es un respaldo del modo práctica (datos de ejemplo): no se importa a los datos reales.'
+        : 'En el modo práctica solo se importan respaldos del modo práctica.',
+    );
+  }
+}
+
+/**
+ * Combina el respaldo con los datos locales. Si trae atenciones de una versión
+ * más nueva que reemplazarían las existentes, pregunta antes de reemplazarlas.
+ * @param {Parameters<typeof mergeBackup>[0]} localData
+ * @param {RespaldoEntrante} incoming
+ */
+async function mergeWithConfirm(localData, incoming) {
+  const merged = mergeBackup(localData, incoming);
+  if (!merged.futureConflicts.length) return merged;
+  const replace = await uiConfirm({
+    title: 'Atenciones de una versión más nueva',
+    message: `El respaldo trae ${merged.futureConflicts.length} atención(es) de una versión más nueva de la app que reemplazarían atenciones existentes en este equipo. Si no reconoces este archivo, no las reemplaces.`,
+    tone: 'warn',
+    okLabel: 'Reemplazar',
+    cancelLabel: 'Mantener las actuales',
+  });
+  return replace ? mergeBackup(localData, incoming, { allowFutureOverride: true }) : merged;
+}
+
+/**
+ * Importa los adjuntos del respaldo: primero el contenido (verificado), luego sus metadatos.
+ * @param {import('./context.js').AppContext} ctx
+ * @param {RespaldoEntrante} incoming
+ * @param {Map<string, Uint8Array>} contents contenido de los adjuntos (del ZIP)
+ * @returns {Promise<string>} el texto que se agrega al aviso final ('' si no hay nada que decir)
+ */
+async function importAttachments(ctx, incoming, contents) {
+  if (!incoming.attachments?.length || !ctx.store.supportsAttachments()) return '';
+  const att = await attachmentsToImport(incoming.attachments, contents, (id) => Boolean(ctx.store.getAttachment(id)));
+  for (const [id, bytes] of att.contents) await ctx.store.saveAttachmentData(id, bytes);
+  ctx.store.saveAttachments(att.metas);
+  let msg = '';
+  if (att.metas.length) msg = `\n\n${att.metas.length} adjunto(s) nuevo(s).`;
+  if (att.rechazados.length) msg += ` No se importó el contenido dañado de: ${att.rechazados.join(', ')}.`;
+  return msg;
+}
+
+/**
+ * Clave de seudonimización del respaldo: se adopta si este equipo no tiene una;
+ * si tiene otra, se mantiene la local.
+ * @param {import('./context.js').AppContext} ctx
+ * @param {RespaldoEntrante} incoming
+ * @returns {string} el texto que se agrega al aviso final ('' si no hay nada que decir)
+ */
+function adoptSecret(ctx, incoming) {
+  const local = ctx.store.loadSecret();
+  if (incoming.anonSecret && !local) {
+    ctx.store.saveSecret(incoming.anonSecret);
+    return '\n\nSe adoptó la clave de seudonimización del respaldo.';
+  }
+  if (incoming.anonSecret && local && incoming.anonSecret !== local) {
+    return '\n\nOjo: el respaldo trae otra clave de seudonimización; se mantiene la de este equipo.';
+  }
+  return '';
 }
 
 /** Dibuja la lista de procedimientos y los ajustes guardados. @param {import('./context.js').AppContext} ctx */

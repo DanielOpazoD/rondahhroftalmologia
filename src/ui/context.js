@@ -30,7 +30,7 @@ import { outputActions } from './actions/outputs.js';
 import { attachmentActions } from './actions/attachments.js';
 
 /** Pausa al escribir tras la que se guarda solo (ms). */
-export const AUTOSAVE_MS = 1200;
+const AUTOSAVE_MS = 1200;
 
 /**
  * @typedef {ReturnType<typeof createContext>} AppContext

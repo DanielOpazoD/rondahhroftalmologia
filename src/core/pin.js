@@ -11,9 +11,9 @@
  */
 import { hmacSha256, toHex, utf8 } from '../lib/sha256.js';
 
-export const PIN_ITERATIONS = 20_000;
+const PIN_ITERATIONS = 20_000;
 export const PIN_MINUTES = [5, 10, 15, 30];
-export const DEFAULT_MINUTES = 10;
+const DEFAULT_MINUTES = 10;
 /** Intentos fallidos permitidos antes de tener que esperar. */
 export const FREE_ATTEMPTS = 5;
 

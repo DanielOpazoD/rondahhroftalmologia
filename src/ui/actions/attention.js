@@ -30,6 +30,36 @@ export const confirmDiscard = (what) =>
   });
 
 /**
+ * Atención NUEVA de un paciente que ya tiene otra ese día: pregunta si
+ * combinarlas (continúa en la existente) o guardarla aparte.
+ * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @param {AtencionGuardada} dup la atención existente
+ * @returns {Promise<boolean>} false si se canceló (no se guarda)
+ */
+async function resolveDuplicate(ctx, dup) {
+  const name = dup.f.paciente_nombre || dup.f.paciente_rut;
+  const choice = await uiChoose({
+    title: 'Este paciente ya tiene una atención ese día',
+    message: `${name} ya tiene una atención el ${fmtDate(dup.f.fecha_atencion)}, quizás registrada en otro equipo. Combinar junta los datos de ambas en una sola atención, sin perder lo que cada una tiene.`,
+    tone: 'warn',
+    okLabel: 'Combinar',
+    altLabel: 'Guardar aparte',
+  });
+  if (!choice) return false;
+  if (choice === 'ok') ctx.joinExisting(dup.id, { silent: true });
+  return true;
+}
+
+/**
+ * Avisa que se guardó (con la primera advertencia, si las hay).
+ * @param {string[]} warnings
+ */
+function toastSaved(warnings) {
+  if (warnings.length) toast(`Guardada con ${warnings.length} advertencia(s): ${warnings[0]}`, 3500);
+  else toast('Atención guardada', 2200);
+}
+
+/**
  * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
  *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
@@ -56,18 +86,7 @@ export function attentionActions(ctx, store) {
       const dup = !ctx.rec.id && findDuplicate(ctx.rec, /** @type {AtencionGuardada[]} */ (ctx.records));
       if (dup && auto) return false; // la barra ofrece continuar en la existente
       await ctx.ensureUser();
-      if (dup) {
-        const name = dup.f.paciente_nombre || dup.f.paciente_rut;
-        const choice = await uiChoose({
-          title: 'Este paciente ya tiene una atención ese día',
-          message: `${name} ya tiene una atención el ${fmtDate(dup.f.fecha_atencion)}, quizás registrada en otro equipo. Combinar junta los datos de ambas en una sola atención, sin perder lo que cada una tiene.`,
-          tone: 'warn',
-          okLabel: 'Combinar',
-          altLabel: 'Guardar aparte',
-        });
-        if (!choice) return false;
-        if (choice === 'ok') ctx.joinExisting(dup.id, { silent: true });
-      }
+      if (dup && !(await resolveDuplicate(ctx, dup))) return false;
       const stored = ctx.records.find((/** @type {Atencion} */ r) => r.id === ctx.rec.id) || null;
       const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: clock.tick() });
       const ok = ctx.persist(() => {
@@ -97,10 +116,7 @@ export function attentionActions(ctx, store) {
       ctx.emit('datos');
       ctx.sync?.schedule();
       if (auto) return true;
-      toast(
-        v.warnings.length ? `Guardada con ${v.warnings.length} advertencia(s): ${v.warnings[0]}` : 'Atención guardada',
-        v.warnings.length ? 3500 : 2200,
-      );
+      toastSaved(v.warnings);
       return true;
     },
 

@@ -90,26 +90,51 @@ export function renderSyncView(ctx) {
   $('#syncOff').hidden = acc;
   $('#syncActive details.setup').hidden = acc;
   ctx.accounts?.render(); // «Activar cuentas» depende de que haya contraseña del equipo
-  // «Generar» solo en la primera configuración: si el servidor ya tiene
-  // contraseña, generar otra solo produce una que no coincide.
-  const firstSetup = s.server === 'unconfigured';
+  renderPassSetup(s.server === 'unconfigured');
+  $('#syncActive').hidden = !on || !s.available;
+  $('#syncState').textContent = label;
+  renderBadge(s, label);
+  if (on) {
+    $('#syncInfo').textContent = syncInfoText(s);
+    $('#syncHash').textContent = s.hash;
+  }
+}
+
+/**
+ * Textos del formulario de contraseña. «Generar» solo en la primera
+ * configuración: si el servidor ya tiene contraseña, generar otra solo
+ * produce una que no coincide.
+ * @param {boolean} firstSetup si el servidor aún no tiene contraseña
+ */
+function renderPassSetup(firstSetup) {
   $('#syncGen').hidden = !firstSetup;
   $('#syncPassLabel').textContent = firstSetup ? 'Nueva contraseña del equipo' : 'Contraseña del equipo';
   $('#syncSetupHint').textContent = firstSetup
     ? 'Primera configuración: genera la contraseña del equipo, anótala en un lugar seguro y actívala. Luego se usa la misma en todos los PC.'
     : 'Escribe la contraseña del equipo, la misma de los otros PC (formato XXXXX-XXXXX-XXXXX-XXXXX). Si se pierde, los datos del servidor no se pueden descifrar.';
-  $('#syncActive').hidden = !on || !s.available;
-  $('#syncState').textContent = label;
+}
+
+/**
+ * Insignia del encabezado con el estado de la sincronización.
+ * @param {import('./context.js').SyncState} s
+ * @param {string} label texto del estado (STATUS_LABELS)
+ */
+function renderBadge(s, label) {
   const badge = $('#syncBadge');
-  badge.hidden = !on || !s.available;
+  badge.hidden = !s.configured || !s.available;
   badge.className = 'syncBadge ' + s.status;
   badge.textContent = s.status === 'idle' ? 'Sincronizado' : label;
   badge.title = s.message || (s.lastSync ? 'Última sincronización: ' + fmtDateTime(new Date(s.lastSync)) : '');
-  if (on) {
-    $('#syncInfo').textContent =
-      (s.lastSync ? `Última sincronización: ${fmtDateTime(new Date(s.lastSync))}.` : 'Aún no se ha sincronizado.') +
-      (s.message ? ' ' + s.message : '') +
-      (s.skewMin ? ` Atención: la hora de este equipo difiere ${Math.abs(s.skewMin)} min de la del servidor; ajústala.` : '');
-    $('#syncHash').textContent = s.hash;
-  }
+}
+
+/**
+ * Detalle de la sincronización activa: última vez, mensaje y desfase de la hora.
+ * @param {import('./context.js').SyncState} s
+ */
+function syncInfoText(s) {
+  return (
+    (s.lastSync ? `Última sincronización: ${fmtDateTime(new Date(s.lastSync))}.` : 'Aún no se ha sincronizado.') +
+    (s.message ? ' ' + s.message : '') +
+    (s.skewMin ? ` Atención: la hora de este equipo difiere ${Math.abs(s.skewMin)} min de la del servidor; ajústala.` : '')
+  );
 }

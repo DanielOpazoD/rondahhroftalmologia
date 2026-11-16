@@ -73,7 +73,7 @@ const fuentesPlugin = () => ({
 async function checkSpecialty(id) {
   const dir = resolve(root, 'src/specialties', id);
   const mod = await import(pathToFileURL(resolve(dir, 'index.js')).href);
-  const { validateSpecialty } = await import(pathToFileURL(resolve(root, 'src/specialties/contrato.js')).href);
+  const { validateSpecialty } = await import('../src/specialties/contrato.js');
   const formHtml = await readFile(resolve(dir, 'formulario.html'), 'utf8');
   const problems = validateSpecialty(mod, { formHtml });
   if (problems.length) throw new Error(`La especialidad "${id}" no cumple el contrato:\n - ${problems.join('\n - ')}`);

@@ -87,6 +87,37 @@ export function planSync(local, remote, localHash) {
 }
 
 /**
+ * ¿La versión bajada reemplaza a lo local? Sí si es más nueva que lo local
+ * (o que su eliminación), o si es `adopt`: la versión del servidor con el
+ * mismo número que la local tras resolver un conflicto.
+ * @param {import('../domain').ElementoBajado} item
+ * @param {import('../domain').ElementoSync | undefined} cur
+ * @param {Record<string, number>} tomb
+ */
+function replacesLocal(item, cur, tomb) {
+  const localU = Math.max(cur?.updated || 0, tomb[item.id] || 0);
+  return item.u > localU || !!item.adopt;
+}
+
+/**
+ * Datos y versión que quedan al recibir `item` sobre `cur`: fusionados si el
+ * tipo tiene fusión. Si la fusión agregó algo local que el servidor no tiene,
+ * es una versión nueva que hay que subir.
+ * @param {import('../domain').ElementoSync | undefined} cur
+ * @param {import('../domain').ElementoBajado & {data: Record<string, unknown>}} item
+ * @param {string} kind
+ * @param {MergeFn | undefined} mergeFn
+ * @returns {{data: Record<string, unknown>, u: number, needsPush: boolean}}
+ */
+function resolvePulled(cur, item, kind, mergeFn) {
+  const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
+  if (!cur || !m) return { data: item.data, u: item.u, needsPush: false };
+  const data = /** @type {Record<string, unknown>} */ (m.data);
+  if (m.sameAsRemote) return { data, u: item.u, needsPush: false };
+  return { data, u: Math.max(cur.updated || 0, item.u) + 1, needsPush: true };
+}
+
+/**
  * Aplica versiones descargadas y descifradas sobre el estado local.
  * Los elementos son genéricos: {id, updated, kind, data}, donde `kind` es
  * 'atencion' | 'medico' | 'operativo'. La aplicación los separa por tipo.
@@ -99,43 +130,29 @@ export function planSync(local, remote, localHash) {
 export function applyPulled(items, tombstones, pulled, mergeFn) {
   const byId = new Map(items.map((r) => [r.id, r]));
   const tomb = { ...tombstones };
-  let added = 0;
-  let updated = 0;
-  let deleted = 0;
+  const count = { added: 0, updated: 0, deleted: 0 };
   let needsPush = false;
   for (const item of pulled) {
     if (!isValidId(item.id)) continue;
     const cur = byId.get(item.id);
-    const localU = Math.max(cur?.updated || 0, tomb[item.id] || 0);
-    // `adopt`: versión del servidor con el mismo número que la local tras resolver un conflicto.
-    if (item.u <= localU && !item.adopt) continue; // lo local es igual o más nuevo
+    if (!replacesLocal(item, cur, tomb)) continue; // lo local es igual o más nuevo
     if (item.deleted) {
       if (cur) {
         byId.delete(item.id);
-        deleted++;
+        count.deleted++;
       }
       tomb[item.id] = item.u;
-    } else {
-      if (!item.data || typeof item.data !== 'object') continue;
-      const kind = item.kind || 'atencion';
-      let data = item.data;
-      let u = item.u;
-      const m = cur && cur.kind === kind && mergeFn ? mergeFn(kind, cur.data, { ...item.data, id: item.id, updated: item.u }) : null;
-      if (cur && m) {
-        data = /** @type {Record<string, unknown>} */ (m.data);
-        // Si la fusión agregó algo local que el servidor no tiene, es una versión nueva que hay que subir.
-        if (!m.sameAsRemote) {
-          u = Math.max(cur.updated || 0, item.u) + 1;
-          needsPush = true;
-        }
-      }
-      if (cur) updated++;
-      else added++;
-      byId.set(item.id, { id: item.id, updated: u, kind, data: { ...data, id: item.id, updated: u } });
-      delete tomb[item.id];
+      continue;
     }
+    if (!item.data || typeof item.data !== 'object') continue;
+    const kind = item.kind || 'atencion';
+    const v = resolvePulled(cur, { ...item, data: item.data }, kind, mergeFn);
+    needsPush ||= v.needsPush;
+    count[cur ? 'updated' : 'added']++;
+    byId.set(item.id, { id: item.id, updated: v.u, kind, data: { ...v.data, id: item.id, updated: v.u } });
+    delete tomb[item.id];
   }
-  return { items: [...byId.values()], tombstones: tomb, added, updated, deleted, needsPush };
+  return { items: [...byId.values()], tombstones: tomb, ...count, needsPush };
 }
 
 /**

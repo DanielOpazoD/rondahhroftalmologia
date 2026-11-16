@@ -66,7 +66,7 @@ export function initRegistryView(ctx) {
  * @param {{f?: Record<string, string>}} p ficha (o atención)
  * @param {string} q
  */
-export function matchesQuery(p, q) {
+function matchesQuery(p, q) {
   if (!q) return true;
   const nq = normalizeText(q);
   const rq = cleanRut(q);

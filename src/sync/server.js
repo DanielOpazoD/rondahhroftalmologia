@@ -42,7 +42,7 @@ import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protoc
  * }} BlobStore
  */
 
-export const LIMITS = Object.freeze({
+const LIMITS = Object.freeze({
   itemsPerRequest: 200,
   ctMaxChars: 400_000,
   futureSkewMs: 24 * 3600 * 1000,
@@ -119,8 +119,8 @@ const ESP_RE = /^[a-z][a-z0-9-]{1,39}$/;
  * `m_` + 8, paciente: `p_` + 10). Hoy viajan con id opaco; `purge` solo puede
  * borrar ids con esta forma (nunca atenciones ni ids opacos).
  */
-export const LEGACY_ID_RE = /^(?:m_[0-9a-z]{8}|p_[0-9a-z]{10})$/;
-export const DEFAULT_ESP = 'oftalmologia';
+const LEGACY_ID_RE = /^(?:m_[0-9a-z]{8}|p_[0-9a-z]{10})$/;
+const DEFAULT_ESP = 'oftalmologia';
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 const H_RE = /^[0-9a-f]{16}$/;

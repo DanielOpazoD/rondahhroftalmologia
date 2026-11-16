@@ -38,7 +38,7 @@ export const ACCEPT = 'image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.odt,.
  * binario genérico, nunca se abre: un adjunto no debe poder ejecutar código
  * en el origen de la app.
  */
-export const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
+const INLINE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
 
 /** Tipo MIME normalizado (minúsculas, sin parámetros). @param {unknown} tipo */
 export const cleanType = (tipo) =>

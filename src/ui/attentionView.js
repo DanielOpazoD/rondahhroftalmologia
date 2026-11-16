@@ -378,7 +378,7 @@ export function renderHistory(ctx) {
  * Otras atenciones del mismo paciente (historial clínico a lo largo del tiempo).
  * @param {AppContext} ctx
  */
-export function renderPrevious(ctx) {
+function renderPrevious(ctx) {
   const id = ctx.rec.pacienteId || patientIdFor(ctx.rec.f);
   const others = id ? attentionsOf(ctx.records, id).filter((r) => r.id !== ctx.rec.id) : [];
   $('#patPrev').hidden = !others.length;
