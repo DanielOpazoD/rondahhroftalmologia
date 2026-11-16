@@ -22,6 +22,10 @@ async function auditGes(page, where) {
   await page.getByRole('menuitem', { name: /^IPD/ }).click();
   found.push(...(await audit(page, where + ' IPD')));
   await page.getByRole('dialog', { name: 'IPD · Informe del proceso diagnóstico' }).getByRole('button', { name: 'Cancelar' }).click();
+  await page.locator('#bPdf').click();
+  await page.getByRole('menuitem', { name: /^Receta para lentes/ }).click();
+  found.push(...(await audit(page, where + ' receta para lentes')));
+  await page.getByRole('dialog', { name: 'Receta para lentes' }).getByRole('button', { name: 'Cancelar' }).click();
   return found;
 }
 

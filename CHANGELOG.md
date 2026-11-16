@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.20.0 — 2026-11-15
+
+### Nuevo
+- **Receta para lentes** desde el menú PDF de cada atención: propone nombre, RUT y edad del paciente, profesional y fecha actual de Rapa Nui. Todos los datos se pueden revisar y corregir.
+- Campos manuales para Lejos y Cerca (OD, OI y distancia pupilar) y ejes TABO. La graduación no se deduce de la agudeza visual ni de otros textos clínicos.
+- Descarga editable sobre la plantilla proporcionada por el hospital, con firma vacía, y vista del PDF con impresión del navegador. Disponible sin conexión, con los mismos permisos y protección por bloqueo que GES e IPD.
+
 ## 2.19.0 — 2026-11-15
 
 ### Nuevo
