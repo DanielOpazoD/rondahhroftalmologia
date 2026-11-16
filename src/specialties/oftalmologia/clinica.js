@@ -32,9 +32,20 @@ function procHasPio(id, rec, procs) {
 }
 
 /**
+ * Descripción de un procedimiento para un ojo: la propia del ojo, o la única
+ * de la 2.18.0 (`desc`) si el procedimiento cubre ese ojo. Solo en ojos cubiertos.
+ * @param {{eye?: string, desc_od?: string, desc_oi?: string, desc?: string}} v
+ * @param {'od' | 'oi'} e
+ */
+export function descFor(v, e) {
+  if (!v || !coversEye(v.eye, e)) return '';
+  return String(v[`desc_${e}`] ?? v.desc ?? '').trim();
+}
+
+/**
  * Procedimientos realizados como datos estructurados, en el orden de la lista
  * configurada (los que ya no están en ella no se incluyen).
- * @returns {{id: string, nombre: string, abrev: string, desc: string, ojo: string, ojos: number, pioOd: string, pioOi: string}[]}
+ * @returns {{id: string, nombre: string, abrev: string, descOd: string, descOi: string, ojo: string, ojos: number, pioOd: string, pioOi: string}[]}
  */
 export function proceduresDone(rec, procs) {
   // Solo los procedimientos de la lista configurada: uno que se quitó de la
@@ -49,7 +60,8 @@ export function proceduresDone(rec, procs) {
       id,
       nombre: procName(id, rec, procs),
       abrev: def?.abrev || procName(id, rec, procs),
-      desc: (v.desc || '').trim(),
+      descOd: descFor(v, 'od'),
+      descOi: descFor(v, 'oi'),
       ojo: v.eye,
       ojos: eyeCount(v.eye),
       pioOd: pio && coversEye(v.eye, 'od') ? (v.od || '').trim() : '',
@@ -59,24 +71,31 @@ export function proceduresDone(rec, procs) {
 }
 
 /**
- * "T. Aplanática AO (OD 14 / OI 15 mmHg)" · "Fondo de ojo (FO) OD: papila normal".
- * @param {{nombre: string, ojo: string, pioOd?: string, pioOi?: string, desc?: string}} p
- * @param {{desc?: boolean}} [o] `desc: false` sin la descripción (el PDF la pone en el recuadro del examen)
+ * "T. Aplanática AO (OD 14 / OI 15 mmHg)" · "Fondo de ojo (FO) OD: papila normal" ·
+ * "Fondo de ojo (FO) AO: OD papila normal; OI excavación 0,5".
+ * @param {{nombre: string, ojo: string, pioOd?: string, pioOi?: string, descOd?: string, descOi?: string}} p
+ * @param {{desc?: boolean}} [o] `desc: false` sin las descripciones (el PDF las pone en el recuadro de cada ojo)
  */
 export function procLabel(p, { desc = true } = {}) {
   const vals = [p.pioOd && 'OD ' + p.pioOd, p.pioOi && 'OI ' + p.pioOi].filter(Boolean);
-  return `${p.nombre} ${p.ojo}` + (vals.length ? ` (${vals.join(' / ')} mmHg)` : '') + (desc && p.desc ? `: ${p.desc}` : '');
+  const descs = !desc
+    ? ''
+    : p.ojo === 'AO'
+      ? [p.descOd && 'OD ' + p.descOd, p.descOi && 'OI ' + p.descOi].filter(Boolean).join('; ')
+      : p.descOd || p.descOi || '';
+  return `${p.nombre} ${p.ojo}` + (vals.length ? ` (${vals.join(' / ')} mmHg)` : '') + (descs ? `: ${descs}` : '');
 }
 
 /**
  * Descripciones de procedimientos que van en el recuadro del examen de un ojo
- * («FO: …», «BMC: …»): las de los procedimientos hechos en ese ojo (o en AO).
+ * («FO: …», «BMC: …»): la de ese ojo de cada procedimiento.
  * @param {any} rec @param {string} e @param {import('./config.js').ProcDef[]} procs
  */
 export function procDescriptions(rec, e, procs) {
   return proceduresDone(rec, procs)
-    .filter((p) => p.desc && coversEye(p.ojo, e))
-    .map((p) => `${p.abrev}: ${p.desc}`);
+    .map((p) => [p.abrev, e === 'od' ? p.descOd : p.descOi])
+    .filter(([, d]) => d)
+    .map(([abrev, d]) => `${abrev}: ${d}`);
 }
 
 /**

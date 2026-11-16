@@ -16,7 +16,7 @@ PROCEDIMIENTOS REALIZADOS:
 - Autorrefractometría AO
 - T. Aplanática AO (OD 14 / OI 16 mmHg)
 - T. Neumática OD (OD 18 mmHg)
-- Fondo de ojo (FO) AO: Papila 0,3, mácula sin brillo foveal
+- Fondo de ojo (FO) AO: OD Papila 0,3, mácula sin brillo foveal; OI Papila 0,5
 - BMC OD: Catarata nuclear N3
 - OCT OI
 

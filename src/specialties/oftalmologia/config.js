@@ -60,8 +60,9 @@ export const OJOS = ['OD', 'OI', 'AO'];
 /**
  * @typedef {{id: string, n: string, pio?: 0|1, desc?: 0|1, abrev?: string}} ProcDef
  * `pio: 1` = el procedimiento registra presión intraocular por ojo.
- * `desc: 1` = admite una descripción en texto; en el PDF va en el recuadro del
- * examen físico del ojo, con su abreviatura (`abrev`, p. ej. «FO: …»).
+ * `desc: 1` = admite una descripción en texto POR OJO (la del OD y la del OI);
+ * en el PDF cada una va en el recuadro del examen de su ojo, con la abreviatura
+ * (`abrev`, p. ej. «FO: …»).
  */
 
 /** Lista por defecto de procedimientos realizados (editable en Ajustes). @type {ProcDef[]} */
@@ -195,4 +196,11 @@ export const ETIQUETAS = {
 };
 
 /** Etiqueta de cada parte de un procedimiento realizado: lado y medidas. */
-export const ETIQUETAS_PROC = { eye: '(ojo)', od: 'PIO OD', oi: 'PIO OI', desc: 'descripción' };
+export const ETIQUETAS_PROC = {
+  eye: '(ojo)',
+  od: 'PIO OD',
+  oi: 'PIO OI',
+  desc_od: 'descripción OD',
+  desc_oi: 'descripción OI',
+  desc: 'descripción',
+};
