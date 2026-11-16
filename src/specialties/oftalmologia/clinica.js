@@ -114,11 +114,6 @@ export function pioFor(rec, e, procs) {
   return '';
 }
 
-/** Etiquetas de las casillas marcadas de un catálogo. */
-export function checkedLabels(rec, defs) {
-  return defs.filter((d) => rec.checks?.[d.key]).map((d) => d.label);
-}
-
 /** Antecedentes legibles: ["DM2", "Cx: facoemulsificación OD", "otros…"]. */
 export function antecedentsList(rec) {
   const f = rec.f || {};

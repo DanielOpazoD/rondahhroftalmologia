@@ -20,7 +20,7 @@ import { OJOS } from '../specialties/activa/config.js';
 import { validarClinico } from '../specialties/activa/validacion.js';
 import { migrate } from './migrations.js';
 import { refreshNames, nameParts, personName } from './names.js';
-import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt } from './format.js';
+import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ageAt, compareCode } from './format.js';
 
 /**
  * Atención recién creada en el formulario. Es una Atencion (normalizeRecord
@@ -214,7 +214,7 @@ export function findDuplicate(rec, records) {
  */
 export function sortRecords(records) {
   return [...records].sort(
-    (a, b) => (b.f?.fecha_atencion || '').localeCompare(a.f?.fecha_atencion || '') || (b.created || 0) - (a.created || 0),
+    (a, b) => compareCode(b.f?.fecha_atencion || '', a.f?.fecha_atencion || '') || (b.created || 0) - (a.created || 0),
   );
 }
 

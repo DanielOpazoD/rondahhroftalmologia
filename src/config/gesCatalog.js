@@ -1,8 +1,8 @@
 /** Catálogo MINSAL TEI 0.2.3 (22-07-2026): 90 problemas GES.
  * Las áreas son una agrupación de navegación de esta aplicación, no una clasificación ministerial.
+ * Fuente: https://interoperabilidad.minsal.cl/fhir/ig/tei/0.2.3/CodeSystem-cs-problema-ges-tei.html
  * Procedencia y alcance de los subgrupos: docs/FORMULARIOS_GES_IPD.md.
  */
-export const GES_CATALOG_SOURCE = 'https://interoperabilidad.minsal.cl/fhir/ig/tei/0.2.3/CodeSystem-cs-problema-ges-tei.html';
 export const GES_AREAS = [
   {
     area: 'Oftalmología',

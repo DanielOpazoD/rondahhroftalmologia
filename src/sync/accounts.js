@@ -723,6 +723,3 @@ export function createAccounts({
     },
   };
 }
-
-/** Utilidad de pruebas: el hash de la contraseña del equipo es el secreto del servidor. */
-export const secretFromTeamToken = (/** @type {string} */ token) => toHex(sha256(token));

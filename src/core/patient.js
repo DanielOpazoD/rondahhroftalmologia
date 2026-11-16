@@ -33,7 +33,7 @@
  */
 import { NAME_PARTS, refreshNames, personName } from './names.js';
 import { sha256 } from '../lib/sha256.js';
-import { rutKey, normalizeText } from './format.js';
+import { rutKey, normalizeText, compareCode } from './format.js';
 import { unknownFields, isSafeField } from './compat.js';
 
 /** @typedef {import('../domain').Paciente} Paciente */
@@ -206,7 +206,7 @@ export function attentionsOf(records, pacienteId) {
     .filter((r) => r.pacienteId === pacienteId)
     .sort(
       (a, b) =>
-        (b.f?.fecha_atencion || '').localeCompare(a.f?.fecha_atencion || '') ||
+        compareCode(b.f?.fecha_atencion || '', a.f?.fecha_atencion || '') ||
         (b.created || 0) - (a.created || 0) ||
         (b.updated || 0) - (a.updated || 0),
     );
@@ -235,8 +235,13 @@ export function isAttended(rec) {
 
 /* ------------------------------------------------- identidad y duplicados */
 
-/** Fichas por id (acepta lista o Map). @type {(patients: Fichas | null | undefined) => Map<string, Paciente>} */
-const asMap = (patients) => (patients instanceof Map ? patients : new Map((patients || []).map((p) => [p.id, p])));
+/**
+ * Fichas por id (acepta lista o Map). Quien consulta muchas fichas seguidas
+ * (isCanonicalPatient en un filtro) debe pasar el Map: con una lista, cada
+ * consulta arma el Map de nuevo.
+ * @type {(patients: Fichas | null | undefined) => Map<string, Paciente>}
+ */
+export const patientsById = (patients) => (patients instanceof Map ? patients : new Map((patients || []).map((p) => [p.id, p])));
 
 /**
  * Ficha vigente de un id, siguiendo las uniones (A → B → C). Si dos equipos
@@ -247,7 +252,7 @@ const asMap = (patients) => (patients instanceof Map ? patients : new Map((patie
  * @returns {string}
  */
 export function canonicalPatientId(patients, id) {
-  const map = asMap(patients);
+  const map = patientsById(patients);
   /** @type {string[]} */
   const seen = [];
   let cur = id;
@@ -310,7 +315,7 @@ export const isCanonicalPatient = (patients, p) => canonicalPatientId(patients, 
  * @returns {string|null}
  */
 export function resolvePatientId(f, patients, currentId) {
-  const map = asMap(patients);
+  const map = patientsById(patients);
   const k = rutKey(f?.paciente_rut);
   if (k) {
     const derived = 'p_' + hashId('rut:' + k);
@@ -334,7 +339,7 @@ export function resolvePatientId(f, patients, currentId) {
  * @returns {ParDuplicado[]}
  */
 export function findDuplicatePairs(patients, dismissed = new Set()) {
-  const map = asMap(patients);
+  const map = patientsById(patients);
   const live = [...map.values()].filter((p) => isCanonicalPatient(map, p) && !isDeletedPatient(p));
   /** @type {Map<string, ParDuplicado>} */
   const pairs = new Map();

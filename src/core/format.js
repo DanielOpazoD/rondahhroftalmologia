@@ -131,6 +131,20 @@ export function escapeHtml(s) {
 }
 
 /**
+ * Compara textos en español sin importar tildes ni mayúsculas (para ordenar
+ * nombres). Un Intl.Collator se crea una vez: es mucho más rápido que
+ * `localeCompare(b, 'es', …)`, que lo crea en cada comparación.
+ * @type {(a: string, b: string) => number}
+ */
+export const compareEs = new Intl.Collator('es', { sensitivity: 'base' }).compare;
+
+/**
+ * Compara por código (para fechas ISO y claves: «2026-01-02» < «2026-01-10»).
+ * @param {string} a @param {string} b
+ */
+export const compareCode = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
  * Minúsculas, sin tildes y con espacios simples: para búsquedas y claves.
  * @param {unknown} s
  */

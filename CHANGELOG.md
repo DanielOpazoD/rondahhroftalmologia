@@ -1,5 +1,27 @@
 # Cambios
 
+## 2.22.0 — 2026-11-16
+
+### Rendimiento (medido: `npm run perf`, detalle en docs/RENDIMIENTO.md)
+- **La app pesa 3,4 veces menos**: 4,3 MB → 1,26 MB (comprimida 2,8 MB → 0,63 MB). Se descarga, se guarda sin conexión y se abre más rápido.
+  - Las plantillas PDF traían peso que no se ve (perfil de color de imprenta, metadatos, fuentes completas, imágenes guardadas como texto). Se ven igual: la de atención, la IPD y la GES idénticas píxel a píxel.
+- **Con muchos pacientes, todo responde al instante** (medido con 3.000 atenciones de 1.100 pacientes):
+  - abrir la app: 1,2 s → 0,37 s;
+  - pestaña Pacientes: 0,37 s → 0,06 s;
+  - buscar un paciente: 0,57 s → 0,04 s.
+- Un cambio que llega de otro equipo solo re-dibuja la pestaña que se está viendo.
+
+### Visual
+- **Datos del paciente en dos filas** (Ingreso y Atención): RUT, apellidos y nombres; nacimiento, edad, sexo y fono. En el celular, de a pares, sin campos sueltos.
+- En el celular, AV · AVcc · PIO de cada ojo en una sola fila.
+- **Reportes** muestra solo lo que tiene datos: sin tarjetas vacías, sin contadores en cero y sin columnas de sexo vacías (el Excel sigue trayendo todo).
+
+### Cimientos
+- `npm run perf`: mide tamaño, composición del script, núcleo y la app real en el navegador con datos sintéticos.
+- `scripts/plantillas-livianas.mjs` y una prueba de presupuesto que impide que una plantilla vuelva a traer peso invisible.
+- Se quitaron reglas CSS y funciones sin uso; tamaño de letra base y fondo de diálogos como variables del diseño (`--fs-base`, `--scrim`).
+- `@playwright/test` documentado como dependencia de desarrollo (pruebas e2e y medición).
+
 ## 2.21.0 — 2026-11-16
 
 ### Nuevo
