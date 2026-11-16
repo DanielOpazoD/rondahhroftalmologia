@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.18.0 — 2026-11-15
+
+### Nuevo
+- **Constancia GES** desde el menú PDF de una atención de oftalmología: autocompleta paciente, teléfono y profesional, con los datos del Hospital Hanga Roa.
+- Selector con los siete títulos oficiales de patologías oftalmológicas GES. La previsión se elige al revisar el formulario.
+- Fecha y hora de notificación actuales de **Rapa Nui**, aunque el PC esté en otra zona horaria; se pueden corregir antes de descargar.
+- PDF de una página sobre la plantilla IF/N°469 de la Superintendencia de Salud, disponible sin conexión. Firmas en blanco para completar en papel.
+
 ## 2.17.0 — 2026-11-15
 
 ### Más limpio y compacto (#52)

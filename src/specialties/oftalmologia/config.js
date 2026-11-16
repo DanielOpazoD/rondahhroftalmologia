@@ -12,6 +12,17 @@
 /** Identidad: `id` separa los datos en el servidor; `prefijo`, en el navegador. */
 export const ESPECIALIDAD = Object.freeze({ id: 'oftalmologia', nombre: 'Oftalmología', prefijo: 'oft_' });
 
+/** Títulos oficiales GES de oftalmología (Superintendencia de Salud; docs/CONSTANCIA_GES.md). */
+export const GES_PATOLOGIAS = Object.freeze([
+  'Tratamiento quirúrgico de cataratas',
+  'Vicios de refracción en personas de 65 años y más',
+  'Estrabismo en personas menores de 9 años',
+  'Retinopatía diabética',
+  'Desprendimiento de retina regmatógeno no traumático',
+  'Trauma ocular grave',
+  'Retinopatía del prematuro',
+]);
+
 /** @typedef {{key: string, label: string}} CheckDef */
 
 /** @type {CheckDef[]} */

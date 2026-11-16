@@ -160,3 +160,5 @@ export const ETIQUETAS = {
 
 /** Etiqueta de cada parte de un procedimiento realizado (solo el lado). */
 export const ETIQUETAS_PROC = { eye: '(oído)' };
+/** Sin catálogo GES configurado para esta especialidad piloto. */
+export const GES_PATOLOGIAS = Object.freeze([]);

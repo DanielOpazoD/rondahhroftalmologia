@@ -1547,6 +1547,22 @@ dialog.msgdlg::backdrop {
   background: rgba(16, 24, 40, 0.38);
   backdrop-filter: blur(2px);
 }
+dialog.gesdlg {
+  width: min(720px, calc(100% - 24px));
+  max-height: calc(100dvh - 32px);
+}
+.gesdlg h3 {
+  margin: 0;
+}
+.gesdlg h4 {
+  margin: 18px 0 0;
+}
+.gesdlg p {
+  font-size: var(--fs-sm);
+}
+.gesdlg details {
+  margin-top: 16px;
+}
 .msghead {
   display: flex;
   align-items: center;

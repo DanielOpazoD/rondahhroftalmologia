@@ -27,6 +27,8 @@ Los campos de RUT muestran **✓ verde** si el dígito verificador es correcto y
 
 **Adjuntos:** cada atención admite imágenes, PDF o Word (tarjeta «Adjuntos»: botón o arrastrar). Las fotos grandes se reducen solas. Viajan cifrados a los otros PC. Al descargar el PDF de una atención con adjuntos se puede elegir **«Con anexos»**: la hoja, un índice y los adjuntos en el mismo documento. Las imágenes y los PDF van como páginas; Word va dentro del PDF y se abre desde el panel de adjuntos del visor.
 
+**Constancia GES:** desde **PDF → Constancia GES**, revisa los datos del paciente y del profesional, selecciona una de las siete patologías oftalmológicas y la previsión, y descarga el formulario oficial autocompletado. Trae los datos del Hospital Hanga Roa y la fecha y hora actuales de **Rapa Nui**. Las firmas se completan en papel. Funciona sin conexión. Ver [fuentes y alcance](docs/CONSTANCIA_GES.md).
+
 **Posibles duplicados:** si un paciente quedó registrado dos veces (por ejemplo, primero sin RUT), Pacientes lo avisa y permite unir las fichas sin perder atenciones, o marcarlas como personas distintas.
 
 ### Antes de cada operativo
