@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildHtml, buildSite, cspOf, cspHash } from '../scripts/build.mjs';
+import { buildHtml, buildSite, cspOf, cspHash, expandPartials } from '../scripts/build.mjs';
 
 test('el build produce un HTML autocontenido y sin recursos externos', async () => {
   const html = await buildHtml();
@@ -32,9 +32,9 @@ const uiFiles = () => {
     .map((f) => ({ name: f, text: readFileSync(new URL(f, dir), 'utf8') }));
 };
 
-test('cada id que usa la interfaz existe en el HTML', () => {
+test('cada id que usa la interfaz existe en el HTML', async () => {
   const html =
-    readFileSync(new URL('../src/index.html', import.meta.url), 'utf8') +
+    (await expandPartials(readFileSync(new URL('../src/index.html', import.meta.url), 'utf8'))) +
     readFileSync(new URL('../src/specialties/oftalmologia/formulario.html', import.meta.url), 'utf8');
   const sources = [...uiFiles().map((f) => f.text), readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')];
   const ids = new Set(sources.flatMap((s) => [...s.matchAll(/\$\('#([A-Za-z0-9_-]+)/g)].map((m) => m[1])));
@@ -77,4 +77,15 @@ test('buildSite escribe el sitio para Netlify con service worker versionado', as
   assert.ok(headers.includes(`style-src ${cspHash(style)}`), 'el hash de estilos corresponde a la hoja incluida');
   assert.ok(!/\sstyle="/.test(html), 'sin atributos style en el HTML');
   assert.match(headers, /frame-ancestors 'none'/);
+});
+
+test('datos del paciente: una sola plantilla para Ingreso y Atención (solo la atención valida)', async () => {
+  const html = await expandPartials(readFileSync(new URL('../src/index.html', import.meta.url), 'utf8'));
+  assert.ok(!html.includes('@PACIENTE'));
+  for (const f of ['rut', 'nombre', 'fono', 'fnac', 'edad']) {
+    assert.ok(html.includes(`id="ing_${f}"`) && html.includes(`id="paciente_${f}"`), f);
+  }
+  assert.ok(html.includes('data-msg="paciente_rut"'));
+  assert.ok(!html.includes('data-msg="ing_rut"'));
+  assert.ok(html.includes('id="ingSexo"') && html.includes('id="sexSeg"'));
 });

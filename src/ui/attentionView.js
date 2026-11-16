@@ -2,7 +2,6 @@
  * Formulario de atención: dibuja casillas y procedimientos, enlaza entradas
  * con el registro en edición y lo refleja en pantalla (`sync`).
  */
-import { SEXOS } from '../config/catalogs.js';
 import { ANTECEDENTES, SOLICITADOS, DIAGNOSTICOS, TEXT_FIELDS, OJOS, coversEye, diagnosesList } from '../specialties/activa/index.js';
 import { formatRut, isIsoDate, fmtDateTime, fmtDate } from '../core/format.js';
 import { auditLabel, shortValue } from '../core/audit.js';
@@ -10,6 +9,7 @@ import { patientIdFor, attentionsOf } from '../core/patient.js';
 import { refreshRutMarks } from './rut.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
+import { initSexSelector, renderSexSelector } from './patientFields.js';
 import { $, $$, toast } from './dom.js';
 import { renderAttachments } from './attachmentsView.js';
 import { html, setHtml } from './html.js';
@@ -45,19 +45,14 @@ export function initAttentionView(ctx) {
     ctx.rec.cat = ctx.rec.cat === v ? '' : v;
     ctx.changed();
   });
-  seg(
+  initSexSelector(
     $('#sexSeg'),
-    SEXOS.map((s) => s.key),
-    ['F', 'M', 'Otro'],
+    () => ctx.rec.f.paciente_sexo || '',
     (v) => {
-      ctx.rec.f.paciente_sexo = ctx.rec.f.paciente_sexo === v ? '' : v;
+      ctx.rec.f.paciente_sexo = v;
       ctx.changed();
     },
   );
-  $$('#sexSeg button').forEach((b, i) => {
-    b.title = SEXOS[i].label;
-    b.setAttribute('aria-label', SEXOS[i].label);
-  });
 
   renderProcList(ctx);
   const list = $('#procList');
@@ -139,7 +134,7 @@ export function syncAttentionView(ctx) {
   $('#schBox').hidden = !rec.checks.procedimiento_test_schirmer;
   $('#catBox').hidden = !rec.checks.diagnostico_catarata;
   $$('#catSeg button').forEach((b) => setPressed(b, b.dataset.v === rec.cat));
-  $$('#sexSeg button').forEach((b) => setPressed(b, b.dataset.v === rec.f.paciente_sexo));
+  renderSexSelector($('#sexSeg'), rec.f.paciente_sexo || '');
 
   let n = 0;
   $$('#procList .proc').forEach((row) => {

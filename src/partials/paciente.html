@@ -1,0 +1,24 @@
+<!--
+  Datos del paciente: UNA plantilla para Ingreso y Atención (el build la expande).
+  {p} = prefijo de los ids (paciente_ / ing_); {sexo} = id del selector de sexo;
+  {msg:campo} = mensaje de validación (solo donde se valida: la atención).
+-->
+<div>
+  <label class="l" for="{p}rut">RUT</label>
+  <div class="rutwrap">
+    <input id="{p}rut" autocomplete="off" placeholder="12.345.678-9" /><span
+      class="rutmark"
+      data-rut-for="{p}rut"
+      aria-live="polite"
+    ></span>
+  </div>
+  {msg:rut}
+</div>
+<div class="span2"><label class="l" for="{p}nombre">Nombre y apellidos</label><input id="{p}nombre" autocomplete="off" />{msg:nombre}</div>
+<div><label class="l" for="{p}fono">Fono</label><input id="{p}fono" inputmode="tel" /></div>
+<div><label class="l" for="{p}fnac">Fecha de nacimiento</label><input id="{p}fnac" type="date" />{msg:fnac}</div>
+<div><label class="l" for="{p}edad">Edad</label><input id="{p}edad" inputmode="numeric" placeholder="años" />{msg:edad}</div>
+<div class="span2">
+  <span class="l">Sexo</span>
+  <div class="seg" id="{sexo}" role="group" aria-label="Sexo"></div>
+</div>

@@ -20,6 +20,9 @@ import { cryptoAvailable, importEncKey, DecryptError } from '../sync/crypto.js';
 import { createAccountsApi } from '../sync/accountsApi.js';
 import { deriveAccountSecrets, unwrapTeamKey, decryptProfile, encryptProfile, credentialsFor } from '../sync/accountCrypto.js';
 import { blankRecord } from '../core/record.js';
+import { makeMedico } from '../core/catalog.js';
+import { rutKey } from '../core/format.js';
+import { clock } from '../core/clock.js';
 import { $, toast, nextFrame } from './dom.js';
 import { html, setHtml } from './html.js';
 import { addGuard, showGuarded } from './guard.js';
@@ -334,6 +337,17 @@ export function createAccountsController(ctx) {
     ctx.emit('cuenta');
     render();
     ctx.lock?.render();
+    // Una sola identidad: la persona de la cuenta queda (o se actualiza) en la lista de
+    // profesionales del formulario (campo Médico), que se comparte con los demás PC.
+    setTimeout(() => syncProfile(u), 0);
+  }
+
+  /** @param {CuentaActiva} u */
+  function syncProfile(u) {
+    const existing = ctx.medicos.find((/** @type {any} */ m) => rutKey(m.rut) === rutKey(u.rut));
+    if (existing && existing.nombre === u.nombre && (existing.rol || 'medico') === u.rol) return;
+    const m = makeMedico({ ...(existing || {}), nombre: u.nombre, rut: u.rut, rol: u.rol, updated: clock.tick() });
+    if (m) ctx.saveCatalog?.('medico', m);
   }
 
   /** Recupera la sesión de esta pestaña (al recargar la página). */
@@ -593,6 +607,9 @@ export function createAccountsController(ctx) {
     $('#acctActivate').hidden = !canActivate;
     $('#acctSession').hidden = !st.user;
     $('#acctState').textContent = st.on ? 'Activas' : 'Sin activar';
+    $('#medHint').textContent = st.user
+      ? 'Profesionales que aparecen en el campo Médico. Con cuentas de usuario, cada persona se agrega sola al entrar; aquí puedes sumar a quien no tiene cuenta.'
+      : 'Médicos y otros profesionales. Cada uno elige su perfil al registrar: el historial de cambios guarda quién hizo cada cambio.';
     if (st.user) {
       const u = st.user;
       setHtml(

@@ -72,8 +72,9 @@ test('ORL no depende del módulo de oftalmología ni de la interfaz', () => {
   }
 });
 
-test('el formulario ORL tiene cada id que usa la interfaz', () => {
-  const html = readFileSync(new URL('../src/index.html', import.meta.url), 'utf8') + formHtml;
+test('el formulario ORL tiene cada id que usa la interfaz', async () => {
+  const { expandPartials } = await import('../scripts/build.mjs');
+  const html = (await expandPartials(readFileSync(new URL('../src/index.html', import.meta.url), 'utf8'))) + formHtml;
   const uiDir = new URL('../src/ui/', import.meta.url);
   const sources = readdirSync(uiDir, { recursive: true })
     .map(String)

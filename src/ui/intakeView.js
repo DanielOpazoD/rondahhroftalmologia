@@ -5,11 +5,11 @@
  * demográficos) mientras médicos y otros profesionales abren cada paciente
  * de la lista y registran lo clínico. Todo se fusiona campo a campo.
  */
-import { SEXOS } from '../config/catalogs.js';
 import { formatRut, isIsoDate, todayIso, ageAt, fmtDate } from '../core/format.js';
 import { resolvePatientId, isAttended, attentionsOf } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
-import { $, $$ } from './dom.js';
+import { initSexSelector, renderSexSelector } from './patientFields.js';
+import { $ } from './dom.js';
 import { updateRutMark } from './rut.js';
 import { html, setHtml } from './html.js';
 
@@ -19,17 +19,14 @@ const FIELDS = { ing_rut: 'paciente_rut', ing_nombre: 'paciente_nombre', ing_fna
 /** @param {import('./context.js').AppContext} ctx */
 export function initIntakeView(ctx) {
   ctx.intakeSexo = '';
-  const sexButtons = SEXOS.map(
-    (s) =>
-      html`<button type="button" data-v="${s.key}" title="${s.label}" aria-label="${s.label}" aria-pressed="false">${s.key === 'O' ? 'Otro' : s.key}</button>`,
+  initSexSelector(
+    $('#ingSexo'),
+    () => ctx.intakeSexo,
+    (v) => {
+      ctx.intakeSexo = v;
+      renderSexo(ctx);
+    },
   );
-  setHtml($('#ingSexo'), html`${sexButtons}`);
-  $('#ingSexo').addEventListener('click', (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    ctx.intakeSexo = ctx.intakeSexo === b.dataset.v ? '' : b.dataset.v;
-    renderSexo(ctx);
-  });
 
   // Al escribir el RUT de un paciente ya registrado, se completan sus datos.
   $('#ing_rut').addEventListener('blur', () => {
@@ -61,10 +58,7 @@ export function initIntakeView(ctx) {
 }
 
 function renderSexo(ctx) {
-  for (const b of $$('#ingSexo button')) {
-    b.classList.toggle('on', b.dataset.v === ctx.intakeSexo);
-    b.setAttribute('aria-pressed', String(b.dataset.v === ctx.intakeSexo));
-  }
+  renderSexSelector($('#ingSexo'), ctx.intakeSexo);
 }
 
 function updateAge() {
