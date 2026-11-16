@@ -16,6 +16,7 @@ import { normalizeAttachment } from '../core/attachments.js';
 import { normalizeRecord, sortRecords, isValidId } from '../core/record.js';
 import { isFutureVersion } from '../core/migrations.js';
 import { normalizePatient, patientLabel } from '../core/patient.js';
+import { compareEs } from '../core/format.js';
 
 /**
  * @typedef {{getAll: Function, put: Function, putMany: Function, delete: Function, clear: Function, name: string,
@@ -44,6 +45,8 @@ export function createRepo(
   const audit = new Map();
   /** Fichas de pacientes (comunes a todas las especialidades). */
   const patients = new Map();
+  /** Fichas ordenadas por nombre (se recalcula solo si cambió alguna). @type {any[] | null} */
+  let patientsSorted = null;
   /** Metadatos de adjuntos (los bytes se leen de a uno: ver loadAttachmentData). */
   const attachments = new Map();
   /** Última versión persistida de cada documento (para escribir solo lo que cambió). */
@@ -182,6 +185,7 @@ export function createRepo(
         const p = normalizePatient(raw);
         if (!p) continue;
         patients.set(p.id, p);
+        patientsSorted = null;
         persisted.set(keyOf('pacientes', p.id), JSON.stringify(p));
       }
       for (const r of recs) {
@@ -296,14 +300,20 @@ export function createRepo(
 
     /* ----------------------------------------------------------- pacientes */
 
-    /** Fichas de pacientes, ordenadas por nombre. */
-    loadPatients: () =>
-      [...patients.values()].sort((a, b) => patientLabel(a).localeCompare(patientLabel(b), 'es', { sensitivity: 'base' })),
+    /** Fichas de pacientes, ordenadas por nombre (copia: quien la recibe puede ordenarla o filtrarla). */
+    loadPatients() {
+      if (!patientsSorted) {
+        const labeled = [...patients.values()].map((p) => ({ p, k: patientLabel(p) }));
+        patientsSorted = labeled.sort((a, b) => compareEs(a.k, b.k)).map((x) => x.p);
+      }
+      return [...patientsSorted];
+    },
     getPatient: (id) => patients.get(id),
     upsertPatient(raw) {
       const p = normalizePatient(raw);
       if (!p) return null;
       patients.set(p.id, p);
+      patientsSorted = null;
       putIfChanged('pacientes', p);
       return p;
     },
@@ -311,6 +321,7 @@ export function createRepo(
     savePatients(list) {
       const valid = list.map(normalizePatient).filter(Boolean);
       for (const p of valid) patients.set(p.id, p);
+      patientsSorted = null;
       putManyIfChanged('pacientes', valid);
     },
 

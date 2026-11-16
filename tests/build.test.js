@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildHtml, buildSite, cspOf, cspHash, expandPartials } from '../scripts/build.mjs';
+import { buildHtml, buildSite, cspOf, cspHash, expandPartials, PDF_FONTS } from '../scripts/build.mjs';
 
 test('el build produce un HTML autocontenido y sin recursos externos', async () => {
   const html = await buildHtml();
@@ -88,4 +88,39 @@ test('datos del paciente: una sola plantilla para Ingreso y Atención (solo la a
   assert.ok(html.includes('data-msg="paciente_rut"'));
   assert.ok(!html.includes('data-msg="ing_rut"'));
   assert.ok(html.includes('id="ingSexo"') && html.includes('id="sexSeg"'));
+});
+
+test('PDF: el código solo usa fuentes estándar incluidas en el build (PDF_FONTS)', () => {
+  // El build deja fuera las medidas de las fuentes que no están en PDF_FONTS (scripts/build.mjs).
+  const names = {
+    Helvetica: 'Helvetica',
+    HelveticaBold: 'Helvetica-Bold',
+    HelveticaOblique: 'Helvetica-Oblique',
+    HelveticaBoldOblique: 'Helvetica-BoldOblique',
+    Courier: 'Courier',
+    CourierBold: 'Courier-Bold',
+    CourierOblique: 'Courier-Oblique',
+    CourierBoldOblique: 'Courier-BoldOblique',
+    TimesRoman: 'Times-Roman',
+    TimesRomanBold: 'Times-Bold',
+    TimesRomanItalic: 'Times-Italic',
+    TimesRomanBoldItalic: 'Times-BoldItalic',
+    Symbol: 'Symbol',
+    ZapfDingbats: 'ZapfDingbats',
+  };
+  const walk = (/** @type {string} */ dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(dir, e.name)) : e.name.endsWith('.js') ? [join(dir, e.name)] : [],
+    );
+  const used = new Set();
+  for (const f of walk(new URL('../src', import.meta.url).pathname)) {
+    for (const m of readFileSync(f, 'utf8').matchAll(/StandardFonts\.(\w+)/g)) used.add(m[1]);
+  }
+  assert.ok(used.size > 0);
+  for (const k of used) {
+    assert.ok(
+      PDF_FONTS.includes(names[/** @type {keyof typeof names} */ (k)]),
+      `StandardFonts.${k} no está en PDF_FONTS (scripts/build.mjs)`,
+    );
+  }
 });

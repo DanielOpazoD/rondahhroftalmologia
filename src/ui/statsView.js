@@ -1,5 +1,7 @@
 /**
- * Filtro compartido (Estadística / Exportar) y tablero de estadística.
+ * Pestaña Reportes: filtro y tablero de estadística. Minimalista: lo que no
+ * tiene datos no se muestra (secciones vacías, contadores en cero, columnas
+ * de sexo sin casos); el Excel sí trae todo.
  */
 import { fmtDate } from '../core/format.js';
 import { computeStats, operativosOf, sortedEntries, ageGroupLabels } from '../specialties/activa/index.js';
@@ -55,7 +57,9 @@ export function renderStats(ctx) {
   const rows = Object.entries(S.proc).sort((a, b) => b[1].pac - a[1].pac);
   const tot = rows.reduce((a, [, o]) => ({ od: a.od + o.od, oi: a.oi + o.oi }), { od: 0, oi: 0 });
   const groups = ageGroupLabels();
-  const sexKeys = ['F', 'M', 'O', 'Sin dato'];
+  // F y M siempre; «Otro» y «Sin dato» solo si hay casos.
+  const sexKeys = ['F', 'M', 'O', 'Sin dato'].filter((k) => k === 'F' || k === 'M' || S.sexo[k]);
+  const sexLabel = { F: 'F', M: 'M', O: 'Otro', 'Sin dato': 'S/d' };
   // Decimales con coma (es-CL): «68,4».
   const fmt1 = (x) => (x === null ? '—' : (Math.round(x * 10) / 10).toLocaleString('es-CL', { maximumFractionDigits: 1 }));
   const gest = [
@@ -64,23 +68,25 @@ export function renderStats(ctx) {
     ['Receta', S.gest.receta],
     ['Seguimiento', S.gest.seguimiento],
     ['Alta', S.gest.alta],
-  ].map(([k, v]) => html`<span><b>${v}</b> ${k}</span>`);
+  ]
+    .filter(([, v]) => v)
+    .map(([k, v]) => html`<span><b>${v}</b> ${k}</span>`);
 
-  const procTable = rows.length
-    ? html`<div class="tw"><table class="st"><tr><th>Procedimiento</th><th>Pac.</th><th>OD</th><th>OI</th><th>Ojos</th></tr>
-        ${rows.map(([k, o]) => html`<tr><td>${k}</td><td>${o.pac}</td><td>${o.od}</td><td>${o.oi}</td><td>${o.ojos}</td></tr>`)}
-        <tr class="tot"><td>Total</td><td>${S.procTotal}</td><td>${tot.od}</td><td>${tot.oi}</td><td>${S.ojos}</td></tr></table></div>`
-    : html`<p class="hint">Sin procedimientos registrados.</p>`;
+  const procTable = html`<div class="tw"><table class="st"><tr><th>Procedimiento</th><th>Pac.</th><th>OD</th><th>OI</th><th>Ojos</th></tr>
+    ${rows.map(([k, o]) => html`<tr><td>${k}</td><td>${o.pac}</td><td>${o.od}</td><td>${o.oi}</td><td>${o.ojos}</td></tr>`)}
+    <tr class="tot"><td>Total</td><td>${S.procTotal}</td><td>${tot.od}</td><td>${tot.oi}</td><td>${S.ojos}</td></tr></table></div>`;
 
   const ageRows = groups.map((g) => {
     const o = S.edadSexo[g];
     const t = sexKeys.reduce((a, k) => a + o[k], 0);
     return t ? html`<tr><td>${g}</td>${sexKeys.map((k) => html`<td>${o[k] || '·'}</td>`)}<td>${t}</td></tr>` : '';
   });
-  const ageTable = html`<div class="tw"><table class="st"><tr><th>Edad</th><th>F</th><th>M</th><th>Otro</th><th>S/d</th><th>Total</th></tr>
+  const ageTable = html`<div class="tw"><table class="st"><tr><th>Edad</th>${sexKeys.map((k) => html`<th>${sexLabel[k]}</th>`)}<th>Total</th></tr>
     ${ageRows}
     <tr class="tot"><td>Total</td>${sexKeys.map((k) => html`<td>${S.sexo[k]}</td>`)}<td>${S.n}</td></tr></table></div>`;
 
+  const dx = sortedEntries(S.dx);
+  const sol = sortedEntries(S.sol);
   const dayRows = S.porDia.map(
     (d) =>
       html`<tr><td>${fmtDate(d.fecha) || d.fecha}</td><td>${d.atenciones}</td><td>${d.pacientes}</td><td>${d.procedimientos}</td><td>${d.ojos}</td></tr>`,
@@ -92,12 +98,12 @@ export function renderStats(ctx) {
     html`
   <div class="card">
     <div class="kpis">${kpi(S.n, 'Atenciones')}${kpi(S.pacientes, 'Pacientes')}${kpi(S.procTotal, 'Procedimientos')}${kpi(S.ojos, 'Ojos')}${kpi(fmt1(S.edad.promedio), 'Edad promedio')}</div>
-    <div class="gestline">${gest}</div>
+    ${gest.length ? html`<div class="gestline">${gest}</div>` : ''}
   </div>
   <div class="g2 cards">
-    ${card('Procedimientos realizados', procTable)}
-    ${card('Diagnósticos', bars(sortedEntries(S.dx), S.n))}
-    ${card('Procedimientos solicitados', bars(sortedEntries(S.sol), S.n))}
+    ${rows.length ? card('Procedimientos realizados', procTable) : ''}
+    ${dx.length ? card('Diagnósticos', bars(dx, S.n)) : ''}
+    ${sol.length ? card('Procedimientos solicitados', bars(sol, S.n)) : ''}
     ${card('Edad y sexo', ageTable)}
   </div>
   ${S.porDia.length > 1 ? card('Por día', dayTable) : ''}`,

@@ -11,7 +11,7 @@
  */
 import { nameParts, personName } from './names.js';
 import { hmacSha256 } from '../lib/sha256.js';
-import { normalizeText, rutKey, formatRut } from './format.js';
+import { normalizeText, rutKey, formatRut, compareEs } from './format.js';
 import { isValidId } from './record.js';
 import { ROLES } from '../config/catalogs.js';
 import { unknownFields } from './compat.js';
@@ -114,7 +114,7 @@ export function makeOperativo(o = {}, now = Date.now()) {
  * @returns {T[]}
  */
 export function byName(list) {
-  return [...list].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  return [...list].sort((a, b) => compareEs(a.nombre, b.nombre));
 }
 
 /**
@@ -160,9 +160,18 @@ export function seedCatalogs({ records = [], recordado = {}, medicos = [], opera
       added++;
     }
   };
+  const seenMed = new Set();
+  const seenOp = new Set();
   for (const r of records) {
-    addMed(r.f?.medico_nombre, r.f?.medico_rut);
-    addOp(r.f?.operativo);
+    const mk = `${r.f?.medico_nombre ?? ''}\u0000${r.f?.medico_rut ?? ''}`;
+    if (!seenMed.has(mk)) {
+      seenMed.add(mk);
+      addMed(r.f?.medico_nombre, r.f?.medico_rut);
+    }
+    if (!seenOp.has(r.f?.operativo)) {
+      seenOp.add(r.f?.operativo);
+      addOp(r.f?.operativo);
+    }
   }
   addMed(recordado.n, recordado.r);
   addOp(recordado.op);

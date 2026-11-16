@@ -50,6 +50,25 @@ const especialidadPlugin = (id) => ({
   },
 });
 
+/**
+ * Fuentes estándar de PDF que la app usa (pdf-lib trae las medidas de las 14;
+ * las demás pesan ~85 KB y no se usan). tests/build.test.js verifica que el
+ * código solo pida estas. Symbol y ZapfDingbats son pequeñas y se dejan.
+ */
+export const PDF_FONTS = Object.freeze(['Helvetica', 'Helvetica-Bold', 'Symbol', 'ZapfDingbats']);
+
+/** Deja fuera las medidas de las fuentes estándar que no se usan. */
+const fuentesPlugin = () => ({
+  name: 'fuentes-pdf',
+  setup(b) {
+    b.onLoad({ filter: /@pdf-lib[\\/]standard-fonts[\\/].*[\\/][\w-]+\.compressed\.json$/ }, (args) => {
+      const name = /([\w-]+)\.compressed\.json$/.exec(args.path)?.[1] || '';
+      if (name === 'all-encodings' || PDF_FONTS.includes(name)) return undefined;
+      return { contents: `export default ${JSON.stringify('sin-fuente:' + name)};`, loader: 'js' };
+    });
+  },
+});
+
 /** Verifica el contrato de la especialidad antes de construir (falla si está mal configurada). */
 async function checkSpecialty(id) {
   const dir = resolve(root, 'src/specialties', id);
@@ -106,6 +125,9 @@ export async function expandPartials(html) {
   );
 }
 
+/** Datos de la última compilación (composición del JS, para npm run perf). @type {{metafile: import('esbuild').Metafile | null}} */
+export const lastBuild = { metafile: null };
+
 export async function buildHtml() {
   const id = especialidadActiva();
   const formHtml = await checkSpecialty(id);
@@ -115,13 +137,15 @@ export async function buildHtml() {
     format: 'iife',
     platform: 'browser',
     target: ['es2020', 'safari15'],
-    minify: true,
+    minify: process.env.SIN_MINIFICAR !== '1',
     legalComments: 'inline',
     loader: { '.pdf': 'base64' },
-    plugins: [especialidadPlugin(id)],
+    plugins: [especialidadPlugin(id), fuentesPlugin()],
     write: false,
+    metafile: true,
     logLevel: 'warning',
   });
+  lastBuild.metafile = result.metafile;
   // Evita que "</script" dentro del código cierre la etiqueta antes de tiempo.
   let js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const css = await readFile(resolve(root, 'src/styles.css'), 'utf8');

@@ -43,13 +43,13 @@ test('formulario: campos con etiqueta, sexo con nombre completo y errores asocia
     - textbox "Apellido paterno"
     - textbox "Apellido materno"
     - textbox "Nombres"
-    - textbox "Fono"
     - textbox "Fecha de nacimiento"
     - textbox "Edad"
     - group "Sexo":
       - button "Femenino"
       - button "Masculino"
       - button "Otro / no informa"
+    - textbox "Fono"
   `);
   await page.locator('#bSave').click();
   await expect(page.getByRole('textbox', { name: 'Nombres', exact: true })).toHaveAccessibleDescription('Requerido (nombre o RUT)');

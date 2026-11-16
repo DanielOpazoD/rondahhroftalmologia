@@ -46,6 +46,16 @@ export function createContext(store, templateB64) {
   let autosaveTimer;
   const bus = createBus();
 
+  /** Dibuja el contenido de una pestaña que depende de los datos. @param {string} id */
+  function renderTab(id) {
+    if (id === 't-reg') renderRegistry(ctx);
+    else if (id === 't-ing') renderIntake(ctx);
+    else if (id === 't-est') {
+      renderStats(ctx);
+      renderExportView(ctx);
+    }
+  }
+
   const ctx = {
     store,
     /** Atención en edición. */
@@ -150,10 +160,7 @@ export function createContext(store, templateB64) {
 
     onFilterChange() {
       renderFilter(ctx);
-      if (ctx.currentTab === 't-est') {
-        renderStats(ctx);
-        renderExportView(ctx);
-      }
+      if (ctx.currentTab === 't-est') renderTab('t-est');
     },
 
     /**
@@ -176,15 +183,14 @@ export function createContext(store, templateB64) {
     emit: (topic) => bus.emit(topic),
     on: (topic, fn) => bus.on(topic, fn),
 
-    /** Re-dibuja listas que dependen de los registros guardados. */
+    /**
+     * Re-dibuja lo que depende de los registros guardados. Solo la pestaña
+     * visible: las demás se dibujan al abrirlas (showTab), así un cambio que
+     * llega por sincronización no re-dibuja listas ocultas.
+     */
     refreshLists() {
       renderFilter(ctx);
-      renderRegistry(ctx);
-      renderIntake(ctx);
-      if (ctx.currentTab === 't-est') {
-        renderStats(ctx);
-        renderExportView(ctx);
-      }
+      renderTab(ctx.currentTab);
     },
 
     /** Recarga todo desde el almacenamiento (tras importar o borrar). */
@@ -216,14 +222,11 @@ export function createContext(store, templateB64) {
       });
       $$('.tab').forEach((t) => t.classList.toggle('on', t.id === id));
       ctx.emit('tab:' + id);
-      if (id === 't-reg') renderRegistry(ctx);
-      if (id === 't-ing') renderIntake(ctx);
       if (id === 't-est') {
         placeFilter(id);
         renderFilter(ctx);
       }
-      if (id === 't-est') renderStats(ctx);
-      if (id === 't-est') renderExportView(ctx);
+      renderTab(id);
     },
 
     /** Restaura el borrador que quedó al cerrar la página. */

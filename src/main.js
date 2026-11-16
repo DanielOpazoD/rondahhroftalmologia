@@ -218,6 +218,8 @@ async function main() {
   });
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && ctx.flushAutosave());
   if (!persistent) toast('Este navegador no permite guardar datos: las atenciones se perderán al cerrar.', 6000);
+  // Marca de «app lista» (la usa scripts/perf.mjs para medir el inicio).
+  performance.mark('hhr:listo');
 }
 
 /** Permite usar la app sin conexión cuando se abre desde la web (Netlify). */

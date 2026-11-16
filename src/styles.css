@@ -23,10 +23,12 @@
   --bad: #c0163f;
   --bad-soft: #fff1f3;
   --shadow-lg: 0 12px 32px -14px rgba(16, 24, 40, 0.28);
+  --scrim: rgba(16, 24, 40, 0.36); /* fondo detrás de diálogos y menús */
   /* Escala visual: 5 tamaños de letra y 4 radios para toda la app. */
   --fs-xs: 11.5px; /* insignias, metadatos mínimos */
   --fs-sm: 12.5px; /* ayudas, etiquetas, metadatos */
   --fs-md: 13.5px; /* texto secundario, controles compactos */
+  --fs-base: 14px; /* texto normal (cuerpo, campos clínicos) */
   --fs-title: 16px; /* títulos de diálogos y paneles */
   --fs-xl: 22px; /* cifras destacadas */
   --r: 12px; /* tarjetas y diálogos */
@@ -81,7 +83,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 14px/1.45 var(--font);
+  font: var(--fs-base) / 1.45 var(--font);
   -webkit-font-smoothing: antialiased;
   padding-bottom: 32px;
 }
@@ -180,7 +182,7 @@ header.top {
 }
 .brand b {
   display: block;
-  font-size: 14px;
+  font-size: var(--fs-base);
   line-height: 1.15;
 }
 .brand > .brandtx {
@@ -423,8 +425,7 @@ p.muted {
   margin: 8px 0 3px;
 }
 .g2 > div > .l:first-child,
-.g4 > div > .l:first-child,
-.grid > div > .l:first-child {
+.g4 > div > .l:first-child {
   margin-top: 0;
 }
 input,
@@ -523,8 +524,7 @@ input.warned {
 
 /* Rejillas */
 .g2,
-.g4,
-.grid {
+.g4 {
   display: grid;
   gap: 10px 12px;
   margin-top: 10px;
@@ -540,12 +540,8 @@ input.warned {
 .g4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.grid {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
 .card > .g2:first-child,
-.card > .g4:first-child,
-.card > .grid:first-child {
+.card > .g4:first-child {
   margin-top: 0;
 }
 .span2 {
@@ -698,16 +694,19 @@ input.warned {
 .eye textarea {
   background: var(--surface);
 }
-.eye .g4 {
-  margin-top: 0;
+/* AV · AVcc · PIO: valores cortos, siempre en una fila (también en el celular). */
+.eye .g3 {
   gap: 8px;
 }
 @media (max-width: 760px) {
   .g2.eyes {
     grid-template-columns: 1fr;
   }
-  .eye .g4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .eye .g3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .eye .g3 > :last-child {
+    grid-column: auto;
   }
 }
 
@@ -1000,7 +999,6 @@ pre.note {
   color: var(--ok);
   border-color: color-mix(in srgb, var(--ok) 25%, transparent);
 }
-details.conf,
 details.setup {
   margin-top: 12px;
   border-top: 1px solid var(--line);
@@ -1027,9 +1025,6 @@ details summary::before {
 }
 details[open] summary::before {
   transform: rotate(90deg);
-}
-details.conf summary {
-  color: var(--bad);
 }
 details.setup summary {
   color: var(--acc-text);
@@ -1133,7 +1128,7 @@ details.setup summary {
 }
 .pname {
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1302,9 +1297,6 @@ table.st tr.tot td {
 }
 .filterSlot #filterCard {
   display: block;
-}
-#filterCard .grid {
-  margin-top: 0;
 }
 
 /* ---------------------------------------------------------------- toast */
@@ -1495,60 +1487,7 @@ table.st.bars td.pct {
   width: 3.5em;
 }
 
-/* --------------------------------------------------------- exportar */
-.xlist {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  overflow: hidden;
-}
-.xrow {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-top: 1px solid var(--line);
-}
-.xrow:first-child {
-  border-top: 0;
-}
-.xi {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-sm);
-  background: var(--acc-soft);
-  color: var(--acc-text);
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.xt {
-  flex: 1;
-  min-width: 0;
-}
-.xt b {
-  display: block;
-  font-size: 14px;
-}
-.xt small {
-  display: block;
-  color: var(--mut);
-  font-size: var(--fs-sm);
-  margin-top: 1px;
-}
-.xbtns {
-  display: flex;
-  gap: 6px;
-}
-@media (max-width: 560px) {
-  .xrow {
-    flex-wrap: wrap;
-  }
-  .xrow > .btn,
-  .xbtns {
-    margin-left: 50px;
-  }
-}
+/* --------------------------------------------------------- reportes */
 details.xopts {
   margin-top: 10px;
   background: var(--surface);
@@ -1580,7 +1519,7 @@ dialog#dlg {
   box-shadow: var(--shadow-lg);
 }
 dialog#dlg::backdrop {
-  background: rgba(16, 24, 40, 0.35);
+  background: var(--scrim);
   backdrop-filter: blur(2px);
 }
 dialog#dlg h3 {
@@ -1617,7 +1556,7 @@ dialog.msgdlg[open] {
   }
 }
 dialog.msgdlg::backdrop {
-  background: rgba(16, 24, 40, 0.38);
+  background: var(--scrim);
   backdrop-filter: blur(2px);
 }
 dialog.clinical-form {
@@ -1637,7 +1576,7 @@ dialog.clinical-form {
 }
 .clinical-form .l {
   margin-bottom: 3px;
-  font-size: 13px;
+  font-size: var(--fs-md);
 }
 .clinical-form input,
 .clinical-form select,
@@ -1645,7 +1584,7 @@ dialog.clinical-form {
   min-width: 0;
   min-height: 34px;
   padding: 6px 8px;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 .clinical-form label {
   display: block;
@@ -1790,7 +1729,7 @@ dialog.pdf-preview {
 .msgtext {
   margin: 12px 0 0 48px;
   color: var(--ink-2);
-  font-size: 14px;
+  font-size: var(--fs-base);
   line-height: 1.55;
 }
 .msgtext b {
@@ -2361,9 +2300,6 @@ html.locked body > *:not(#lockDlg):not(#loginDlg) {
 /* ------------------------------------------------ utilidades (sin estilos en línea: CSP sin 'unsafe-inline') */
 .u-mt10 {
   margin-top: 10px;
-}
-.u-mb10 {
-  margin: 0 0 10px;
 }
 .u-wauto {
   width: auto;

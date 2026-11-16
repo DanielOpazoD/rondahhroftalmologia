@@ -3,8 +3,8 @@
  * historial de atenciones de esta especialidad a lo largo del tiempo.
  */
 import { SEXOS } from '../config/catalogs.js';
-import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut } from '../core/format.js';
-import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs, isDeletedPatient } from '../core/patient.js';
+import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut, compareCode, compareEs } from '../core/format.js';
+import { isAttended, patientLabel, isCanonicalPatient, findDuplicatePairs, isDeletedPatient, patientsById } from '../core/patient.js';
 import { diagnosesList, proceduresDone } from '../specialties/activa/index.js';
 import { $ } from './dom.js';
 import { html, setHtml, join } from './html.js';
@@ -63,7 +63,7 @@ function byPatient(records) {
     if (!map.has(r.pacienteId)) map.set(r.pacienteId, []);
     map.get(r.pacienteId).push(r);
   }
-  for (const list of map.values()) list.sort((a, b) => (b.f.fecha_atencion || '').localeCompare(a.f.fecha_atencion || ''));
+  for (const list of map.values()) list.sort((a, b) => compareCode(b.f.fecha_atencion || '', a.f.fecha_atencion || ''));
   return map;
 }
 
@@ -95,19 +95,19 @@ export function renderRegistry(ctx) {
   sel.value = ops.includes(cur) ? cur : '';
 
   const all = ctx.store.loadPatients();
-  renderDuplicates(ctx, all, groups);
-  renderOrphans(ctx, all, groups);
+  const byId = patientsById(all);
+  renderDuplicates(ctx, byId, groups);
+  renderOrphans(ctx, all, byId, groups);
   const q = $('#regSearch').value.trim();
   const op = sel.value;
   const patients = all
     // Las fichas unidas a otra no se muestran (sus atenciones ya están en la vigente).
-    .filter((p) => isCanonicalPatient(all, p) && !isDeletedPatient(p))
+    .filter((p) => isCanonicalPatient(byId, p) && !isDeletedPatient(p))
     .map((p) => ({ p, recs: groups.get(p.id) || [] }))
     .filter(({ p, recs }) => recs.length && matchesQuery(p, q) && (!op || recs.some((r) => r.f.operativo === op)))
     .sort(
       (a, b) =>
-        (b.recs[0].f.fecha_atencion || '').localeCompare(a.recs[0].f.fecha_atencion || '') ||
-        patientLabel(a.p).localeCompare(patientLabel(b.p), 'es'),
+        compareCode(b.recs[0].f.fecha_atencion || '', a.recs[0].f.fecha_atencion || '') || compareEs(patientLabel(a.p), patientLabel(b.p)),
     );
   $('#regCount').textContent = patients.length;
   if (!patients.length) {
@@ -205,10 +205,9 @@ function renderPatient(ctx, recs) {
  * Fichas sin atenciones en esta especialidad (p. ej. creadas por error, o
  * cuya única atención se eliminó): se pueden eliminar.
  */
-function renderOrphans(ctx, all, groups) {
-  const list = all
-    .filter((p) => isCanonicalPatient(all, p) && !isDeletedPatient(p) && !(groups.get(p.id) || []).length)
-    .sort((a, b) => patientLabel(a).localeCompare(patientLabel(b), 'es'));
+function renderOrphans(ctx, all, byId, groups) {
+  // `all` ya viene ordenada por nombre.
+  const list = all.filter((p) => isCanonicalPatient(byId, p) && !isDeletedPatient(p) && !(groups.get(p.id) || []).length);
   $('#orphBox').hidden = !list.length;
   if (!list.length) return;
   $('#orphTitle').textContent = `${list.length} ${list.length === 1 ? 'ficha sin atenciones' : 'fichas sin atenciones'}`;

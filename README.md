@@ -130,8 +130,9 @@ netlify/functions/       función de Netlify para la sincronización
 netlify.toml             configuración de despliegue
 scripts/build.mjs        empaqueta todo en un HTML
 scripts/dev-server.mjs   servidor local con sincronización en memoria
+scripts/perf.mjs         mide tamaño y rendimiento (npm run perf; ver docs/RENDIMIENTO.md)
 tests/                   tests con node:test
 docs/                    arquitectura, modelo de datos, anonimización
 ```
 
-Más detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) y [docs/MODELO_DATOS.md](docs/MODELO_DATOS.md).
+Más detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md), [docs/MODELO_DATOS.md](docs/MODELO_DATOS.md) y [docs/RENDIMIENTO.md](docs/RENDIMIENTO.md).

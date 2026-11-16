@@ -61,10 +61,11 @@ Pocos y con versión fija en `package.json` (sin `^` ni `~`). Dependabot propone
 | Paquete | Versión | Tipo | Para qué | Dónde |
 |---|---|---|---|---|
 | `@netlify/blobs` | 11.1.9 | servidor | Almacén del servidor: sincronización, cuentas, registro de accesos y respaldos. | Solo en el servidor (funciones de Netlify) y en los scripts de operación. |
+| `@playwright/test` | 1.65.1 | desarrollo y build | Pruebas de punta a punta (e2e/) y medir la app en un navegador real (npm run perf). | Solo en desarrollo y en la integración continua; nunca va dentro de la app. |
 | `esbuild` | 0.25.10 | desarrollo y build | Empaquetar la app en un solo archivo HTML. | Solo al construir (scripts/build.mjs). |
 | `pdf-lib` | 1.17.1 | desarrollo y build | Llenar la plantilla PDF de la atención y armar el PDF con anexos. | Va dentro de la app (el build la incluye en el HTML). |
 
-Herramientas de desarrollo que no se importan desde el código: `@axe-core/playwright` 4.14.0, `@eslint/js` 10.0.1, `@playwright/test` 1.65.1, `eslint` 10.15.0, `fake-indexeddb` 6.2.8, `globals` 17.14.0, `prettier` 3.10.1, `typescript` 5.9.3.
+Herramientas de desarrollo que no se importan desde el código: `@axe-core/playwright` 4.14.0, `@eslint/js` 10.0.1, `eslint` 10.15.0, `fake-indexeddb` 6.2.8, `globals` 17.14.0, `prettier` 3.10.1, `typescript` 5.9.3.
 
 ## Módulos por capa
 
