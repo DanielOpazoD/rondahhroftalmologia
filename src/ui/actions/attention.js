@@ -103,6 +103,7 @@ export function attentionActions(ctx, store) {
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = false;
       ctx.persist(() => store.saveDraft(ctx.rec));
+      ctx.emit('atencion');
       syncAttentionView(ctx);
       ctx.showTab('t-at');
       scrollTo(0, 0);
@@ -173,6 +174,7 @@ export function attentionActions(ctx, store) {
       ctx.rec = normalizeRecord(r);
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = false;
+      ctx.emit('atencion');
       syncAttentionView(ctx);
     },
 

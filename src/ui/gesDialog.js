@@ -5,10 +5,11 @@ import { GES_HOSPITAL, gesDefaults, validateGes, buildGesPdf, gesFileName } from
 import { html } from './html.js';
 import { base64ToBytes } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
+import { clinicalFormValues } from '../core/clinicalForms.js';
 
 /** @param {import('./context.js').AppContext} ctx @param {import('../domain').Atencion} rec @param {HTMLElement} anchor */
 export function downloadGes(ctx, rec, anchor) {
-  const initial = gesDefaults(rec);
+  const initial = clinicalFormValues(rec, 'ges', gesDefaults(rec));
   const input = (key, label, type = 'text') => clinicalInput(initial, key, label, type);
   return openClinicalForm(ctx, {
     title: 'Constancia GES',
@@ -16,6 +17,7 @@ export function downloadGes(ctx, rec, anchor) {
     initial,
     anchor,
     id: rec.id,
+    remember: (values, previous) => ctx.rememberForm(rec, 'ges', previous, values),
     validate: validateGes,
     build: (values) => buildGesPdf(base64ToBytes(templateB64), values),
     filename: gesFileName,

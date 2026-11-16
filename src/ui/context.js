@@ -28,6 +28,7 @@ import { patientActions } from './actions/patients.js';
 import { catalogActions } from './actions/catalogs.js';
 import { outputActions } from './actions/outputs.js';
 import { attachmentActions } from './actions/attachments.js';
+import { formActions } from './actions/forms.js';
 
 /** Pausa al escribir tras la que se guarda solo (ms). */
 export const AUTOSAVE_MS = 1200;
@@ -251,11 +252,12 @@ export function createContext(store, templateB64) {
     catalogActions(ctx, store),
     outputActions(ctx, store),
     attachmentActions(ctx, store),
+    formActions(ctx, store),
   );
   // Las listas se re-dibujan cuando cambian los datos (agrupado por el bus).
   bus.on(TOPICS.DATOS, () => ctx.refreshLists());
   ctx.snap = structuredClone(ctx.rec);
-  return /** @type {typeof ctx & ReturnType<typeof attentionActions> & ReturnType<typeof patientActions> & ReturnType<typeof catalogActions> & ReturnType<typeof outputActions>} */ (
+  return /** @type {typeof ctx & ReturnType<typeof attentionActions> & ReturnType<typeof patientActions> & ReturnType<typeof catalogActions> & ReturnType<typeof outputActions> & ReturnType<typeof formActions>} */ (
     ctx
   );
 }

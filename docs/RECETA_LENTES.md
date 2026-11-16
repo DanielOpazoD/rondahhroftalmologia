@@ -1,14 +1,16 @@
 # Receta para lentes
 
-Se abre desde **PDF → Receta para lentes** en una atención de oftalmología, con el mismo diálogo de revisión, descarga e impresión que GES e IPD.
+Se abre desde el **botón circular Formularios → Receta para lentes** en una atención de oftalmología, con el mismo diálogo de revisión, descarga e impresión que GES e IPD.
 
 ## Plantilla
 
-`src/specialties/oftalmologia/receta-plantilla.pdf` es una copia íntegra del archivo «receta rellenable.pdf» proporcionado por el usuario el 15 de noviembre de 2026. Es una página de 396 × 612 puntos, con trece campos de texto y un campo de firma digital vacío. SHA-256:
+`src/specialties/oftalmologia/receta-plantilla.pdf` deriva del archivo «receta rellenable.pdf» proporcionado por el usuario el 15 de noviembre de 2026. Desde la versión 2.22.0 su almacenamiento se optimizó, conservando la página y los campos (ver [rendimiento](RENDIMIENTO.md)). Es una página de 396 × 612 puntos, con trece campos de texto y un campo de firma digital vacío. SHA-256 del archivo original:
 
 ```text
 c552a72947ef6039c48e90d4ac1d1d5c7f5af901b503221d2456fcd2cd71a9e9
 ```
+
+SHA-256 de la plantilla optimizada incluida: `faa7d483391acef1508238e9199001de8a992d22ef7ae6c1a1ea27f9e8797c16`.
 
 El PDF se incluye en la aplicación para poder usarlo sin conexión. No se envían datos a un servicio externo para rellenarlo.
 
@@ -26,7 +28,7 @@ El PDF se incluye en la aplicación para poder usarlo sin conexión. No se enví
 | `tabo_eje_od`, `tabo_eje_oi` | Vacíos, para ejes manuales. |
 | `oftalmologo_firma` | Vacío. La aplicación no inserta firmas. |
 
-Todos los valores propuestos se pueden corregir antes de generar el PDF. Los cambios pertenecen a esa emisión: no modifican la ficha ni el perfil del profesional. Al abrir otra atención o reabrir la receta se toman sus datos de nuevo.
+Todos los valores propuestos se pueden corregir antes de generar el PDF. Se guardan automáticamente dentro de la atención y se recuperan al reabrirla o recargar. Las correcciones del formulario no reemplazan los datos demográficos ni el perfil del profesional. Otra atención empieza con sus propias propuestas y graduación vacía.
 
 La graduación nunca se infiere de AV, AVcc, diagnósticos, medicamentos o indicaciones. Se admite texto óptico libre; el signo menos Unicode se convierte a su equivalente ASCII sin perder el signo. Se avisa si un carácter no se puede representar o un texto no cabe, en vez de eliminarlo o cortarlo.
 

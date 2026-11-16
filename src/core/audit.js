@@ -24,6 +24,14 @@ const CHECK_LABELS = Object.fromEntries([
  * @param {{id: string, n: string}[]} [procs]
  */
 export function auditLabel(path, procs = []) {
+  const form = /^f\.form_(ges|ipd|receta)_(.+)$/.exec(path);
+  if (form) {
+    const title = form[1] === 'ges' ? 'GES' : form[1] === 'ipd' ? 'IPD' : 'Receta de lentes';
+    const key = form[2];
+    const label =
+      /** @type {Record<string, string>} */ (ETIQUETAS)[key] || key.replaceAll('_', ' ').replace(/\b(od|oi|dp)\b/g, (s) => s.toUpperCase());
+    return `${title} · ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+  }
   if (path.startsWith('f.')) return /** @type {Record<string, string>} */ (ETIQUETAS)[path.slice(2)] || path.slice(2);
   if (path.startsWith('checks.')) return CHECK_LABELS[path.slice(7)] || path.slice(7);
   if (path === 'cat') return 'Catarata (ojo)';

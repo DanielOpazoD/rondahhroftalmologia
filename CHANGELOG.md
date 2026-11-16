@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.23.0 — 2026-11-16
+
+### Nuevo
+- **Botón circular de formularios**, fijo abajo a la derecha: abre Constancia GES, IPD y Receta para lentes para el paciente de la atención. En celular se ubica sobre la navegación.
+- **Guardado automático por atención** de los tres formularios: al cerrar, recargar o volver al paciente se recuperan los datos. Otro paciente y una atención nueva empiezan con sus propios valores. También se conservan los campos borrados expresamente.
+- Los borradores viajan en respaldos y sincronización con fechas por campo, sin reemplazar datos demográficos ni perfiles profesionales. El esquema v6 conserva los datos anteriores y protege los formularios frente a versiones antiguas.
+
+
 ## 2.22.0 — 2026-11-16
 
 ### Rendimiento (medido: `npm run perf`, detalle en docs/RENDIMIENTO.md)

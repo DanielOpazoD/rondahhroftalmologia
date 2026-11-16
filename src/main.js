@@ -179,6 +179,7 @@ async function main() {
   $('#bCopy').addEventListener('click', () => ctx.copyNote(ctx.rec));
   $('#bPdf').addEventListener('click', (e) => ctx.downloadPdf(ctx.rec, e.currentTarget));
   $('#brandBtn').addEventListener('click', () => ctx.showTab('t-aj'));
+  $('#bForms').addEventListener('click', (e) => ctx.openForms(e.currentTarget));
 
   // Ctrl/Cmd + S guarda la atención.
   document.addEventListener('keydown', (e) => {

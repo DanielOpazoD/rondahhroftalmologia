@@ -4,16 +4,18 @@ import { recetaDefaults, validateReceta, buildRecetaPdf, recetaFileName, RECETA_
 import { html } from './html.js';
 import { base64ToBytes } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
+import { clinicalFormValues } from '../core/clinicalForms.js';
 
 /** @param {import('./context.js').AppContext} ctx @param {import('../domain').Atencion} rec @param {HTMLElement} anchor */
 export function downloadReceta(ctx, rec, anchor) {
-  const initial = recetaDefaults(rec);
+  const initial = clinicalFormValues(rec, 'receta', recetaDefaults(rec));
   const input = (key, type = 'text') => clinicalInput(initial, key, RECETA_LABELS[key], type);
   return openClinicalForm(ctx, {
     title: 'Receta para lentes',
     initial,
     anchor,
     id: rec.id,
+    remember: (values, previous) => ctx.rememberForm(rec, 'receta', previous, values),
     validate: validateReceta,
     build: (values) => buildRecetaPdf(base64ToBytes(templateB64), values),
     filename: recetaFileName,

@@ -59,13 +59,13 @@ La marca se sincroniza como cualquier campo. Si un equipo que aún no sabía de 
 - Sus datos **no se borran**: las fichas son comunes a todas las especialidades, y otra podría tener atenciones de ese paciente.
 - Si una atención vuelve a usar la ficha (al guardarla, o al llegar una de otro equipo), la marca se quita sola (`restorePatient`); la restauración gana a la eliminación.
 
-## Atención (esquema v5)
+## Atención (esquema v6)
 
 Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atenciones`, con un documento por atención (`src/storage/repo.js`). Si IndexedDB no está disponible, se usa localStorage como respaldo. Al abrir esta versión por primera vez, las atenciones que versiones anteriores guardaban en `localStorage["oft_atenciones_v1"]` se migran a IndexedDB y se libera ese espacio.
 
 ```jsonc
 {
-  "v": 5,                          // versión de esquema
+  "v": 6,                          // versión de esquema
   "pacienteId": "p_k3j9x0a2mq",    // paciente al que pertenece (v4)
   "especialidad": "oftalmologia",  // separa datos de distintas rondas
   "id": "amhz3k2a9x1",             // único; se genera al guardar
@@ -99,7 +99,7 @@ Se guarda en **IndexedDB**, base `hhr-rondas-oftalmologia`, colección `atencion
 
 - `proc[id].od / .oi` son la PIO en mmHg y solo existen en procedimientos con `pio: 1`.
 - `procNames` guarda el nombre del procedimiento al momento de guardar. Así, si después se quita de la lista en Ajustes, la estadística sigue mostrando su nombre.
-- `normalizeRecord()` acepta registros v1 a v4 o incompletos y los lleva a v5 sin perder datos (v4 agrega `pacienteId`; v5 admite nombres separados y conserva los nombres anteriores) (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
+- `normalizeRecord()` acepta registros v1 a v5 o incompletos y los lleva a v6 sin perder datos (v4 agrega `pacienteId`; v5 admite nombres separados y conserva los nombres anteriores) (los antiguos quedan con `especialidad: "oftalmologia"`): convierte números a texto y descarta lateralidades inválidas.
 
 ### Fechas por campo (`ft`)
 
@@ -251,3 +251,9 @@ Se aceptan respaldos v1 (sin `anonSecret`). Al importar, si el equipo no tiene c
 ## Nombres separados (v5)
 
 Los datos demográficos agregan `paciente_apellido_paterno`, `paciente_apellido_materno` y `paciente_nombres`; el médico de una atención agrega los equivalentes con prefijo `medico_`. Perfiles y perfiles cifrados de cuentas agregan `apellido_paterno`, `apellido_materno`, `nombres`. Son opcionales para lectores de datos antiguos. El nombre completo se deriva de estos componentes al existir; si no, se conserva íntegro el texto legado. La migración no deduce apellidos y preserva `pacienteId`, incluso al ordenar un nombre sin RUT. Ver [Formularios GES e IPD](FORMULARIOS_GES_IPD.md).
+
+### Formularios de la atención (esquema v6)
+
+GES, IPD y receta de lentes guardan sus borradores dentro de `f` con prefijos `form_ges_`, `form_ipd_` y `form_receta_`. Cada campo usa su sello `ft` habitual; un campo vacío con sello conserva el borrado, también al sincronizar. Los valores propuestos se inicializan con un sello anterior a las ediciones manuales, para que no reemplacen una corrección de otro equipo.
+
+No se copian a la ficha maestra demográfica ni se heredan en una atención nueva. Se incluyen en los respaldos y la fusión por campo, con historial de cambios. El paso v5 → v6 conserva íntegros los campos anteriores; las versiones antiguas conservan el registro v6 sin editarlo.

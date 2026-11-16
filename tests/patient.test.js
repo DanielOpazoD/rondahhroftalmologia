@@ -15,6 +15,7 @@ import {
 } from '../src/core/patient.js';
 import { syncMerge } from '../src/core/merge.js';
 import { normalizeRecord } from '../src/core/record.js';
+import { SCHEMA_VERSION } from '../src/config/catalogs.js';
 import { mergeRecords, stampChanges } from '../src/core/merge.js';
 import { minimalRecord } from './fixtures.js';
 import { buildBackup, parseBackup, mergeBackup } from '../src/core/backup.js';
@@ -30,7 +31,7 @@ test('id de paciente determinista: por RUT (sin importar formato) o por nombre',
 
 test('migración v4: cada atención antigua queda vinculada a su paciente', () => {
   const r = normalizeRecord({ id: 'x', v: 3, f: { paciente_rut: '12.345.678-5', paciente_nombre: 'Ana' } });
-  assert.equal(r.v, 5);
+  assert.equal(r.v, SCHEMA_VERSION);
   assert.equal(r.pacienteId, patientIdFor({ paciente_rut: '12345678-5' }));
   assert.equal(normalizeRecord({ id: 'y', v: 3, f: {} }).pacienteId, undefined, 'sin datos no inventa paciente');
 });

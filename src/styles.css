@@ -2590,3 +2590,49 @@ table.st.aud td {
 .g2 > details.card {
   align-self: start;
 }
+
+/* Formularios del paciente: acceso fijo. */
+.form-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--acc-ink);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+}
+.form-fab svg {
+  width: 24px;
+  height: 24px;
+}
+.form-fab:hover:not(:disabled),
+.form-fab[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--acc) 86%, #000);
+}
+.form-fab:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+.form-fab:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.locked .form-fab {
+  visibility: hidden;
+}
+body.has-forms main {
+  padding-bottom: 80px;
+}
+@media (max-width: 760px) {
+  .form-fab {
+    right: 14px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+}

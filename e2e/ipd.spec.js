@@ -21,7 +21,7 @@ async function prepare(page) {
   await page.locator('#dlgOk').click();
 }
 async function openIpd(page) {
-  await page.locator('#bPdf').click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^IPD/ }).click();
   return page.getByRole('dialog', { name: 'IPD · Informe del proceso diagnóstico' });
 }
@@ -77,12 +77,12 @@ test('IPD y GES: diálogos compactos caben en 1024×768 y las áreas siguen disp
   expect(bounds.height).toBeLessThan(745);
   expect(bounds.scroll).toBeLessThanOrEqual(bounds.client + 1);
   expect(bounds.width).toBeLessThanOrEqual(1024);
-  await dlg.getByRole('button', { name: 'Cancelar' }).click();
-  await page.locator('#bPdf').click();
+  await dlg.getByRole('button', { name: 'Cerrar' }).click();
+  await page.locator('#bForms').click();
   await page.getByRole('menuitem', { name: /^Constancia GES/ }).click();
   dlg = page.getByRole('dialog', { name: 'Constancia GES' });
   expect(await dlg.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
-  await dlg.getByRole('button', { name: 'Cancelar' }).click();
+  await dlg.getByRole('button', { name: 'Cerrar' }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   dlg = await openIpd(page);
   expect(await dlg.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);

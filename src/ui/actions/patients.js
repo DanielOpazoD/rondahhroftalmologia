@@ -131,6 +131,7 @@ export function patientActions(ctx, store) {
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = true;
       ctx.persist(() => store.saveDraft(ctx.rec));
+      ctx.emit('atencion');
       syncAttentionView(ctx);
       ctx.showTab('t-at');
       scrollTo(0, 0);
