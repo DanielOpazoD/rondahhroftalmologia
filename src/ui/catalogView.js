@@ -13,6 +13,8 @@ import { openDialog } from './dialog.js';
 import { clock } from '../core/clock.js';
 import { uiConfirm } from './modal.js';
 import { icon } from './icons.js';
+import { NAME_PARTS, nameParts, personName } from '../core/names.js';
+import { profileNameFields, profileNameValues } from './patientFields.js';
 
 const NEW = '__nuevo';
 const CUR = '__actual';
@@ -63,6 +65,8 @@ function setMedico(ctx, m) {
   if (m === undefined) return renderCatalogSelects(ctx);
   ctx.rec.f.medico_nombre = m?.nombre || '';
   ctx.rec.f.medico_rut = m?.rut || '';
+  for (const k of NAME_PARTS) delete ctx.rec.f['medico_' + k];
+  Object.assign(ctx.rec.f, Object.fromEntries(Object.entries(nameParts(m || {})).map(([k, v]) => ['medico_' + k, v])));
   ctx.changed();
 }
 
@@ -77,14 +81,16 @@ export function editProfile(ctx, m = null, done) {
   openDialog({
     title: editing ? 'Editar perfil' : 'Nuevo perfil',
     fields: [
-      { id: 'nombre', label: 'Nombre', value: m?.nombre, placeholder: 'Ej: Dra. Ana Pérez Soto' },
+      ...profileNameFields(m || {}),
       { id: 'rol', label: 'Rol', value: m?.rol || 'medico', options: ROLES.map((r) => ({ value: r.key, label: r.label })) },
       { id: 'rut', label: 'RUT', value: m?.rut, placeholder: '12.345.678-9' },
     ],
-    onSave: ({ nombre, rut, rol }) => {
-      if (!nombre) return 'Escribe el nombre';
+    onSave: (values) => {
+      const { rut, rol } = values;
+      const parts = profileNameValues(values, m || {});
+      if (!personName(parts)) return 'Escribe los nombres y apellidos';
       if (rut && !isValidRut(rut)) return 'RUT con dígito verificador inválido';
-      const item = makeMedico({ ...m, nombre, rut, rol, updated: clock.tick() });
+      const item = makeMedico({ ...m, ...parts, rut, rol, updated: clock.tick() });
       result = ctx.saveCatalog('medico', item);
       return null;
     },

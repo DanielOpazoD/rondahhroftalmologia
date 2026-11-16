@@ -45,7 +45,7 @@ test('modo práctica: datos de ejemplo aparte, sin sincronización, y los reales
   expect(pdf.suggestedFilename()).toMatch(/^PRACTICA_/);
   // Lo que se haga aquí no toca los datos reales.
   await page.locator('#bNew').click();
-  await page.locator('#paciente_nombre').fill('Paciente Practicado');
+  await page.locator('#paciente_nombres').fill('Paciente Practicado');
   await page.locator('#bSave').click();
   await expect(page.locator('#toast')).toContainText('Atención guardada');
   await page.locator('#practiceExit').click();
@@ -130,7 +130,7 @@ test('bloqueo robusto: no se imprime, Escape no lo cierra, queda sobre otros di�
   context,
 }) => {
   await openApp(page);
-  await page.locator('#paciente_nombre').fill('Paciente Confidencial');
+  await page.locator('#paciente_nombres').fill('Paciente Confidencial');
   await setPin(page);
   await page.locator('#lockNow').click();
   const lock = page.locator('#lockDlg');
@@ -171,7 +171,7 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   // Un perfil real.
   await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
-  await page.locator('#dlg_nombre').fill('Dra. Real');
+  await page.locator('#dlg_nombres').fill('Dra. Real');
   await page.locator('#dlg').getByRole('button', { name: 'Guardar' }).click();
   // En práctica se elige (al abrir) un perfil de ejemplo y se descarga un respaldo.
   await ajustes(page, 'Este equipo');
@@ -180,7 +180,7 @@ test('modo práctica: su perfil de sesión y sus respaldos no se mezclan con los
   await page.locator('#dlg_perfil').selectOption({ label: 'Dra. Ejemplo · Médico/a' });
   await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
   await tab(page, 'Atención');
-  await page.locator('#paciente_nombre').fill('Paciente de Práctica');
+  await page.locator('#paciente_nombres').fill('Paciente de Práctica');
   await page.locator('#bSave').click();
   await expect(page.locator('#toast')).toContainText('Atención guardada');
   await ajustes(page, 'Datos');
@@ -236,7 +236,7 @@ test('almacenamiento: si una escritura falla, se avisa y se guarda al reintentar
       return orig.apply(this, a);
     };
   });
-  await page.locator('#paciente_nombre').fill('Paciente Sin Disco');
+  await page.locator('#paciente_nombres').fill('Paciente Sin Disco');
   await page.locator('#bSave').click();
   await expect(page.locator('#saveBar')).toBeVisible();
   await expect(page.locator('#saveText')).toHaveText(/no se pudieron? guardar en este equipo/);

@@ -21,7 +21,7 @@ test('cabecera: nada se superpone ni se sale, en cualquier ancho y con un nombre
   await openApp(page);
   await ajustes(page, 'Listas');
   await page.locator('#medAdd').click();
-  await page.locator('#dlg_nombre').fill('Dra. María Fernanda de los Ángeles Pakarati Tuki');
+  await page.locator('#dlg_nombres').fill('Dra. María Fernanda de los Ángeles Pakarati Tuki');
   await page.locator('#dlg').getByRole('button', { name: 'Guardar' }).click();
   await page.locator('#userChip').click();
   await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();

@@ -13,6 +13,7 @@
  *
  * El perfil de la cuenta (nombre, RUT, profesión) va cifrado con `K`.
  */
+import { nameParts, personName } from '../core/names.js';
 import { utf8, toHex, hmacSha256 } from '../lib/sha256.js';
 import { bytesToB64, b64ToBytes, encryptPayload, decryptPayload, DecryptError } from './crypto.js';
 
@@ -82,7 +83,7 @@ export async function unwrapTeamKey(wrapped, { envoltura, complemento, uid }) {
 }
 
 /**
- * @typedef {{nombre: string, rut: string, rol?: string}} PerfilCuenta
+ * @typedef {{nombre: string, rut: string, rol?: string, apellido_paterno?: string, apellido_materno?: string, nombres?: string}} PerfilCuenta
  *   Datos de la persona: van cifrados con la clave del equipo.
  */
 
@@ -91,7 +92,8 @@ export async function unwrapTeamKey(wrapped, { envoltura, complemento, uid }) {
  * @param {string} uid
  * @param {PerfilCuenta} perfil
  */
-export const encryptProfile = (teamKey, uid, perfil) => encryptPayload(teamKey, 'perfil:' + uid, 1, perfil);
+export const encryptProfile = (teamKey, uid, perfil) =>
+  encryptPayload(teamKey, 'perfil:' + uid, 1, { ...perfil, nombre: personName(perfil) });
 
 /**
  * @param {CryptoKey} teamKey
@@ -101,7 +103,7 @@ export const encryptProfile = (teamKey, uid, perfil) => encryptPayload(teamKey, 
  */
 export async function decryptProfile(teamKey, uid, payload) {
   const p = await decryptPayload(teamKey, 'perfil:' + uid, 1, payload);
-  return { nombre: String(p?.nombre || ''), rut: String(p?.rut || ''), ...(p?.rol ? { rol: String(p.rol) } : {}) };
+  return { nombre: personName(p || {}), ...nameParts(p || {}), rut: String(p?.rut || ''), ...(p?.rol ? { rol: String(p.rol) } : {}) };
 }
 
 /**

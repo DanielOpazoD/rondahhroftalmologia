@@ -7,7 +7,6 @@ import {
   missingPatients,
   attentionsOf,
   isAttended,
-  PATIENT_FIELDS,
   resolvePatientId,
   canonicalPatientId,
   findDuplicatePairs,
@@ -31,7 +30,7 @@ test('id de paciente determinista: por RUT (sin importar formato) o por nombre',
 
 test('migración v4: cada atención antigua queda vinculada a su paciente', () => {
   const r = normalizeRecord({ id: 'x', v: 3, f: { paciente_rut: '12.345.678-5', paciente_nombre: 'Ana' } });
-  assert.equal(r.v, 4);
+  assert.equal(r.v, 5);
   assert.equal(r.pacienteId, patientIdFor({ paciente_rut: '12345678-5' }));
   assert.equal(normalizeRecord({ id: 'y', v: 3, f: {} }).pacienteId, undefined, 'sin datos no inventa paciente');
 });
@@ -78,7 +77,7 @@ test('la misma ficha editada en dos equipos se fusiona campo a campo', () => {
   const m = normalizePatient(mergeRecords(edit(20, 'paciente_fono', '555'), edit(30, 'paciente_fnac', '1960-01-02')));
   assert.equal(m.f.paciente_fono, '555');
   assert.equal(m.f.paciente_fnac, '1960-01-02');
-  assert.deepEqual(Object.keys(m.f).sort(), [...PATIENT_FIELDS].filter((k) => k !== 'paciente_sexo').sort());
+  assert.deepEqual(Object.keys(m.f).sort(), ['paciente_rut', 'paciente_nombre', 'paciente_fono', 'paciente_fnac'].sort());
   assert.equal(normalizePatient({ id: 'a1', f: {} }), null, 'id de paciente debe empezar con p_');
 });
 

@@ -18,12 +18,18 @@ export const PLATFORM_FIELDS = [
   'operativo',
   'fecha_atencion',
   'paciente_nombre',
+  'paciente_apellido_paterno',
+  'paciente_apellido_materno',
+  'paciente_nombres',
   'paciente_rut',
   'paciente_fnac',
   'paciente_edad',
   'paciente_sexo',
   'paciente_fono',
   'medico_nombre',
+  'medico_apellido_paterno',
+  'medico_apellido_materno',
+  'medico_nombres',
   'medico_rut',
 ];
 

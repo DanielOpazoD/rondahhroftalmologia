@@ -18,6 +18,10 @@ async function auditGes(page, where) {
   await page.getByRole('menuitem', { name: /^Constancia GES/ }).click();
   const found = await audit(page, where);
   await page.getByRole('dialog', { name: 'Constancia GES' }).getByRole('button', { name: 'Cancelar' }).click();
+  await page.locator('#bPdf').click();
+  await page.getByRole('menuitem', { name: /^IPD/ }).click();
+  found.push(...(await audit(page, where + ' IPD')));
+  await page.getByRole('dialog', { name: 'IPD · Informe del proceso diagnóstico' }).getByRole('button', { name: 'Cancelar' }).click();
   return found;
 }
 

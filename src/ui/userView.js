@@ -20,6 +20,7 @@ import { editProfile } from './catalogView.js';
 import { syncAttentionView } from './attentionView.js';
 import { PRACTICE_PREFIX } from './practice.js';
 import { openMenu } from './menu.js';
+import { nameParts } from '../core/names.js';
 
 const NEW = '__nuevo';
 const SKIP = '__ninguno';
@@ -139,7 +140,7 @@ function setUser(ctx, id) {
   const u = ctx.currentUser();
   if (u?.rol === 'medico') {
     // Las atenciones nuevas de este equipo traen a este médico.
-    ctx.store.saveMedico({ ...ctx.store.loadMedico(), n: u.nombre, r: u.rut });
+    ctx.store.saveMedico({ op: ctx.store.loadMedico().op, n: u.nombre, r: u.rut, ...nameParts(u) });
     if (!ctx.rec.id && !ctx.dirty) {
       ctx.rec = blankRecord(ctx.store.loadMedico());
       ctx.snap = structuredClone(ctx.rec);

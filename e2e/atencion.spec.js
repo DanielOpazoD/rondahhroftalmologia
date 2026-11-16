@@ -26,8 +26,8 @@ test('guardar una atención completa y verla en Pacientes', async ({ page }) => 
 
 test('no guarda sin nombre ni RUT y lo indica junto al campo', async ({ page }) => {
   await save(page);
-  await expect(page.locator('[data-msg="paciente_nombre"]')).toHaveText('Requerido (nombre o RUT)');
-  await expect(page.locator('#paciente_nombre')).toHaveClass(/invalid/);
+  await expect(page.locator('[data-msg="paciente_nombres"]')).toHaveText('Requerido (nombre o RUT)');
+  await expect(page.locator('#paciente_nombres')).toHaveClass(/invalid/);
 });
 
 test('la fecha de nacimiento calcula la edad (solo lectura)', async ({ page }) => {
@@ -76,7 +76,7 @@ test('crear un médico desde el menú rellena la atención', async ({ page }) =>
   await page.locator('#medicoSel').selectOption('__nuevo');
   const dlg = page.locator('#dlg');
   await expect(dlg).toBeVisible();
-  await dlg.locator('#dlg_nombre').fill('Dra. Prueba E2E');
+  await dlg.locator('#dlg_nombres').fill('Dra. Prueba E2E');
   await dlg.locator('#dlg_rut').fill('12.345.678-4');
   await dlg.getByRole('button', { name: 'Guardar' }).click();
   await expect(dlg.locator('#dlgErr')).toHaveText('RUT con dígito verificador inválido');

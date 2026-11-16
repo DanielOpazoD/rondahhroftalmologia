@@ -14,7 +14,13 @@
   </div>
   {msg:rut}
 </div>
-<div class="span2"><label class="l" for="{p}nombre">Nombre y apellidos</label><input id="{p}nombre" autocomplete="off" />{msg:nombre}</div>
+<div><label class="l" for="{p}apellido_paterno">Apellido paterno</label><input id="{p}apellido_paterno" autocomplete="off" /></div>
+<div><label class="l" for="{p}apellido_materno">Apellido materno</label><input id="{p}apellido_materno" autocomplete="off" /></div>
+<div class="span2">
+  <label class="l" for="{p}nombres">Nombres</label><input id="{p}nombres" autocomplete="off" />{msg:nombres}
+  <input id="{p}nombre" type="hidden" />
+  <small class="hint" data-legacy-name="{p}" hidden></small>
+</div>
 <div><label class="l" for="{p}fono">Fono</label><input id="{p}fono" inputmode="tel" /></div>
 <div><label class="l" for="{p}fnac">Fecha de nacimiento</label><input id="{p}fnac" type="date" />{msg:fnac}</div>
 <div><label class="l" for="{p}edad">Edad</label><input id="{p}edad" inputmode="numeric" placeholder="años" />{msg:edad}</div>

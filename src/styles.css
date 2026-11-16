@@ -1547,21 +1547,125 @@ dialog.msgdlg::backdrop {
   background: rgba(16, 24, 40, 0.38);
   backdrop-filter: blur(2px);
 }
-dialog.gesdlg {
-  width: min(720px, calc(100% - 24px));
-  max-height: calc(100dvh - 32px);
+dialog.clinical-form {
+  width: min(980px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 16px;
 }
-.gesdlg h3 {
+.clinical-form h3 {
   margin: 0;
 }
-.gesdlg h4 {
-  margin: 18px 0 0;
+.clinical-form h4 {
+  margin: 10px 0 5px;
 }
-.gesdlg p {
+.clinical-form p {
+  margin: 6px 0;
   font-size: var(--fs-sm);
 }
-.gesdlg details {
-  margin-top: 16px;
+.clinical-form .l {
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+.clinical-form input,
+.clinical-form select,
+.clinical-form textarea {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+.clinical-form label {
+  display: block;
+  min-width: 0;
+}
+.clinical-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+.clinical-names {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 8px;
+}
+.clinical-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.clinical-form details {
+  margin-top: 8px;
+}
+.clinical-form details[open] summary {
+  margin-bottom: 6px;
+}
+.clinical-form .dlg-actions {
+  margin-top: 10px;
+}
+.clinical-form .err:empty {
+  display: none;
+}
+.ipd-columns {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 18px;
+}
+.ipd-columns > div {
+  min-width: 0;
+}
+.ipd-columns > div > label {
+  margin-top: 6px;
+}
+.clinical-form textarea {
+  min-height: 68px;
+  resize: vertical;
+}
+dialog.pdf-preview {
+  width: min(1100px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+}
+.pdf-preview iframe {
+  display: block;
+  width: 100%;
+  height: 72dvh;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.pdf-preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.pdf-preview-head h3 {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .clinical-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ipd-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .clinical-names {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pdf-preview-head {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 420px) {
+  .clinical-grid,
+  .clinical-names {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .clinical-form .span2 {
+    grid-column: auto;
+  }
+  .clinical-form .dlg-actions {
+    flex-wrap: wrap;
+  }
 }
 .msghead {
   display: flex;

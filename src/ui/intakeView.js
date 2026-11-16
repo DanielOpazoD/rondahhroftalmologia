@@ -8,17 +8,38 @@
 import { formatRut, isIsoDate, todayIso, ageAt, fmtDate } from '../core/format.js';
 import { resolvePatientId, isAttended, attentionsOf } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
-import { initSexSelector, renderSexSelector } from './patientFields.js';
+import { initSexSelector, renderSexSelector, renderLegacyName } from './patientFields.js';
+import { NAME_PARTS, refreshNames } from '../core/names.js';
 import { $ } from './dom.js';
 import { updateRutMark } from './rut.js';
 import { html, setHtml } from './html.js';
 import { icon } from './icons.js';
 
-const FIELDS = { ing_rut: 'paciente_rut', ing_nombre: 'paciente_nombre', ing_fnac: 'paciente_fnac', ing_fono: 'paciente_fono' };
+const FIELDS = {
+  ing_rut: 'paciente_rut',
+  ing_nombre: 'paciente_nombre',
+  ...Object.fromEntries(NAME_PARTS.map((k) => ['ing_' + k, 'paciente_' + k])),
+  ing_fnac: 'paciente_fnac',
+  ing_fono: 'paciente_fono',
+};
 
 /** @param {import('./context.js').AppContext} ctx */
 export function initIntakeView(ctx) {
   ctx.intakeSexo = '';
+  ctx.intakePatientId = null;
+  const updateName = () => {
+    const f = Object.fromEntries(NAME_PARTS.map((k) => ['paciente_' + k, $(`#ing_${k}`).value]));
+    refreshNames(f);
+    $('#ing_nombre').value = f.paciente_nombre;
+    renderLegacyName('ing_', f);
+  };
+  for (const k of NAME_PARTS) {
+    $(`#ing_${k}`).addEventListener('input', updateName);
+    $(`#ing_${k}`).addEventListener('blur', () => !$('#ing_rut').value.trim() && fillFromRegistry(ctx));
+  }
+  $('#ing_rut').addEventListener('input', () => {
+    ctx.intakePatientId = null;
+  });
   initSexSelector(
     $('#ingSexo'),
     () => ctx.intakeSexo,
@@ -77,6 +98,7 @@ function fillFromRegistry(ctx) {
     $('#ingHint').textContent = id && $('#ing_rut').value.trim() ? 'Paciente nuevo.' : '';
     return;
   }
+  ctx.intakePatientId = p.id;
   for (const [el, key] of Object.entries(FIELDS)) {
     const input = $('#' + el);
     if (!input.value.trim() && p.f[key]) input.value = p.f[key];
@@ -86,6 +108,7 @@ function fillFromRegistry(ctx) {
     renderSexo(ctx);
   }
   updateAge();
+  renderLegacyName('ing_', p.f);
   updateRutMark($('#ing_rut'));
   const prev = attentionsOf(ctx.records, id);
   $('#ingHint').textContent =
@@ -93,12 +116,14 @@ function fillFromRegistry(ctx) {
 }
 
 function clearForm(ctx) {
+  ctx.intakePatientId = null;
   for (const id of [...Object.keys(FIELDS), 'ing_edad']) $('#' + id).value = '';
   $('#ing_edad').readOnly = false;
   ctx.intakeSexo = '';
   renderSexo(ctx);
   updateRutMark($('#ing_rut'));
   $('#ingHint').textContent = '';
+  renderLegacyName('ing_', {});
   $('#ing_rut').focus();
 }
 
@@ -106,12 +131,19 @@ async function admit(ctx) {
   const data = {
     paciente_rut: $('#ing_rut').value.trim() ? formatRut($('#ing_rut').value) : '',
     paciente_nombre: $('#ing_nombre').value.trim(),
+    ...($('#ing_nombres').value || $('#ing_apellido_paterno').value || $('#ing_apellido_materno').value
+      ? Object.fromEntries(NAME_PARTS.map((k) => ['paciente_' + k, $(`#ing_${k}`).value.trim()]))
+      : {}),
     paciente_fnac: $('#ing_fnac').value,
     paciente_edad: $('#ing_edad').value.trim(),
     paciente_sexo: ctx.intakeSexo,
     paciente_fono: $('#ing_fono').value.trim(),
   };
-  const result = await ctx.admitPatient(data, { fecha: $('#ingFecha').value || todayIso(), operativo: $('#ingOp').value });
+  const result = await ctx.admitPatient(data, {
+    fecha: $('#ingFecha').value || todayIso(),
+    operativo: $('#ingOp').value,
+    pacienteId: ctx.intakePatientId,
+  });
   if (result.ok) clearForm(ctx);
 }
 

@@ -19,7 +19,7 @@ test('constancia GES: datos autocompletados, selección, validación y descarga 
   await fillPatient(page, { nombre: 'Ana GES Prueba', rut: '12.345.678-5', fecha: '2020-02-03' });
   await page.locator('#paciente_fono').fill('+56 9 1234 5678');
   await page.locator('#medicoSel').selectOption('__nuevo');
-  await page.locator('#dlg_nombre').fill('Profesional GES Prueba');
+  await page.locator('#dlg_nombres').fill('Profesional GES Prueba');
   await page.locator('#dlg_rut').fill('11.111.111-1');
   await page.locator('#dlgOk').click();
   await save(page);
@@ -59,7 +59,7 @@ test('cancelar GES no cambia la atención y el siguiente paciente trae sus propi
   await dlg.getByRole('button', { name: 'Cancelar' }).click();
   await expect(page.locator('#paciente_nombre')).toHaveValue('Primer Paciente Prueba');
   await expect(page.locator('#bPdf')).toBeFocused();
-  await page.locator('#paciente_nombre').fill('Segundo Paciente Prueba');
+  await page.locator('#paciente_nombres').fill('Segundo Paciente Prueba');
   await page.locator('#paciente_fono').fill('912345678');
   dlg = await openGes(page);
   await expect(dlg.getByLabel('Nombre legal', { exact: true })).toHaveValue('Segundo Paciente Prueba');

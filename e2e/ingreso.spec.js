@@ -72,12 +72,12 @@ test('trabajo simultáneo: ingreso, médico y mediciones en tres PC', async ({ b
   // 1. Admisión preingresa a dos pacientes.
   await lista(adm);
   await adm.locator('#ing_rut').fill(RUT);
-  await adm.locator('#ing_nombre').fill(ROSA);
+  await adm.locator('#ing_nombres').fill(ROSA);
   await adm.locator('#ing_fnac').fill('1950-03-01');
   await expect(adm.locator('#ing_edad')).toHaveValue(EDAD);
   await adm.locator('#ingSexo button[data-v="F"]').click();
   await adm.locator('#ingAdd').click();
-  await adm.locator('#ing_nombre').fill(PEDRO);
+  await adm.locator('#ing_nombres').fill(PEDRO);
   await adm.locator('#ingAdd').click();
   await expect(adm.locator('#ingList .prow')).toHaveCount(2);
   await expect(adm.locator('#ingPend')).toHaveText('2');

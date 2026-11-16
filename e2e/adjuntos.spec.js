@@ -19,7 +19,7 @@ const attach = (page, files) => page.locator('#attInput').setInputFiles(files);
 test('adjuntos: imagen, PDF y Word en la atención; persisten y se eliminan', async ({ page }) => {
   await openApp(page);
   await expect(page.locator('#attAdd')).toBeDisabled(); // sin paciente aún
-  await page.locator('#paciente_nombre').fill('Paciente Con Adjuntos');
+  await page.locator('#paciente_nombres').fill('Paciente Con Adjuntos');
   await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   await attach(page, [
     { name: 'fondo de ojo.png', mimeType: 'image/png', buffer: PNG },
@@ -55,7 +55,7 @@ test('adjuntos: imagen, PDF y Word en la atención; persisten y se eliminan', as
 
 test('adjuntos: una foto grande se reduce sola (JPEG, lado mayor 2400 px)', async ({ page }) => {
   await openApp(page);
-  await page.locator('#paciente_nombre').fill('Paciente Foto');
+  await page.locator('#paciente_nombres').fill('Paciente Foto');
   await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   // Foto de 3000×2000 con ruido (como una de celular), creada en el navegador.
   const size = await page.evaluate(async () => {
@@ -91,7 +91,7 @@ test('adjuntos: viajan cifrados a otro equipo', async ({ browser }) => {
     await activateSync(P);
   }
   await tab(A, 'Atención');
-  await A.locator('#paciente_nombre').fill('Paciente Compartido');
+  await A.locator('#paciente_nombres').fill('Paciente Compartido');
   await expect(A.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   await attach(A, [{ name: 'campo visual.pdf', mimeType: 'application/pdf', buffer: await pdfBytes('Campo visual') }]);
   await expect(A.locator('#attCount')).toHaveText('1');
@@ -106,7 +106,7 @@ test('adjuntos: viajan cifrados a otro equipo', async ({ browser }) => {
 
 test('PDF con anexos: desde el botón PDF, la hoja y sus adjuntos en un solo documento', async ({ page }) => {
   await openApp(page);
-  await page.locator('#paciente_nombre').fill('Paciente PDF Anexos');
+  await page.locator('#paciente_nombres').fill('Paciente PDF Anexos');
   await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   // Sin adjuntos: el menú ofrece el PDF; «PDF + adjuntos» está desactivado.
   await page.locator('#bPdf').click();
@@ -139,7 +139,7 @@ test('PDF con anexos: desde el botón PDF, la hoja y sus adjuntos en un solo doc
 
 test('seguridad: un SVG o HTML adjunto se descarga, nunca se abre (no ejecuta scripts en la app)', async ({ page, context }) => {
   await openApp(page);
-  await page.locator('#paciente_nombre').fill('Paciente SVG');
+  await page.locator('#paciente_nombres').fill('Paciente SVG');
   await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>window.parent.__pwned=1</script></svg>');
   await attach(page, [{ name: 'dibujo.svg', mimeType: 'image/svg+xml', buffer: svg }]);
@@ -156,7 +156,7 @@ test('respaldo con adjuntos: se descarga como ZIP y al importarlo en otro equipo
   const [ca, cb] = await Promise.all([browser.newContext(), browser.newContext()]);
   const [A, B] = await Promise.all([ca.newPage(), cb.newPage()]);
   await openApp(A);
-  await A.locator('#paciente_nombre').fill('Paciente Respaldo Adjuntos');
+  await A.locator('#paciente_nombres').fill('Paciente Respaldo Adjuntos');
   await expect(A.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   await attach(A, [{ name: 'retina.png', mimeType: 'image/png', buffer: PNG }]);
   await expect(A.locator('#attCount')).toHaveText('1');
@@ -186,7 +186,7 @@ test('miniaturas: se guardan al adjuntar y se ven en otro equipo antes de que ll
     await activateSync(P);
   }
   await tab(A, 'Atención');
-  await A.locator('#paciente_nombre').fill('Paciente Miniatura');
+  await A.locator('#paciente_nombres').fill('Paciente Miniatura');
   await expect(A.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   await attach(A, [{ name: 'retina.png', mimeType: 'image/png', buffer: PNG }]);
   await expect(A.locator('#attList .attthumb')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);

@@ -21,6 +21,7 @@ import { syncAttentionView } from '../attentionView.js';
 import { confirmDiscard } from './attention.js';
 import { buildAdmission, nonEmpty, relinkRecord, patientUpdateFromRecord } from '../../app/attentions.js';
 import { uiConfirm } from '../modal.js';
+import { hasNameParts, NAME_PARTS } from '../../core/names.js';
 
 /**
  * @param {any} ctx contexto de la aplicación (ver ui/context.js)
@@ -33,17 +34,22 @@ export function patientActions(ctx, store) {
      * atención de una fecha, sin datos clínicos. Si ya está en la lista de esa
      * fecha, no se duplica.
      * @param {Record<string, string>} data campos paciente_*
-     * @param {{fecha: string, operativo?: string}} where
+     * @param {{fecha: string, operativo?: string, pacienteId?: string}} where
      * @returns {Promise<{ok: boolean, id?: string}>}
      */
-    async admitPatient(data, { fecha, operativo = '' }) {
-      const f = nonEmpty(data);
+    async admitPatient(data, { fecha, operativo = '', pacienteId: currentId }) {
+      const f = {
+        ...nonEmpty(data),
+        ...(hasNameParts(data, 'paciente_')
+          ? Object.fromEntries(NAME_PARTS.map((k) => ['paciente_' + k, data['paciente_' + k] || '']))
+          : {}),
+      };
       if (!f.paciente_nombre && !f.paciente_rut) {
         toast('Escribe al menos el nombre o el RUT');
         return { ok: false };
       }
       // Por RUT entre las fichas existentes (aunque la ficha naciera solo con nombre).
-      const pacienteId = resolvePatientId(f, store.loadPatients());
+      const pacienteId = resolvePatientId(f, store.loadPatients(), currentId);
       const existing = ctx.records.find((r) => r.pacienteId === pacienteId && r.f.fecha_atencion === fecha);
       if (existing) {
         toast(`${existing.f.paciente_nombre || existing.f.paciente_rut} ya está en la lista de ese día`, 3500);

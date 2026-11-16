@@ -2,6 +2,7 @@
 import { PDFDocument, PDFName, StandardFonts, rgb } from 'pdf-lib';
 import { GES_PATOLOGIAS } from '../specialties/activa/config.js';
 import { fmtDate, fileSafe, toWinAnsi, isValidRut } from './format.js';
+import { personName } from './names.js';
 
 const hospitalClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Pacific/Easter',
@@ -19,6 +20,12 @@ export const GES_HOSPITAL = Object.freeze({
   ciudad: 'Rapa Nui',
 });
 
+/** Calendario y hora civil del hospital, independientes del equipo y del reloj de sincronización. */
+export function hospitalDateTime(now = new Date()) {
+  const parts = Object.fromEntries(hospitalClock.formatToParts(now).map(({ type, value }) => [type, value]));
+  return { fecha: `${parts.year}-${parts.month}-${parts.day}`, hora: `${parts.hour}:${parts.minute}` };
+}
+
 /** @typedef {ReturnType<typeof gesDefaults>} DatosGes */
 
 /** No usa la fecha de la atención ni el reloj lógico de sincronización.
@@ -27,9 +34,8 @@ export const GES_HOSPITAL = Object.freeze({
  */
 export function gesDefaults(rec, now = new Date()) {
   const f = rec.f;
-  const parts = Object.fromEntries(hospitalClock.formatToParts(now).map(({ type, value }) => [type, value]));
   return {
-    paciente_nombre: f.paciente_nombre || '',
+    paciente_nombre: personName(f, 'paciente_'),
     paciente_rut: f.paciente_rut || '',
     paciente_fono: f.paciente_fono || '',
     paciente_social: '',
@@ -38,11 +44,10 @@ export function gesDefaults(rec, now = new Date()) {
     paciente_region: 'Quinta región',
     paciente_correo: '',
     prevision: '',
-    profesional_nombre: f.medico_nombre || '',
+    profesional_nombre: personName(f, 'medico_'),
     profesional_rut: f.medico_rut || '',
     patologia: '',
-    fecha: `${parts.year}-${parts.month}-${parts.day}`,
-    hora: `${parts.hour}:${parts.minute}`,
+    ...hospitalDateTime(now),
     representante_nombre: '',
     representante_rut: '',
     representante_fono: '',

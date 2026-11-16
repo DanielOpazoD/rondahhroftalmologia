@@ -106,7 +106,7 @@ describe('record', () => {
     const now = new Date(2026, 10, 14);
     const empty = validateRecord(minimalRecord('x', { fecha_atencion: '' }), now);
     assert.equal(empty.errors.length, 2);
-    assert.equal(empty.fields.paciente_nombre.level, 'error');
+    assert.equal(empty.fields.paciente_nombres.level, 'error');
 
     const ok = validateRecord(fullRecord(), now);
     assert.deepEqual(ok.errors, []);

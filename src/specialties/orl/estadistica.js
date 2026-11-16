@@ -9,7 +9,7 @@
  */
 import { SEXOS } from '../../config/catalogs.js';
 import { AGE_GROUPS, DIAGNOSTICOS, SOLICITADOS, ANTECEDENTES } from './config.js';
-import { patientKey } from '../../core/record.js';
+import { patientIdentityKey } from '../../core/record.js';
 import * as base from '../../core/estadistica.js';
 import { proceduresDone } from './clinica.js';
 
@@ -46,7 +46,7 @@ export function computeStats(records, procs) {
 
   for (const r of records) {
     const f = r.f || {};
-    const pk = patientKey(r).key;
+    const pk = patientIdentityKey(r);
     pats.add(pk);
     const sx = SEXOS.some((s) => s.key === f.paciente_sexo) ? f.paciente_sexo : 'Sin dato';
     sexo[sx]++;

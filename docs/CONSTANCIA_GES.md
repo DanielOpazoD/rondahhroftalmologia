@@ -28,4 +28,6 @@ El selector muestra solo los títulos oficiales, sin números ni diagnósticos d
 - [Trauma ocular grave](https://www.superdesalud.gob.cl/orientacion-en-salud/trauma-ocular-grave/)
 - [Retinopatía del prematuro](https://www.superdesalud.gob.cl/orientacion-en-salud/retinopatia-del-prematuro/)
 
-El IPD queda fuera de esta primera entrega.
+La opción **Imprimir** abre el PDF visible y solicita el diálogo de impresión del navegador. El formulario de revisión usa una cuadrícula compacta en escritorio.
+
+El IPD y la separación de nombres se describen en [Formularios GES e IPD](FORMULARIOS_GES_IPD.md).

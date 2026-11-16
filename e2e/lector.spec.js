@@ -31,7 +31,7 @@ test('barra de la atención: botones con nombre y estado del guardado anunciado'
     - button "Descargar PDF"
     - button "Guardar"
   `);
-  await page.locator('#paciente_nombre').fill('Paciente Lector');
+  await page.locator('#paciente_nombres').fill('Paciente Lector');
   await expect(page.getByRole('status').filter({ hasText: 'Guardada' })).toBeVisible({ timeout: 5000 });
 });
 

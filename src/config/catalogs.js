@@ -18,7 +18,7 @@ export const APP = Object.freeze({
 });
 
 /** Versión del esquema de cada registro de atención (ver docs/MODELO_DATOS.md y core/migrations.js). */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** Claves de localStorage, con el prefijo de la especialidad (no se mezclan datos entre rondas). */
 const P = ESPECIALIDAD.prefijo;

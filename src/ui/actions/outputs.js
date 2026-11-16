@@ -13,6 +13,7 @@ import { toPng } from '../images.js';
 import { GES_PATOLOGIAS } from '../../specialties/activa/config.js';
 import { can, PERMISSIONS } from '../../core/permissions.js';
 import { downloadGes } from '../gesDialog.js';
+import { downloadIpd } from '../ipdDialog.js';
 
 /**
  * Cómo entra un adjunto al PDF: JPEG/PNG como página, otras imágenes
@@ -63,7 +64,13 @@ export function outputActions(ctx, store) {
                 {
                   value: 'ges',
                   label: 'Constancia GES',
-                  hint: 'Autocompletar y revisar antes de descargar',
+                  hint: 'Autocompletar, descargar o imprimir',
+                  disabled: !can(ctx.accounts?.user, PERMISSIONS.EDITAR_CLINICO),
+                },
+                {
+                  value: 'ipd',
+                  label: 'IPD · Proceso diagnóstico',
+                  hint: 'Autocompletar, descargar o imprimir',
                   disabled: !can(ctx.accounts?.user, PERMISSIONS.EDITAR_CLINICO),
                 },
               ]
@@ -73,6 +80,7 @@ export function outputActions(ctx, store) {
       );
       if (!choice) return undefined;
       if (choice === 'ges') return downloadGes(ctx, rec, button);
+      if (choice === 'ipd') return downloadIpd(ctx, rec, button);
       const withAnnexes = choice === 'anexos';
       return withBusy(button, async () => {
         const r = await buildAttentionPdf(ctx.templateBytes(), rec, ctx.procs, ctx.pdfOptions());
