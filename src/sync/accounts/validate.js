@@ -61,12 +61,12 @@ const STATES = /** @type {readonly EstadoCuenta[]} */ (Object.freeze(['activo', 
 const oneOf = (list, v) => list.includes(/** @type {T} */ (v));
 
 /**
- * ¿Id de cuenta válido? Como `USER_ID_RE.test(v)` sin revisar el tipo
- * (RegExp#test convierte a texto), que es como se validó siempre.
+ * ¿Id de cuenta válido? Tiene que ser texto: hasta 2.31 una lista con un id
+ * (`["u0123…"]`) pasaba, porque RegExp#test la convierte a texto.
  * @param {unknown} v
  * @returns {v is string}
  */
-export const isUserId = (v) => USER_ID_RE.test(String(v));
+export const isUserId = (v) => typeof v === 'string' && USER_ID_RE.test(v);
 
 /**
  * Cifrado válido (perfil o clave envuelta): iv de 12 bytes y texto cifrado acotado.

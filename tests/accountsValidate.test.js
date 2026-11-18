@@ -27,6 +27,7 @@ test('objetos e ids: arreglos cuentan como objeto (como en el router); el id se 
   assert.ok(!isObject(null) && !isObject('x') && !isObject(5));
   assert.ok(isUserId('u0123456789abcdef'));
   assert.ok(!isUserId('u0123') && !isUserId(undefined) && !isUserId(5));
+  assert.equal(isUserId(['u0123456789abcdef']), false, 'una lista con un id no es un id (antes pasaba)');
 });
 
 test('credenciales: sal de 16 bytes, iteraciones en rango, acceso hex y clave envuelta válida', () => {

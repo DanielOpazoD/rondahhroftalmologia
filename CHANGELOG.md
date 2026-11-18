@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.32.0 — 2026-11-18
+
+### Cimientos: fase 1 de la deuda (arquitectura; docs/ARQUITECTURA.md)
+- **Contrato tipado del contexto de la interfaz** (`ui/contract.d.ts`): las acciones y el servicio de cuentas declaran su forma, y reciben el contexto con su tipo en vez de `any`. Al quitarlo aparecieron 20 inconsistencias reales, corregidas.
+- **Servidor de cuentas en módulos**: de 888 líneas a 187 más siete piezas (validación, HTTP, secretos, almacén, ingreso, sesión, administración). Se comparó en 194 solicitudes con el código anterior: las respuestas y lo guardado son idénticos.
+- **Sin `any` en los bordes**: respaldos, adjuntos, servidor y archivo de la llave del PC se validan con guardas de tipo. Quedan 2 en la interfaz (el ayudante `$` del DOM).
+- **Temas de eventos cerrados**: un nombre mal escrito ya no pasa la revisión de tipos.
+- **Especialidad activa con el alias `#especialidad/`** (package.json): si falta un archivo, el build falla con un mensaje claro. Antes, la redirección dependía de la ruta de la carpeta y podía fallar sin aviso.
+
+### Correcciones
+- El servidor de sincronización aceptaba elementos sin id (guardados como `r/undefined/1`) o con id numérico; ahora exige texto. Lo mismo para los ids de cuenta, que aceptaban una lista.
+- El HTML publicado incluía `package.json` entero (scripts y dependencias de desarrollo); ahora solo la versión.
+
 ## 2.31.0 — 2026-11-17
 
 ### Seguridad y sincronización (fase 0 de la deuda; docs/CALIDAD.md)

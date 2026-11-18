@@ -211,12 +211,14 @@ async function versionsOf(store, esp, id) {
 }
 
 /**
- * Como `re.test(v)` sin revisar antes el tipo: RegExp#test convierte `v` a
- * texto. Así se validó siempre el id y la huella de cada elemento.
+ * ¿Es un texto con esa forma? Sin revisar el tipo, RegExp#test convierte a
+ * texto: un elemento sin id se guardaba como `r/undefined/1` y un id numérico
+ * dejaba versiones antiguas sin limpiar (hasta 2.31).
  * @param {RegExp} re
  * @param {unknown} v
+ * @returns {v is string}
  */
-const matchesAsText = (re, v) => re.test(String(v));
+const matchesText = (re, v) => typeof v === 'string' && re.test(v);
 
 /**
  * ¿Tiene id seguro, versión (fecha) plausible y huella bien formada?
@@ -224,12 +226,12 @@ const matchesAsText = (re, v) => re.test(String(v));
  * @param {number} now
  */
 const validVersion = (it, now) =>
-  matchesAsText(ID_RE, it.id) &&
+  matchesText(ID_RE, it.id) &&
   typeof it.u === 'number' &&
   Number.isSafeInteger(it.u) &&
   it.u > 0 &&
   it.u <= now + LIMITS.futureSkewMs &&
-  (it.h === undefined || matchesAsText(H_RE, it.h));
+  (it.h === undefined || matchesText(H_RE, it.h));
 
 /**
  * ¿Trae contenido cifrado válido? iv de 12 bytes y texto cifrado no vacío, dentro del tope.

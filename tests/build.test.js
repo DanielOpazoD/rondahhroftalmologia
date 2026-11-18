@@ -10,6 +10,8 @@ import pkg from '../package.json' with { type: 'json' };
 
 test('el build produce un HTML autocontenido y sin recursos externos', async () => {
   const html = await buildHtml();
+  // De package.json solo viaja la versión (antes se incrustaba entero: scripts y dependencias).
+  for (const s of ['devDependencies', 'test:coverage', '"scripts"']) assert.equal(html.includes(s), false, s);
   assert.ok(html.startsWith('<!DOCTYPE html>'));
   assert.ok(!html.includes('<!-- @STYLES -->') && !html.includes('<!-- @SCRIPT -->'));
   assert.match(html, /Content-Security-Policy[^>]+connect-src 'self'/, 'solo puede conectarse con su propio servidor');

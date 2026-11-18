@@ -79,6 +79,21 @@ export const especialidadPlugin = (id) => ({
  */
 export const PDF_FONTS = Object.freeze(['Helvetica', 'Helvetica-Bold', 'Symbol', 'ZapfDingbats']);
 
+/**
+ * La app solo usa la versión de package.json (config/catalogs.js): el resto
+ * (scripts, dependencias de desarrollo) no se incrusta en el HTML publicado.
+ * @returns {import('esbuild').Plugin}
+ */
+const paquetePlugin = () => ({
+  name: 'paquete-minimo',
+  setup(b) {
+    const file = resolve(root, 'package.json');
+    b.onLoad({ filter: /package\.json$/ }, (args) =>
+      args.path === file ? { contents: JSON.stringify({ version: pkg.version }), loader: 'json' } : undefined,
+    );
+  },
+});
+
 /** Deja fuera las medidas de las fuentes estándar que no se usan. @returns {import('esbuild').Plugin} */
 const fuentesPlugin = () => ({
   name: 'fuentes-pdf',
@@ -167,7 +182,7 @@ export async function buildHtml() {
     minify: process.env.SIN_MINIFICAR !== '1',
     legalComments: 'inline',
     loader: { '.pdf': 'base64' },
-    plugins: [especialidadPlugin(id), fuentesPlugin()],
+    plugins: [especialidadPlugin(id), fuentesPlugin(), paquetePlugin()],
     write: false,
     metafile: true,
     logLevel: 'warning',
