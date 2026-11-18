@@ -50,8 +50,11 @@ const tabSession = {
   },
 };
 
-/** @param {any} ctx contexto de la aplicación (ver ui/context.js) */
-export function createAccountsController(ctx) {
+/**
+ * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * @param {{vault?: import('../sync/accountSession.js').LlavePc}} [o] llave que cifra los datos de este PC (ADR 0016)
+ */
+export function createAccountsController(ctx, { vault } = {}) {
   const { store } = ctx;
   const api = createAccountsApi();
   const ui = {
@@ -66,6 +69,7 @@ export function createAccountsController(ctx) {
   const session = createAccountSession({
     api,
     store,
+    vault,
     session: tabSession,
     persist: (fn) => ctx.persist(fn),
     online: () => navigator.onLine,

@@ -6,7 +6,10 @@ import TEMPLATE_PDF_B64 from './specialties/activa/plantilla.js';
 import { createStore, memoryStorage, readLegacyData, clearLegacyData } from './storage/store.js';
 import { createRepo } from './storage/repo.js';
 import { idbBackend, localStorageBackend } from './storage/backends.js';
-import { STORAGE_KEYS as K } from './config/catalogs.js';
+import { sealedBackend, sealedStorage } from './storage/sealed.js';
+import { createPcVault } from './storage/pcVault.js';
+import { blankRecord } from './core/record.js';
+import { STORAGE_KEYS as K, SEALED_KEYS } from './config/catalogs.js';
 import { createContext } from './ui/context.js';
 import { $, $$, toast } from './ui/dom.js';
 import { initAttentionView, syncAttentionView } from './ui/attentionView.js';
@@ -50,10 +53,13 @@ function getStorage() {
  * Abre el almacenamiento de datos clínicos: IndexedDB (preferido) o, si no
  * está disponible, localStorage. La primera vez migra los datos antiguos.
  * El motor elegido queda en `repo.backendName` ('indexeddb' | 'localstorage').
+ * Con la llave del PC (ADR 0016) IndexedDB va cifrado; si está cerrada, no se
+ * carga nada hasta entrar (`repo.init` lo llama quien la abre).
  * @param {import('./storage/store.js').KeyValueStorage} storage
  * @param {boolean} practice
+ * @param {boolean} locked
  */
-async function openRepo(storage, practice) {
+async function openRepo(storage, practice, locked) {
   /** @param {Error} e */
   const onError = (e) => {
     toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
@@ -61,10 +67,15 @@ async function openRepo(storage, practice) {
     window.dispatchEvent(new Event('hhr:storage-error'));
   };
   try {
-    const repo = createRepo(await idbBackend(dbName(practice)), { onError });
-    const { migrated } = await repo.init(practice ? {} : { legacy: readLegacyData(storage), clearLegacy: () => clearLegacyData(storage) });
-    if (migrated) toast(`Datos actualizados al nuevo almacenamiento (${migrated} atenciones).`, 4000);
-    return repo;
+    const sealed = sealedBackend(await idbBackend(dbName(practice)), { locked });
+    const repo = createRepo(sealed.backend, { onError });
+    if (!locked) {
+      const { migrated } = await repo.init(
+        practice ? {} : { legacy: readLegacyData(storage), clearLegacy: () => clearLegacyData(storage) },
+      );
+      if (migrated) toast(`Datos actualizados al nuevo almacenamiento (${migrated} atenciones).`, 4000);
+    }
+    return { repo, sealed };
   } catch (e) {
     console.warn('IndexedDB no disponible; se usa localStorage:', e);
     const repo = createRepo(
@@ -79,8 +90,9 @@ async function openRepo(storage, practice) {
         onError,
       },
     );
-    await repo.init();
-    return repo;
+    if (!locked) await repo.init();
+    // Sin IndexedDB, las colecciones están en claves de localStorage, que el almacenamiento cifrado ya cubre.
+    return { repo, sealed: null };
   }
 }
 
@@ -89,8 +101,25 @@ async function main() {
   const practice = isPractice();
   const { persistent } = base;
   // Modo práctica: almacenamiento propio (los datos reales no se tocan).
-  const storage = practice ? prefixedStorage(base.storage) : base.storage;
-  const repo = await openRepo(storage, practice);
+  const plain = practice ? prefixedStorage(base.storage) : base.storage;
+  // Datos de este PC cifrados con la clave personal (ADR 0016): con llave, todo empieza cerrado hasta entrar.
+  const locked = !practice && !!plain.getItem(K.pcKey);
+  const sealedLs = sealedStorage(plain, SEALED_KEYS, { locked, onError: (e) => logError('almacenamiento', e) });
+  const storage = sealedLs.storage;
+  const { repo, sealed } = await openRepo(storage, practice, locked);
+  /** Carga lo cifrado al abrir la llave tras entrar (se asigna cuando existe el contexto). */
+  let afterUnlock = async () => {};
+  const pcVault = createPcVault({
+    storage: plain,
+    name: K.pcKey,
+    targets: sealed ? [sealedLs, sealed] : [sealedLs],
+    // La primera vez los datos ya estaban cargados (legibles): solo se cifraron.
+    onOpen: ({ first }) => (first ? undefined : afterUnlock()),
+  });
+  // Otra pestaña creó la llave: esta (sin llave) recarga para no seguir guardando legible.
+  window.addEventListener('storage', (e) => {
+    if (e.key === K.pcKey && e.newValue && pcVault.state === 'clear') void repo.flush().then(() => location.reload());
+  });
   const store = createStore(storage, repo);
   if (practice) {
     seedPractice(store);
@@ -134,7 +163,17 @@ async function main() {
   window.addEventListener('hhr:storage-error', () => setTimeout(saveBar, 0));
   initErrorLog(ctx);
   // Cuentas de usuario (ADR 0014) y bloqueo: antes de mostrar datos.
-  ctx.accounts = createAccountsController(ctx);
+  afterUnlock = async () => {
+    await repo.init();
+    ctx.rec = blankRecord(store.loadMedico());
+    ctx.snap = null;
+    ctx.dirty = false;
+    ctx.reload();
+    ctx.restoreDraft();
+    syncAttentionView(ctx);
+    ctx.refreshLists();
+  };
+  ctx.accounts = createAccountsController(ctx, { vault: pcVault });
   const lock = createLock(ctx);
   ctx.lock = lock;
   ctx.accounts.start(); // con cuentas activadas, muestra el ingreso (o recupera la sesión de la pestaña)

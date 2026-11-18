@@ -11,7 +11,7 @@
  */
 
 /** Colecciones persistentes. `adjuntos_datos` (bytes de los adjuntos) no se carga entera al abrir. */
-const COLLECTIONS = ['atenciones', 'eliminadas', 'bitacora', 'pacientes', 'adjuntos', 'adjuntos_datos'];
+export const COLLECTIONS = ['atenciones', 'eliminadas', 'bitacora', 'pacientes', 'adjuntos', 'adjuntos_datos'];
 
 /** Versión de la base IndexedDB: subirla al agregar colecciones (se crean en onupgradeneeded). */
 const DB_VERSION = 3;

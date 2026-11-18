@@ -407,3 +407,60 @@ test('activar las cuentas exige un PC con la contraseña del equipo', async () =
   await assert.rejects(P.session.activate({ rut: RUT, nombre: 'X', rol: 'medico' }), /contraseña del equipo/);
   assert.equal(P.session.on, false);
 });
+
+test('sesión: con los datos del PC cifrados, entrar abre la llave, recargar pide la clave y cambiarla rehace el estuche', async () => {
+  const w = await world();
+  const A = w.pc();
+  A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
+  await A.session.activate({ rut: RUT, nombre: 'Dra. Admin', rol: 'medico' });
+  await A.session.login(RUT, '17752753');
+  await A.session.changePassword('Ojo2026');
+  // Un PC con su llave (ADR 0016), simulada: registra lo que la sesión le pide.
+  const calls = [];
+  const vault = {
+    state: 'locked',
+    unlockOnline: async (o) => {
+      calls.push(['online', o.uid, o.teamKeyB64 === w.keys.encKey]);
+      vault.state = 'open';
+    },
+    unlockOffline: async (o) => (calls.push(['offline', o.uid]), vault.answer),
+    rewrap: async (o) => calls.push(['rewrap', o.uid]),
+  };
+  const B = w.pc();
+  let tab = null;
+  const net = { online: true };
+  const fetchFn = async (url, init) => {
+    if (!net.online) throw new TypeError('Failed to fetch');
+    return w.accounts.handler(new Request(`https://x${url}`, init));
+  };
+  const session = createAccountSession({
+    api: createAccountsApi({ fetchFn }),
+    store: B.store,
+    session: { get: () => tab, set: (v) => (tab = v) },
+    now: () => w.clock.t,
+    iterations: ITER,
+    vault,
+  });
+  assert.equal((await session.login(RUT, 'Ojo2026')).status, 'ok');
+  assert.deepEqual(calls.shift(), ['online', session.user.id, true], 'se abre con la clave del equipo, antes de guardar nada');
+  // Recargar: con la llave cerrada, la sesión de la pestaña no basta.
+  vault.state = 'locked';
+  assert.equal(session.restore(), false);
+  // Sin conexión, la clave se comprueba abriendo el estuche.
+  await session.logout();
+  net.online = false;
+  vault.answer = 'wrong';
+  await assert.rejects(session.login(RUT, 'Ojo2026'), /incorrectos/);
+  vault.answer = 'missing';
+  await assert.rejects(session.login(RUT, 'Ojo2026'), /entra una vez con conexión/);
+  vault.answer = 'ok';
+  assert.equal((await session.login(RUT, 'Ojo2026')).status, 'offline');
+  // Cambiar la clave rehace el estuche de la cuenta.
+  net.online = true;
+  vault.state = 'open';
+  await session.logout();
+  await session.login(RUT, 'Ojo2026');
+  calls.length = 0;
+  await session.changeMyPassword('Ojo2026', 'Nueva22');
+  assert.deepEqual(calls.at(-1), ['rewrap', session.user.id]);
+});
