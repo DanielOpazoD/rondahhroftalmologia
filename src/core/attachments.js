@@ -12,6 +12,7 @@
  */
 import { sha256, toHex } from '../lib/sha256.js';
 import { unknownFields } from './compat.js';
+import { isRecord } from './guards.js';
 
 export const ATTACHMENT_LIMITS = Object.freeze({
   /** Tamaño máximo de un archivo (después de comprimir las fotos). */
@@ -89,7 +90,11 @@ const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 /** Miniatura de una imagen: JPEG pequeño en base64, guardado con los metadatos. */
 export const THUMB_MAX_CHARS = 16_000;
 const THUMB_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
-/** ¿Es una miniatura válida? (un dato recibido no puede traer otra cosa a un `src`) @param {unknown} v */
+/**
+ * ¿Es una miniatura válida? (un dato recibido no puede traer otra cosa a un `src`)
+ * @param {unknown} v
+ * @returns {v is string}
+ */
 export const isThumbnail = (v) => typeof v === 'string' && v.length <= THUMB_MAX_CHARS && THUMB_RE.test(v);
 const SHA_RE = /^[0-9a-f]{64}$/;
 
@@ -103,11 +108,11 @@ const matches = (re, v) => typeof v === 'string' && re.test(v);
 
 /**
  * ¿Trae los identificadores de un adjunto (id, atención y huella del contenido)?
- * @param {any} raw
- * @returns {boolean}
+ * @param {unknown} raw
+ * @returns {raw is Record<string, unknown> & {id: string, atencionId: string, sha256: string}}
  */
 function hasAttachmentIds(raw) {
-  if (!raw || typeof raw !== 'object' || !matches(ID_RE, raw.id) || !raw.id.startsWith('j')) return false;
+  if (!isRecord(raw) || !matches(ID_RE, raw.id) || !raw.id.startsWith('j')) return false;
   return matches(ID_RE, raw.atencionId) && matches(SHA_RE, raw.sha256);
 }
 
@@ -117,7 +122,7 @@ const isAttachmentSize = (n) => Number.isSafeInteger(n) && n >= 0 && n <= ATTACH
 /**
  * Normaliza los metadatos de un adjunto; null si no son válidos. Conserva los
  * campos de versiones más nuevas (ADR 0012).
- * @param {any} raw
+ * @param {unknown} raw
  */
 export function normalizeAttachment(raw) {
   if (!hasAttachmentIds(raw)) return null;

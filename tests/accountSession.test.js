@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveTeamKeys, tokenHash } from '../src/sync/crypto.js';
+import { deriveTeamKeys, tokenHash, DecryptError } from '../src/sync/crypto.js';
 import { memoryBlobStore, createSyncHandler } from '../src/sync/server.js';
 import { createAccounts } from '../src/sync/accounts.js';
 import { createAccountsApi } from '../src/sync/accountsApi.js';
-import { createAccountSession } from '../src/sync/accountSession.js';
+import { createAccountSession, errorMessage } from '../src/sync/accountSession.js';
 import { createStore, memoryStorage } from '../src/storage/store.js';
 import { credentialsFor } from '../src/sync/accountCrypto.js';
 
@@ -505,4 +505,12 @@ test('sesión: con los datos del PC cifrados, entrar abre la llave, recargar pid
   net.deactivated = true;
   await assert.rejects(session.login(RUT, 'Nueva#22'));
   assert.deepEqual(calls, [['forget', uid]]);
+});
+
+test('errorMessage: el texto del error, o uno claro si la clave del equipo no abre', () => {
+  assert.equal(errorMessage(new Error('Sin conexión con el servidor')), 'Sin conexión con el servidor');
+  assert.equal(errorMessage({ message: 'del servidor' }), 'del servidor');
+  assert.equal(errorMessage('texto'), 'texto');
+  assert.equal(errorMessage(new Error('')), 'Error');
+  assert.match(errorMessage(new DecryptError('x')), /No se pudo abrir la clave del equipo/);
 });

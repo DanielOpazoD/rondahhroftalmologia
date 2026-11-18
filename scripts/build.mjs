@@ -6,7 +6,8 @@
  * - Valida la especialidad elegida (ESPECIALIDAD=<id>, por defecto oftalmologia)
  *   contra el contrato de src/specialties/contrato.js.
  * - Empaqueta src/main.js y sus módulos (incluido pdf-lib) con esbuild, con la
- *   especialidad elegida detrás de src/specialties/activa/.
+ *   especialidad elegida detrás de src/specialties/activa/ (el alias
+ *   `#especialidad/` de package.json apunta a ella; ver especialidadPlugin).
  * - Incrusta la plantilla PDF en base64 y el formulario de la especialidad.
  * - Calcula la CSP con el hash del script (sin 'unsafe-inline' para scripts).
  *
@@ -20,7 +21,7 @@ import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -31,22 +32,41 @@ const outFile = outArg > -1 ? resolve(process.argv[outArg + 1]) : resolve(root, 
 /** Especialidad a construir (carpeta en src/specialties/). */
 export const especialidadActiva = () => process.env.ESPECIALIDAD || 'oftalmologia';
 
+/** Alias con que src/specialties/activa/ nombra la especialidad (package.json → "imports"). */
+const ALIAS = '#especialidad/';
+
 /**
- * Redirige src/specialties/activa/* a la especialidad elegida
- * (por defecto oftalmologia). Así la plataforma no conoce la especialidad.
- * La plantilla PDF es opcional: una especialidad que dibuja su PDF desde cero
- * (p. ej. orl) no la tiene y recibe una plantilla vacía.
+ * Archivo de la especialidad `id` al que apunta `#especialidad/<ruta>`. Node, tsc
+ * y ESLint resuelven el alias con package.json ("imports": oftalmología); el
+ * build lo resuelve aquí para la especialidad elegida. Falla si el archivo no
+ * existe (salvo una plantilla PDF: una especialidad que dibuja su PDF desde
+ * cero, p. ej. orl, no la tiene y recibe una plantilla vacía, `null`).
+ * @param {string} id
+ * @param {string} spec especificador importado (`#especialidad/config.js`)
+ * @returns {string | null}
+ */
+export function specialtyFile(id, spec) {
+  if (!spec.startsWith(ALIAS)) throw new Error(`No es un import de la especialidad: ${spec}`);
+  const dir = resolve(root, 'src/specialties', id);
+  const path = resolve(dir, spec.slice(ALIAS.length));
+  if (!path.startsWith(dir + sep)) throw new Error(`${spec} sale de la carpeta de la especialidad "${id}"`);
+  if (existsSync(path)) return path;
+  if (path.endsWith('plantilla.pdf')) return null;
+  throw new Error(`La especialidad "${id}" no tiene ${spec.slice(ALIAS.length)} (lo pide src/specialties/activa/).`);
+}
+
+/**
+ * Apunta `#especialidad/*` (lo usa solo src/specialties/activa/) a la
+ * especialidad elegida. Así la plataforma no conoce la especialidad.
  * @param {string} id
  * @returns {import('esbuild').Plugin}
  */
-const especialidadPlugin = (id) => ({
+export const especialidadPlugin = (id) => ({
   name: 'especialidad',
   setup(b) {
-    b.onResolve({ filter: /^\.\.\/oftalmologia\// }, (args) => {
-      if (!args.importer.includes(`${'/'}specialties${'/'}activa${'/'}`)) return undefined;
-      const path = resolve(root, 'src/specialties', id, args.path.replace('../oftalmologia/', ''));
-      if (path.endsWith('plantilla.pdf') && !existsSync(path)) return { path, namespace: 'sin-plantilla' };
-      return { path };
+    b.onResolve({ filter: /^#especialidad\// }, (args) => {
+      const path = specialtyFile(id, args.path);
+      return path ? { path } : { path: args.path, namespace: 'sin-plantilla' };
     });
     b.onLoad({ filter: /.*/, namespace: 'sin-plantilla' }, () => ({ contents: "export default '';", loader: 'js' }));
   },
@@ -58,6 +78,21 @@ const especialidadPlugin = (id) => ({
  * código solo pida estas. Symbol y ZapfDingbats son pequeñas y se dejan.
  */
 export const PDF_FONTS = Object.freeze(['Helvetica', 'Helvetica-Bold', 'Symbol', 'ZapfDingbats']);
+
+/**
+ * La app solo usa la versión de package.json (config/catalogs.js): el resto
+ * (scripts, dependencias de desarrollo) no se incrusta en el HTML publicado.
+ * @returns {import('esbuild').Plugin}
+ */
+const paquetePlugin = () => ({
+  name: 'paquete-minimo',
+  setup(b) {
+    const file = resolve(root, 'package.json');
+    b.onLoad({ filter: /package\.json$/ }, (args) =>
+      args.path === file ? { contents: JSON.stringify({ version: pkg.version }), loader: 'json' } : undefined,
+    );
+  },
+});
 
 /** Deja fuera las medidas de las fuentes estándar que no se usan. @returns {import('esbuild').Plugin} */
 const fuentesPlugin = () => ({
@@ -147,7 +182,7 @@ export async function buildHtml() {
     minify: process.env.SIN_MINIFICAR !== '1',
     legalComments: 'inline',
     loader: { '.pdf': 'base64' },
-    plugins: [especialidadPlugin(id), fuentesPlugin()],
+    plugins: [especialidadPlugin(id), fuentesPlugin(), paquetePlugin()],
     write: false,
     metafile: true,
     logLevel: 'warning',

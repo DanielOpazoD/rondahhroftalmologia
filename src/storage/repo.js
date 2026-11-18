@@ -17,6 +17,7 @@ import { normalizeRecord, sortRecords, isValidId } from '../core/record.js';
 import { isFutureVersion } from '../core/migrations.js';
 import { normalizePatient, patientLabel } from '../core/patient.js';
 import { compareEs } from '../core/format.js';
+import { isRecord } from '../core/guards.js';
 
 /** @typedef {import('./backends.js').Backend} Backend */
 /** @typedef {import('./backends.js').Documento} Documento */
@@ -114,7 +115,7 @@ export function createRepo(
         return await op();
       } catch (e) {
         // Sin espacio: reintentar en el acto no sirve; queda pendiente para más tarde.
-        if (i >= retries || /** @type {any} */ (e)?.name === 'QuotaExceededError') throw e;
+        if (i >= retries || (isRecord(e) && e.name === 'QuotaExceededError')) throw e;
         await sleep(100 * 2 ** i);
       }
     }

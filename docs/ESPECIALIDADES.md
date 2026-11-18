@@ -15,6 +15,8 @@ La aplicación tiene dos partes:
 
 La plataforma ve la especialidad **solo** a través de `src/specialties/activa/`. ESLint lo exige: un import directo a `specialties/oftalmologia/` desde la plataforma es un error.
 
+Cada archivo de `activa/` reexporta `#especialidad/<archivo>`, un alias de `package.json` (`"imports"`): Node, las pruebas, `tsc` y ESLint lo resuelven a `oftalmologia/`, y el build a la carpeta de `ESPECIALIDAD=<id>`. Si a la especialidad le falta un archivo que pide `activa/`, el build falla con un mensaje claro; solo las plantillas PDF son opcionales (la que falta queda vacía).
+
 ## Contenido de una especialidad
 
 | Archivo | Contenido |

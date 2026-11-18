@@ -12,6 +12,7 @@
  * validateSpecialty() revisa el módulo antes de construir (scripts/build.mjs)
  * y en las pruebas: una especialidad mal configurada no llega a producción.
  */
+import { isRecord } from '../core/guards.js';
 
 /** Campos de texto que la plataforma usa en todas las especialidades. */
 const PLATFORM_FIELDS = [
@@ -94,11 +95,13 @@ function checkList(list, name, keyOf, seen, repeated, p) {
 /** Casillas (antecedentes, solicitados, diagnósticos) y procedimientos. @param {ModuloEspecialidad} mod @param {string[]} p */
 function checkCatalogs(mod, p) {
   const keys = new Set();
-  const checkKey = (/** @type {any} */ d) => (SAFE_KEY.test(d?.key || '') && d.label ? d.key : undefined);
+  const checkKey = (/** @type {unknown} */ d) =>
+    isRecord(d) && typeof d.key === 'string' && SAFE_KEY.test(d.key) && d.label ? d.key : undefined;
   for (const group of ['ANTECEDENTES', 'SOLICITADOS', 'DIAGNOSTICOS']) {
     checkList(mod[group], group, checkKey, keys, 'Clave de casilla repetida', p);
   }
-  const procKey = (/** @type {any} */ pr) => (SAFE_KEY.test(pr?.id || '') && pr.n ? pr.id : undefined);
+  const procKey = (/** @type {unknown} */ pr) =>
+    isRecord(pr) && typeof pr.id === 'string' && SAFE_KEY.test(pr.id) && pr.n ? pr.id : undefined;
   checkList(mod.DEFAULT_PROCS, 'DEFAULT_PROCS', procKey, new Set(), 'Procedimiento repetido', p);
   if (!Array.isArray(mod.OJOS) || !mod.OJOS.length) p.push('OJOS (lados posibles de un procedimiento) no puede estar vacío');
   if (!Array.isArray(mod.MEDIDAS_PROC) || !mod.MEDIDAS_PROC.every((/** @type {string} */ k) => SAFE_KEY.test(k) && k !== 'eye')) {

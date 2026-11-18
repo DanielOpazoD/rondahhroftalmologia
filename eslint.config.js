@@ -47,18 +47,44 @@ export default [
               group: ['**/specialties/*/*', '!**/specialties/activa/*', '!**/specialties/contrato.js'],
               message: 'Importa la especialidad a través de src/specialties/activa/.',
             },
+            { regex: '^#especialidad/', message: 'Importa la especialidad a través de src/specialties/activa/.' },
           ],
         },
       ],
     },
   },
-  // Las especialidades no dependen de la interfaz
+  // Las especialidades no dependen de la interfaz. Solo specialties/activa/ nombra
+  // la especialidad, y siempre con el alias `#especialidad/` (package.json → imports),
+  // que el build apunta a la elegida (ESPECIALIDAD=<id>; scripts/build.mjs).
   {
     files: ['src/specialties/**/*.js'],
+    ignores: ['src/specialties/activa/**'],
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [{ group: ['**/ui/*'], message: 'Una especialidad no puede depender de la interfaz.' }] },
+        {
+          patterns: [
+            { group: ['**/ui/*'], message: 'Una especialidad no puede depender de la interfaz.' },
+            { regex: '^#especialidad/', message: 'Solo src/specialties/activa/ usa #especialidad/ (apunta a la especialidad del build).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/specialties/activa/**/*.js'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['**/ui/*'], message: 'Una especialidad no puede depender de la interfaz.' },
+            {
+              group: ['../*', '!../contrato.js'],
+              message: 'activa/ nombra la especialidad con #especialidad/<archivo> (el build la elige); una ruta directa no se redirige.',
+            },
+          ],
+        },
       ],
     },
   },

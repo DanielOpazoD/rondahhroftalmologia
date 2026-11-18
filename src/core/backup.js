@@ -6,6 +6,7 @@ import { APP } from '../config/catalogs.js';
 import { normalizeRecord, sortRecords, isValidId, isSavedRecord } from './record.js';
 import { isFutureVersion, versionOf } from './migrations.js';
 import { SCHEMA_VERSION } from '../config/catalogs.js';
+import { isRecord } from './guards.js';
 
 /** Cuántas versiones de esquema por delante se aceptan en un respaldo. */
 const MAX_FUTURE_STEPS = 3;
@@ -20,7 +21,7 @@ import { createZip, readZip, isZip } from '../lib/zip.js';
  * `futureRecords`: atenciones de versiones más nuevas de la app, intactas.
  * @typedef {{records: import('../domain').AtencionGuardada[], futureRecords?: RegistroFuturo[],
  *   procs: import('../domain').Procedimiento[], auditDocs?: import('../domain').AuditDoc[], patients?: import('../domain').Paciente[],
- *   attachments?: any[]}} DatosRespaldo
+ *   attachments?: import('../domain').Adjunto[]}} DatosRespaldo
  *   `attachments`: metadatos de los adjuntos (su contenido va en el ZIP: ver packBackup).
  */
 
@@ -65,14 +66,27 @@ export function buildBackup(
   };
 }
 
-/** @param {any} d documento de bitácora leído del respaldo (sin validar) */
+/**
+ * ¿Es un documento de bitácora válido? (leído del respaldo, sin validar)
+ * @param {unknown} d
+ * @returns {d is import('../domain').AuditDoc} con lo que se revisa aquí (id, y id y fecha de
+ *   cada entrada); lo demás de cada entrada lo valida la fusión de la bitácora (core/audit.js)
+ */
 const validAuditDoc = (d) =>
-  d &&
-  typeof d === 'object' &&
+  isRecord(d) &&
   isValidId(d.id) &&
-  d.id.startsWith('b_') &&
+  /** @type {string} */ (d.id).startsWith('b_') &&
   Array.isArray(d.entries) &&
-  d.entries.every((/** @type {any} */ e) => e && typeof e.id === 'string' && Number.isFinite(e.at));
+  d.entries.every((/** @type {unknown} */ e) => isRecord(e) && typeof e.id === 'string' && Number.isFinite(e.at));
+
+/**
+ * Procedimiento del respaldo, normalizado; null si no es válido.
+ * @param {unknown} p
+ */
+const backupProc = (p) =>
+  isRecord(p) && isValidId(p.id) && typeof p.n === 'string' && p.n.trim()
+    ? { id: /** @type {string} */ (p.id), n: p.n.trim(), pio: /** @type {0 | 1} */ (p.pio ? 1 : 0) }
+    : null;
 
 /**
  * Lee y valida un respaldo (v1, v2 o v3).
@@ -81,14 +95,14 @@ const validAuditDoc = (d) =>
  * @throws {Error} si el contenido no es un respaldo válido
  */
 export function parseBackup(text) {
-  /** @type {any} JSON del archivo, sin validar */
+  /** @type {unknown} JSON del archivo, sin validar */
   let data;
   try {
     data = JSON.parse(text);
   } catch {
     throw new Error('El archivo no es JSON válido');
   }
-  if (!data || !Array.isArray(data.atenciones)) throw new Error('El archivo no es un respaldo de esta aplicación');
+  if (!isRecord(data) || !Array.isArray(data.atenciones)) throw new Error('El archivo no es un respaldo de esta aplicación');
   if (data.app && data.app !== APP.id) throw new Error(`El respaldo es de otra aplicación (${data.app})`);
   /** @type {Record<string, unknown>[]} */
   const objects = data.atenciones.filter((/** @type {unknown} */ r) => r && typeof r === 'object');
@@ -100,14 +114,10 @@ export function parseBackup(text) {
       .filter(isSavedRecord),
     // Solo versiones futuras plausibles.
     futureRecords: objects.filter(isPlausibleFuture),
-    procs: Array.isArray(data.procs)
-      ? data.procs
-          .filter((/** @type {any} */ p) => p && isValidId(p.id) && typeof p.n === 'string' && p.n.trim())
-          .map((/** @type {any} */ p) => ({ id: p.id, n: p.n.trim(), pio: p.pio ? 1 : 0 }))
-      : [],
+    procs: Array.isArray(data.procs) ? data.procs.map(backupProc).filter((p) => p !== null) : [],
     auditDocs: Array.isArray(data.bitacora) ? data.bitacora.filter(validAuditDoc) : [],
-    patients: Array.isArray(data.pacientes) ? data.pacientes.map(normalizePatient).filter(Boolean) : [],
-    attachments: Array.isArray(data.adjuntos) ? data.adjuntos.map(normalizeAttachment).filter(Boolean) : [],
+    patients: Array.isArray(data.pacientes) ? data.pacientes.map(normalizePatient).filter((p) => p !== null) : [],
+    attachments: Array.isArray(data.adjuntos) ? data.adjuntos.map(normalizeAttachment).filter((a) => a !== null) : [],
     practica: data.practica === true,
     anonSecret: typeof data.anonSecret === 'string' && /^[0-9a-f]{64}$/.test(data.anonSecret) ? data.anonSecret : null,
   };

@@ -26,6 +26,7 @@ import { addGuard, showGuarded } from './guard.js';
 import { openDialog } from './dialog.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { practiceUrl } from './practice.js';
+import { TOPICS } from './events.js';
 
 const SESSION_KEY = `${ESPECIALIDAD.prefijo}sesion_cuenta_v1`;
 const LOCK_MINUTES = [5, 10, 15, 30, 60];
@@ -51,8 +52,9 @@ const tabSession = {
 };
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js)
+ * @param {import('./context.js').AppContext} ctx contexto de la aplicación (ver ui/context.js)
  * @param {{vault?: import('../sync/accountSession.js').LlavePc}} [o] llave que cifra los datos de este PC (ADR 0016)
+ * @returns {import('./contract').AccountsService}
  */
 export function createAccountsController(ctx, { vault } = {}) {
   const { store } = ctx;
@@ -107,7 +109,7 @@ export function createAccountsController(ctx, { vault } = {}) {
     $('#loginErr').textContent = message;
     if (!$('#loginRut').value) {
       const locals = Object.values(store.loadLocalAccounts());
-      if (locals.length === 1) $('#loginRut').value = formatRut(/** @type {any} */ (locals[0]).rut);
+      if (locals.length === 1) $('#loginRut').value = formatRut(locals[0].rut);
     }
     if (!dlg.open) showGuarded(dlg);
     focusStep();
@@ -210,7 +212,7 @@ export function createAccountsController(ctx, { vault } = {}) {
         ctx.snap = structuredClone(ctx.rec);
       }
     }
-    ctx.emit('cuenta');
+    ctx.emit(TOPICS.CUENTA);
     render();
     ctx.lock?.render();
     // Una sola identidad: la persona de la cuenta queda (o se actualiza) en la lista de
@@ -220,7 +222,7 @@ export function createAccountsController(ctx, { vault } = {}) {
 
   /** @param {import('../sync/accountSession.js').CuentaActiva} u */
   function syncProfile(u) {
-    const existing = ctx.medicos.find((/** @type {any} */ m) => rutKey(m.rut) === rutKey(u.rut));
+    const existing = ctx.medicos.find((m) => rutKey(m.rut) === rutKey(u.rut));
     if (
       existing &&
       existing.nombre === u.nombre &&

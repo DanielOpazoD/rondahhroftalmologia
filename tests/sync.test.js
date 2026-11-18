@@ -207,6 +207,12 @@ describe('servidor', () => {
     assert.equal((await post('put', JSON.stringify({ items: [{ id: 'a', u: 1, iv: 'corto', ct: 'AA==' }] }))).status, 400);
     assert.equal((await post('put', JSON.stringify({ items: Array(201).fill({ id: 'a', u: 1 }) }))).status, 400);
     assert.equal((await post('borrar', JSON.stringify({ items: [] }))).status, 404);
+    // El id y la huella tienen que ser texto: antes un elemento sin id se guardaba como `r/undefined/1`.
+    const ok = { u: 1, iv: 'AAAAAAAAAAAAAAAA', ct: 'QUJD' };
+    for (const bad of [{}, { id: 123 }, { id: ['b'] }, { id: 'b', h: 12 }]) {
+      const r = await post('put', JSON.stringify({ items: [{ ...ok, ...bad }] }));
+      assert.equal(r.status, 400, JSON.stringify(bad));
+    }
   });
 
   test('guarda solo versión vigente y no acepta versiones viejas', async () => {

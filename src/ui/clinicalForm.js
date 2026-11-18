@@ -3,6 +3,7 @@ import { can, PERMISSIONS } from '../core/permissions.js';
 import { patientIdentityKey } from '../core/record.js';
 import { html, setHtml } from './html.js';
 import { download, toast, required } from './dom.js';
+import { TOPICS } from './events.js';
 
 /**
  * PDF visible en el navegador. La impresión apunta al PDF, no a la aplicación.
@@ -140,9 +141,9 @@ export async function openClinicalForm(ctx, opts) {
     if (!sessionValid()) dismiss();
   };
   const observer = new MutationObserver(closeIfContextChanged);
-  const unsubscribe = ctx.on('cuenta', closeIfContextChanged);
-  const unsubscribeData = ctx.on('datos', closeIfContextChanged);
-  const unsubscribeAttention = ctx.on('atencion', () => {
+  const unsubscribe = ctx.on(TOPICS.CUENTA, closeIfContextChanged);
+  const unsubscribeData = ctx.on(TOPICS.DATOS, closeIfContextChanged);
+  const unsubscribeAttention = ctx.on(TOPICS.ATENCION, () => {
     if (active) toast('La atención cambió. Abre el formulario para revisar los datos actuales.');
     dismiss();
   });

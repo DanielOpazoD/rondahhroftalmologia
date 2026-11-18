@@ -26,15 +26,16 @@ import { openDialog } from '../dialog.js';
 import { uiConfirm } from '../modal.js';
 import { hasNameParts, NAME_PARTS, refreshNames } from '../../core/names.js';
 import { profileNameFields, profileNameValues } from '../patientFields.js';
+import { TOPICS } from '../events.js';
 
 /** @typedef {import('../../domain').Atencion} Atencion */
 /** @typedef {import('../../domain').AtencionGuardada} AtencionGuardada */
 /** @typedef {import('../../domain').Paciente} Paciente */
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
- *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación (ver ui/context.js)
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
+ * @returns {import('../contract').PatientActions}
  */
 export function patientActions(ctx, store) {
   /**
@@ -54,13 +55,14 @@ export function patientActions(ctx, store) {
       return;
     }
     await ctx.ensureUser();
-    const r = editPatientData({ patient: p, fields, records: ctx.records, now: clock.tick() });
+    const at = clock.tick();
+    const r = editPatientData({ patient: p, fields, records: ctx.records, now: at });
     if (!r.changed.length) return toast('Sin cambios');
     const done = ctx.persist(() => {
       store.savePatients([r.patient]);
       for (const { before, after } of r.records) {
         ctx.records = store.upsertRecord(after);
-        const entry = makeAuditEntry({ tipo: 'editada', before, after, at: after.updated, ...ctx.author() });
+        const entry = makeAuditEntry({ tipo: 'editada', before, after, at, ...ctx.author() });
         if (entry) store.addAuditEntry(after.id, entry);
       }
     });
@@ -68,7 +70,7 @@ export function patientActions(ctx, store) {
     // La atención abierta de este paciente muestra los datos corregidos.
     const open = r.records.find((x) => x.after.id === ctx.rec.id);
     if (open && !ctx.dirty) ctx.loadIntoForm(open.after);
-    ctx.emit('datos');
+    ctx.emit(TOPICS.DATOS);
     ctx.sync?.schedule();
     toast(
       r.records.length
@@ -125,7 +127,7 @@ export function patientActions(ctx, store) {
         if (entry) store.addAuditEntry(saved.id, entry);
       });
       if (!ok) return { ok: false };
-      ctx.emit('datos');
+      ctx.emit(TOPICS.DATOS);
       ctx.sync?.schedule();
       toast(`${saved.f.paciente_nombre || saved.f.paciente_rut} agregado a la lista`);
       return { ok: true, id: saved.id };
@@ -146,7 +148,7 @@ export function patientActions(ctx, store) {
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = true;
       ctx.persist(() => store.saveDraft(ctx.rec));
-      ctx.emit('atencion');
+      ctx.emit(TOPICS.ATENCION);
       syncAttentionView(ctx);
       ctx.showTab('t-at');
       scrollTo(0, 0);
@@ -253,13 +255,13 @@ export function patientActions(ctx, store) {
         for (const r of recs) {
           const next = relinkRecord(r, keepId, at);
           ctx.records = store.upsertRecord(next);
-          const entry = makeAuditEntry({ tipo: 'editada', before: r, after: next, at: next.updated, ...ctx.author() });
+          const entry = makeAuditEntry({ tipo: 'editada', before: r, after: next, at, ...ctx.author() });
           if (entry) store.addAuditEntry(next.id, entry);
           ctx.syncPatientFromRecord(next);
         }
       });
       if (!done) return false;
-      ctx.emit('datos');
+      ctx.emit(TOPICS.DATOS);
       ctx.sync?.schedule();
       toast('Fichas unidas');
       return true;
@@ -287,7 +289,7 @@ export function patientActions(ctx, store) {
       await ctx.ensureUser();
       if (!ctx.persist(() => store.savePatients([deletePatient(p, clock.tick())]))) return false;
       if (ctx.openPatientId === id) ctx.openPatientId = null;
-      ctx.emit('datos');
+      ctx.emit(TOPICS.DATOS);
       ctx.sync?.schedule();
       toast('Ficha eliminada');
       return true;
@@ -352,7 +354,7 @@ export function patientActions(ctx, store) {
       const set = store.loadNotDuplicates();
       set.add([aId, bId].sort().join('|'));
       ctx.persist(() => store.saveNotDuplicates(set));
-      ctx.emit('datos');
+      ctx.emit(TOPICS.DATOS);
     },
   };
 }

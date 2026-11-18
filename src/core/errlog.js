@@ -3,6 +3,7 @@
  * servidor (hay datos clínicos): quedan en este equipo, acotados, para que el
  * usuario los copie y los mande a soporte si algo falla en terreno.
  */
+import { isRecord } from './guards.js';
 export const MAX_ENTRIES = 50;
 
 /**
@@ -12,8 +13,8 @@ export const MAX_ENTRIES = 50;
  * @returns {ErrorEntry}
  */
 export function errorEntry(where, err, now = Date.now(), version = '') {
-  const e = /** @type {any} */ (err);
-  const msg = String(e?.message ?? e ?? 'Error desconocido').slice(0, 300);
+  const e = isRecord(err) ? err : null;
+  const msg = String(e?.message ?? err ?? 'Error desconocido').slice(0, 300);
   const stack = typeof e?.stack === 'string' ? e.stack.split('\n').slice(0, 6).join('\n').slice(0, 800) : '';
   return { at: now, where: String(where).slice(0, 40), msg, ...(stack ? { stack } : {}), ...(version ? { v: version } : {}) };
 }

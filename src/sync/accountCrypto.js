@@ -15,7 +15,7 @@
  */
 import { nameParts, personName } from '../core/names.js';
 import { utf8, toHex, hmacSha256 } from '../lib/sha256.js';
-import { bytesToB64, b64ToBytes, encryptPayload, decryptPayload, DecryptError } from './crypto.js';
+import { bytesToB64, b64ToBytes, encryptPayload, decryptPayload, DecryptError, isObject } from './crypto.js';
 
 export const ACCOUNT_ITERATIONS = 310_000;
 const LABEL = 'hhr-cuentas-v1';
@@ -78,7 +78,7 @@ async function wrapTeamKey(teamKeyB64, { envoltura, complemento, uid }) {
  */
 export async function unwrapTeamKey(wrapped, { envoltura, complemento, uid }) {
   const out = await decryptPayload(await wrappingKey(envoltura, complemento), 'cuenta:' + uid, 1, wrapped);
-  if (!out || typeof out.k !== 'string' || b64ToBytes(out.k).length !== 32) throw new DecryptError('Clave del equipo inválida');
+  if (!isObject(out) || typeof out.k !== 'string' || b64ToBytes(out.k).length !== 32) throw new DecryptError('Clave del equipo inválida');
   return out.k;
 }
 
@@ -102,8 +102,9 @@ export const encryptProfile = (teamKey, uid, perfil) =>
  * @returns {Promise<PerfilCuenta>}
  */
 export async function decryptProfile(teamKey, uid, payload) {
-  const p = await decryptPayload(teamKey, 'perfil:' + uid, 1, payload);
-  return { nombre: personName(p || {}), ...nameParts(p || {}), rut: String(p?.rut || ''), ...(p?.rol ? { rol: String(p.rol) } : {}) };
+  const d = await decryptPayload(teamKey, 'perfil:' + uid, 1, payload);
+  const p = isObject(d) ? d : {};
+  return { nombre: personName(p), ...nameParts(p), rut: String(p.rut || ''), ...(p.rol ? { rol: String(p.rol) } : {}) };
 }
 
 /**

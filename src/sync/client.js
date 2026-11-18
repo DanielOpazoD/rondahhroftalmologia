@@ -14,6 +14,13 @@ import { localVersions, remoteVersions, planSync, applyPulled, chunks, PROTOCOL_
 /** @typedef {import('../domain').SyncBlob} SyncBlob */
 /** @typedef {import('../domain').ElementoSync} ElementoSync */
 /** @typedef {import('../domain').ElementoBajado} ElementoBajado */
+/**
+ * Contenido descifrado de una versión bajada, como lo sube `push` (o, de la
+ * v2.1, con `record`). Viene autenticado con la clave del equipo (AES-GCM atado
+ * al id y la versión): lo escribió un equipo del mismo grupo, por eso su forma
+ * no se revalida campo a campo.
+ * @typedef {{lid?: unknown, kind?: string, deleted?: boolean, data?: Record<string, unknown>, record?: Record<string, unknown>}} ContenidoBajado
+ */
 
 export class SyncHttpError extends Error {
   /**
@@ -575,11 +582,11 @@ async function fetchItems(p, list, { fromLegacy = false } = {}) {
  * lanza el error, como siempre (no se aparta todo como «dañado»).
  * @param {PassState} p
  * @param {SyncBlob} it
- * @returns {Promise<any>} contenido descifrado, o null
+ * @returns {Promise<ContenidoBajado | null>} contenido descifrado, o null
  */
 async function openPulled(p, it) {
   try {
-    const content = await decryptPayload(p.deps.key, it.id, it.u, it);
+    const content = /** @type {ContenidoBajado | null} */ (await decryptPayload(p.deps.key, it.id, it.u, it));
     p.keyOk = true;
     return content;
   } catch (e) {
@@ -611,7 +618,7 @@ function pulledId(lids, wire, content, sid, fromLegacy) {
 /**
  * Elemento bajado a partir de su contenido descifrado. Lo que viene de un id
  * antiguo lleva en sus datos el id nuevo y la versión.
- * @param {any} content contenido descifrado
+ * @param {ContenidoBajado} content contenido descifrado
  * @param {string} id id con que se aplica
  * @param {number} u versión
  * @param {boolean} fromLegacy

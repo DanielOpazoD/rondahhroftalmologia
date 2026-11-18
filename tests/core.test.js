@@ -247,3 +247,9 @@ describe('clinical', () => {
     assert.ok(!minimal.includes('PROCEDIMIENTOS'));
   });
 });
+
+test('isRecord: solo objetos con propiedades (no nulo ni lista)', async () => {
+  const { isRecord } = await import('../src/core/guards.js');
+  assert.equal(isRecord({ a: 1 }), true);
+  for (const v of [null, undefined, [], 'x', 1, true]) assert.equal(isRecord(v), false, JSON.stringify(v));
+});

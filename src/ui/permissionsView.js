@@ -49,7 +49,9 @@ export function applyPermissions(ctx) {
 
 /**
  * Protege las acciones del contexto según los permisos (además de ocultar los controles).
- * @param {any} ctx
+ * Reemplaza métodos del contexto por versiones que revisan el permiso; por eso
+ * los recorre por nombre (`Record`), con la firma de cada uno.
+ * @param {import('./context.js').AppContext} ctx
  */
 export function guardActions(ctx) {
   /** @returns {undefined} */
@@ -58,11 +60,13 @@ export function guardActions(ctx) {
     return undefined;
   };
   const allowed = (/** @type {string} */ perm) => can(user(ctx), perm);
+  /** El contexto como mapa de métodos, para reemplazarlos por nombre. */
+  const methods = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (ctx));
   /** @param {string} name @param {string} perm @param {(...a: any[]) => boolean} [when] permitido también si… */
   const wrap = (name, perm, when) => {
-    const fn = ctx[name];
+    const fn = methods[name];
     if (typeof fn !== 'function') return;
-    ctx[name] = (/** @type {any[]} */ ...args) => (allowed(perm) || when?.(...args) ? fn(...args) : deny());
+    methods[name] = (/** @type {any[]} */ ...args) => (allowed(perm) || when?.(...args) ? fn(...args) : deny());
   };
   // Guardar sin permiso: no hace nada (el formulario está en solo lectura; el autoguardado no debe avisar).
   const save = ctx.save;
@@ -75,8 +79,8 @@ export function guardActions(ctx) {
   wrap('deleteAttachment', PERMISSIONS.EDITAR_CLINICO);
   // Quitar de la lista a alguien aún no atendido (un ingreso por error) es parte del ingreso.
   wrap('deleteRecord', PERMISSIONS.EDITAR_CLINICO, (id) => {
-    const r = ctx.records.find((/** @type {any} */ x) => x.id === id);
-    return Boolean(r) && !isAttended(r);
+    const r = ctx.records.find((x) => x.id === id);
+    return r !== undefined && !isAttended(r);
   });
   wrap('setProcs', PERMISSIONS.AJUSTES);
 }

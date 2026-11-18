@@ -18,6 +18,7 @@ import { clock } from '../../core/clock.js';
 import { toast } from '../dom.js';
 import { uiConfirm, uiAlert } from '../modal.js';
 import { prepareImage, makeThumbnail } from '../images.js';
+import { TOPICS } from '../events.js';
 
 /** @typedef {import('../../domain').Adjunto} Adjunto */
 /** @typedef {{bytes: Uint8Array, tipo: string, nombre: string, comprimida: boolean}} Preparado archivo listo para guardar */
@@ -45,9 +46,9 @@ async function thumbnailOf(prepared) {
 }
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
- *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación (ver ui/context.js)
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
+ * @returns {import('../contract').AttachmentActions}
  */
 export function attachmentActions(ctx, store) {
   /**
@@ -65,14 +66,14 @@ export function attachmentActions(ctx, store) {
   /**
    * Guarda la atención abierta si aún no lo está o tiene cambios (adjuntar
    * necesita su id). Si no se pudo guardar, avisa.
-   * @returns {Promise<boolean>} true si la atención quedó guardada
+   * @returns {Promise<string | null>} el id de la atención guardada, o null
    */
   const ensureSaved = async () => {
-    if (ctx.rec.id && !ctx.dirty) return true;
-    const saved = await ctx.save({ auto: true });
-    if (saved || ctx.rec.id) return true;
+    if (ctx.rec.id && !ctx.dirty) return ctx.rec.id;
+    await ctx.save({ auto: true });
+    if (ctx.rec.id) return ctx.rec.id;
     toast('Para adjuntar, escribe primero el nombre o RUT del paciente.', 4000);
-    return false;
+    return null;
   };
 
   return {
@@ -87,8 +88,8 @@ export function attachmentActions(ctx, store) {
         uiAlert({ title: 'Adjuntos no disponibles', message: 'Este navegador no permite guardar archivos (sin IndexedDB).', tone: 'warn' });
         return;
       }
-      if (!(await ensureSaved())) return;
-      const atencionId = ctx.rec.id;
+      const atencionId = await ensureSaved();
+      if (!atencionId) return;
       let added = 0;
       for (const file of files) {
         const prepared = await prepareFile(file);
@@ -120,7 +121,7 @@ export function attachmentActions(ctx, store) {
         added++;
       }
       if (added) {
-        ctx.emit('adjuntos');
+        ctx.emit(TOPICS.ADJUNTOS);
         ctx.sync?.schedule();
         toast(added === 1 ? 'Archivo adjuntado' : `${added} archivos adjuntados`);
       }
@@ -191,7 +192,7 @@ export function attachmentActions(ctx, store) {
       });
       if (!ok) return;
       ctx.removeAttachmentsOf([meta]);
-      ctx.emit('adjuntos');
+      ctx.emit(TOPICS.ADJUNTOS);
       toast('Adjunto eliminado');
     },
 

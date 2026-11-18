@@ -26,7 +26,7 @@ import { todayIso, isIsoDate, isValidRut, rutKey, normalizeText, parseNumber, ag
  * Atención recién creada en el formulario. Es una Atencion (normalizeRecord
  * devuelve una que se le puede asignar), salvo `proc`, que el formulario
  * completa por partes (ver ProcRealizado en domain.d.ts).
- * @typedef {{v: number, especialidad: string, id: string|null, checks: Record<string, boolean>, cat: string,
+ * @typedef {{v: number, especialidad: string, id: string|null, checks: Record<string, boolean>, cat: import('../domain').Atencion['cat'],
  *   proc: {}, ft?: import('../domain').FechasPorCampo, f: Record<string, string>,
  *   created?: number, updated?: number, pacienteId?: string, procNames?: Record<string, string>}} AtencionEnBlanco
  */

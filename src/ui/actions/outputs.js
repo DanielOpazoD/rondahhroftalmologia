@@ -39,9 +39,9 @@ async function annexFrom(m, bytes) {
  */
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
- *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación (ver ui/context.js)
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
+ * @returns {import('../contract').OutputActions}
  */
 export function outputActions(ctx, store) {
   /**

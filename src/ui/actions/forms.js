@@ -14,6 +14,7 @@ import { downloadReceta } from '../recetaDialog.js';
 import { openMenu } from '../menu.js';
 import { renderToolbar, renderHistory } from '../attentionView.js';
 import { toast } from '../dom.js';
+import { TOPICS } from '../events.js';
 
 const HAS_CLINICAL_FORMS = !!(GES_PATOLOGIAS.length || recetaTemplate);
 
@@ -34,7 +35,11 @@ const FORM_CHOICES = [
   ...(recetaTemplate ? [{ value: 'receta', label: 'Receta para lentes', hint: 'Completar, descargar o imprimir' }] : []),
 ];
 
-/** @param {any} ctx @param {ReturnType<import('../../storage/store.js').createStore>} store */
+/**
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación (ver ui/context.js)
+ * @param {ReturnType<import('../../storage/store.js').createStore>} store
+ * @returns {import('../contract').FormActions}
+ */
 export function formActions(ctx, store) {
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let refreshTimer;
@@ -53,11 +58,18 @@ export function formActions(ctx, store) {
   const stillSame = (userId, attentionId, patient) =>
     canContinue(userId) && ctx.rec.id === attentionId && patientIdentityKey(ctx.rec) === patient;
 
+  /** Da una identidad estable a la atención antes de abrir un formulario: su id guardado, o null. */
+  async function savedAttentionId() {
+    if ((!ctx.rec.id || ctx.dirty) && !(await ctx.save())) return null;
+    return ctx.rec.id;
+  }
+
   /** Abre la atención de la ficha seleccionada sin descartar cambios pendientes.
    * @param {string | undefined} userId
    * @returns {Promise<boolean>}
    */
   async function focusPatientAttention(userId) {
+    const currentTab = () => ctx.currentTab;
     if (ctx.currentTab !== 't-reg' || !ctx.openPatientId) {
       ctx.showTab('t-at');
       return true;
@@ -73,7 +85,8 @@ export function formActions(ctx, store) {
     if (ctx.rec.pacienteId === patientId && (!selected || ctx.rec.id === selected.id)) ctx.showTab('t-at');
     else if (selected) await ctx.openRecord(selected.id);
     else await ctx.newAttentionFor(patientId);
-    return ctx.currentTab === 't-at' && ctx.rec.pacienteId === patientId;
+    // `showTab`/`openRecord` cambian la pestaña: se vuelve a leer (no vale lo comprobado arriba).
+    return currentTab() === 't-at' && ctx.rec.pacienteId === patientId;
   }
 
   return {
@@ -90,10 +103,8 @@ export function formActions(ctx, store) {
         toast('Selecciona o ingresa un paciente para completar sus formularios.');
         return;
       }
-      // Da una identidad estable a la atención antes de abrir el formulario.
-      if ((!ctx.rec.id || ctx.dirty) && !(await ctx.save())) return;
-      if (!canContinue(userId)) return;
-      const attentionId = ctx.rec.id;
+      const attentionId = await savedAttentionId();
+      if (!attentionId || !canContinue(userId)) return;
       const patient = patientIdentityKey(ctx.rec);
       const choice = await openMenu(button, FORM_CHOICES, { label: 'Formularios del paciente' });
       if (!stillSame(userId, attentionId, patient)) return;
@@ -129,7 +140,7 @@ export function formActions(ctx, store) {
       refreshTimer = setTimeout(() => {
         renderToolbar(ctx);
         renderHistory(ctx);
-        ctx.emit('datos');
+        ctx.emit(TOPICS.DATOS);
       }, 250);
       ctx.sync?.schedule();
       return true;

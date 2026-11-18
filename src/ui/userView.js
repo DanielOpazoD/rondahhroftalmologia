@@ -21,6 +21,7 @@ import { syncAttentionView } from './attentionView.js';
 import { PRACTICE_PREFIX } from './practice.js';
 import { openMenu } from './menu.js';
 import { nameParts } from '../core/names.js';
+import { TOPICS } from './events.js';
 
 const NEW = '__nuevo';
 const SKIP = '__ninguno';
@@ -59,7 +60,7 @@ export function initUserView(ctx) {
   $('#userChip').addEventListener('click', (/** @type {MouseEvent} */ e) =>
     ctx.accounts?.user ? accountMenu(ctx, /** @type {HTMLElement} */ (e.currentTarget)) : chooseUser(ctx),
   );
-  ctx.on('cuenta', () => renderUserChip(ctx));
+  ctx.on(TOPICS.CUENTA, () => renderUserChip(ctx));
   renderUserChip(ctx);
 }
 

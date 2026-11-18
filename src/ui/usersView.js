@@ -20,6 +20,7 @@ import { html, setHtml } from './html.js';
 import { openDialog } from './dialog.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { icon } from './icons.js';
+import { TOPICS, tabTopic } from './events.js';
 
 const ROLE_OPTIONS = ROLES.map((r) => ({ value: r.key, label: r.label }));
 const ADMIN_OPTIONS = [
@@ -335,11 +336,11 @@ export function initUsersView(ctx) {
     if (a === 'reset') void reset(u);
     if (a === 'toggle') void toggle(u);
   });
-  ctx.on('cuenta', () => {
+  ctx.on(TOPICS.CUENTA, () => {
     render();
     void load();
   });
   // Al abrir Ajustes, la lista se actualiza.
-  ctx.on('tab:t-aj', /** @returns {undefined} */ () => void load());
+  ctx.on(tabTopic('t-aj'), /** @returns {undefined} */ () => void load());
   render();
 }

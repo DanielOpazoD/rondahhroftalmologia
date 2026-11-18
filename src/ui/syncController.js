@@ -15,6 +15,7 @@ import { PROTOCOL_VERSION } from '../sync/protocol.js';
 import { logError } from './errorLog.js';
 import { attachmentsPending, syncAttachmentContent } from '../sync/attachments.js';
 import { readPatientItems, writePatientItems, readSpecialtyItems, writeSpecialtyItems, opaqueInSpecialty } from '../app/syncData.js';
+import { TOPICS } from './events.js';
 
 const INTERVAL_MS = 2 * 60 * 1000;
 /** Espacio del servidor con las fichas de pacientes, compartido por todas las especialidades. */
@@ -124,7 +125,7 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
   function writePatients(items) {
     writePatientItems(store, items);
     for (const i of items) clock.observe(i.updated);
-    ctx.emit('datos');
+    ctx.emit(TOPICS.DATOS);
   }
 
   /** Todo lo que se sincroniza de la especialidad (ver app/syncData.js). */
@@ -148,7 +149,7 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
       if (fresh && fresh.updated !== ctx.rec.updated) ctx.absorbRemote(fresh);
       if (!fresh) notify('La atención abierta fue eliminada en otro equipo', 4000);
     }
-    ctx.emit('datos');
+    ctx.emit(TOPICS.DATOS);
   }
 
   /**
@@ -184,7 +185,7 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
       store.saveAttachmentPurges(store.loadAttachmentPurges().filter((id) => !r.borrados.includes(id)));
     });
     for (const id of r.fallidos) logError('adjuntos', new Error(`Contenido del adjunto ${id} no coincide con su huella`));
-    if (r.bajados) ctx.emit('adjuntos');
+    if (r.bajados) ctx.emit(TOPICS.ADJUNTOS);
   }
 
   /**
