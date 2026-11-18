@@ -28,6 +28,7 @@ Cada archivo de `activa/` reexporta `#especialidad/<archivo>`, un alias de `pack
 | `index.js` | Reexporta todo lo anterior |
 | `formulario.html` | Parte clínica del formulario de atención |
 | `plantilla.pdf` | Hoja oficial con campos rellenables. **Opcional**: sin ella, `pdf.js` dibuja el PDF desde cero (como `orl`) |
+| `ges-plantilla.pdf`, `ipd-plantilla.pdf`, `receta-plantilla.pdf` | Formularios clínicos (constancia GES, IPD, receta de lentes). **Opcionales**: si faltan, el menú de formularios no los ofrece (`specialties/activa/*Plantilla.js`) |
 
 `src/specialties/contrato.js` define lo que toda especialidad debe tener y lo verifica:
 
