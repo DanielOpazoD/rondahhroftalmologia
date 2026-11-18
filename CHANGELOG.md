@@ -1,5 +1,9 @@
 # Cambios
 
+## 2.36.0 — 2026-11-18
+
+### Seguridad
+- **Los intentos de ingreso ya no revelan qué RUT tiene cuenta.** Antes, tras 5 intentos fallidos, un RUT con cuenta respondía «Cuenta bloqueada» y uno sin cuenta seguía respondiendo «RUT o clave incorrectos». Ahora un RUT sin cuenta se bloquea igual (mismos intentos, misma duración y mismo mensaje). Para quien tiene cuenta no cambia nada.
 ## 2.35.0 — 2026-11-18
 
 ### Cimientos: tipos precisos en toda la interfaz

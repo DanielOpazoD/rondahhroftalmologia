@@ -23,11 +23,17 @@ import {
 } from '../src/core/accounts.js';
 import { can, PERMISSIONS } from '../src/core/permissions.js';
 import { hmacSha256, toHex } from '../src/lib/sha256.js';
+import { rutCheckDigit } from '../src/core/format.js';
 
 const PASS = 'K7QM3-XRT9P-ZAWD4-N8F2C';
 const ITER = 100_000; // mínimo que acepta el servidor (rápido en las pruebas)
 const ADMIN_RUT = '17.752.753-K';
 const DAY = 24 * 3600_000;
+/** El RUT n.º i de una serie sin cuentas (cada uno con su propio límite de 5 intentos). @param {number} i */
+const unknownRut = (i) => {
+  const body = String(30_000_000 + i);
+  return `${body}-${rutCheckDigit(body)}`;
+};
 
 describe('reglas de cuentas', () => {
   test('clave inicial = RUT sin dígito verificador; reglas de la clave nueva', () => {
@@ -622,8 +628,9 @@ describe('servidor de cuentas: entrar y límites', () => {
     const { body: s } = await env.call('cuentas/sal', { body: { rut: ADMIN_RUT } });
     const good = { rut: ADMIN_RUT, acceso: (await deriveAccountSecrets('Ojo2026', s.sal, s.iter)).acceso };
     const from = (ip, body) => raw(env, 'cuentas/entrar', { body: JSON.stringify(body), headers: { 'x-nf-client-connection-ip': ip } });
-    const bad = { rut: '22.222.222-2', acceso: HEX }; // RUT sin cuenta: no bloquea ninguna cuenta
-    for (let i = 0; i < 30; i++) assert.equal((await from('10.0.0.1', bad)).status, 401);
+    // RUT distintos sin cuenta: cada uno tiene su límite, aquí actúa el de la red.
+    const bad = (/** @type {number} */ i) => ({ rut: unknownRut(i), acceso: HEX });
+    for (let i = 0; i < 30; i++) assert.equal((await from('10.0.0.1', bad(i))).status, 401);
     const blocked = await from('10.0.0.1', good);
     assert.equal(blocked.status, 429);
     assert.equal(blocked.body.code, 'demasiados_intentos');
@@ -637,7 +644,7 @@ describe('servidor de cuentas: entrar y límites', () => {
     assert.equal((await from('10.0.0.2', good)).status, 200, 'otra red no está bloqueada');
     // Al cumplirse el bloqueo (justo 15 min), los fallos se cuentan desde cero.
     env.clock.t += 15 * 60_000;
-    assert.equal((await from('10.0.0.1', bad)).status, 401);
+    assert.equal((await from('10.0.0.1', bad(99))).status, 401);
     assert.equal((await from('10.0.0.1', good)).status, 200);
   });
 
@@ -658,11 +665,38 @@ describe('servidor de cuentas: entrar y límites', () => {
 
   test('límite por red: los fallos espaciados más de 15 min no se acumulan', async () => {
     const env = await activated();
-    const bad = { rut: '22.222.222-2', acceso: HEX };
-    for (let i = 0; i < 29; i++) assert.equal((await env.call('cuentas/entrar', { body: bad })).status, 401);
+    const bad = (/** @type {number} */ i) => ({ rut: unknownRut(i), acceso: HEX });
+    for (let i = 0; i < 29; i++) assert.equal((await env.call('cuentas/entrar', { body: bad(i) })).status, 401);
     env.clock.t += 16 * 60_000;
-    for (let i = 0; i < 2; i++) assert.equal((await env.call('cuentas/entrar', { body: bad })).status, 401);
+    for (let i = 0; i < 2; i++) assert.equal((await env.call('cuentas/entrar', { body: bad(100 + i) })).status, 401);
     assert.equal((await env.login(ADMIN_RUT, 'Ojo2026')).status, 200);
+  });
+
+  test('un RUT sin cuenta se bloquea igual que uno con cuenta: las respuestas no revelan cuál tiene cuenta', async () => {
+    const env = await activated();
+    await addUser(env, { rut: '22.222.222-2', password: 'Otra2026' });
+    /** Estado y cuerpo de cada respuesta a 7 intentos con clave mala, 15 min de espera y 1 más. @param {string} rut */
+    const trace = async (rut) => {
+      const out = [];
+      const t0 = env.clock.t;
+      for (let i = 0; i < 7; i++) {
+        const r = await env.call('cuentas/entrar', { body: { rut, acceso: HEX } });
+        out.push([r.status, r.body]);
+        env.clock.t += 60_000;
+      }
+      env.clock.t = t0 + 4 * 60_000 + ACCOUNT_LOCK.lockMs; // se cumple el bloqueo (desde el 5.º intento)
+      const r = await env.call('cuentas/entrar', { body: { rut, acceso: HEX } });
+      out.push([r.status, r.body]);
+      env.clock.t = t0;
+      return out;
+    };
+    const real = await trace('22.222.222-2');
+    const none = await trace(unknownRut(1));
+    assert.deepEqual(none, real);
+    assert.deepEqual(
+      real.map(([status]) => status),
+      [401, 401, 401, 401, 401, 423, 423, 401],
+    );
   });
 
   test('restablecer la clave desbloquea una cuenta bloqueada por intentos fallidos', async () => {
