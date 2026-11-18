@@ -56,24 +56,41 @@ export function createSessionActions({ db, keys, now }) {
   async function clave({ b, t, a, me }) {
     const { accesoActual } = b;
     if (!isCredentials(b)) return fail(400, 'datos_invalidos', 'Datos inválidos');
-    // Fuera del primer ingreso, cambiar la clave exige la actual.
-    if (!me.debeCambiar && !(typeof accesoActual === 'string' && safeEqual(keys.verifierOf(accesoActual), me.verificador))) {
-      return fail(401, 'credenciales', 'La clave actual no es correcta.');
-    }
-    if (safeEqual(keys.verifierOf(b.acceso), me.verificador)) {
-      return fail(400, 'clave_igual', 'La clave nueva debe ser distinta de la actual.');
-    }
-    await db.putUser({
-      ...me,
-      sal: b.sal,
-      iter: b.iter,
-      verificador: keys.verifierOf(b.acceso),
-      envuelta: b.envuelta,
-      debeCambiar: false,
-      tempExpira: null,
-      claveCambiada: t,
-      actualizado: t,
-    });
+    const verificador = keys.verifierOf(b.acceso);
+    /**
+     * Por qué no se puede cambiar la clave de la cuenta tal como está (null si se puede).
+     * @param {Cuenta} cur
+     */
+    const problem = (cur) => {
+      // La clave cambió desde que se verificó la sesión (un administrador la restableció y cierra
+      // sus sesiones): no se pisa la restablecida.
+      if (cur.verificador !== me.verificador) return fail(401, 'sesion_invalida', 'La sesión terminó. Vuelve a entrar con tu RUT y clave.');
+      // Fuera del primer ingreso, cambiar la clave exige la actual.
+      if (!cur.debeCambiar && !(typeof accesoActual === 'string' && safeEqual(keys.verifierOf(accesoActual), cur.verificador))) {
+        return fail(401, 'credenciales', 'La clave actual no es correcta.');
+      }
+      if (safeEqual(verificador, cur.verificador)) return fail(400, 'clave_igual', 'La clave nueva debe ser distinta de la actual.');
+      return null;
+    };
+    // Sobre la cuenta vigente al escribir: no pisa un cambio simultáneo (p. ej. una desactivación).
+    const r = await db.updateUser(me.id, (cur) =>
+      problem(cur)
+        ? null
+        : {
+            ...cur,
+            sal: b.sal,
+            iter: b.iter,
+            verificador,
+            envuelta: b.envuelta,
+            debeCambiar: false,
+            tempExpira: null,
+            claveCambiada: t,
+            actualizado: t,
+          },
+    );
+    // authenticate acaba de leer la cuenta: r es null solo si se borró entretanto.
+    if (!r) return fail(403, 'cuenta_desactivada', 'Tu cuenta está desactivada. Habla con un administrador.');
+    if (!r.despues) return /** @type {Response} */ (problem(r.antes));
     await db.audit({ ev: 'sesion.clave', u: me.id, s: a.sid });
     // La sesión existe: authenticate acaba de leerla.
     const ses = /** @type {Sesion} */ (await db.getSession(a.sid));

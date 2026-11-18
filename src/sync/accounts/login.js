@@ -70,6 +70,9 @@ export function createLogin({ db, keys, attempts, now, randId }) {
 
   /**
    * Bloquea por intentos fallidos (si no lo estaba ya): la cuenta, o el id ficticio.
+   * Sobre la cuenta vigente (no la leída al empezar): no pisa lo que cambió
+   * entretanto. Si la clave cambió (un administrador la restableció), los
+   * intentos eran contra la anterior y no se bloquea.
    * @param {Cuenta | null} u @param {string} id @param {number} t
    */
   async function lock(u, id, t) {
@@ -77,9 +80,12 @@ export function createLogin({ db, keys, attempts, now, randId }) {
       if ((await fakeLockedUntil(id, t)) <= t) await attempts.add('bloqueo', id, t);
       return;
     }
-    if ((u.bloqueadaHasta || 0) > t) return;
-    await db.putUser({ ...u, fallos: 0, bloqueadaHasta: t + ACCOUNT_LOCK.lockMs });
-    await db.audit({ ev: 'sesion.bloqueada', u: u.id });
+    const r = await db.updateUser(u.id, (cur) =>
+      cur.verificador !== u.verificador || (cur.bloqueadaHasta || 0) > t
+        ? null
+        : { ...cur, fallos: 0, bloqueadaHasta: t + ACCOUNT_LOCK.lockMs },
+    );
+    if (r?.despues) await db.audit({ ev: 'sesion.bloqueada', u: u.id });
   }
 
   /**
@@ -136,24 +142,48 @@ export function createLogin({ db, keys, attempts, now, randId }) {
     return null;
   }
 
-  /** Clave correcta: abre la sesión (si la cuenta puede entrar). @param {Cuenta} u @param {number} t */
-  async function openSession(u, t) {
-    const state = loginState(u, t);
+  /**
+   * Por qué la cuenta, tal como está ahora, no puede abrir una sesión con la
+   * clave `verificador` (null si puede).
+   * @param {Cuenta} cur @param {string} verificador @param {number} t
+   */
+  function refusal(cur, verificador, t) {
+    // La clave cambió desde que se revisó (restablecida o cambiada): la recibida ya no es la vigente.
+    if (cur.verificador !== verificador) return fail(401, 'credenciales', 'RUT o clave incorrectos.');
+    const state = loginState(cur, t);
     if (state === 'desactivada') return fail(403, 'cuenta_desactivada', 'Tu cuenta está desactivada. Habla con un administrador.');
+    // Bloqueada entretanto por intentos simultáneos: el bloqueo se respeta.
+    if (state === 'bloqueada') return lockedResponse(cur.bloqueadaHasta, t);
     if (state === 'clave_inicial_vencida') {
       return fail(403, 'clave_inicial_vencida', 'Tu clave inicial venció. Pide a un administrador que la restablezca.');
     }
+    return null;
+  }
+
+  /**
+   * Clave correcta: abre la sesión (si la cuenta puede entrar). Lo decide
+   * sobre la cuenta vigente al escribir, no sobre la leída al empezar: una
+   * desactivación, un bloqueo o una clave nueva escritos entretanto se respetan.
+   * @param {Cuenta} u la cuenta con la que se revisó la clave @param {number} t
+   */
+  async function openSession(u, t) {
+    const r = await db.updateUser(u.id, (cur) =>
+      refusal(cur, u.verificador, t) ? null : { ...cur, fallos: 0, bloqueadaHasta: 0, ultimoIngreso: t },
+    );
+    // La cuenta existe (se acaba de leer): r es null solo si se borró entretanto.
+    if (!r) return fail(401, 'credenciales', 'RUT o clave incorrectos.');
+    if (!r.despues) return /** @type {Response} */ (refusal(r.antes, u.verificador, t));
+    const cuenta = r.despues;
     const sid = dayOf(t) + randId(16);
     const exp = t + SESSION_MS;
-    await db.putSession(sid, { uid: u.id, inicio: t, ultimo: t, exp });
-    await db.putUser({ ...u, fallos: 0, bloqueadaHasta: 0, ultimoIngreso: t });
-    await db.audit({ ev: 'sesion.inicio', u: u.id, s: sid });
-    const { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta } = u;
+    await db.putSession(sid, { uid: cuenta.id, inicio: t, ultimo: t, exp });
+    await db.audit({ ev: 'sesion.inicio', u: cuenta.id, s: sid });
+    const { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta } = cuenta;
     return json(200, {
-      token: keys.signToken({ u: u.id, s: sid, e: exp, c: u.debeCambiar }),
+      token: keys.signToken({ u: id, s: sid, e: exp, c: debeCambiar }),
       exp,
       sesion: sid,
-      usuario: { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta, complemento: keys.complementOf(u.id) },
+      usuario: { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta, complemento: keys.complementOf(id) },
     });
   }
 

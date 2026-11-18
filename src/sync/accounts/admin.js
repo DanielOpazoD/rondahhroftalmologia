@@ -145,10 +145,12 @@ export function createAdmin({ db, keys, attempts, now, rand }) {
 
   /** Nueva clave inicial para una cuenta (el administrador la entrega en persona). @param {PeticionConSesion} p */
   async function restablecer({ b, t, a, me }) {
-    const u = isUserId(b.id) ? await db.getUser(b.id) : null;
-    if (!u) return fail(404, 'no_existe', 'La cuenta no existe.');
-    if (!isCredentials(b)) return fail(400, 'datos_invalidos', 'Credenciales inválidas');
-    await db.putUser(withInitialPassword(u, b, t));
+    const c = isCredentials(b) ? b : null;
+    // Sobre la cuenta vigente al escribir: no pisa un cambio simultáneo (edición, bloqueo, ingreso).
+    const r = isUserId(b.id) ? await db.updateUser(b.id, (cur) => (c ? withInitialPassword(cur, c, t) : null)) : null;
+    if (!r) return fail(404, 'no_existe', 'La cuenta no existe.');
+    if (!r.despues) return fail(400, 'datos_invalidos', 'Credenciales inválidas');
+    const u = r.despues;
     await attempts.clear('cuenta', u.id);
     await db.closeSessionsOf(u.id, 'clave_restablecida');
     await db.audit({ ev: 'usuario.restablecer', u: me.id, s: a.sid, obj: u.id });
@@ -157,16 +159,25 @@ export function createAdmin({ db, keys, attempts, now, rand }) {
 
   /** @param {PeticionConSesion} p */
   async function editar({ b, t, a, me }) {
-    const u = isUserId(b.id) ? await db.getUser(b.id) : null;
-    if (!u) return fail(404, 'no_existe', 'La cuenta no existe.');
-    const r = accountChanges(b);
-    if ('error' in r) return fail(400, 'datos_invalidos', r.error);
-    const { changes } = r;
-    const next = { ...u, ...changes, actualizado: t };
-    // Siempre debe quedar al menos un administrador activo.
-    const users = (await db.allUsers()).map((x) => (x.id === u.id ? next : x));
-    if (!activeAdmins(users).length) return fail(409, 'ultimo_admin', 'Debe quedar al menos un administrador activo.');
-    await db.putUser(next);
+    const v = accountChanges(b);
+    // Cambios válidos, o null: se rechazan después de ver que la cuenta existe (404 antes que 400).
+    const valid = 'error' in v ? null : v.changes;
+    const users = isUserId(b.id) && valid ? await db.allUsers() : [];
+    /**
+     * La cuenta con los cambios, aplicados sobre la versión vigente al escribir (dos ediciones
+     * simultáneas no se pisan); null si no quedaría ningún administrador activo.
+     * @param {Cuenta} cur
+     */
+    const edited = (cur) => {
+      const next = { ...cur, ...valid, actualizado: t };
+      return activeAdmins(users.map((x) => (x.id === cur.id ? next : x))).length ? next : null;
+    };
+    const r = isUserId(b.id) ? await db.updateUser(b.id, (cur) => (valid ? edited(cur) : null)) : null;
+    if (!r) return fail(404, 'no_existe', 'La cuenta no existe.');
+    if ('error' in v) return fail(400, 'datos_invalidos', v.error);
+    if (!r.despues) return fail(409, 'ultimo_admin', 'Debe quedar al menos un administrador activo.');
+    const { changes } = v;
+    const { antes: u, despues: next } = r;
     if (changes.estado === 'desactivado' && u.estado !== 'desactivado') await db.closeSessionsOf(u.id, 'cuenta_desactivada');
     const campos = Object.keys(changes).filter(
       (k) => JSON.stringify(changes[/** @type {keyof typeof changes} */ (k)]) !== JSON.stringify(u[/** @type {keyof Cuenta} */ (k)]),
@@ -223,7 +234,8 @@ export function createAdmin({ db, keys, attempts, now, rand }) {
     const c = await credentials(uid, keys.complementOf(uid));
     if (!isCredentials(c)) throw new Error('Credenciales inválidas');
     if (u) {
-      await db.putUser(withInitialPassword({ ...u, admin: true, estado: 'activo' }, c, t));
+      const r = await db.updateUser(uid, (cur) => withInitialPassword({ ...cur, admin: true, estado: 'activo' }, c, t));
+      if (!r) throw new Error('La cuenta ya no existe');
       await attempts.clear('cuenta', uid);
       await db.closeSessionsOf(uid, 'clave_restablecida');
     } else {
