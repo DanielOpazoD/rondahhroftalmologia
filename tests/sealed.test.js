@@ -178,6 +178,12 @@ test('llave del PC: se crea al entrar con conexión, se abre con la clave person
   // Nueva clave del equipo: abre con la cuenta y renueva el estuche del equipo.
   await make().unlockOnline({ teamKeyB64: K2, uid: 'uA', local: LOCAL_B });
   await make().unlockOnline({ teamKeyB64: K2, uid: 'uC', local: LOCAL_A });
+  // Cuenta desactivada o quitada de este PC: su estuche se borra y ya no abre sin conexión.
+  make().forget({ uid: 'uC' });
+  assert.equal(await make().unlockOffline({ uid: 'uC', local: LOCAL_A }), 'missing');
+  make().forget({ keep: ['uA'] });
+  assert.equal(await make().unlockOffline({ uid: 'uB', local: LOCAL_A2 }), 'missing');
+  assert.equal(await make().unlockOffline({ uid: 'uA', local: LOCAL_B }), 'ok', 'las demás siguen');
   // Si nada la abre, se avisa (no se crea otra llave encima de los datos).
   await assert.rejects(make().unlockOnline({ teamKeyB64: K1, uid: 'uZ', local: LOCAL_A }), /No se pudieron abrir/);
 });

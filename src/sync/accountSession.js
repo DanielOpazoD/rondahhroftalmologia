@@ -30,6 +30,7 @@ import {
  *   unlockOnline: (o: {teamKeyB64: string, uid: string, local: string}) => Promise<void>,
  *   unlockOffline: (o: {uid: string, local: string}) => Promise<'ok' | 'wrong' | 'missing'>,
  *   rewrap: (o: {uid: string, local: string}) => Promise<void>,
+ *   forget: (o: {uid?: string, keep?: string[]}) => void,
  * }} LlavePc  llave que cifra los datos de este PC (storage/pcVault.js, ADR 0016)
  */
 
@@ -98,6 +99,8 @@ export function createAccountSession({
     const all = locals();
     delete all[uid];
     persist(() => store.saveLocalAccounts(all));
+    // Y su estuche: sin conexión ya no abre los datos de este PC.
+    vault?.forget({ uid });
   }
   const saveSession = () => st.token && session.set({ uid: st.user?.id, token: st.token, exp: st.exp });
   function clear() {
@@ -133,7 +136,12 @@ export function createAccountSession({
       throw e;
     }
     const sec = await deriveAccountSecrets(password, s.sal, s.iter);
-    const r = await api.entrar(rut, sec.acceso);
+    const r = await api.entrar(rut, sec.acceso).catch((e) => {
+      // Cuenta desactivada: se olvida en este PC (sin conexión tampoco debe poder entrar).
+      const known = /** @type {any} */ (e).code === 'cuenta_desactivada' && localByRut(rut);
+      if (known) removeLocal(known.uid);
+      throw e;
+    });
     const u = r.usuario;
     const teamKey = await unwrapTeamKey(u.envuelta, { envoltura: sec.envoltura, complemento: u.complemento, uid: u.id });
     const perfil = await decryptProfile(await importEncKey(teamKey), u.id, u.perfil);
@@ -175,6 +183,8 @@ export function createAccountSession({
       rol: u.rol,
       admin: u.admin === true,
     });
+    // Estuches solo de cuentas que siguen en este PC (las quitadas no abren sin conexión).
+    vault?.forget({ keep: Object.keys(locals()) });
     if (u.debeCambiar) return { status: 'change', nombre: perfil.nombre };
     complete();
     return { status: 'ok', nombre: perfil.nombre };

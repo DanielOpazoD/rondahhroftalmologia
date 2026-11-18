@@ -142,6 +142,20 @@ export function createPcVault({ storage, name, targets, onOpen = () => {} }) {
     },
 
     /**
+     * Quita estuches de cuentas: las que no están en `keep` (o solo `uid`, si se da).
+     * Se usa al desactivar una cuenta o quitarla de este PC: deja de poder abrir
+     * los datos sin conexión. No necesita la llave abierta.
+     * @param {{uid?: string, keep?: string[]}} o
+     */
+    forget({ uid, keep }) {
+      const file = read();
+      if (!file) return;
+      const cuentas = { ...file.cuentas };
+      for (const id of Object.keys(cuentas)) if (id === uid || (keep && !keep.includes(id))) delete cuentas[id];
+      if (Object.keys(cuentas).length !== Object.keys(file.cuentas).length) write({ ...file, cuentas });
+    },
+
+    /**
      * Tras cambiar la clave: rehace el estuche de la cuenta (el anterior deja de servir).
      * @param {{uid: string, local: string}} o
      */
