@@ -45,7 +45,7 @@ Lo encontró el perfil de CPU (no la intuición):
 
 <!-- mediciones -->
 
-## Última medición (2026-11-18, versión 2.32.0)
+## Última medición (2026-11-18, versión 2.34.0)
 
 ```text
 Tamaño: 1285 KB (gzip 643 KB, brotli 592 KB) · JS 624 KB · plantillas PDF 545 KB · CSS 54 KB

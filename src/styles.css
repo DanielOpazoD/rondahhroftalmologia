@@ -1394,10 +1394,23 @@ table.st tr.tot td {
   color: var(--on-bad);
   box-shadow: var(--shadow-lg);
   pointer-events: auto; /* el mensaje breve deja pasar los clics; este tiene su botón Cerrar */
+  /* Es un popover (capa superior): se quitan la posición y el marco que le da el navegador. */
+  top: auto;
+  right: auto;
+  margin: 0;
+  border: 0;
+  overflow: visible;
 }
 .toast.err .ib {
   color: inherit;
   flex: none;
+}
+.toast.err .ib:hover {
+  background: color-mix(in srgb, var(--on-bad) 18%, transparent);
+  color: inherit;
+}
+.toast.err .ib:focus-visible {
+  outline-color: var(--on-bad);
 }
 .toast.err .ib svg {
   transform: rotate(45deg);

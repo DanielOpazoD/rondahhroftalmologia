@@ -57,24 +57,37 @@ export function toast(message, ms = 2200) {
 
 /**
  * Aviso de error: queda a la vista hasta que la persona lo cierra (no se pierde
- * si mira a otro lado, como el mensaje breve) y se anuncia como alerta.
+ * si mira a otro lado, como el mensaje breve) y se anuncia como alerta. Va en
+ * la capa superior (`popover`): un diálogo abierto no lo tapa. Un error nuevo
+ * reemplaza el texto del anterior.
  * @param {string} message
  */
 export function errorToast(message) {
   const box = $('#errToast');
   $('#errToastText').textContent = message;
-  if (box.hidden) {
-    box.hidden = false;
-    box.classList.add('on');
-    $('#errToastClose').addEventListener(
-      'click',
-      () => {
-        box.classList.remove('on');
-        box.hidden = true;
-      },
-      { once: true },
-    );
-  }
+  if (!box.hidden) return;
+  // Al cerrarlo, el foco vuelve a donde estaba (si no, queda en la página).
+  const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const close = () => {
+    const hadFocus = box.contains(document.activeElement);
+    box.classList.remove('on');
+    if (box.matches(':popover-open')) box.hidePopover();
+    box.hidden = true;
+    box.removeEventListener('keydown', onKey);
+    if (hadFocus && before?.isConnected) before.focus();
+  };
+  /** @param {KeyboardEvent} e */
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation(); // que no cierre también el diálogo de abajo
+      close();
+    }
+  };
+  box.hidden = false;
+  box.showPopover?.();
+  box.classList.add('on');
+  box.addEventListener('keydown', onKey);
+  $('#errToastClose').addEventListener('click', close, { once: true });
 }
 
 /**

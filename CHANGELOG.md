@@ -1,5 +1,18 @@
 # Cambios
 
+## 2.34.0 — 2026-11-18
+
+### Interfaz: fase 3 de la deuda (accesibilidad y listas grandes)
+- **Los errores ya no se pierden:** un fallo al guardar, al sincronizar o al unir fichas queda en un aviso rojo hasta que se cierra (antes desaparecía en 2 segundos). Se anuncia al lector de pantalla, queda por encima de los diálogos, se cierra con Escape y devuelve el foco a donde estaba.
+- **Pacientes sin tope de 500:** con más pacientes se muestran de a 500 con «Mostrar N más». Antes, los más antiguos solo se alcanzaban buscando. «Ver ficha» desde «Posibles duplicados» abre al paciente aunque esté más allá de la página.
+- **Foco de teclado visible** en campos y botones.
+- **Botones de 44 px en pantallas táctiles.** La atención compacta queda solo para mouse.
+- **Texto sobre rojo legible en el tema oscuro:** el botón Eliminar tenía contraste 2,69:1; ahora 6,87:1.
+
+### Operación
+- docs/OPERACION.md: custodia de la contraseña del equipo y qué hacer si se pierde o se filtra.
+- Pruebas en navegador sin esperas fijas (reloj simulado), menos frágiles.
+
 ## 2.33.0 — 2026-11-18
 
 ### Operación: fase 2 de la deuda (docs/OPERACION.md)
