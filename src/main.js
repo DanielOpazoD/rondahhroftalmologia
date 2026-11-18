@@ -11,7 +11,7 @@ import { createPcVault } from './storage/pcVault.js';
 import { blankRecord } from './core/record.js';
 import { STORAGE_KEYS as K, SEALED_KEYS } from './config/catalogs.js';
 import { createContext } from './ui/context.js';
-import { $, $$, toast, errorToast } from './ui/dom.js';
+import { $, $$, toast, errorToast, dataOf } from './ui/dom.js';
 import { initAttentionView, syncAttentionView } from './ui/attentionView.js';
 import { initRegistryView } from './ui/registryView.js';
 import { initFilter } from './ui/statsView.js';
@@ -204,11 +204,11 @@ async function main() {
   ctx.on(TOPICS.CUENTA, () => applyPermissions(ctx));
   ctx.seedCatalogs();
 
-  $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));
+  $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(dataOf(b, 'tab'))));
   // Teclado en las pestañas (patrón WAI-ARIA): flechas, Inicio y Fin.
   $('nav').addEventListener('keydown', (/** @type {KeyboardEvent} */ e) => {
     const tabs = $$('nav button');
-    const i = tabs.indexOf(document.activeElement);
+    const i = tabs.findIndex((t) => t === document.activeElement);
     if (i < 0) return;
     /** @type {Record<string, number | undefined>} */
     const keys = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 };
@@ -216,7 +216,7 @@ async function main() {
     if (next === undefined) return;
     e.preventDefault();
     const t = tabs[(next + tabs.length) % tabs.length];
-    ctx.showTab(t.dataset.tab);
+    ctx.showTab(dataOf(t, 'tab'));
     t.focus();
   });
   $('#bNew').addEventListener('click', () => ctx.newAttention());

@@ -58,6 +58,7 @@ Un cambio que contradiga una decisión de [docs/adr](docs/adr/README.md) necesit
 | El HTML de la interfaz se arma con `html` y se escribe con `setHtml` (`ui/html.js`), que escapan solos | ESLint prohíbe `innerHTML`, `outerHTML` e `insertAdjacentHTML` |
 | Sin infracciones WCAG 2.1 A/AA en pestañas y diálogos | Prueba (`e2e/accesibilidad.spec.js`) |
 | Cada id que usa la interfaz existe en `index.html` | Prueba |
+| `$('#id')` tiene el tipo de su elemento: al cambiar ids o etiquetas de la plantilla, `npm run elementos -- --write` | Prueba (`tests/elementos.test.js`) |
 | La versión vive solo en `package.json` | `src/config/catalogs.js` la importa |
 | Dependencias con versión exacta | `package.json` y `package-lock.json` |
 | Cambios en datos o sincronización van con pruebas, incluida convergencia con varios PC | Revisión de código |

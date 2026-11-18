@@ -17,7 +17,7 @@ export function initAttachmentsView(ctx) {
   input.setAttribute('accept', ACCEPT);
   $('#attAdd').addEventListener('click', () => input.click());
   input.addEventListener('change', async () => {
-    const files = [...input.files];
+    const files = [...(input.files || [])];
     input.value = '';
     await ctx.addAttachments(files);
   });

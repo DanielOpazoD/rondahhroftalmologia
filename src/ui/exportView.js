@@ -35,7 +35,7 @@ function suffix(ctx) {
 /** @param {AppContext} ctx */
 export function initExportView(ctx) {
   /**
-   * @param {string} sel
+   * @param {'#anFechas' | '#anEdad' | '#anTexto'} sel
    * @param {string[][]} opts pares [valor, etiqueta]
    * @param {string} value elegido
    */

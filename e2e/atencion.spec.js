@@ -30,6 +30,18 @@ test('no guarda sin nombre ni RUT y lo indica junto al campo', async ({ page }) 
   await expect(page.locator('#paciente_nombres')).toHaveClass(/invalid/);
 });
 
+test('validar la atención no borra los mensajes de error de otras pantallas', async ({ page }) => {
+  // #usersErr (Ajustes → Usuarios) también es un .msg, pero no de un campo de la atención.
+  await page.evaluate(() => {
+    const err = /** @type {HTMLElement} */ (document.querySelector('#usersErr'));
+    err.textContent = 'No se pudo cargar';
+  });
+  await save(page);
+  await expect(page.locator('[data-msg="paciente_nombres"]')).toHaveText('Requerido (nombre o RUT)');
+  await expect(page.locator('#usersErr')).toHaveText('No se pudo cargar');
+  await expect(page.locator('#usersErr')).toHaveClass('msg err');
+});
+
 test('la fecha de nacimiento calcula la edad (solo lectura)', async ({ page }) => {
   await fillPatient(page, { nombre: 'Edad Calculada' });
   await page.locator('#paciente_fnac').fill('1959-11-15');

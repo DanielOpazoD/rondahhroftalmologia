@@ -285,10 +285,10 @@ export function unpackBackup(bytes) {
  * contenido se acepta solo si coincide con su huella (un archivo dañado o
  * manipulado no entra); si falta, el adjunto entra igual y su contenido
  * llegará al sincronizar.
- * @param {any[]} metas metadatos del respaldo (ya normalizados)
+ * @param {import('../domain').Adjunto[]} metas metadatos del respaldo (ya normalizados)
  * @param {Map<string, Uint8Array>} contents
  * @param {(id: string) => boolean} known ¿este equipo ya tiene ese adjunto?
- * @returns {Promise<{metas: any[], contents: Map<string, Uint8Array>, rechazados: string[]}>}
+ * @returns {Promise<{metas: import('../domain').Adjunto[], contents: Map<string, Uint8Array>, rechazados: string[]}>}
  */
 export async function attachmentsToImport(metas, contents, known) {
   const add = metas.filter((m) => !known(m.id));

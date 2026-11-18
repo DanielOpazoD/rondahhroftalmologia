@@ -10,6 +10,7 @@
  * - Tras varios intentos fallidos hay que esperar, cada vez más.
  */
 import { hmacSha256, toHex, utf8 } from '../lib/sha256.js';
+import { isRecord } from './guards.js';
 
 const PIN_ITERATIONS = 20_000;
 export const PIN_MINUTES = [5, 10, 15, 30];
@@ -108,12 +109,12 @@ export const verifyPin = (lock, pin) => !!lock?.hash && same(pbkdf2(String(pin ?
 export const verifyRecovery = (lock, code) => !!lock?.rhash && same(pbkdf2(normCode(code), lock.rsalt, lock.iter), lock.rhash);
 
 /** ¿Es una configuración de bloqueo válida? (lo guardado puede venir alterado o de otra versión) */
-/** @type {(l: any) => boolean} lo guardado, sin validar */
+/** @type {(l: unknown) => boolean} lo guardado, sin validar */
 export const isLockConfig = (l) =>
-  Boolean(l) &&
-  typeof l === 'object' &&
-  /^[0-9a-f]{64}$/.test(l.hash || '') &&
-  /^[0-9a-f]{32}$/.test(l.salt || '') &&
+  isRecord(l) &&
+  /^[0-9a-f]{64}$/.test(String(l.hash || '')) &&
+  /^[0-9a-f]{32}$/.test(String(l.salt || '')) &&
+  typeof l.iter === 'number' &&
   Number.isInteger(l.iter) &&
   l.iter >= 1000;
 

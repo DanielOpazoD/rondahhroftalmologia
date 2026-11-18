@@ -112,7 +112,7 @@ export function initAttentionView(ctx) {
     else procs[id] = cur;
     ctx.changed();
   });
-  list.addEventListener('input', (/** @type {InputEvent} */ e) => {
+  list.addEventListener('input', (e) => {
     const d = /** @type {HTMLInputElement | null} */ (closestTo(e, '.pdesc input'));
     if (d) {
       const id = procIdOf(d);
@@ -152,7 +152,7 @@ export function initAttentionView(ctx) {
       ctx.changed({ silent: !ageChanged && k !== 'paciente_fnac' });
     }
   });
-  $('#dupJoin').addEventListener('click', () => ctx.joinExisting($('#dupBanner').dataset.id));
+  $('#dupJoin').addEventListener('click', () => ctx.joinExisting(dataOf($('#dupBanner'), 'id')));
   $('#paciente_rut').addEventListener('blur', (/** @type {FocusEvent} */ e) => {
     const input = /** @type {HTMLInputElement} */ (e.target);
     if (!input.value.trim()) return;
@@ -207,7 +207,7 @@ export function syncAttentionView(ctx) {
     const el = /** @type {HTMLInputElement | null} */ (document.getElementById(k));
     if (el && el.value !== (rec.f[k] || '')) el.value = rec.f[k] || '';
   }
-  $$('.chip[data-k]').forEach((c) => setPressed(c, !!rec.checks[c.dataset.k]));
+  $$('.chip[data-k]').forEach((c) => setPressed(c, !!rec.checks[dataOf(c, 'k')]));
   $('#cxBox').hidden = !rec.checks.antecedente_cirugia;
   $('#schBox').hidden = !rec.checks.procedimiento_test_schirmer;
   $('#catBox').hidden = !rec.checks.diagnostico_catarata;
@@ -238,7 +238,7 @@ export function syncAttentionView(ctx) {
       /** @type {HTMLElement} */ (d.closest('.pf')).hidden = !!p && !coversEye(p.eye, e);
     });
   });
-  $('#procBadge').textContent = n;
+  $('#procBadge').textContent = String(n);
   const fromBirth = isIsoDate(rec.f.paciente_fnac);
   $('#paciente_edad').readOnly = fromBirth;
   $('#paciente_edad').title = fromBirth ? 'Calculada desde la fecha de nacimiento' : '';
@@ -302,8 +302,10 @@ export function renderToolbar(ctx) {
  */
 export function showValidation(ctx, { showErrors = false } = {}) {
   const { fields } = validateRecord(editingOf(ctx));
-  $$('.msg').forEach((m) => {
-    const k = m.dataset.msg;
+  // Solo los mensajes de los campos (data-msg): los demás .msg (errores del
+  // ingreso, del bloqueo, de los diálogos…) son de otras pantallas y no se tocan.
+  $$('.msg[data-msg]').forEach((m) => {
+    const k = dataOf(m, 'msg');
     const item = fields[k];
     const show = !!item && (item.level === 'warn' || showErrors);
     m.textContent = show ? item.msg : '';
@@ -375,7 +377,7 @@ export function renderHistory(ctx) {
   const id = ctx.rec.id;
   const entries = id ? ctx.store.auditFor(id) : [];
   $('#histCard').hidden = !entries.length;
-  $('#histCount').textContent = entries.length;
+  $('#histCount').textContent = String(entries.length);
   setHtml(
     $('#histList'),
     html`${entries.map((e) => {

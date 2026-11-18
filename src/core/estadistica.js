@@ -11,9 +11,17 @@ import { parseNumber } from './format.js';
  */
 
 /**
+ * Lo único que estas funciones leen de una atención: sus campos de texto.
+ * Cada especialidad pasa sus propias atenciones y recibe el mismo tipo de vuelta.
+ * @typedef {{f?: Record<string, string | undefined>}} ConCampos
+ */
+
+/**
  * Aplica un filtro por operativo y rango de fechas.
- * @param {any[]} records
+ * @template {ConCampos} R
+ * @param {R[]} records
  * @param {RecordFilter} [filter]
+ * @returns {R[]}
  */
 export function filterRecords(records, filter = {}) {
   const { operativo, desde, hasta } = filter;
@@ -36,7 +44,7 @@ export function describeFilter(filter = {}, fmt = (x) => x) {
 
 /**
  * Operativos distintos presentes en los registros, ordenados.
- * @param {any[]} records
+ * @param {ConCampos[]} records
  */
 export function operativosOf(records) {
   return [...new Set(records.map((r) => (r.f?.operativo || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
@@ -44,7 +52,7 @@ export function operativosOf(records) {
 
 /**
  * Edad como entero o null.
- * @param {{f?: Record<string, string | undefined>}} rec
+ * @param {ConCampos} rec
  */
 export function ageOf(rec) {
   const n = parseNumber(rec.f?.paciente_edad);

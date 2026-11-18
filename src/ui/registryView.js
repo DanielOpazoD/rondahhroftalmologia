@@ -181,7 +181,7 @@ export function renderRegistry(ctx) {
       (a, b) =>
         compareCode(b.recs[0].f.fecha_atencion || '', a.recs[0].f.fecha_atencion || '') || compareEs(patientLabel(a.p), patientLabel(b.p)),
     );
-  $('#regCount').textContent = patients.length;
+  $('#regCount').textContent = String(patients.length);
   // La ficha desplegada siempre se dibuja, aunque esté más allá de las páginas mostradas.
   const openAt = ctx.openPatientId ? patients.findIndex(({ p }) => p.id === ctx.openPatientId) : -1;
   if (openAt >= shown) shown = (Math.floor(openAt / PAGE) + 1) * PAGE;

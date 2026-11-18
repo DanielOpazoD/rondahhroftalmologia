@@ -125,7 +125,15 @@ export function createSyncApi({
     }
   };
 
-  /** @type {(path: string, body?: unknown, extra?: string) => Promise<any>} respuesta JSON del servidor */
+  /**
+   * Solicitud con reintentos. Devuelve el JSON del servidor con la forma que
+   * declara cada método de `api` (abajo; la de src/sync/server.js).
+   * @template T
+   * @param {string} path
+   * @param {unknown} [body]
+   * @param {string} [extra]
+   * @returns {Promise<T>}
+   */
   const call = async (path, body, extra = '') => {
     for (let attempt = 0; ; attempt++) {
       try {
