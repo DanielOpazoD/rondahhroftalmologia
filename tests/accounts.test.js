@@ -218,7 +218,7 @@ describe('servidor de cuentas', () => {
     // Sal de un RUT sin cuenta: estable y con la misma forma.
     const a = await env.call('cuentas/sal', { body: { rut: '11.111.111-1' } });
     const b = await env.call('cuentas/sal', { body: { rut: '11.111.111-1' } });
-    assert.equal(a.body.iter, ACCOUNT_ITERATIONS, 'las iteraciones de una cuenta nueva (600 000): no delata que no existe');
+    assert.equal(a.body.iter, ACCOUNT_ITERATIONS, 'las mismas iteraciones que una cuenta real: no delata que no existe');
     assert.equal(a.body.sal, b.body.sal);
     assert.equal(a.body.sal.length, 24);
     assert.equal((await env.login('11.111.111-1', '11111111')).status, 401);
@@ -892,9 +892,11 @@ test('desactivar cierra la sesión abierta aunque haya empezado ayer, sin leer t
   assert.ok(mine.length && mine.every((s) => s.fin && s.motivo), 'la sesión de ayer quedó cerrada');
 });
 
-test('claves nuevas con 600 000 iteraciones de PBKDF2 (OWASP); las anteriores conservan las suyas', async () => {
-  assert.equal(ACCOUNT_ITERATIONS, 600_000);
+test('iteraciones de PBKDF2: las de todas las cuentas (subirlas sin migrar delataría qué RUT tiene cuenta)', async () => {
+  // La sal falsa de un RUT sin cuenta responde ACCOUNT_ITERATIONS. Si cambia,
+  // las cuentas existentes (310 000) se distinguirían de las inexistentes.
+  assert.equal(ACCOUNT_ITERATIONS, 310_000, 'antes de subirlas, migra todas las cuentas al entrar (ADR 0014)');
   const keys = await deriveTeamKeys('K7QM3-XRT9P-ZAWD4-N8F2C', 1000);
   const c = await credentialsFor({ password: 'Ojo#2026', teamKeyB64: keys.encKey, uid: 'u0123456789abcdef', complemento: 'ab'.repeat(32) });
-  assert.equal(c.iter, 600_000);
+  assert.equal(c.iter, ACCOUNT_ITERATIONS);
 });

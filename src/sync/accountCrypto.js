@@ -18,11 +18,13 @@ import { utf8, toHex, hmacSha256 } from '../lib/sha256.js';
 import { bytesToB64, b64ToBytes, encryptPayload, decryptPayload, DecryptError, isObject } from './crypto.js';
 
 /**
- * Iteraciones de PBKDF2 para las claves NUEVAS (600 000, recomendación OWASP
- * para SHA-256; hasta 2.32 eran 310 000). Cada cuenta guarda las suyas: una
- * clave anterior sigue sirviendo y pasa a 600 000 cuando la persona la cambia.
+ * Iteraciones de PBKDF2 de las claves personales. El servidor responde la sal
+ * de un RUT sin cuenta con estas mismas iteraciones (accounts/login.js), así
+ * que deben ser las de TODAS las cuentas: si se suben solo para las claves
+ * nuevas, una respuesta distinta delata qué RUT tiene cuenta. Subirlas a
+ * 600 000 (OWASP) exige antes migrar cada cuenta al entrar (ADR 0014).
  */
-export const ACCOUNT_ITERATIONS = 600_000;
+export const ACCOUNT_ITERATIONS = 310_000;
 const LABEL = 'hhr-cuentas-v1';
 
 /** Sal nueva para una cuenta (base64, 16 bytes). */
