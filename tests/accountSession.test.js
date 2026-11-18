@@ -62,7 +62,7 @@ test('sesión: activar, primer ingreso con cambio de clave, y la clave del equip
   const r = await B.session.login('17752753-k', '17752753');
   assert.deepEqual(r, { status: 'change', nombre: 'Dra. Admin' });
   assert.equal(B.reloadTab(), null, 'sin clave nueva, la sesión de la pestaña no se guarda');
-  await B.session.changePassword('Ojo2026');
+  await B.session.changePassword('Ojo#2026');
   assert.ok(B.reloadTab()?.token);
   assert.equal(B.store.loadSyncConfig().encKey, w.keys.encKey, 'la clave del equipo llegó al PC');
   assert.equal(B.store.loadSyncConfig().mode, 'cuenta');
@@ -70,7 +70,7 @@ test('sesión: activar, primer ingreso con cambio de clave, y la clave del equip
   // La clave nueva sirve; la inicial ya no.
   const C = w.pc();
   await assert.rejects(C.session.login(RUT, '17752753'), /incorrectos/);
-  assert.equal((await C.session.login(RUT, 'Ojo2026')).status, 'ok');
+  assert.equal((await C.session.login(RUT, 'Ojo#2026')).status, 'ok');
 });
 
 test('sesión: sin conexión entra con lo guardado en el PC; al volver, renueva sin pedir la clave', async () => {
@@ -79,21 +79,21 @@ test('sesión: sin conexión entra con lo guardado en el PC; al volver, renueva 
   A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
   await A.session.activate({ rut: RUT, nombre: 'Dra. Admin', rol: 'medico' });
   await A.session.login(RUT, '17752753');
-  await A.session.changePassword('Ojo2026');
+  await A.session.changePassword('Ojo#2026');
   await A.session.logout();
   assert.equal(A.session.user, null);
 
   // PC sin conexión: entra con lo guardado; una clave incorrecta no.
   A.net.online = false;
   await assert.rejects(A.session.login(RUT, 'Mala123'), /incorrectos/);
-  assert.deepEqual(await A.session.login(RUT, 'Ojo2026'), { status: 'offline', nombre: 'Dra. Admin' });
+  assert.deepEqual(await A.session.login(RUT, 'Ojo#2026'), { status: 'offline', nombre: 'Dra. Admin' });
   assert.equal(A.session.token(), null);
   A.session.event('ficha.ver', 'p_x');
   assert.equal(A.store.loadAccountEvents()[1].off, true, 'el evento queda marcado como sin conexión');
   // Un PC donde nunca entró no puede sin conexión.
   const N = w.pc();
   N.net.online = false;
-  await assert.rejects(N.session.login(RUT, 'Ojo2026'), /primera vez/);
+  await assert.rejects(N.session.login(RUT, 'Ojo#2026'), /primera vez/);
 
   // Vuelve la conexión: renueva la sesión y envía los eventos pendientes.
   A.net.online = true;
@@ -108,9 +108,9 @@ test('sesión: desbloquear con la clave, recuperar la pestaña y cuenta desactiv
   A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
   await A.session.activate({ rut: RUT, nombre: 'Dra. Admin', rol: 'medico' });
   await A.session.login(RUT, '17752753');
-  await A.session.changePassword('Ojo2026');
+  await A.session.changePassword('Ojo#2026');
   assert.equal(await A.session.verifyPassword('Mala123'), false);
-  assert.equal(await A.session.verifyPassword('Ojo2026'), true);
+  assert.equal(await A.session.verifyPassword('Ojo#2026'), true);
   // Recargar la pestaña: la sesión se recupera.
   const tab = A.reloadTab();
   const A2 = createAccountSession({
@@ -136,7 +136,7 @@ test('sesión: componentes del nombre sobreviven al cifrado, recarga y entrada s
   await A.session.activate({ rut: RUT, nombre: 'Nombre anterior', rol: 'medico', ...names });
   const B = w.pc();
   await B.session.login(RUT, '17752753');
-  await B.session.changePassword('Ojo2026');
+  await B.session.changePassword('Ojo#2026');
   assert.equal(B.session.user.nombre, 'Prueba Ficticio Profesional');
   for (const [k, v] of Object.entries(names)) assert.equal(B.session.user[k], v);
   const copy = createAccountSession({
@@ -149,7 +149,7 @@ test('sesión: componentes del nombre sobreviven al cifrado, recarga y entrada s
   assert.equal(copy.user.apellido_materno, 'Ficticio');
   await B.session.logout();
   B.net.online = false;
-  await B.session.login(RUT, 'Ojo2026');
+  await B.session.login(RUT, 'Ojo#2026');
   assert.equal(B.session.user.nombres, 'Profesional');
 });
 
@@ -160,7 +160,7 @@ async function signedIn() {
   A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
   await A.session.activate({ rut: RUT, nombre: 'Dra. Admin', rol: 'medico' });
   await A.session.login(RUT, '17752753');
-  await A.session.changePassword('Ojo2026');
+  await A.session.changePassword('Ojo#2026');
   A.net.calls.length = 0;
   return { w, A };
 }
@@ -174,7 +174,7 @@ async function until(cond) {
 test('sesión: RUT inválido o clave vacía se rechazan sin consultar al servidor', async () => {
   const w = await world();
   const A = w.pc();
-  await assert.rejects(A.session.login('17.752.753-1', 'Ojo2026'), /dígito verificador/);
+  await assert.rejects(A.session.login('17.752.753-1', 'Ojo#2026'), /dígito verificador/);
   await assert.rejects(A.session.login(RUT, ''), /Escribe tu clave/);
   assert.deepEqual(A.net.calls, []);
 });
@@ -183,7 +183,7 @@ test('sesión: si el servidor responde con error (no es falta de conexión), no 
   const { A } = await signedIn();
   await A.session.logout();
   A.net.down = 503;
-  await assert.rejects(A.session.login(RUT, 'Ojo2026'), /Servidor caído/);
+  await assert.rejects(A.session.login(RUT, 'Ojo#2026'), /Servidor caído/);
   assert.equal(A.session.user, null);
   assert.equal(A.reloadTab(), null);
 });
@@ -191,24 +191,24 @@ test('sesión: si el servidor responde con error (no es falta de conexión), no 
 test('sesión: cambiar la clave exige sesión en línea; cambiar «mi clave» verifica la actual en el servidor', async () => {
   const w = await world();
   const N = w.pc();
-  await assert.rejects(N.session.changePassword('Nueva22'), /conexión/);
-  await assert.rejects(N.session.changeMyPassword('Ojo2026', 'Nueva22'), /No hay sesión/);
+  await assert.rejects(N.session.changePassword('Nueva#22'), /conexión/);
+  await assert.rejects(N.session.changeMyPassword('Ojo#2026', 'Nueva#22'), /No hay sesión/);
 
   const { A, w: w2 } = await signedIn();
   // La regla «distinta de la actual» se revisa aquí: el servidor recibe la clave ya derivada con otra sal.
   const calls = A.net.calls.length;
-  await assert.rejects(A.session.changeMyPassword('Ojo2026', 'Ojo2026'), /distinta de la actual/);
+  await assert.rejects(A.session.changeMyPassword('Ojo#2026', 'Ojo#2026'), /distinta de la actual/);
   assert.equal(A.net.calls.length, calls, 'se rechaza sin ir al servidor');
-  await assert.rejects(A.session.changeMyPassword('Mala123', 'Nueva22'), /clave actual/);
-  await A.session.changeMyPassword('Ojo2026', 'Nueva22');
+  await assert.rejects(A.session.changeMyPassword('Mala123', 'Nueva#22'), /clave actual/);
+  await A.session.changeMyPassword('Ojo#2026', 'Nueva#22');
   const B = w2.pc();
-  await assert.rejects(B.session.login(RUT, 'Ojo2026'), /incorrectos/);
-  assert.equal((await B.session.login(RUT, 'Nueva22')).status, 'ok');
+  await assert.rejects(B.session.login(RUT, 'Ojo#2026'), /incorrectos/);
+  assert.equal((await B.session.login(RUT, 'Nueva#22')).status, 'ok');
   // Lo guardado para entrar sin conexión también quedó con la clave nueva.
   await A.session.logout();
   A.net.online = false;
-  await assert.rejects(A.session.login(RUT, 'Ojo2026'), /incorrectos/);
-  assert.equal((await A.session.login(RUT, 'Nueva22')).status, 'offline');
+  await assert.rejects(A.session.login(RUT, 'Ojo#2026'), /incorrectos/);
+  assert.equal((await A.session.login(RUT, 'Nueva#22')).status, 'offline');
 });
 
 test('sesión: la pestaña no se recupera si falta, venció, no tiene token o es de una cuenta que no está en el PC', async () => {
@@ -238,7 +238,7 @@ test('sesión: salir sin poder avisar al servidor igual cierra la sesión en el 
   assert.equal(A.session.token(), null);
   assert.equal(A.reloadTab(), null);
   // Una sesión que empezó sin conexión: el fin queda en la cola del registro de accesos.
-  await A.session.login(RUT, 'Ojo2026');
+  await A.session.login(RUT, 'Ojo#2026');
   await A.session.logout();
   assert.deepEqual(
     A.store.loadAccountEvents().map((e) => [e.ev, e.off]),
@@ -362,7 +362,7 @@ test('sesión: «credenciales» no reintenta con el acceso en memoria; sin perso
 
 test('sesión: verificar la clave sin sesión o con clave vacía es falso', async () => {
   const w = await world();
-  assert.equal(await w.pc().session.verifyPassword('Ojo2026'), false);
+  assert.equal(await w.pc().session.verifyPassword('Ojo#2026'), false);
   const { A } = await signedIn();
   assert.equal(await A.session.verifyPassword(''), false);
 });
@@ -406,4 +406,29 @@ test('activar las cuentas exige un PC con la contraseña del equipo', async () =
   P.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token, mode: 'cuenta' });
   await assert.rejects(P.session.activate({ rut: RUT, nombre: 'X', rol: 'medico' }), /contraseña del equipo/);
   assert.equal(P.session.on, false);
+});
+
+test('sesión: una clave anterior a las reglas actuales (6 caracteres, sin símbolo) se cambia al entrar', async () => {
+  const w = await world();
+  const A = w.pc();
+  A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
+  await A.session.activate({ rut: RUT, nombre: 'Dra. Admin', rol: 'medico' });
+  await A.session.login(RUT, '17752753');
+  await A.session.changePassword('Ojo2026'); // creada antes de 2.28.0, cuando bastaban 6 caracteres
+  const B = w.pc();
+  assert.deepEqual(await B.session.login(RUT, 'Ojo2026'), { status: 'change', nombre: 'Dra. Admin', weak: true });
+  assert.equal(B.reloadTab(), null, 'sin clave nueva no hay sesión');
+  assert.equal(B.session.pendingChange, true);
+  // El cambio usa la clave con que acaba de entrar (el servidor la exige: no es un primer ingreso).
+  await B.session.changePassword('Ojo#2026');
+  assert.ok(B.reloadTab()?.token);
+  const C = w.pc();
+  await assert.rejects(C.session.login(RUT, 'Ojo2026'), /incorrectos/);
+  assert.equal((await C.session.login(RUT, 'Ojo#2026')).status, 'ok');
+  // Sin conexión no se puede cambiar: entra igual y se le pide al volver a entrar con conexión.
+  const D = w.pc();
+  await D.session.login(RUT, 'Ojo#2026');
+  await D.session.logout();
+  D.net.online = false;
+  assert.equal((await D.session.login(RUT, 'Ojo#2026')).status, 'offline');
 });

@@ -1,5 +1,11 @@
 # Cambios
 
+## 2.28.0 — 2026-11-17
+
+### Seguridad
+- **Claves personales más fuertes:** al menos 8 caracteres, con una mayúscula, un número y un símbolo (antes, 6 caracteres sin símbolo).
+- Quien tenga una clave anterior que no cumple la regla debe crear una nueva al entrar con conexión. Sin conexión puede entrar igual, y se le pide al volver a entrar con conexión.
+
 ## 2.27.1 — 2026-11-17
 
 ### Receta para lentes

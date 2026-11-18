@@ -12,7 +12,7 @@
 import { nameParts, personName } from '../core/names.js';
 import { profileNameFields, profileNameValues } from './patientFields.js';
 import { ESPECIALIDAD, ROLES } from '../config/catalogs.js';
-import { accountRut, passwordProblem, rutBody } from '../core/accounts.js';
+import { accountRut, passwordProblem, rutBody, PASSWORD_RULES } from '../core/accounts.js';
 import { rolLabel, makeMedico } from '../core/catalog.js';
 import { formatRut, rutKey } from '../core/format.js';
 import { blankRecord } from '../core/record.js';
@@ -145,7 +145,9 @@ export function createAccountsController(ctx) {
     try {
       const r = await session.login($('#loginRut').value, $('#loginPass').value);
       if (r.status === 'change') {
-        $('#pwHint').textContent = `Hola, ${r.nombre}. Es tu primer ingreso: crea tu clave personal.`;
+        $('#pwHint').textContent = r.weak
+          ? `Hola, ${r.nombre}. Tu clave no cumple las nuevas reglas de seguridad: crea una nueva.`
+          : `Hola, ${r.nombre}. Es tu primer ingreso: crea tu clave personal.`;
         setStep('change');
         focusStep();
         return;
@@ -303,7 +305,7 @@ export function createAccountsController(ctx) {
       okLabel: 'Cambiar',
       fields: [
         { id: 'actual', label: 'Clave actual', type: 'password' },
-        { id: 'nueva', label: 'Clave nueva (6 o más, con una mayúscula y un número)', type: 'password' },
+        { id: 'nueva', label: 'Clave nueva (8 o más, con una mayúscula, un número y un símbolo)', type: 'password' },
         { id: 'nueva2', label: 'Repite la clave nueva', type: 'password' },
       ],
       onSave: ({ actual, nueva, nueva2 }) => {
@@ -356,6 +358,7 @@ export function createAccountsController(ctx) {
   }
 
   function init() {
+    $('#pwRules').textContent = PASSWORD_RULES; // una sola fuente para la regla
     setHtml($('#acctLockMin'), html`${LOCK_MINUTES.map((m) => html`<option value="${m}">${m} min sin uso</option>`)}`);
     $('#acctLockMin').addEventListener('change', (/** @type {Event} */ e) =>
       ctx.persist(() => store.saveSessionLockMinutes(Number(/** @type {HTMLSelectElement} */ (e.target).value))),

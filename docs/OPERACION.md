@@ -9,7 +9,7 @@ Diseño completo: [ADR 0014](adr/0014.md).
 **Activarlas (una vez):**
 1. En un PC que ya sincroniza con la contraseña del equipo, ve a **Ajustes → Cuentas de usuario → Activar cuentas de usuario**.
 2. Escribe tu RUT, nombre y profesión: serás el **primer administrador**.
-3. La app se recarga y pide entrar. Tu clave inicial es tu **RUT sin dígito verificador** (por ejemplo, para 17.752.753-K: `17752753`). Al entrar, crea tu clave personal: al menos 6 caracteres, con una mayúscula y un número.
+3. La app se recarga y pide entrar. Tu clave inicial es tu **RUT sin dígito verificador** (por ejemplo, para 17.752.753-K: `17752753`). Al entrar, crea tu clave personal: al menos 8 caracteres, con una mayúscula, un número y un símbolo (por ejemplo ! ? # . -). Si tu clave es anterior a esta regla, la app te pide cambiarla al entrar con conexión.
 
 Desde ese momento, **todos los PC** piden RUT y clave, y la contraseña del equipo deja de servir para sincronizar. **Guárdala igual**: es la llave de respaldo de los datos y la que permite recuperar un administrador.
 

@@ -71,6 +71,8 @@ export function createAccountSession({
     acceso: null,
     /** Solo en memoria: para cambiar la clave. @type {string | null} */
     complemento: null,
+    /** La clave con que entró no cumple las reglas actuales: debe cambiarla ahora. */
+    weakPassword: false,
   };
 
   /* ------------------------------------------------------ cuentas locales */
@@ -110,7 +112,7 @@ export function createAccountSession({
    * Entra con RUT y clave. Sin conexión, verifica con lo guardado en este PC.
    * @param {string} rut
    * @param {string} password
-   * @returns {Promise<{status: 'ok' | 'change' | 'offline', nombre: string}>}
+   * @returns {Promise<{status: 'ok' | 'change' | 'offline', nombre: string, weak?: boolean}>}
    *   `change`: primer ingreso (o clave restablecida): hay que crear una clave nueva con `changePassword`.
    * @throws {Error} con un mensaje para la persona
    */
@@ -166,6 +168,11 @@ export function createAccountSession({
       admin: u.admin === true,
     });
     if (u.debeCambiar) return { status: 'change', nombre: perfil.nombre };
+    // Una clave anterior a las reglas actuales (p. ej. 6 caracteres sin símbolo) se cambia ahora.
+    if (passwordProblem(password)) {
+      st.weakPassword = true;
+      return { status: 'change', nombre: perfil.nombre, weak: true };
+    }
     complete();
     return { status: 'ok', nombre: perfil.nombre };
   }
@@ -204,7 +211,7 @@ export function createAccountSession({
    * @param {string} password nueva
    * @param {string} [accesoActual] fuera del primer ingreso
    */
-  async function changePassword(password, accesoActual) {
+  async function changePassword(password, accesoActual = (st.weakPassword && st.acceso) || undefined) {
     const cfg = store.loadSyncConfig();
     if (!st.user || !st.token || !st.complemento || !cfg?.encKey) throw new Error('Necesitas conexión para cambiar la clave.');
     const c = await credentialsFor({ password, teamKeyB64: cfg.encKey, uid: st.user.id, complemento: st.complemento, iterations });
@@ -218,6 +225,7 @@ export function createAccountSession({
     st.token = r.token;
     st.exp = r.exp;
     st.acceso = c.acceso;
+    st.weakPassword = false;
     saveLocal(st.user.id, { sal: c.sal, iter: c.iter, localHash: localHashOf(c.local) });
     complete();
   }
