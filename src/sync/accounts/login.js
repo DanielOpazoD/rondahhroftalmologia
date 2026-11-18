@@ -54,30 +54,50 @@ export function createLogin({ db, keys, attempts, now, randId }) {
   }
 
   /**
-   * Respuesta a un intento fallido. El intento ya quedó anotado (ver `entrar`):
-   * con `tries` (los recientes, incluido este) al máximo, la cuenta se bloquea.
-   * @param {Request} req @param {Cuenta | null} u @param {number} t @param {number} tries
+   * Un RUT sin cuenta se bloquea igual que una cuenta real: mismos intentos,
+   * misma duración y misma respuesta. Si no, «cuenta bloqueada» (o su ausencia
+   * tras 5 intentos) revelaría qué RUT tiene cuenta. Su registro de intentos va
+   * con un id ficticio derivado del RUT (`x…`, nunca choca con uno real).
+   * @param {unknown} rut
    */
-  async function loginFailed(req, u, t, tries) {
-    await ipFailure(req);
-    if (!u) {
-      await db.audit({ ev: 'sesion.fallida' });
-    } else if (tries >= ACCOUNT_LOCK.maxFails) {
-      await lockAccount(u, t);
-    } else await db.audit({ ev: 'sesion.fallida', u: u.id });
-    return fail(401, 'credenciales', 'RUT o clave incorrectos.');
+  const fakeId = (rut) => 'x' + keys.rutHashOf(rut).slice(0, 32);
+
+  /** Hasta cuándo está bloqueado un id ficticio (0 si no lo está). @param {string} id @param {number} t */
+  async function fakeLockedUntil(id, t) {
+    const marks = await attempts.recent('bloqueo', id, t, ACCOUNT_LOCK.lockMs);
+    return marks.length ? marks[marks.length - 1] + ACCOUNT_LOCK.lockMs : 0;
   }
 
-  /** Bloquea la cuenta por intentos fallidos (si no lo estaba ya). @param {Cuenta} u @param {number} t */
-  async function lockAccount(u, t) {
+  /**
+   * Bloquea por intentos fallidos (si no lo estaba ya): la cuenta, o el id ficticio.
+   * @param {Cuenta | null} u @param {string} id @param {number} t
+   */
+  async function lock(u, id, t) {
+    if (!u) {
+      if ((await fakeLockedUntil(id, t)) <= t) await attempts.add('bloqueo', id, t);
+      return;
+    }
     if ((u.bloqueadaHasta || 0) > t) return;
     await db.putUser({ ...u, fallos: 0, bloqueadaHasta: t + ACCOUNT_LOCK.lockMs });
     await db.audit({ ev: 'sesion.bloqueada', u: u.id });
   }
 
-  /** @param {Cuenta} u @param {number} t */
-  function lockedResponse(u, t) {
-    const min = Math.ceil(((u.bloqueadaHasta || t + ACCOUNT_LOCK.lockMs) - t) / 60_000);
+  /**
+   * Respuesta a un intento fallido. El intento ya quedó anotado (ver `entrar`):
+   * con `tries` (los recientes, incluido este) al máximo, se bloquea.
+   * @param {Request} req @param {Cuenta | null} u @param {string} id @param {number} t @param {number} tries
+   */
+  async function loginFailed(req, u, id, t, tries) {
+    await ipFailure(req);
+    if (tries >= ACCOUNT_LOCK.maxFails) await lock(u, id, t);
+    // Una cuenta real que se bloquea queda anotada como «bloqueada» (en lock); lo demás, como intento fallido.
+    if (!u || tries < ACCOUNT_LOCK.maxFails) await db.audit(u ? { ev: 'sesion.fallida', u: u.id } : { ev: 'sesion.fallida' });
+    return fail(401, 'credenciales', 'RUT o clave incorrectos.');
+  }
+
+  /** @param {number} until hasta cuándo dura el bloqueo @param {number} t */
+  function lockedResponse(until, t) {
+    const min = Math.ceil((until - t) / 60_000);
     return fail(
       423,
       'cuenta_bloqueada',
@@ -89,14 +109,14 @@ export function createLogin({ db, keys, attempts, now, randId }) {
    * Anota el intento ANTES de revisar la clave, y cuenta los recientes. Si ya
    * había el máximo, no se revisa la clave: así muchos intentos simultáneos no
    * se saltan el límite. Devuelve cuántos hay (incluido este), o null si se rechaza.
-   * @param {Cuenta} u @param {number} t
+   * @param {Cuenta | null} u @param {string} id @param {number} t
    */
-  async function admitAttempt(u, t) {
-    const mine = await attempts.add('cuenta', u.id, t);
-    const tries = (await attempts.recent('cuenta', u.id, t, ACCOUNT_LOCK.lockMs)).length;
+  async function admitAttempt(u, id, t) {
+    const mine = await attempts.add('cuenta', id, t);
+    const tries = (await attempts.recent('cuenta', id, t, ACCOUNT_LOCK.lockMs)).length;
     if (tries <= ACCOUNT_LOCK.maxFails) return tries;
     await attempts.remove(mine); // un rechazo no alarga el bloqueo
-    await lockAccount(u, t);
+    await lock(u, id, t);
     return null;
   }
 
@@ -143,11 +163,14 @@ export function createLogin({ db, keys, attempts, now, randId }) {
     if (refused) return refused;
     if (!isLogin(b)) return fail(400, 'datos_invalidos', 'Datos inválidos');
     const u = await db.userByRut(b.rut);
-    if (!u) return loginFailed(req, null, t, 0);
-    if (loginState(u, t) === 'bloqueada') return lockedResponse(u, t);
-    const tries = await admitAttempt(u, t);
-    if (tries === null) return lockedResponse({ ...u, bloqueadaHasta: t + ACCOUNT_LOCK.lockMs }, t);
-    if (!safeEqual(keys.verifierOf(b.acceso), u.verificador)) return loginFailed(req, u, t, tries);
+    // Con o sin cuenta, el mismo camino (ver fakeId).
+    const id = u ? u.id : fakeId(b.rut);
+    const until = u ? (loginState(u, t) === 'bloqueada' ? u.bloqueadaHasta || 0 : 0) : await fakeLockedUntil(id, t);
+    if (until > t) return lockedResponse(until, t);
+    const tries = await admitAttempt(u, id, t);
+    if (tries === null) return lockedResponse(t + ACCOUNT_LOCK.lockMs, t);
+    const right = safeEqual(keys.verifierOf(b.acceso), u ? u.verificador : '');
+    if (!u || !right) return loginFailed(req, u, id, t, tries);
     await attempts.clear('cuenta', u.id);
     return openSession(u, t);
   }
