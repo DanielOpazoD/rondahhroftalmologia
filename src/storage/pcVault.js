@@ -11,6 +11,7 @@
  * con `onOpen` para cargar los datos.
  */
 import { pcKeys, deriveAesKey, seal, unseal, toB64, fromB64 } from './sealed.js';
+import { isRecord } from '../core/guards.js';
 
 /**
  * Estuche: `D` cifrada con una llave derivada.
@@ -47,12 +48,7 @@ const accountKey = (localHex) => deriveAesKey(fromHex(localHex), 'cuenta');
 const teamKey = (teamKeyB64) => deriveAesKey(fromB64(teamKeyB64), 'equipo');
 
 /** @param {unknown} v @returns {v is ArchivoLlave} */
-const isFile = (v) =>
-  !!v &&
-  typeof v === 'object' &&
-  /** @type {any} */ (v).v === 1 &&
-  !!(/** @type {any} */ (v).equipo) &&
-  typeof (/** @type {any} */ (v).cuentas) === 'object';
+const isFile = (v) => isRecord(v) && v.v === 1 && isRecord(v.equipo) && isRecord(v.cuentas);
 
 /**
  * @param {{

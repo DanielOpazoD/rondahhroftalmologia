@@ -84,7 +84,9 @@ export function initAttentionView(ctx) {
     });
   };
   seg($('#catSeg'), OJOS, OJOS, (v) => {
-    ctx.rec.cat = ctx.rec.cat === v ? '' : v;
+    // `v` es uno de OJOS ('OD' | 'OI' | 'AO'): los botones se dibujan desde esa lista.
+    const eye = /** @type {import('../domain').Atencion['cat']} */ (v);
+    ctx.rec.cat = ctx.rec.cat === eye ? '' : eye;
     ctx.changed();
   });
   initSexSelector(

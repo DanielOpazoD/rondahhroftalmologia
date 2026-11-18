@@ -15,6 +15,7 @@ import { ESPECIALIDAD } from '../config/catalogs.js';
 import { $, download, toast, required } from './dom.js';
 import { withBusy } from './busy.js';
 import { html, setHtml } from './html.js';
+import { TOPICS } from './events.js';
 
 const MAX_ROWS = 500;
 
@@ -194,6 +195,6 @@ export function initAuditView(ctx) {
   for (const id of ['#audUser', '#audGroup']) $(id).addEventListener('change', render);
   $('#audQuery').addEventListener('input', render);
   $('#audXlsx').addEventListener('click', exportXlsx);
-  ctx.on('cuenta', render);
+  ctx.on(TOPICS.CUENTA, render);
   render();
 }

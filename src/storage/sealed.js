@@ -118,7 +118,8 @@ const isSealed = (d) => 'ct' in d || 'bin' in d;
 async function sealDoc(k, col, doc) {
   const id = storedId(k, col, doc.id);
   if (col === BINARY) {
-    const { iv, ct } = await seal(k.enc, `${col}|${id}`, /** @type {Uint8Array} */ (doc.bytes));
+    if (!(doc.bytes instanceof Uint8Array)) throw new TypeError(`${col}: el contenido de ${doc.id} no son bytes`);
+    const { iv, ct } = await seal(k.enc, `${col}|${id}`, doc.bytes);
     return { id, iv: toB64(iv), bin: ct };
   }
   const { iv, ct } = await seal(k.enc, `${col}|${id}`, utf8(JSON.stringify(doc)));
@@ -154,7 +155,7 @@ export function sealedBackend(inner, { locked = false } = {}) {
   };
 
   /** @param {string} col @param {{id: string}} doc */
-  const toStore = async (col, doc) => (keys ? sealDoc(keys, col, /** @type {any} */ (doc)) : doc);
+  const toStore = async (col, doc) => (keys ? sealDoc(keys, col, doc) : doc);
 
   /** Documentos escritos o borrados desde que se abrió: la conversión no los pisa. @type {Set<string>} */
   const touched = new Set();
@@ -172,7 +173,7 @@ export function sealedBackend(inner, { locked = false } = {}) {
     const clear = docs.filter((d) => !isSealed(d));
     if (!clear.length) return 0;
     const sealedIds = new Set(docs.filter(isSealed).map((d) => d.id));
-    const fresh = await Promise.all(clear.map((d) => sealDoc(k, col, /** @type {any} */ (d))));
+    const fresh = await Promise.all(clear.map((d) => sealDoc(k, col, d)));
     // Sin esperas entre el filtro y la escritura: lo que se guarde después va en una transacción posterior.
     const toWrite = fresh.filter((d) => !sealedIds.has(d.id) && !touched.has(`${col}|${d.id}`));
     if (toWrite.length) await inner.putMany(col, toWrite);
@@ -186,7 +187,7 @@ export function sealedBackend(inner, { locked = false } = {}) {
     for (const id of await inner.keys(BINARY)) {
       const doc = await inner.get(BINARY, id);
       if (!doc || isSealed(doc) || touched.has(`${BINARY}|${id}`)) continue;
-      await inner.put(BINARY, await sealDoc(k, BINARY, /** @type {any} */ (doc)));
+      await inner.put(BINARY, await sealDoc(k, BINARY, doc));
       n++;
     }
     return n;

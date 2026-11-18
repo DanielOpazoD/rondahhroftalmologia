@@ -37,6 +37,7 @@ import { initUsersView } from './ui/usersView.js';
 import { initSettingsSections } from './ui/settingsSections.js';
 import { initAuditView } from './ui/auditView.js';
 import { applyPermissions, guardActions } from './ui/permissionsView.js';
+import { TOPICS } from './ui/events.js';
 
 function getStorage() {
   try {
@@ -200,7 +201,7 @@ async function main() {
   initAuditView(ctx);
   guardActions(ctx);
   ctx.applyPermissions = () => applyPermissions(ctx);
-  ctx.on('cuenta', () => applyPermissions(ctx));
+  ctx.on(TOPICS.CUENTA, () => applyPermissions(ctx));
   ctx.seedCatalogs();
 
   $$('nav button').forEach((b) => b.addEventListener('click', () => ctx.showTab(b.dataset.tab)));

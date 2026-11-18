@@ -44,7 +44,7 @@ export function operativosOf(records) {
 
 /**
  * Edad como entero o null.
- * @param {any} rec
+ * @param {{f?: Record<string, string | undefined>}} rec
  */
 export function ageOf(rec) {
   const n = parseNumber(rec.f?.paciente_edad);

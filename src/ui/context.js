@@ -15,7 +15,7 @@ import { stampChanges } from '../core/merge.js';
 import { clock } from '../core/clock.js';
 import { $, $$, toast, base64ToBytes } from './dom.js';
 import { logError } from './errorLog.js';
-import { createBus, TOPICS } from './events.js';
+import { createBus, TOPICS, tabTopic } from './events.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
 import { renderRegistry } from './registryView.js';
 import { renderStats, renderFilter, placeFilter } from './statsView.js';
@@ -74,8 +74,9 @@ const AUTOSAVE_MS = 1200;
  */
 
 /**
- * Acciones que se agregan al contexto con Object.assign (ver ui/actions/).
- * @typedef {ReturnType<typeof attentionActions> & ReturnType<typeof patientActions> & ReturnType<typeof catalogActions> & ReturnType<typeof outputActions> & ReturnType<typeof attachmentActions> & ReturnType<typeof formActions>} ContextActions
+ * Acciones que se agregan al contexto con Object.assign: su contrato está en
+ * ui/contract.d.ts (declarado, no deducido, para romper la circularidad).
+ * @typedef {import('./contract').ContextActions} ContextActions
  */
 
 /**
@@ -116,6 +117,7 @@ export function createContext(store, templateB64) {
     settings: store.loadSettings(),
     /** Filtro compartido de Estadística y Exportar. */
     filter: { operativo: '', desde: '', hasta: '' },
+    /** Pestaña visible (id de su sección: 't-at', 't-reg'…). @type {string} */
     currentTab: 't-at',
 
     filtered: () => filterRecords(ctx.records, ctx.filter),
@@ -137,7 +139,7 @@ export function createContext(store, templateB64) {
     /** Aplica los permisos de la sesión a la interfaz (lo asigna main.js; ver permissionsView.js). */
     applyPermissions: /** @type {() => void} */ (() => {}),
     /** Bloqueo con PIN (lo asigna lock.js). */
-    lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
+    lock: /** @type {{lock: (o?: {broadcast?: boolean}) => void, render: () => void, whenUnlocked: (fn: () => void) => void, state: {enabled: boolean, minutes: number, locked: boolean}} | null} */ (
       null
     ),
     /** Ficha abierta en la pestaña Pacientes (null: la lista). @type {string | null} */
@@ -152,7 +154,7 @@ export function createContext(store, templateB64) {
      * orden): cuentas → bloqueo → vistas → sincronización. Ninguna vista
      * agrega propiedades nuevas al contexto: si hace falta una, se declara aquí.
      * --------------------------------------------------------------- */
-    /** Cuentas de usuario (lo asigna main.js; ver accounts.js y ADR 0014). @type {ReturnType<typeof import('./accounts.js').createAccountsController> | null} */
+    /** Cuentas de usuario (lo asigna main.js; ver accounts.js y ADR 0014). @type {import('./contract').AccountsService | null} */
     accounts: null,
     /** Perfil que registra en esta sesión (ver userView.js); null si no se eligió. */
     userId: /** @type {string | null} */ (null),
@@ -230,9 +232,10 @@ export function createContext(store, templateB64) {
     },
 
     /** Anuncia un cambio (ver ui/events.js): las vistas suscritas se re-dibujan una vez. */
-    emit: (/** @type {string} */ topic) => bus.emit(topic),
+    emit: (/** @type {import('./events.js').Topic} */ topic) => bus.emit(topic),
     /** Se suscribe a un tema; devuelve la función para desuscribirse. */
-    on: (/** @type {string} */ topic, /** @type {(topics: string[]) => void} */ fn) => bus.on(topic, fn),
+    on: (/** @type {import('./events.js').Topic} */ topic, /** @type {(topics: import('./events.js').Topic[]) => void} */ fn) =>
+      bus.on(topic, fn),
 
     /**
      * Re-dibuja lo que depende de los registros guardados. Solo la pestaña
@@ -273,7 +276,7 @@ export function createContext(store, templateB64) {
         b.tabIndex = b.dataset.tab === id ? 0 : -1;
       });
       $$('.tab').forEach((t) => t.classList.toggle('on', t.id === id));
-      ctx.emit('tab:' + id);
+      ctx.emit(tabTopic(id));
       if (id === 't-est') {
         placeFilter(id);
         renderFilter(app);
@@ -301,12 +304,12 @@ export function createContext(store, templateB64) {
   const app = /** @type {FullContext} */ (ctx);
   Object.assign(
     ctx,
-    attentionActions(ctx, store),
-    patientActions(ctx, store),
-    catalogActions(ctx, store),
-    outputActions(ctx, store),
-    attachmentActions(ctx, store),
-    formActions(ctx, store),
+    attentionActions(app, store),
+    patientActions(app, store),
+    catalogActions(app, store),
+    outputActions(app, store),
+    attachmentActions(app, store),
+    formActions(app, store),
   );
   // Las listas se re-dibujan cuando cambian los datos (agrupado por el bus).
   bus.on(TOPICS.DATOS, () => ctx.refreshLists());

@@ -28,7 +28,8 @@ export class StorageError extends Error {}
 /** Evento del registro de accesos pendiente de enviar (ver sync/accountSession.js). @typedef {{ev: string, obj?: string, n?: number, at: number, off?: boolean}} EventoPendiente */
 /**
  * Configuración de sincronización de este equipo (la escribe ui/syncController.js al activarla).
- * @typedef {{encKey: string, token: string, hash: string, activatedAt: number, lastSync: number | null}} SyncConfig
+ * Con cuentas de usuario (ADR 0014) no hay token ni huella del equipo: `mode: 'cuenta'`.
+ * @typedef {{encKey: string, token: string, hash?: string, mode?: 'cuenta', activatedAt: number, lastSync: number | null}} SyncConfig
  */
 
 /**

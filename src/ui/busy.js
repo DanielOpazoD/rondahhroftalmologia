@@ -4,6 +4,7 @@
  */
 import { logError } from './errorLog.js';
 import { uiAlert } from './modal.js';
+import { isRecord } from '../core/guards.js';
 
 /**
  * @template T
@@ -18,7 +19,7 @@ export async function withBusy(button, fn) {
   } catch (e) {
     console.error(e);
     logError('acción', e);
-    void uiAlert({ title: 'No se pudo completar la acción', message: String(/** @type {any} */ (e)?.message || e), tone: 'danger' });
+    void uiAlert({ title: 'No se pudo completar la acción', message: String((isRecord(e) && e.message) || e), tone: 'danger' });
     return undefined;
   } finally {
     if (button) button.disabled = false;

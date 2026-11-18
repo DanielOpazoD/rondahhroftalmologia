@@ -204,3 +204,9 @@ test('motor cifrado: lo que se guarda o borra durante la primera conversión no 
   assert.deepEqual(all.map((d) => d.f.plan).sort(), ['nuevo', 'sin cambios']);
   assert.equal((await rawText(inner)).includes('viejo'), false);
 });
+
+test('motor cifrado: el contenido de un adjunto tiene que ser bytes (no se cifra cualquier cosa)', async () => {
+  const s = sealedBackend(await idbBackend('s' + Math.random(), new IDBFactory()));
+  await s.open(await pcKeys(D));
+  await assert.rejects(s.backend.put('adjuntos_datos', { id: 'j1', bytes: 'texto' }), TypeError);
+});

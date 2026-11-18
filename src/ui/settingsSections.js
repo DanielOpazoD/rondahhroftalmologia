@@ -4,6 +4,7 @@
  * Inicio y Fin. La sección elegida se recuerda en la pestaña del navegador.
  */
 import { $ } from './dom.js';
+import { TOPICS } from './events.js';
 
 const STORE_KEY = 'hhr_ajustes_seccion';
 const SECTIONS = ['equipo', 'listas', 'datos', 'admin'];
@@ -66,7 +67,7 @@ export function initSettingsSections(ctx) {
     return el;
   };
 
-  ctx.on('cuenta', renderAdminTab);
+  ctx.on(TOPICS.CUENTA, renderAdminTab);
   renderAdminTab();
   let saved = '';
   try {

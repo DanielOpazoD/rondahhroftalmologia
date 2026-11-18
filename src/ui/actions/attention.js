@@ -13,6 +13,7 @@ import { makeAuditEntry, auditChanges, changesSummary } from '../../core/audit.j
 import { toast } from '../dom.js';
 import { syncAttentionView, showValidation, renderToolbar, renderHistory, flashFields, showRemoteNotice } from '../attentionView.js';
 import { uiConfirm, uiChoose } from '../modal.js';
+import { TOPICS } from '../events.js';
 
 /** @typedef {import('../../domain').Atencion} Atencion */
 /** @typedef {import('../../domain').AtencionGuardada} AtencionGuardada */
@@ -32,7 +33,7 @@ export const confirmDiscard = (what) =>
 /**
  * Atención NUEVA de un paciente que ya tiene otra ese día: pregunta si
  * combinarlas (continúa en la existente) o guardarla aparte.
- * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación
  * @param {AtencionGuardada} dup la atención existente
  * @returns {Promise<boolean>} false si se canceló (no se guarda)
  */
@@ -62,7 +63,7 @@ function toastSaved(warnings) {
 /**
  * Atención guardada del mismo paciente y día que la atención NUEVA en edición
  * (p. ej. creada en otro equipo); ninguna si la atención ya existe.
- * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación
  * @returns {AtencionGuardada | false | undefined} false o undefined si no hay
  */
 const duplicateOfNew = (ctx) => !ctx.rec.id && findDuplicate(ctx.rec, /** @type {AtencionGuardada[]} */ (ctx.records));
@@ -70,7 +71,7 @@ const duplicateOfNew = (ctx) => !ctx.rec.id && findDuplicate(ctx.rec, /** @type 
 /**
  * Refresca la vista tras guardar y avisa. El guardado automático no re-dibuja
  * el formulario mientras se escribe (solo estado e historial) ni muestra mensajes.
- * @param {any} ctx contexto de la aplicación (ver attentionActions)
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación
  * @param {boolean} auto
  * @param {string[]} warnings
  */
@@ -79,15 +80,15 @@ function refreshAfterSave(ctx, auto, warnings) {
     renderToolbar(ctx);
     renderHistory(ctx);
   } else syncAttentionView(ctx);
-  ctx.emit('datos');
+  ctx.emit(TOPICS.DATOS);
   ctx.sync?.schedule();
   if (!auto) toastSaved(warnings);
 }
 
 /**
- * @param {any} ctx contexto de la aplicación (ver ui/context.js). `any`: su tipo
- *   (AppContext) incluye lo que devuelve esta función; declararlo aquí sería circular.
+ * @param {import("../context.js").AppContext} ctx contexto de la aplicación (ver ui/context.js)
  * @param {ReturnType<import('../../storage/store.js').createStore>} store
+ * @returns {import('../contract').AttentionActions}
  */
 export function attentionActions(ctx, store) {
   /** Guardado en curso (o el último): cada guardado espera al anterior. */
@@ -115,16 +116,17 @@ export function attentionActions(ctx, store) {
     await ctx.ensureUser();
     if (dup && !(await resolveDuplicate(ctx, dup))) return false;
     const stored = ctx.records.find((/** @type {Atencion} */ r) => r.id === ctx.rec.id) || null;
-    const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: clock.tick() });
+    const at = clock.tick();
+    const rec = prepareSave({ rec: ctx.rec, stored, patients: store.loadPatients(), procs: ctx.procs, now: at });
     const ok = ctx.persist(() => {
       ctx.records = store.upsertRecord(rec);
       ctx.syncPatientFromRecord(rec);
       // Bitácora: qué cambió, cuándo y desde qué equipo.
       const entry = makeAuditEntry({
         tipo: stored ? 'editada' : 'creada',
-        before: stored,
+        before: stored ?? undefined,
         after: rec,
-        at: rec.updated,
+        at,
         ...ctx.author(),
       });
       if (entry) store.addAuditEntry(rec.id, entry);
@@ -161,7 +163,7 @@ export function attentionActions(ctx, store) {
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = false;
       ctx.persist(() => store.saveDraft(ctx.rec));
-      ctx.emit('atencion');
+      ctx.emit(TOPICS.ATENCION);
       syncAttentionView(ctx);
       ctx.showTab('t-at');
       scrollTo(0, 0);
@@ -226,10 +228,12 @@ export function attentionActions(ctx, store) {
       const cambios = auditChanges(before, ctx.rec);
       if (!cambios.length) return;
       // Quién: la última entrada de la bitácora hecha en otro equipo.
+      const id = ctx.rec.id;
+      if (!id) return; // una atención que llega de otro equipo siempre está guardada
       const me = store.loadDeviceId();
-      const last = store.auditFor(ctx.rec.id).find((e) => e.equipoId !== me);
+      const last = store.auditFor(id).find((e) => e.equipoId !== me);
       const who = last ? last.autor || last.equipo : 'otro equipo';
-      showRemoteNotice(ctx.rec.id, `Cambios de ${who}: ${changesSummary(cambios, ctx.procs)}`);
+      showRemoteNotice(id, `Cambios de ${who}: ${changesSummary(cambios, ctx.procs)}`);
       flashFields(cambios.map((c) => c.c));
     },
 
@@ -241,7 +245,7 @@ export function attentionActions(ctx, store) {
       ctx.rec = normalizeRecord(r);
       ctx.snap = structuredClone(ctx.rec);
       ctx.dirty = false;
-      ctx.emit('atencion');
+      ctx.emit(TOPICS.ATENCION);
       syncAttentionView(ctx);
     },
 
@@ -275,7 +279,7 @@ export function attentionActions(ctx, store) {
         ctx.rec.id = null;
         syncAttentionView(ctx);
       }
-      ctx.emit('datos');
+      ctx.emit(TOPICS.DATOS);
       toast('Atención eliminada');
     },
   };

@@ -6,6 +6,7 @@ import { ACCEPT, kindOf, fmtSize, isInlineType, cleanType } from '../core/attach
 import { $, dataOf } from './dom.js';
 import { html, setHtml } from './html.js';
 import { icon } from './icons.js';
+import { TOPICS } from './events.js';
 
 /** URLs de miniaturas vigentes (se liberan al re-dibujar). @type {string[]} */
 let thumbs = [];
@@ -39,7 +40,7 @@ export function initAttachmentsView(ctx) {
     if (b.dataset.a === 'open') void ctx.openAttachment(dataOf(b, 'id'));
     if (b.dataset.a === 'del') void ctx.deleteAttachment(dataOf(b, 'id'));
   });
-  ctx.on('adjuntos', () => renderAttachments(ctx));
+  ctx.on(TOPICS.ADJUNTOS, () => renderAttachments(ctx));
 }
 
 /**
@@ -110,5 +111,5 @@ export async function renderAttachments(ctx) {
   $('#attAdd').disabled = !id || !store.supportsAttachments();
   // Adjuntos anteriores sin miniatura: se crea una vez (y se re-dibuja).
   const missingThumbs = list.some((a) => lacksThumbnail(a, have));
-  if (missingThumbs && (await ctx.addMissingThumbnails(list))) ctx.emit('adjuntos');
+  if (missingThumbs && (await ctx.addMissingThumbnails(list))) ctx.emit(TOPICS.ADJUNTOS);
 }
