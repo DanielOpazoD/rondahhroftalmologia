@@ -4,7 +4,7 @@
  * - /api/*: nunca se guarda en caché (datos cifrados de sincronización).
  * CACHE se reemplaza en cada build por una huella del contenido.
  */
-const CACHE = 'oftalmo-87f0227c5fa0';
+const CACHE = 'oftalmo-9b431b172fa2';
 /** El ámbito global de un service worker (TypeScript solo conoce el de un worker genérico). */
 const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
