@@ -26,6 +26,15 @@ test('ageAt: años cumplidos', () => {
   assert.equal(ageAt('', '2026-11-14'), null);
 });
 
+test('ageAt: bordes del nacimiento y del cumpleaños', () => {
+  // El mismo día del nacimiento es una edad válida (0), no una fecha imposible.
+  assert.equal(ageAt('2026-11-14', '2026-11-14'), 0, 'día del nacimiento');
+  assert.equal(ageAt('2026-11-14', '2026-11-13'), null, 'víspera del nacimiento');
+  assert.equal(ageAt('2016-03-10', '2026-03-09'), 9, 'víspera del cumpleaños: N-1');
+  assert.equal(ageAt('2016-03-10', '2026-03-10'), 10, 'día del cumpleaños: N');
+  assert.equal(ageAt('2016-03-10', '2026-02-28'), 9, 'mes anterior al cumpleaños');
+});
+
 test('applyBirthDate calcula la edad a la fecha de atención', () => {
   const r = minimalRecord('a', { paciente_fnac: '1959-11-15', fecha_atencion: '2026-11-14', paciente_edad: '99' });
   assert.equal(applyBirthDate(r), true);

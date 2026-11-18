@@ -31,6 +31,10 @@ async function auditGes(page, where) {
 
 test('accesibilidad: pestañas, diálogos, bloqueo y modo práctica sin infracciones WCAG A/AA', async ({ page }) => {
   await openApp(page);
+  // Buena práctica de axe fuera de las etiquetas WCAG: la página tiene un <h1> (oculto, con el nombre de la app).
+  const h1 = await new AxeBuilder({ page }).withRules(['page-has-heading-one']).analyze();
+  expect(h1.violations.map((v) => v.id)).toEqual([]);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Oftalmología · Rondas HHR');
   const all = [];
   // Datos para que las listas no estén vacías.
   await fillPatient(page, { nombre: 'Ana Accesible', rut: '12.345.678-5' });
@@ -64,6 +68,25 @@ test('accesibilidad: pestañas, diálogos, bloqueo y modo práctica sin infracci
   await page.locator('#lockGo').click();
   await page.goto('/?practica');
   all.push(...(await audit(page, 'modo práctica')));
+  all.push(...(await auditPracticeIntake(page, 'modo práctica')));
+  expect(all, all.join('\n')).toEqual([]);
+});
+
+/** En práctica la lista de Ingreso trae pacientes ya atendidos: su estado «Atendido» (.state.done) también se audita. */
+async function auditPracticeIntake(page, where) {
+  await page.locator('#dlg').getByRole('button', { name: 'Continuar' }).click();
+  await tab(page, 'Ingreso');
+  await expect(page.locator('#ingList .state.done').first()).toBeVisible();
+  return audit(page, where + ' · Ingreso');
+}
+
+test('accesibilidad: modo práctica en tema oscuro sin infracciones WCAG A/AA', async ({ page }) => {
+  // La cabecera de práctica (marca en violeta) y los estados de Ingreso, con los colores del tema oscuro.
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/?practica');
+  await expect(page.locator('#practiceBar')).toBeVisible();
+  const all = await audit(page, 'oscuro práctica');
+  all.push(...(await auditPracticeIntake(page, 'oscuro práctica')));
   expect(all, all.join('\n')).toEqual([]);
 });
 
