@@ -16,7 +16,16 @@
  * el contenido de los adjuntos (backupAuditLog).
  */
 
+import { mapLimit } from '../lib/async.js';
+
 export const KEEP_DAYS = 30;
+/**
+ * Estado del último respaldo diario, en el almacén de sincronización (sin
+ * datos): el servidor lo informa a la app, que avisa si es antiguo.
+ */
+export const BACKUP_STATUS_KEY = '_estado/respaldo.json';
+/** Lecturas simultáneas al almacén durante el respaldo. */
+const READ_CONCURRENCY = 16;
 const VERSION_KEY = /^[a-z][a-z0-9-]{1,39}\/r\//;
 /**
  * El contenido de los adjuntos (`<especialidad>-adjuntos`) no entra en el
@@ -40,16 +49,20 @@ export const dayOf = (t) => new Date(t).toISOString().slice(0, 10);
  */
 export async function dailyBackup({ source, target, now = Date.now(), keepDays = KEEP_DAYS }) {
   const { blobs } = await source.list();
+  const keys = blobs.map((b) => b.key).filter(isBackedUp);
+  // En paralelo (acotado): de a una, con miles de versiones, la función programada se quedaba sin tiempo.
+  const values = await mapLimit(keys, READ_CONCURRENCY, (key) => source.get(key, { type: 'json' }));
   /** @type {Record<string, unknown>} */
   const claves = {};
-  for (const { key } of blobs) {
-    if (!isBackedUp(key)) continue;
-    const v = await source.get(key, { type: 'json' });
-    if (v !== null && v !== undefined) claves[key] = v;
-  }
+  keys.forEach((key, i) => {
+    if (values[i] !== null && values[i] !== undefined) claves[key] = values[i];
+  });
   const dia = dayOf(now);
   await target.setJSON(`${dia}.json`, { creado: new Date(now).toISOString(), claves });
-  return { dia, claves: Object.keys(claves).length, borrados: await prune(target, now, keepDays) };
+  const n = Object.keys(claves).length;
+  // Solo tras escribirlo: si algo falla antes, el estado sigue mostrando el anterior (y la app avisa).
+  await source.setJSON(BACKUP_STATUS_KEY, { at: now, dia, claves: n });
+  return { dia, claves: n, borrados: await prune(target, now, keepDays) };
 }
 
 /**
@@ -84,18 +97,21 @@ export async function listBackups(target) {
  * Restaura el respaldo de un día: vuelve a escribir cada versión guardada en
  * el almacén de sincronización. No borra nada: si una versión más nueva de un
  * elemento ya existe, sigue ganando ella (los equipos siempre toman la mayor).
- * @param {{source: BlobStore, target: BlobStore, day: string, dryRun?: boolean}} o
- *   `source`: almacén de respaldos; `target`: almacén de sincronización.
+ * @param {{source: BlobStore, target: BlobStore, day: string, dryRun?: boolean, accounts?: boolean}} o
+ *   `source`: almacén de respaldos; `target`: almacén de sincronización;
+ *   `accounts`: reponer también las cuentas que falten. Va aparte y hay que
+ *   pedirlo: si no, una cuenta que el sistema descartó (p. ej. una activación a
+ *   medias) volvería sola al restaurar datos clínicos.
  * @returns {Promise<{claves: number, escritas: number}>}
  */
-export async function restoreBackup({ source, target, day, dryRun = false }) {
+export async function restoreBackup({ source, target, day, dryRun = false, accounts: withAccounts = false }) {
   // Documento que escribe dailyBackup: {creado, claves}.
   const doc = /** @type {{claves?: Record<string, unknown>} | null} */ (await source.get(`${day}.json`, { type: 'json' }));
   if (!doc || typeof doc.claves !== 'object') throw new Error(`No hay respaldo del ${day}`);
   const entries = Object.entries(doc.claves).filter(([k]) => VERSION_KEY.test(k));
   // Cuentas: solo las que falten (nunca se pisa una cuenta vigente, p. ej. una clave cambiada después).
-  const present = new Set((await target.list({ prefix: '_cuentas/' })).blobs.map((b) => b.key));
-  const accounts = Object.entries(doc.claves).filter(([k]) => ACCOUNT_KEY.test(k) && !present.has(k));
+  const present = withAccounts ? new Set((await target.list({ prefix: '_cuentas/' })).blobs.map((b) => b.key)) : new Set();
+  const accounts = withAccounts ? Object.entries(doc.claves).filter(([k]) => ACCOUNT_KEY.test(k) && !present.has(k)) : [];
   if (!dryRun) for (const [k, v] of [...entries, ...accounts]) await target.setJSON(k, v);
   return { claves: entries.length + accounts.length, escritas: dryRun ? 0 : entries.length + accounts.length };
 }

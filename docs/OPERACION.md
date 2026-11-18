@@ -44,7 +44,7 @@ NETLIFY_SITE_ID=… NETLIFY_AUTH_TOKEN=… node scripts/recover-admin.mjs 17.752
 
 **Adjuntos** (fotos, PDF, Word): su contenido se respalda aparte, de forma **incremental**, con la función `backup-adjuntos`, que corre **cada hora**. Como el contenido de un adjunto no cambia, cada parte se copia una sola vez (a `adjuntos/…` en el mismo almacén de respaldos). Cada ejecución copia lo que alcanza en 20 s y la siguiente continúa, así que un volumen grande se pone al día en algunas horas. El contenido de un adjunto eliminado se conserva 30 días y luego se borra. Sus logs: `{"fn":"respaldo-adjuntos","copiadas":…,"pendientes":…}`.
 
-**Cuentas y registro de accesos:** las cuentas (sin datos en claro) van en el respaldo diario. El registro de accesos se copia de forma incremental con la misma función horaria (a `auditoria/…`). Al restaurar, las cuentas que falten se reponen sin pisar las vigentes, y también los eventos del registro que falten.
+**Cuentas y registro de accesos:** las cuentas (sin datos en claro) van en el respaldo diario. El registro de accesos se copia de forma incremental con la misma función horaria (a `auditoria/…`). Al restaurar se reponen los eventos del registro que falten. Las cuentas que falten se reponen **solo con `--cuentas`** (por ejemplo, si se perdió el almacén entero), y nunca se pisan las vigentes. Sin esa opción, una cuenta que el sistema descartó no vuelve sola.
 
 Los respaldos del servidor **complementan**, no reemplazan, la copia local de cada PC ni el «Descargar respaldo» de Ajustes. Además, cada PC con la sincronización activa tiene una copia completa de los datos.
 

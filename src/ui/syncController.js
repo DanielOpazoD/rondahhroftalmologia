@@ -38,6 +38,7 @@ const DEBOUNCE_MS = 4000;
  *   interval: ReturnType<typeof setInterval> | undefined,
  *   caches: {pacientes: import('../sync/client.js').SyncCache, especialidad: import('../sync/client.js').SyncCache},
  *   damagedSeen: Set<string>,
+ *   lastBackupAt?: number | null,
  *   skewMin?: number,
  *   skewWarned?: boolean,
  *   newerWarned?: boolean,
@@ -231,6 +232,8 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
     });
     const got = resP.added + resP.updated + resP.deleted + resE.added + resE.updated + resE.deleted;
     reportDamaged([...resP.damaged, ...resE.damaged]);
+    // El servidor informa su último respaldo diario en cada lista completa.
+    if (api.lastBackupAt !== undefined) st.lastBackupAt = api.lastBackupAt;
     return { key, api, got };
   }
 
@@ -470,6 +473,8 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
         server: st.server,
         /** Valor para SYNC_TOKEN_SHA256 (configuración del servidor). */
         hash: st.config?.hash || '',
+        /** Último respaldo diario del servidor (null: sin registro; undefined: aún no se sabe). */
+        lastBackupAt: st.lastBackupAt,
       };
     },
   };

@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.33.0 — 2026-11-18
+
+### Operación: fase 2 de la deuda (docs/OPERACION.md)
+- **El respaldo diario lee en paralelo** (16 lecturas a la vez, en el mismo orden). De a una, con miles de versiones, la función programada podía quedarse sin tiempo y no respaldar.
+- **La app muestra cuándo fue el último respaldo del servidor** (Ajustes → Este equipo) y avisa con ⚠ si tiene más de 48 horas. Antes, un respaldo que dejaba de correr pasaba inadvertido.
+- **Restaurar un respaldo ya no repone cuentas** salvo que se pida con `--cuentas`. Así una cuenta descartada no vuelve sola al restaurar datos clínicos.
+- Al desactivar una cuenta se cierran sus sesiones revisando solo los días en que pueden estar abiertas (hoy y ayer), no todas las sesiones guardadas.
+- **Claves personales con PBKDF2 de 600 000 iteraciones** (antes 310 000), según la recomendación vigente de OWASP. Las cuentas existentes conservan las suyas hasta que cambien la clave; la llave del equipo no cambia.
+
 ## 2.32.0 — 2026-11-18
 
 ### Cimientos: fase 1 de la deuda (arquitectura; docs/ARQUITECTURA.md)

@@ -17,7 +17,12 @@ import { nameParts, personName } from '../core/names.js';
 import { utf8, toHex, hmacSha256 } from '../lib/sha256.js';
 import { bytesToB64, b64ToBytes, encryptPayload, decryptPayload, DecryptError, isObject } from './crypto.js';
 
-export const ACCOUNT_ITERATIONS = 310_000;
+/**
+ * Iteraciones de PBKDF2 para las claves NUEVAS (600 000, recomendación OWASP
+ * para SHA-256; hasta 2.32 eran 310 000). Cada cuenta guarda las suyas: una
+ * clave anterior sigue sirviendo y pasa a 600 000 cuando la persona la cambia.
+ */
+export const ACCOUNT_ITERATIONS = 600_000;
 const LABEL = 'hhr-cuentas-v1';
 
 /** Sal nueva para una cuenta (base64, 16 bytes). */

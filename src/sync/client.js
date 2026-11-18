@@ -141,9 +141,15 @@ export function createSyncApi({
     serverDate: /** @type {string | null} */ (null),
     /** Versión de protocolo que declaró el servidor (0 si no la declara). */
     serverProtocol: 0,
+    /** Hora del último respaldo diario del servidor (null: sin registro; undefined: aún no se sabe). */
+    lastBackupAt: /** @type {number | null | undefined} */ (undefined),
     /** Versión vigente de cada id; con `since` (hora del servidor), solo lo cambiado desde entonces. */
-    /** @type {(since?: number) => Promise<{items?: SyncVersion[], now?: number, full?: boolean}>} */
-    list: (since) => call('list', undefined, since ? `since=${Math.floor(since)}` : ''),
+    /** @type {(since?: number) => Promise<{items?: SyncVersion[], now?: number, full?: boolean, respaldo?: number | null}>} */
+    async list(since) {
+      const res = await call('list', undefined, since ? `since=${Math.floor(since)}` : '');
+      if (res?.full) api.lastBackupAt = typeof res.respaldo === 'number' ? res.respaldo : null;
+      return res;
+    },
     /** @type {(items: SyncVersion[]) => Promise<{items?: (SyncBlob & {missing?: boolean})[]}>} */
     get: (items) => call('get', { items }),
     /** @type {(items: SyncBlob[]) => Promise<{saved?: string[], skipped?: string[]}>} */

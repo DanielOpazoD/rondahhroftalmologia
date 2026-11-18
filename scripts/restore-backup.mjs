@@ -4,6 +4,7 @@
  *
  *   NETLIFY_SITE_ID=… NETLIFY_AUTH_TOKEN=… node scripts/restore-backup.mjs --list
  *   NETLIFY_SITE_ID=… NETLIFY_AUTH_TOKEN=… node scripts/restore-backup.mjs 2026-11-20 --dry-run
+ *   … node scripts/restore-backup.mjs 2026-11-20 --cuentas   (repone también las cuentas que falten)
  *   NETLIFY_SITE_ID=… NETLIFY_AUTH_TOKEN=… node scripts/restore-backup.mjs 2026-11-20
  *
  * No borra nada del servidor: vuelve a escribir las versiones del respaldo; si
@@ -33,7 +34,7 @@ if (!args.length || args.includes('--list')) {
     process.exit(1);
   }
   const dryRun = args.includes('--dry-run');
-  const r = await restoreBackup({ source: respaldos, target: sync, day, dryRun });
+  const r = await restoreBackup({ source: respaldos, target: sync, day, dryRun, accounts: args.includes('--cuentas') });
   console.log(dryRun ? `Prueba: se restaurarían ${r.claves} versiones del ${day}.` : `Restauradas ${r.escritas} versiones del ${day}.`);
   // Contenido de adjuntos que falte en el servidor (respaldo incremental).
   const a = await restoreAttachments({ source: respaldos, target: sync, dryRun });

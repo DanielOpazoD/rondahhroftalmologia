@@ -71,6 +71,7 @@ const AUTOSAVE_MS = 1200;
  * @property {number} skewMin
  * @property {string} server configured | unconfigured | unknown
  * @property {string} hash valor para SYNC_TOKEN_SHA256
+ * @property {number | null | undefined} lastBackupAt último respaldo diario del servidor (null: sin registro; undefined: aún no se sabe)
  */
 
 /**
