@@ -16,7 +16,7 @@ import {
 } from '../../core/patient.js';
 import { clock } from '../../core/clock.js';
 import { makeAuditEntry } from '../../core/audit.js';
-import { toast } from '../dom.js';
+import { toast, errorToast } from '../dom.js';
 import { syncAttentionView } from '../attentionView.js';
 import { confirmDiscard } from './attention.js';
 import { buildAdmission, nonEmpty, relinkRecord, patientUpdateFromRecord, editPatientData, rutOwner } from '../../app/attentions.js';
@@ -247,7 +247,7 @@ export function patientActions(ctx, store) {
       try {
         merged = mergePatients(keep, drop, at);
       } catch (e) {
-        toast(/** @type {Error} */ (e).message, 4000);
+        errorToast(e instanceof Error ? e.message : String(e));
         return false;
       }
       const done = ctx.persist(() => {

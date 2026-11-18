@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, tab, ajustes } from './helpers.js';
+import { openApp, tab, ajustes, nextFrames } from './helpers.js';
 
 test('chequeo del equipo: indica qué falta y lleva a resolverlo; aparece solo tras días sin uso', async ({ page }) => {
   await openApp(page);
@@ -143,7 +143,7 @@ test('bloqueo robusto: no se imprime, Escape no lo cierra, queda sobre otros di�
   // Escape (dos veces) no desbloquea ni deja ver la app.
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  await nextFrames(page);
   await expect(lock).toBeVisible();
   await expect(page.locator('#main')).toBeHidden();
   // Otro diálogo que se abre encima (p. ej. un aviso de sincronización): el bloqueo sigue arriba y se puede usar.

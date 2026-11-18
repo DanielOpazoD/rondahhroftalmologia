@@ -27,13 +27,14 @@ test('guardado automático: lo escrito se guarda solo tras una pausa, sin pulsar
 });
 
 test('guardado automático: no duplica una atención del mismo paciente ese día', async ({ page }) => {
+  await page.clock.install(); // el reloj avanza a mano: comprobar que algo NO pasa sin esperar de verdad
   await openApp(page);
   await page.locator('#paciente_nombres').fill('Paciente Único');
   await expect(page.locator('#tbState')).toHaveText('Guardada', { timeout: 5000 });
   await page.locator('#bNew').click();
   await page.locator('#paciente_nombres').fill('Paciente Único');
   await expect(page.locator('#tbState')).toContainText('continúa en la atención existente', { timeout: 5000 });
-  await page.waitForTimeout(1600);
+  await page.clock.runFor(2000); // más que la pausa del guardado automático (1,2 s)
   await tab(page, 'Pacientes');
   await showPatientRecord(page, 'Paciente Único');
   await expect(page.locator('#patAttentions .prow')).toHaveCount(1);

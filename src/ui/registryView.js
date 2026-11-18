@@ -23,14 +23,27 @@ import { icon } from './icons.js';
  */
 const closestTo = (e, sel) => /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(sel));
 
+/** Pacientes por página: se dibujan de a tantos (el DOM no crece sin tope). */
+const PAGE = 500;
+/** Cuántos se muestran ahora (sube con «Mostrar más»). */
+let shown = PAGE;
+
 /** @param {AppContext} ctx */
 export function initRegistryView(ctx) {
   ctx.openPatientId = null;
-  $('#regSearch').addEventListener('input', () => renderRegistry(ctx));
-  $('#regOp').addEventListener('change', () => renderRegistry(ctx));
+  // Una búsqueda o un operativo nuevos vuelven a la primera página.
+  $('#regSearch').addEventListener('input', () => ((shown = PAGE), renderRegistry(ctx)));
+  $('#regOp').addEventListener('change', () => ((shown = PAGE), renderRegistry(ctx)));
   $('#regList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
     const b = closestTo(e, 'button[data-p]');
     if (b) return togglePatient(ctx, dataOf(b, 'p'));
+    if (closestTo(e, '#regMore')) {
+      const first = shown;
+      shown += PAGE;
+      renderRegistry(ctx);
+      // El botón se reemplaza al dibujar: el foco pasa a la primera fila nueva (no se pierde en la página).
+      return /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('#regList button[data-p]'))[first]?.focus();
+    }
     if (closestTo(e, '#patNew')) return ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId);
     if (closestTo(e, '#patEdit')) return ctx.openPatientId && ctx.editPatient(ctx.openPatientId);
     attentionAction(ctx, /** @type {HTMLButtonElement | null} */ (closestTo(e, '#patAttentions button[data-a]')));
@@ -125,6 +138,7 @@ function togglePatient(ctx, id) {
 function revealPatient(ctx, id) {
   $('#regSearch').value = '';
   $('#regOp').value = '';
+  shown = PAGE;
   ctx.openPatientId = null;
   togglePatient(ctx, id);
 }
@@ -168,6 +182,9 @@ export function renderRegistry(ctx) {
         compareCode(b.recs[0].f.fecha_atencion || '', a.recs[0].f.fecha_atencion || '') || compareEs(patientLabel(a.p), patientLabel(b.p)),
     );
   $('#regCount').textContent = patients.length;
+  // La ficha desplegada siempre se dibuja, aunque esté más allá de las páginas mostradas.
+  const openAt = ctx.openPatientId ? patients.findIndex(({ p }) => p.id === ctx.openPatientId) : -1;
+  if (openAt >= shown) shown = (Math.floor(openAt / PAGE) + 1) * PAGE;
   if (!patients.length) {
     const empty = ctx.records.length
       ? 'Sin resultados para esta búsqueda.'
@@ -175,9 +192,12 @@ export function renderRegistry(ctx) {
     setHtml($('#regList'), html`<div class="empty">${empty}</div>`);
     return;
   }
-  const rows = patients.slice(0, 500).map(({ p, recs }) => patientRow(ctx, p, recs));
+  const rows = patients.slice(0, shown).map(({ p, recs }) => patientRow(ctx, p, recs));
+  const rest = patients.length - shown;
   const more =
-    patients.length > 500 ? html`<p class="hint">Se muestran los 500 más recientes: usa la búsqueda para encontrar otros.</p>` : '';
+    rest > 0
+      ? html`<div class="row u-gap8 listmore"><button type="button" class="btn sm" id="regMore">Mostrar ${Math.min(rest, PAGE)} más</button><span class="hint">${rest} sin mostrar (los más antiguos)</span></div>`
+      : '';
   setHtml($('#regList'), html`<section class="pgroup">${rows}</section>${more}`);
 }
 

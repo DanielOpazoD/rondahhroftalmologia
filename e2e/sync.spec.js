@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, fillPatient, save, activateSync, syncNow, openPatient, showPatientRecord } from './helpers.js';
+import { openApp, fillPatient, save, activateSync, syncNow, openPatient, showPatientRecord, ajustes } from './helpers.js';
 
 /**
  * Dos "PC" (contextos de navegador independientes) contra el mismo servidor:
@@ -78,4 +78,47 @@ test('atención nueva del mismo paciente el mismo día: ofrece continuar en la e
   await expect(B.locator('#patAttentions .prow')).toHaveCount(1);
   await pcA.close();
   await pcB.close();
+});
+
+test('error de sincronización: el aviso queda a la vista hasta cerrarlo (no se pierde en 2 s)', async ({ page }) => {
+  await page.clock.install();
+  await openApp(page);
+  await ajustes(page, 'Este equipo');
+  await page.locator('#syncPass').fill('corta');
+  await page.locator('#syncOn').click();
+  const notice = page.getByRole('alert').filter({ hasText: 'contraseña' });
+  await expect(notice).toBeVisible();
+  await page.clock.runFor(10_000);
+  await expect(notice).toBeVisible();
+  // Con el reloj simulado no corren los cuadros de animación: se omite la espera de «estable» (ya se vio visible).
+  await page.getByRole('button', { name: 'Cerrar aviso' }).click({ force: true });
+  await expect(notice).toBeHidden();
+});
+
+test('aviso de error: un error con un diálogo abierto queda por encima; Escape lo cierra y devuelve el foco', async ({ page }) => {
+  await openApp(page);
+  await ajustes(page, 'Este equipo');
+  await page.locator('#syncPass').fill('corta');
+  const notice = page.getByRole('alert').filter({ hasText: 'contraseña' });
+  // El error ocurre mientras un diálogo modal está abierto: el aviso no queda debajo.
+  await page.evaluate(() => {
+    /** @type {HTMLDialogElement} */ (document.querySelector('#dlg')).showModal();
+    /** @type {HTMLButtonElement} */ (document.querySelector('#syncOn')).click();
+  });
+  await expect(notice).toBeVisible();
+  // En la capa superior, abierto después del diálogo: se pinta encima. (El modal deja inerte lo de
+  // fuera, así que `elementFromPoint` no sirve para medirlo; se cierra al volver del diálogo.)
+  expect(await page.locator('#errToast').evaluate((el) => el.matches(':popover-open'))).toBe(true);
+  await page.evaluate(() => /** @type {HTMLDialogElement} */ (document.querySelector('#dlg')).close());
+  await expect(notice).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar aviso' }).click();
+  await expect(notice).toBeHidden();
+  // Con el teclado: Escape lo cierra y el foco vuelve al botón que se usó.
+  await page.locator('#syncOn').focus();
+  await page.keyboard.press('Enter');
+  await expect(notice).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar aviso' }).focus();
+  await page.keyboard.press('Escape');
+  await expect(notice).toBeHidden();
+  await expect(page.locator('#syncOn')).toBeFocused();
 });

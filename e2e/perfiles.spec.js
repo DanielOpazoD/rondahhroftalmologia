@@ -115,6 +115,7 @@ test('quién registra: «Nuevo perfil…» desde la pregunta crea el perfil y lo
 });
 
 test('quién registra: el guardado automático no reemplaza la pregunta abierta', async ({ page }) => {
+  await page.clock.install(); // el reloj avanza a mano (abajo) en vez de esperar de verdad
   // Antes: al guardar, el guardado automático pendiente (1,2 s tras escribir)
   // abría una segunda pregunta que reemplazaba al formulario «Nuevo perfil».
   await openApp(page);
@@ -126,7 +127,7 @@ test('quién registra: el guardado automático no reemplaza la pregunta abierta'
   await dlg.locator('#dlg_perfil').selectOption({ label: '＋ Nuevo perfil…' });
   await dlg.getByRole('button', { name: 'Continuar' }).click();
   await expect(dlg.locator('#dlgTitle')).toHaveText('Nuevo perfil');
-  await page.waitForTimeout(2000); // más que la pausa del guardado automático
+  await page.clock.runFor(2000); // más que la pausa del guardado automático (1,2 s)
   await expect(dlg.locator('#dlgTitle')).toHaveText('Nuevo perfil');
   await dlg.locator('#dlg_nombres').fill('Enf. Paciente');
   await dlg.locator('#dlg_rol').selectOption('enfermeria');

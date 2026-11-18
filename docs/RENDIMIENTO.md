@@ -45,44 +45,44 @@ Lo encontró el perfil de CPU (no la intuición):
 
 <!-- mediciones -->
 
-## Última medición (2026-11-16, versión 2.22.0)
+## Última medición (2026-11-18, versión 2.34.0)
 
 ```text
-Tamaño: 1261 KB (gzip 634 KB, brotli 584 KB) · JS 605 KB · plantillas PDF 545 KB · CSS 49 KB
+Tamaño: 1285 KB (gzip 643 KB, brotli 592 KB) · JS 624 KB · plantillas PDF 545 KB · CSS 54 KB
 
 Composición del script (KB, minificado):
   plantillas PDF                      545 KB
   pdf-lib                             221 KB
-  ui/                                 111 KB
-  core/                                51 KB
+  ui/                                 116 KB
+  core/                                55 KB
   pako                                 45 KB
   @pdf-lib/standard-fonts              41 KB
   specialties/oftalmologia/            31 KB
   @pdf-lib/upng                        24 KB
-  sync/                                21 KB
-  ui/actions/                          15 KB
+  sync/                                23 KB
+  ui/actions/                          18 KB
+  storage/                             17 KB
   lib/                                 11 KB
-  storage/                             11 KB
   config/                               9 KB
-  src/ (main.js)                        6 KB
+  src/ (main.js)                        5 KB
 
 Núcleo en Node (3000 atenciones, 1112 fichas; mediana):
-  Normalizar 3.000 atenciones        48 ms
-  Estadística (3.000)                16 ms
-  Excel de estadística (3.000)       220 ms
-  Posibles duplicados (fichas)       3.0 ms
-  Seudonimizar (3.000)               401 ms
+  Normalizar 3.000 atenciones        33 ms
+  Estadística (3.000)                11 ms
+  Excel de estadística (3.000)       190 ms
+  Posibles duplicados (fichas)       2.3 ms
+  Seudonimizar (3.000)               292 ms
   Nota de una atención               0.0 ms
-  PDF de una atención                69 ms
+  PDF de una atención                46 ms
   Respaldo JSON (3.000)              13 ms
 
 App en el navegador (Chromium, mediana de 5):
-  Inicio sin datos                   58 ms
-  Inicio con 3.000 atenciones        367 ms
-  Pestaña Pacientes                  59 ms
+  Inicio sin datos                   68 ms
+  Inicio con 3.000 atenciones        326 ms
+  Pestaña Pacientes                  83 ms
   Pestaña Reportes                   40 ms
-  Pestaña Ingreso                    29 ms
-  Buscar en Pacientes                39 ms
+  Pestaña Ingreso                    13 ms
+  Buscar en Pacientes                45 ms
   Memoria JS sin datos (MB)          7 MB
-  Memoria JS con datos (MB)          25 MB
+  Memoria JS con datos (MB)          19 MB
 ```

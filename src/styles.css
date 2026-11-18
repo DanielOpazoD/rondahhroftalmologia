@@ -21,6 +21,7 @@
   --warn: #b45309;
   --warn-soft: #fff7e8;
   --bad: #c0163f;
+  --on-bad: #ffffff; /* texto sobre --bad (contraste ≥ 4,5:1 en cada tema) */
   --bad-soft: #fff1f3;
   --shadow-lg: 0 12px 32px -14px rgba(16, 24, 40, 0.28);
   --scrim: rgba(16, 24, 40, 0.36); /* fondo detrás de diálogos y menús */
@@ -61,6 +62,7 @@
     --warn: #fbbf24;
     --warn-soft: #2a2312;
     --bad: #fb7185;
+    --on-bad: #2a0710; /* texto sobre --bad (contraste ≥ 4,5:1 en cada tema) */
     --bad-soft: #2c151a;
     --ok-soft: #12261a;
     --shadow-lg: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
@@ -455,6 +457,19 @@ select:focus {
   border-color: var(--acc);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--acc) 16%, transparent);
 }
+/* Con teclado, el foco se ve con una línea sólida (WCAG 2.4.7 / 1.4.11), no solo un halo tenue. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+/* Pantallas táctiles: controles de 44 px de alto (objetivo táctil recomendado). */
+@media (pointer: coarse) {
+  :root {
+    --h: 44px;
+  }
+}
 select {
   appearance: none;
   -webkit-appearance: none;
@@ -471,9 +486,9 @@ textarea {
   resize: vertical;
   min-height: 48px;
 }
-/* Atención compacta: más del formulario a la vista en pantallas anchas.
-   En celular se mantienen los tamaños para tocar con el dedo. */
-@media (min-width: 761px) {
+/* Atención compacta: más del formulario a la vista en pantallas anchas con
+   mouse. En pantallas táctiles (celular, tablet) se mantienen los tamaños para el dedo. */
+@media (min-width: 761px) and (pointer: fine) {
   #t-at {
     --h: 32px;
   }
@@ -1105,6 +1120,10 @@ details.setup summary {
 .listcount b {
   color: var(--ink-2);
 }
+.listmore {
+  align-items: center;
+  margin: 4px 2px 12px;
+}
 .pgroup {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1364,9 +1383,44 @@ table.st tr.tot td {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+/* Aviso de error: queda hasta cerrarlo, un poco más arriba que el mensaje breve. */
+.toast.err {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  bottom: 72px;
+  max-width: min(560px, calc(100vw - 32px));
+  background: var(--bad);
+  color: var(--on-bad);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto; /* el mensaje breve deja pasar los clics; este tiene su botón Cerrar */
+  /* Es un popover (capa superior): se quitan la posición y el marco que le da el navegador. */
+  top: auto;
+  right: auto;
+  margin: 0;
+  border: 0;
+  overflow: visible;
+}
+.toast.err .ib {
+  color: inherit;
+  flex: none;
+}
+.toast.err .ib:hover {
+  background: color-mix(in srgb, var(--on-bad) 18%, transparent);
+  color: inherit;
+}
+.toast.err .ib:focus-visible {
+  outline-color: var(--on-bad);
+}
+.toast.err .ib svg {
+  transform: rotate(45deg);
+}
 @media (max-width: 760px) {
   .toast {
     bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .toast.err {
+    bottom: calc(132px + env(safe-area-inset-bottom));
   }
 }
 
@@ -1785,7 +1839,7 @@ dialog.pdf-preview {
 .btn.dangerfill {
   background: var(--bad);
   border-color: var(--bad);
-  color: #fff;
+  color: var(--on-bad);
 }
 .btn.dangerfill:hover {
   background: color-mix(in srgb, var(--bad) 88%, #000);

@@ -11,7 +11,7 @@ import { createPcVault } from './storage/pcVault.js';
 import { blankRecord } from './core/record.js';
 import { STORAGE_KEYS as K, SEALED_KEYS } from './config/catalogs.js';
 import { createContext } from './ui/context.js';
-import { $, $$, toast } from './ui/dom.js';
+import { $, $$, toast, errorToast } from './ui/dom.js';
 import { initAttentionView, syncAttentionView } from './ui/attentionView.js';
 import { initRegistryView } from './ui/registryView.js';
 import { initFilter } from './ui/statsView.js';
@@ -63,7 +63,7 @@ function getStorage() {
 async function openRepo(storage, practice, locked) {
   /** @param {Error} e */
   const onError = (e) => {
-    toast('No se pudo guardar en este equipo: ' + (e?.message || e), 6000);
+    errorToast('No se pudo guardar en este equipo: ' + (e?.message || e));
     logError('almacenamiento', e);
     window.dispatchEvent(new Event('hhr:storage-error'));
   };

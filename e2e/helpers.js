@@ -63,3 +63,8 @@ export async function openPatient(page, nombre) {
   await page.locator('#patAttentions .pmain').first().click();
   await expect(page.locator('#tbName')).toHaveText(nombre);
 }
+
+/** Espera a que el navegador dibuje dos cuadros (los ajustes de diseño que corren en el siguiente cuadro ya se aplicaron). */
+export async function nextFrames(page) {
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(undefined)))));
+}
