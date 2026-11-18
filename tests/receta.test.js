@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PDFDocument, PDFName } from 'pdf-lib';
-import { recetaDefaults, validateReceta, buildRecetaPdf, recetaFileName, RECETA_LABELS } from '../src/core/receta.js';
+import { PDFDocument, PDFName, TextAlignment } from 'pdf-lib';
+import { recetaDefaults, recetaValues, validateReceta, buildRecetaPdf, recetaFileName, RECETA_LABELS } from '../src/core/receta.js';
 
 const TEMPLATE = readFileSync(new URL('../src/specialties/oftalmologia/receta-plantilla.pdf', import.meta.url));
 const NOW = new Date('2026-11-16T03:30:00Z');
@@ -32,7 +32,7 @@ const ready = () => ({
   tabo_eje_oi: '80',
 });
 
-test('receta: propone paciente y profesional en orden, edad actual y fecha de Rapa Nui, sin deducir la óptica ni cambiar datos', () => {
+test('receta: propone paciente y profesional con nombres primero, edad actual y fecha de Rapa Nui, sin deducir la óptica ni cambiar datos', () => {
   const rec = {
     f: {
       paciente_apellido_paterno: 'Tepano',
@@ -51,7 +51,7 @@ test('receta: propone paciente y profesional en orden, edad actual y fecha de Ra
   };
   const before = structuredClone(rec),
     d = recetaDefaults(rec, NOW);
-  assert.equal(d.paciente_nombre, 'Tepano Pakarati María José');
+  assert.equal(d.paciente_nombre, 'María José Tepano Pakarati');
   assert.equal(d.paciente_rut, rec.f.paciente_rut);
   assert.equal(d.paciente_edad, '66');
   assert.equal(d.oftalmologo_nombre, 'Profesional anterior');
@@ -79,7 +79,7 @@ test('receta: identidad y fecha revisables, sin exigir RUT a quien no lo tiene n
   ]) {
     assert.ok(validateReceta({ ...d, ...change }));
   }
-  assert.equal(recetaFileName(d), 'Receta_Lentes_2026-11-15_12_345_678-5_Ejemplo_Ficticio_Paciente_Prueba.pdf');
+  assert.equal(recetaFileName(d), 'Receta_Lentes_2026-11-15_12_345_678-5_Paciente_Prueba_Ejemplo_Ficticio.pdf');
   assert.match(recetaFileName({ ...d, paciente_rut: '' }), /_sin_RUT_/);
 });
 
@@ -100,12 +100,14 @@ test('receta: usa los campos originales, conserva los signos y deja el PDF edita
     assert.equal(widgets.length, 1);
     assert.equal(widgets[0].dict.get(PDFName.of('V')).decodeText(), value);
     assert.ok(widgets[0].getAppearances().normal);
+    // Centrado en su casilla, también al editarlo después en el PDF.
+    assert.equal(field.getAlignment(), TextAlignment.Center, key);
   }
   const sig = form.getSignature('oftalmologo_firma');
   assert.equal(sig.acroField.dict.get(PDFName.of('V')), undefined);
   assert.equal(pdf.getPage(0).node.Annots().size(), 14);
-  assert.match(pdf.getTitle(), /Ejemplo Ficticio Paciente Prueba/);
-  assert.equal(pdf.getAuthor(), 'Prueba Ficticio Profesional');
+  assert.match(pdf.getTitle(), /Paciente Prueba Ejemplo Ficticio/);
+  assert.equal(pdf.getAuthor(), 'Profesional Prueba Ficticio');
 });
 
 test('receta: rechaza textos que no caben o caracteres no representables; nunca corta ni quita signos', async () => {
@@ -117,4 +119,32 @@ test('receta: rechaza textos que no caben o caracteres no representables; nunca 
   assert.equal(pdf.getForm().getTextField('lejos_od').getText(), '-2,00 >= -3,00 “prueba”');
   const signs = await PDFDocument.load(await buildRecetaPdf(TEMPLATE, { ...ready(), lejos_od: '-1,00 × 90° · prueba • 2' }));
   assert.equal(signs.getForm().getTextField('lejos_od').getText(), '-1,00 × 90° · prueba • 2');
+});
+
+test('receta: un nombre guardado con la propuesta antigua (apellidos primero) se reabre con nombres primero', () => {
+  const f = {
+    paciente_apellido_paterno: 'Tepano',
+    paciente_apellido_materno: 'Pakarati',
+    paciente_nombres: 'María José',
+    medico_apellido_paterno: 'Prueba',
+    medico_apellido_materno: 'Ficticio',
+    medico_nombres: 'Profesional',
+  };
+  // Borrador guardado por la 2.27.0: la propuesta de entonces, sin editar.
+  const old = {
+    f: {
+      ...f,
+      form_receta_paciente_nombre: 'Tepano Pakarati María José',
+      form_receta_oftalmologo_nombre: 'Prueba Ficticio Profesional',
+      form_receta_lejos_od: '-1,00',
+    },
+    ft: {},
+  };
+  const v = recetaValues(/** @type {any} */ (old), NOW);
+  assert.equal(v.paciente_nombre, 'María José Tepano Pakarati');
+  assert.equal(v.oftalmologo_nombre, 'Profesional Prueba Ficticio');
+  assert.equal(v.lejos_od, '-1,00', 'lo demás guardado se conserva');
+  // Un nombre escrito a mano se respeta.
+  const edited = { f: { ...f, form_receta_paciente_nombre: 'M. José Tepano' }, ft: {} };
+  assert.equal(recetaValues(/** @type {any} */ (edited), NOW).paciente_nombre, 'M. José Tepano');
 });

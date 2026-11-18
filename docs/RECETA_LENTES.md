@@ -18,22 +18,22 @@ El PDF se incluye en la aplicación para poder usarlo sin conexión. No se enví
 
 | Campo del PDF | Contenido inicial |
 | --- | --- |
-| `paciente_nombre` | Apellido paterno, apellido materno y nombres del paciente. Las fichas antiguas sin componentes conservan su nombre registrado. |
+| `paciente_nombre` | Nombres, apellido paterno y apellido materno del paciente (desde 2.27.1; antes, apellidos primero). Las fichas antiguas sin componentes conservan su nombre registrado. |
 | `paciente_rut` | RUT registrado; puede quedar vacío si el paciente no tiene RUT. |
 | `paciente_edad` | Edad calculada desde el nacimiento a la fecha actual de Rapa Nui. Sin nacimiento válido, solo se propone la edad registrada si la atención es del mismo día. |
-| `oftalmologo_nombre` | Apellidos y nombres del profesional de la atención. |
+| `oftalmologo_nombre` | Nombres y apellidos del profesional de la atención. |
 | `fecha` | Fecha actual del hospital (`Pacific/Easter`), impresa como día-mes-año. |
 | `lejos_od`, `lejos_oi`, `lejos_dp` | Vacíos, para prescripción manual. |
 | `cerca_od`, `cerca_oi`, `cerca_dp` | Vacíos, para prescripción manual. |
 | `tabo_eje_od`, `tabo_eje_oi` | Vacíos, para ejes manuales. |
 | `oftalmologo_firma` | Vacío. La aplicación no inserta firmas. |
 
-Todos los valores propuestos se pueden corregir antes de generar el PDF. Se guardan automáticamente dentro de la atención y se recuperan al reabrirla o recargar. Las correcciones del formulario no reemplazan los datos demográficos ni el perfil del profesional. Otra atención empieza con sus propias propuestas y graduación vacía.
+Todos los valores propuestos se pueden corregir antes de generar el PDF. Una receta abierta antes de 2.27.1 que guardó el nombre propuesto con los apellidos primero se reabre con el orden nuevo; un nombre escrito a mano se respeta. Se guardan automáticamente dentro de la atención y se recuperan al reabrirla o recargar. Las correcciones del formulario no reemplazan los datos demográficos ni el perfil del profesional. Otra atención empieza con sus propias propuestas y graduación vacía.
 
 La graduación nunca se infiere de AV, AVcc, diagnósticos, medicamentos o indicaciones. Se admite texto óptico libre; el signo menos Unicode se convierte a su equivalente ASCII sin perder el signo. Se avisa si un carácter no se puede representar o un texto no cabe, en vez de eliminarlo o cortarlo.
 
 ## Salida y protección
 
-La descarga conserva los trece campos de texto editables y el campo de firma original vacío. «Imprimir» muestra el PDF local y solicita el diálogo de impresión del navegador; también permite descargar ese mismo documento o volver a corregirlo. La aplicación no guarda los valores clínicos del diálogo en el registro de accesos.
+Cada texto queda centrado en su casilla (la plantilla original dejaba algunos campos pegados al borde izquierdo), también al editarlo después en el PDF. La descarga conserva los trece campos de texto editables y el campo de firma original vacío. «Imprimir» muestra el PDF local y solicita el diálogo de impresión del navegador; también permite descargar ese mismo documento o volver a corregirlo. La aplicación no guarda los valores clínicos del diálogo en el registro de accesos.
 
 Se requiere permiso de edición clínica. El bloqueo del equipo o un cambio de cuenta cierra el formulario y la vista previa, y revoca la URL temporal del PDF. En modo práctica la descarga lleva el prefijo `PRACTICA_`. El piloto ORL no incluye esta plantilla ni ofrece la opción.
