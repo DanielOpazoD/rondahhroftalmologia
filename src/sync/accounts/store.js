@@ -74,11 +74,18 @@ export function createAccountStore({ store, now, randId, rutHashOf }) {
     for (let i = 0; i < UPDATE_TRIES; i++) {
       const cur = await store.getWithMetadata(key, { type: 'json' });
       if (!cur) return null;
-      // Sin etag la escritura no sería condicional (pisaría): mejor fallar.
-      if (!cur.etag) throw new Error(`El almacén no entregó la versión de la cuenta ${uid}`);
       const antes = /** @type {Cuenta} */ (cur.data);
       const despues = change(antes);
       if (!despues) return { antes, despues: null };
+      if (!cur.etag) {
+        // Un almacén que no entrega versión (p. ej. el servidor local de la
+        // biblioteca) no permite escribir condicionado: se escribe como antes
+        // de 2.39, sin protección ante escrituras simultáneas, en vez de dejar
+        // a todos sin poder entrar.
+        console.warn(`cuentas: el almacén no entregó la versión de ${uid}; escritura sin condición`);
+        await store.setJSON(key, despues);
+        return { antes, despues };
+      }
       if ((await store.setJSON(key, despues, { onlyIfMatch: cur.etag })).modified) return { antes, despues };
     }
     throw new Error(`La cuenta ${uid} cambió ${UPDATE_TRIES} veces mientras se guardaba; no se guardó. Reintenta.`);

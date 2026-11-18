@@ -1159,16 +1159,21 @@ describe('almacén de cuentas: updateUser', () => {
     assert.equal((await store.get(`_cuentas/u/${uid}`)).x, undefined);
   });
 
-  test('cuenta inexistente o id inválido → null; `change` null no escribe; sin etag no escribe', async () => {
+  test('cuenta inexistente o id inválido → null; `change` null no escribe; sin etag escribe sin condición (no deja a nadie fuera)', async () => {
     const { store, db, uid } = await withAccount();
     assert.equal(await db.updateUser(newUserId(), (u) => u), null);
     assert.equal(await db.updateUser('../config', (u) => u), null);
     assert.deepEqual(await db.updateUser(uid, () => null), { antes: { id: uid, n: 0 }, despues: null });
-    store.getWithMetadata = async () => ({ data: { id: uid, n: 0 } });
-    await assert.rejects(
-      db.updateUser(uid, (u) => ({ ...u, x: 1 })),
-      /no entregó la versión/,
-    );
+    const real = store.getWithMetadata.bind(store);
+    store.getWithMetadata = async (/** @type {string} */ k, /** @type {any} */ o) => ({ data: (await real(k, o))?.data });
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      assert.deepEqual(await db.updateUser(uid, (u) => ({ ...u, x: 1 })), { antes: { id: uid, n: 0 }, despues: { id: uid, n: 0, x: 1 } });
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal((await db.getUser(uid))?.x, 1);
   });
 
   test('memoryBlobStore: etag nuevo en cada escritura; onlyIfMatch y onlyIfNew no pisan', async () => {
