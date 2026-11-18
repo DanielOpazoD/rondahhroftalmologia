@@ -13,7 +13,7 @@ import { buildNote, filterRecords } from '../specialties/activa/index.js';
 import { StorageError } from '../storage/store.js';
 import { stampChanges } from '../core/merge.js';
 import { clock } from '../core/clock.js';
-import { $, $$, toast, base64ToBytes } from './dom.js';
+import { $, $$, base64ToBytes, errorToast } from './dom.js';
 import { logError } from './errorLog.js';
 import { createBus, TOPICS, tabTopic } from './events.js';
 import { syncAttentionView, renderProcList, showValidation, renderToolbar } from './attentionView.js';
@@ -191,7 +191,7 @@ export function createContext(store, templateB64) {
         return true;
       } catch (e) {
         if (!(e instanceof StorageError)) throw e;
-        toast(e.message, 4000);
+        errorToast(e.message);
         logError('almacenamiento', e);
         return false;
       }

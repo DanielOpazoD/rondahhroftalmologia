@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, ajustes } from './helpers.js';
+import { openApp, ajustes, nextFrames } from './helpers.js';
 
 /** Rectángulos de la marca, cada pestaña y la zona derecha de la cabecera. */
 const headerBoxes = (page) =>
@@ -28,7 +28,7 @@ test('cabecera: nada se superpone ni se sale, en cualquier ancho y con un nombre
 
   for (const width of [1440, 1180, 1040, 1000, 860, 780]) {
     await page.setViewportSize({ width, height: 700 });
-    await page.waitForTimeout(150); // la cabecera se ajusta en el siguiente cuadro
+    await nextFrames(page); // la cabecera se ajusta en el siguiente cuadro
     const { overflow, parts } = await headerBoxes(page);
     expect(overflow, `a ${width}px el contenido de la cabecera se sale`).toBeLessThanOrEqual(1);
     // Las piezas que están en la misma fila no se cruzan.
@@ -43,7 +43,7 @@ test('cabecera: nada se superpone ni se sale, en cualquier ancho y con un nombre
   }
   // Con espacio, la marca muestra su nombre; sin espacio, solo el logo (y las pestañas su nombre accesible).
   await page.setViewportSize({ width: 1440, height: 700 });
-  await page.waitForTimeout(150);
+  await nextFrames(page);
   await expect(page.locator('.brand b')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Pacientes' })).toBeVisible();
 });

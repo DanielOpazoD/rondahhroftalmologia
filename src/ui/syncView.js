@@ -6,7 +6,7 @@
 import { fmtDateTime } from '../core/format.js';
 import { generatePassphrase } from '../sync/crypto.js';
 import { STATUS_LABELS } from './syncController.js';
-import { $, toast, copyText, required } from './dom.js';
+import { $, toast, copyText, required, errorToast } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { html } from './html.js';
 import { backupText } from '../core/serverBackup.js';
@@ -37,7 +37,7 @@ export function initSyncView(ctx) {
   $('#syncNowBtn').addEventListener('click', async () => {
     const r = await syncOf(ctx).syncNow();
     if (!r) return;
-    if ('error' in r) return toast(r.error, 4000);
+    if ('error' in r) return errorToast(r.error);
     toast(
       r.got ? `Sincronizado: ${r.got} ${r.got === 1 ? 'cambio recibido' : 'cambios recibidos'} de otros equipos` : 'Sincronizado',
       r.got ? 3500 : 1800,
@@ -53,7 +53,7 @@ export function initSyncView(ctx) {
 async function activate(ctx) {
   const r = await syncOf(ctx).activate($('#syncPass').value);
   if (!r) return;
-  if (r.status === 'invalid' || r.status === 'error') return toast(r.message, 4000);
+  if (r.status === 'invalid' || r.status === 'error') return errorToast(r.message);
   if (r.status === 'wrong') {
     $('#syncPass').select();
     return uiAlert({

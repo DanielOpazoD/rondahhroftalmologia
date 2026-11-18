@@ -56,6 +56,28 @@ export function toast(message, ms = 2200) {
 }
 
 /**
+ * Aviso de error: queda a la vista hasta que la persona lo cierra (no se pierde
+ * si mira a otro lado, como el mensaje breve) y se anuncia como alerta.
+ * @param {string} message
+ */
+export function errorToast(message) {
+  const box = $('#errToast');
+  $('#errToastText').textContent = message;
+  if (box.hidden) {
+    box.hidden = false;
+    box.classList.add('on');
+    $('#errToastClose').addEventListener(
+      'click',
+      () => {
+        box.classList.remove('on');
+        box.hidden = true;
+      },
+      { once: true },
+    );
+  }
+}
+
+/**
  * Descarga un contenido como archivo.
  * @param {Blob | string | Uint8Array} data
  * @param {string} fileName

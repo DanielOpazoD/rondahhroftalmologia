@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures.js';
-import { openApp, fillPatient, save, activateSync, syncNow, openPatient, showPatientRecord } from './helpers.js';
+import { openApp, fillPatient, save, activateSync, syncNow, openPatient, showPatientRecord, ajustes } from './helpers.js';
 
 /**
  * Dos "PC" (contextos de navegador independientes) contra el mismo servidor:
@@ -78,4 +78,19 @@ test('atención nueva del mismo paciente el mismo día: ofrece continuar en la e
   await expect(B.locator('#patAttentions .prow')).toHaveCount(1);
   await pcA.close();
   await pcB.close();
+});
+
+test('error de sincronización: el aviso queda a la vista hasta cerrarlo (no se pierde en 2 s)', async ({ page }) => {
+  await page.clock.install();
+  await openApp(page);
+  await ajustes(page, 'Este equipo');
+  await page.locator('#syncPass').fill('corta');
+  await page.locator('#syncOn').click();
+  const notice = page.getByRole('alert').filter({ hasText: 'contraseña' });
+  await expect(notice).toBeVisible();
+  await page.clock.runFor(10_000);
+  await expect(notice).toBeVisible();
+  // Con el reloj simulado no corren los cuadros de animación: se omite la espera de «estable» (ya se vio visible).
+  await page.getByRole('button', { name: 'Cerrar aviso' }).click({ force: true });
+  await expect(notice).toBeHidden();
 });
