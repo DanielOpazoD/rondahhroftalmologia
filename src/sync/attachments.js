@@ -11,7 +11,7 @@
  * hacer (contenido local sin subir, metadatos sin contenido local, o
  * eliminados pendientes), y el contenido se lee de a un adjunto.
  */
-import { encryptPayload, decryptPayload, b64ToBytes } from './crypto.js';
+import { encryptPayload, decryptPayload, b64ToBytes, isObject } from './crypto.js';
 import { remoteVersions, chunks as batches } from './protocol.js';
 import { chunkId, splitChunks, joinChunks, sha256Hex } from '../core/attachments.js';
 
@@ -29,7 +29,7 @@ const toB64 = (bytes) => {
  * @typedef {{id: string, sha256: string, tamano: number, partes: number, created: number}} AttMeta
  * @typedef {{
  *   api: {list: (since?: number) => Promise<{items?: {id: string, u: number, h?: string}[]}>,
- *         get: (items: {id: string, u: number}[]) => Promise<{items?: any[]}>,
+ *         get: (items: {id: string, u: number}[]) => Promise<{items?: {id: string, u: number, iv: string, ct: string, missing?: boolean}[]}>,
  *         put: (items: object[]) => Promise<{saved?: string[], skipped?: string[]}>},
  *   key: CryptoKey,
  *   metas: AttMeta[],
@@ -111,9 +111,9 @@ async function downloadOne({ api, key, batchSize = CHUNKS_PER_REQUEST }, m) {
   for (const batch of batches(wanted, batchSize)) {
     const res = await api.get(batch);
     for (const it of res.items || []) {
-      if (it.missing) continue;
+      if (it.missing) continue; // (sin iv ni ct)
       const content = await decryptPayload(key, it.id, it.u, it);
-      if (typeof content?.b !== 'string') continue;
+      if (!isObject(content) || typeof content.b !== 'string') continue;
       parts[Number(it.id.slice(m.id.length + 1))] = b64ToBytes(content.b);
     }
   }

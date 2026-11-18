@@ -12,6 +12,7 @@ import { nameParts } from '../core/names.js';
 import { accountRut, initialPassword, newUserId, passwordProblem } from '../core/accounts.js';
 import { sha256, toHex } from '../lib/sha256.js';
 import { importEncKey, DecryptError } from './crypto.js';
+import { SyncHttpError } from './client.js';
 import {
   deriveAccountSecrets,
   unwrapTeamKey,
@@ -37,12 +38,13 @@ import {
 /** Huella del valor `local` (lo que se guarda en el PC para entrar sin conexión). @param {string} local */
 const localHashOf = (local) => toHex(sha256(local));
 
-/** Mensaje para un error de cuentas. @param {any} e */
+/** Mensaje para un error de cuentas. @param {unknown} e @returns {string} */
 export function errorMessage(e) {
   if (e instanceof DecryptError) {
     return 'No se pudo abrir la clave del equipo con esta cuenta. Pide a un administrador que restablezca tu clave.';
   }
-  return e?.message || String(e);
+  const message = typeof e === 'object' && e !== null && 'message' in e ? e.message : undefined;
+  return message ? String(message) : String(e);
 }
 
 /**
@@ -119,6 +121,22 @@ export function createAccountSession({
 
   /* ---------------------------------------------------------- entrar */
 
+  /** La clave del equipo queda en este PC para sincronizar (como con la contraseña del equipo). @param {string} teamKey */
+  function keepTeamKey(teamKey) {
+    const cfg = store.loadSyncConfig();
+    if (!cfg || cfg.encKey !== teamKey || cfg.mode !== 'cuenta') {
+      persist(() =>
+        store.saveSyncConfig({
+          encKey: teamKey,
+          token: '',
+          mode: 'cuenta',
+          activatedAt: cfg?.activatedAt || now(),
+          lastSync: cfg?.encKey === teamKey ? cfg.lastSync : null,
+        }),
+      );
+    }
+  }
+
   /**
    * Entra con RUT y clave. Sin conexión, verifica con lo guardado en este PC.
    * @param {string} rut
@@ -134,13 +152,13 @@ export function createAccountSession({
     try {
       s = await api.sal(rut);
     } catch (e) {
-      if (/** @type {any} */ (e).status === 0) return offlineLogin(rut, password);
+      if (e instanceof SyncHttpError && e.status === 0) return offlineLogin(rut, password);
       throw e;
     }
     const sec = await deriveAccountSecrets(password, s.sal, s.iter);
     const r = await api.entrar(rut, sec.acceso).catch((e) => {
       // Cuenta desactivada: se olvida en este PC (sin conexión tampoco debe poder entrar).
-      const known = /** @type {any} */ (e).code === 'cuenta_desactivada' && localByRut(rut);
+      const known = e instanceof SyncHttpError && e.code === 'cuenta_desactivada' && localByRut(rut);
       if (known) removeLocal(known.uid);
       throw e;
     });
@@ -149,19 +167,7 @@ export function createAccountSession({
     const perfil = await decryptProfile(await importEncKey(teamKey), u.id, u.perfil);
     // Datos de este PC (ADR 0016): se abren (o se empiezan a cifrar) antes de guardar nada.
     await vault?.unlockOnline({ teamKeyB64: teamKey, uid: u.id, local: sec.local });
-    // La clave del equipo queda en este PC para sincronizar (como con la contraseña del equipo).
-    const cfg = store.loadSyncConfig();
-    if (!cfg || cfg.encKey !== teamKey || cfg.mode !== 'cuenta') {
-      persist(() =>
-        store.saveSyncConfig({
-          encKey: teamKey,
-          token: '',
-          mode: 'cuenta',
-          activatedAt: cfg?.activatedAt || now(),
-          lastSync: cfg?.encKey === teamKey ? cfg.lastSync : null,
-        }),
-      );
-    }
+    keepTeamKey(teamKey);
     st.token = r.token;
     st.exp = r.exp;
     st.acceso = sec.acceso;
@@ -321,8 +327,8 @@ export function createAccountSession({
       hooks.changed?.();
       return st.token;
     } catch (e) {
-      const x = /** @type {any} */ (e);
-      if (x.status !== 0) handleAuthError(x.code);
+      // Sin conexión se reintenta después; otro error que no es del servidor no cambia la sesión.
+      if (e instanceof SyncHttpError && e.status !== 0) handleAuthError(e.code);
       return null;
     }
   }

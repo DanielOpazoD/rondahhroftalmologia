@@ -21,6 +21,14 @@ const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 export class DecryptError extends Error {}
 
+/**
+ * ¿Es un objeto (o arreglo) cuyos campos se pueden leer? Para validar JSON sin
+ * verificar: lo descifrado (decryptPayload) o lo que llega en una solicitud.
+ * @param {unknown} v
+ * @returns {v is Record<string, unknown>}
+ */
+export const isObject = (v) => typeof v === 'object' && v !== null;
+
 /** ¿Hay WebCrypto en este contexto? */
 export function cryptoAvailable() {
   return !!globalThis.crypto?.subtle;
@@ -147,7 +155,7 @@ export async function encryptPayload(key, id, u, obj) {
  * @param {string} id
  * @param {number} u
  * @param {{iv: string, ct: string}} payload
- * @returns {Promise<any>} JSON descifrado (forma no verificada: la valida quien lo usa)
+ * @returns {Promise<unknown>} JSON descifrado (forma no verificada: la valida quien lo usa)
  */
 export async function decryptPayload(key, id, u, { iv, ct }) {
   try {

@@ -3,7 +3,7 @@
  * un `code` estable, el cuerpo de la solicitud (con tope de tamaño), el token
  * `Bearer` y la IP de origen.
  */
-import { isObject } from './validate.js';
+import { isObject } from '../crypto.js';
 
 /**
  * Una solicitud ya validada (ruta, método, cuerpo JSON).
@@ -49,7 +49,7 @@ function parseJson(text) {
 /**
  * Cuerpo JSON de la solicitud, o la respuesta de error si no sirve: más de
  * 600 KB (413, sin leerlo como JSON) o, en un POST, JSON que no es un objeto
- * (400). Un GET no trae cuerpo.
+ * (400; un arreglo pasa, y cada acción valida sus campos). Un GET no trae cuerpo.
  * @param {Request} req
  * @returns {Promise<{b: Record<string, unknown>} | {response: Response}>}
  */

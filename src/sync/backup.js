@@ -28,14 +28,7 @@ const ACCOUNT_KEY = /^_cuentas\//;
 const isBackedUp = (/** @type {string} */ key) => (VERSION_KEY.test(key) && !/^[a-z0-9-]+-adjuntos\//.test(key)) || ACCOUNT_KEY.test(key);
 const DAY_RE = /^(\d{4}-\d{2}-\d{2})\.json$/; // las claves `adjuntos/…` no son días
 
-/**
- * @typedef {{
- *   list: (o?: {prefix?: string}) => Promise<{blobs: {key: string}[]}>,
- *   get: (key: string, o?: {type: 'json'}) => Promise<any>,
- *   setJSON: (key: string, v: unknown) => Promise<unknown>,
- *   delete: (key: string) => Promise<unknown>,
- * }} BlobStore
- */
+/** @typedef {import('./server.js').BlobStore} BlobStore */
 
 /** «2026-11-16» de una fecha (UTC). @param {number} t */
 export const dayOf = (t) => new Date(t).toISOString().slice(0, 10);
@@ -96,7 +89,8 @@ export async function listBackups(target) {
  * @returns {Promise<{claves: number, escritas: number}>}
  */
 export async function restoreBackup({ source, target, day, dryRun = false }) {
-  const doc = await source.get(`${day}.json`, { type: 'json' });
+  // Documento que escribe dailyBackup: {creado, claves}.
+  const doc = /** @type {{claves?: Record<string, unknown>} | null} */ (await source.get(`${day}.json`, { type: 'json' }));
   if (!doc || typeof doc.claves !== 'object') throw new Error(`No hay respaldo del ${day}`);
   const entries = Object.entries(doc.claves).filter(([k]) => VERSION_KEY.test(k));
   // Cuentas: solo las que falten (nunca se pisa una cuenta vigente, p. ej. una clave cambiada después).
@@ -153,8 +147,8 @@ export async function backupAttachments({ source, target, now = Date.now(), keep
  * @returns {Promise<number>} cuántas se borraron
  */
 async function pruneOrphans(target, saved, liveSet, now, keepDays) {
-  /** @type {Record<string, string>} */
-  const orphans = (await target.get(ORPHANS, { type: 'json' })) || {};
+  /** Parte → día en que se vio huérfana (lo escribe esta función). */
+  const orphans = /** @type {Record<string, string>} */ ((await target.get(ORPHANS, { type: 'json' })) || {});
   const today = dayOf(now);
   const limit = dayOf(now - keepDays * 24 * 3600 * 1000);
   let borradas = 0;

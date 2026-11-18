@@ -6,6 +6,7 @@
  */
 import { accountRut, USER_ID_RE } from '../../core/accounts.js';
 import { ROLES } from '../../config/catalogs.js';
+import { isObject } from '../crypto.js';
 
 /** @typedef {{iv: string, ct: string}} Sellado  cifrado hecho en el PC (perfil o clave envuelta) */
 /** @typedef {{sal: string, iter: number, acceso: string, envuelta: Sellado}} Credenciales  de una clave, calculadas en el PC */
@@ -50,14 +51,6 @@ const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const ROLE_KEYS = ROLES.map((r) => r.key);
 const LOGOUT_REASONS = Object.freeze(['salir', 'inactividad', 'cierre']);
 const STATES = /** @type {readonly EstadoCuenta[]} */ (Object.freeze(['activo', 'desactivado']));
-
-/**
- * ¿Es un objeto (o un arreglo) cuyos campos se pueden leer? Es la misma
- * condición que exige el router a un cuerpo POST (`!b || typeof b !== 'object'` → 400).
- * @param {unknown} v
- * @returns {v is Record<string, unknown>}
- */
-export const isObject = (v) => typeof v === 'object' && v !== null;
 
 /**
  * @template {string} T
