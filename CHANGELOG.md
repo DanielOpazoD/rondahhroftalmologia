@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.30.0 — 2026-11-17
+
+### Interfaz
+- **Pacientes en una sola lista:** cada paciente se despliega en su lugar, con sus datos, «Editar datos», «Nueva atención» y su historial de atenciones. Ya no hay otra pantalla ni botón «← Pacientes». Se despliega uno a la vez; tocarlo de nuevo lo pliega.
+- Filas más claras: iniciales, RUT, edad y sexo, la última fecha y cuántas atenciones tiene, y una flecha que muestra si está desplegado.
+- **Atención más compacta** en pantallas anchas: alrededor de un 10 % menos de alto, con los mismos campos. En el celular se mantienen los tamaños para tocar con el dedo.
+- Se quitó el aviso «Nombre anterior… Completa apellidos y nombres para organizarlo» de Atención e Ingreso.
+- El botón de formularios (Constancia GES, IPD, receta) usa un ícono de herramientas.
+
 ## 2.29.0 — 2026-11-17
 
 ### Seguridad: datos de cada PC cifrados con la clave personal ([ADR 0016](docs/adr/0016.md))
