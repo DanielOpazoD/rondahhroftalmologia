@@ -471,6 +471,46 @@ textarea {
   resize: vertical;
   min-height: 48px;
 }
+/* Atención compacta: más del formulario a la vista en pantallas anchas.
+   En celular se mantienen los tamaños para tocar con el dedo. */
+@media (min-width: 761px) {
+  #t-at {
+    --h: 32px;
+  }
+  #t-at .card {
+    padding: 8px 12px 10px;
+    margin-bottom: 6px;
+  }
+  #t-at .card h2 {
+    margin-bottom: 6px;
+  }
+  #t-at .l {
+    margin: 5px 0 2px;
+  }
+  #t-at .g2,
+  #t-at .g4 {
+    gap: 6px 10px;
+    margin-top: 6px;
+  }
+  #t-at .g3 {
+    gap: 6px 10px;
+  }
+  #t-at :is(input, select, textarea) {
+    padding: 5px 9px;
+  }
+  #t-at textarea {
+    min-height: 40px;
+  }
+  #t-at .eye {
+    padding: 6px 10px 8px;
+  }
+  #t-at .eye h3 {
+    margin-bottom: 2px;
+  }
+  #t-at .eye .g3 {
+    gap: 6px;
+  }
+}
 input[readonly] {
   background: var(--surface-2);
   color: var(--ink-2);
@@ -1937,8 +1977,128 @@ body.perm-sin-ajustes [data-perm~='ajustes'] {
   font-size: var(--fs-sm);
   color: var(--mut);
 }
-#patBack {
-  margin-bottom: 10px;
+/* Lista de pacientes: cada fila se despliega en su lugar con la ficha y sus atenciones. */
+.pitem + .pitem {
+  border-top: 1px solid var(--line);
+}
+.pitem > .prow {
+  border-top: 0;
+  padding: 0;
+}
+.pmain.ppat {
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  column-gap: 12px;
+  padding: 10px 14px;
+}
+.ppat .pavatar {
+  grid-row: 1 / span 2;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  font: 600 var(--fs-sm) / 1 var(--font);
+  letter-spacing: 0.02em;
+  background: var(--acc-soft);
+  color: var(--acc-text);
+}
+.ppat .pname,
+.ppat .pmeta {
+  grid-column: 2;
+}
+.ppat .ptags {
+  grid-column: 3;
+}
+.ppat .plast {
+  grid-column: 4;
+  grid-row: 1 / span 2;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ppat .plast small {
+  font-size: var(--fs-xs);
+  color: var(--mut);
+}
+.ppat .chev {
+  grid-column: 5;
+  grid-row: 1 / span 2;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--mut);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+.pitem.open {
+  background: color-mix(in srgb, var(--acc-soft) 35%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--acc);
+}
+.pitem.open .chev {
+  transform: rotate(90deg);
+  stroke: var(--acc);
+}
+.pitem.open .pname {
+  color: var(--acc-text);
+}
+.pdetail {
+  padding: 0 14px 12px 60px;
+  display: grid;
+  gap: 8px;
+}
+.pdetail .patcard {
+  padding: 0;
+  margin: 0;
+}
+.pdetail #patAttentions {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.pdetail #patAttentions > .prow:first-child {
+  border-top: 0;
+}
+/* Solo para lectores de pantalla (el nombre ya está en la fila). */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ppat .chev {
+    transition: none;
+  }
+}
+@media (max-width: 640px) {
+  .pmain.ppat {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    padding: 10px 10px;
+  }
+  .ppat .ptags {
+    grid-column: 2;
+    grid-row: 3;
+    justify-content: flex-start;
+    margin-top: 4px;
+  }
+  .ppat .plast {
+    grid-column: 3;
+  }
+  .ppat .chev {
+    grid-column: 4;
+  }
+  .pdetail {
+    padding: 0 10px 10px;
+  }
 }
 .prevlist {
   margin-top: 12px;

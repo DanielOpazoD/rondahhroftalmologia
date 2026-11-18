@@ -48,11 +48,12 @@ export async function syncNow(page) {
   await expect(page.locator('#syncBadge')).toHaveText('Sincronizado', { timeout: 20_000 });
 }
 
-/** Abre la ficha de un paciente en la pestaña Pacientes. */
+/** Despliega la ficha de un paciente en la lista de Pacientes (si no lo estaba). */
 export async function showPatientRecord(page, nombre) {
   await tab(page, 'Pacientes');
-  if (await page.locator('#patDetailView').isVisible()) await page.locator('#patBack').click();
-  await page.locator('#regList .pmain', { hasText: nombre }).click();
+  const row = page.locator('#regList button[data-p]', { hasText: nombre });
+  if ((await row.getAttribute('aria-expanded')) !== 'true') await row.click();
+  await expect(row).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#patCard h2')).toHaveText(nombre);
 }
 

@@ -37,18 +37,6 @@ export function profileNameValues(values, previous = {}) {
     : { nombre: values.nombre || previous.nombre || '' };
 }
 
-/**
- * Conserva visible el texto antiguo, sin asignarlo a un apellido ni a los nombres.
- * @param {string} prefix prefijo de los campos del formulario ('paciente_', 'ing_')
- * @param {Record<string, string>} fields campos paciente_*
- */
-export function renderLegacyName(prefix, fields) {
-  const hint = document.querySelector(`[data-legacy-name="${prefix}"]`);
-  if (!(hint instanceof HTMLElement)) return;
-  hint.hidden = hasNameParts(fields, 'paciente_') || !fields.paciente_nombre;
-  hint.textContent = `Nombre anterior: ${fields.paciente_nombre || ''}. Completa apellidos y nombres para organizarlo.`;
-}
-
 /** Texto corto de cada opción de sexo (el nombre completo va en title/aria-label). @param {string} key */
 const short = (key) => (key === 'O' ? 'Otro' : key);
 

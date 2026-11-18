@@ -70,8 +70,8 @@ test('identidad: ingresado sin RUT y luego con RUT sigue siendo el mismo pacient
   await page.locator('#ingAdd').click();
   await showPatientRecord(page, 'Rosa Sin Rut');
   await expect(page.locator('#patAttentions .prow')).toHaveCount(2);
-  await page.locator('#patBack').click();
-  await expect(page.locator('#regList .prow', { hasText: 'Rosa Sin Rut' })).toHaveCount(1);
+  // Una sola ficha en la lista (desplegada en su lugar).
+  await expect(page.locator('#regList button[data-p]', { hasText: 'Rosa Sin Rut' })).toHaveCount(1);
 });
 
 test('posibles duplicados: se detectan y se unen sin perder atenciones', async ({ page }) => {

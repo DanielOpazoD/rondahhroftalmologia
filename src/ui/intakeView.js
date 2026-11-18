@@ -8,7 +8,7 @@
 import { formatRut, isIsoDate, todayIso, ageAt, fmtDate } from '../core/format.js';
 import { resolvePatientId, isAttended, attentionsOf } from '../core/patient.js';
 import { diagnosesList } from '../specialties/activa/index.js';
-import { initSexSelector, renderSexSelector, renderLegacyName } from './patientFields.js';
+import { initSexSelector, renderSexSelector } from './patientFields.js';
 import { NAME_PARTS, refreshNames } from '../core/names.js';
 import { $, dataOf } from './dom.js';
 import { updateRutMark } from './rut.js';
@@ -32,7 +32,6 @@ export function initIntakeView(ctx) {
     const f = Object.fromEntries(NAME_PARTS.map((k) => ['paciente_' + k, $(`#ing_${k}`).value]));
     refreshNames(f);
     $('#ing_nombre').value = f.paciente_nombre;
-    renderLegacyName('ing_', f);
   };
   for (const k of NAME_PARTS) {
     $(`#ing_${k}`).addEventListener('input', updateName);
@@ -110,7 +109,6 @@ function fillFromRegistry(ctx) {
     renderSexo(ctx);
   }
   updateAge();
-  renderLegacyName('ing_', p.f);
   updateRutMark($('#ing_rut'));
   const prev = attentionsOf(ctx.records, id);
   $('#ingHint').textContent =
@@ -126,7 +124,6 @@ function clearForm(ctx) {
   renderSexo(ctx);
   updateRutMark($('#ing_rut'));
   $('#ingHint').textContent = '';
-  renderLegacyName('ing_', {});
   $('#ing_rut').focus();
 }
 
