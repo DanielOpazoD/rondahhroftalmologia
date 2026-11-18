@@ -21,6 +21,7 @@ import { normalizeRecord } from './record.js';
 import { flatten, unflatten, isSafeKey } from './fields.js';
 import { isFutureVersion } from './migrations.js';
 import { mergeAuditDocs } from './audit.js';
+import { MAX_AHEAD_MS } from './clock.js';
 
 /** @typedef {import('../domain').RegistroFusionable} RegistroFusionable */
 
@@ -86,21 +87,24 @@ const rank = (v) => (v === undefined ? '' : JSON.stringify(v));
 
 /**
  * Fusión campo a campo: en cada ruta gana el valor editado más recientemente
- * (a igual fecha, desempate determinista por valor).
+ * (a igual fecha, desempate determinista por valor). Una fecha más allá de
+ * `maxT` cuenta como `maxT`: un campo fechado en 2099 (reloj malo o dato
+ * manipulado) no puede ganar para siempre.
  * @param {RegistroFusionable} a
  * @param {RegistroFusionable} b
+ * @param {number} maxT
  * @returns {{values: Map<string, import('./fields.js').ValorRuta>, ft: Record<string, number>}}
  *   `values`: ruta -> valor ganador; `ft`: ruta -> fecha más reciente
  */
-function mergeFields(a, b) {
+function mergeFields(a, b, maxT) {
   const fa = flatten(a);
   const fb = flatten(b);
   const paths = new Set([...fa.keys(), ...fb.keys(), ...Object.keys(a.ft || {}), ...Object.keys(b.ft || {})]);
   const ft = Object.create(null);
   const values = new Map();
   for (const p of paths) {
-    const ta = ftOf(a, p);
-    const tb = ftOf(b, p);
+    const ta = Math.min(ftOf(a, p), maxT);
+    const tb = Math.min(ftOf(b, p), maxT);
     const va = fa.get(p);
     const vb = fb.get(p);
     const useA = ta !== tb ? ta > tb : rank(va) >= rank(vb);
@@ -117,10 +121,12 @@ function mergeFields(a, b) {
  * que se combina con una existente). Devuelve un registro nuevo.
  * @param {RegistroFusionable} a
  * @param {RegistroFusionable} b
+ * @param {{maxT?: number}} [o] fecha máxima creíble de una edición (por defecto,
+ *   el mismo margen que acepta el reloj lógico: MAX_AHEAD_MS por delante de ahora)
  * @returns {RegistroFusionable}
  */
-export function mergeRecords(a, b) {
-  const { values, ft } = mergeFields(a, b);
+export function mergeRecords(a, b, { maxT = Date.now() + MAX_AHEAD_MS } = {}) {
+  const { values, ft } = mergeFields(a, b, maxT);
   const merged = unflatten(values);
   refreshNames(merged.f);
   const created = [a.created, b.created].flatMap((t) => (t ? [t] : []));

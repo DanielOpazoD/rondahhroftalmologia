@@ -123,14 +123,15 @@ async function setup() {
   const toItems = (records) => records.map((r) => ({ id: r.id, updated: r.updated, kind: 'atencion', data: r }));
   const key = await importEncKey(keys.encKey);
   /** Un "PC": estado local en memoria. */
-  const pc = () => {
-    const state = { records: [], tombstones: {} };
+  /** `keyProven`: esta clave ya sincronizó antes en el PC; `state`: retoma el de otro PC (el mismo equipo). */
+  const pc = ({ keyProven = false, state = { records: [], tombstones: {} } } = {}) => {
     return {
       state,
       sync: () =>
         syncOnce({
           api: createSyncApi({ token: keys.token, fetchFn, esp: 'oftalmologia' }),
           key,
+          keyProven,
           readLocal: () => ({ items: toItems(structuredClone(state.records)), tombstones: { ...state.tombstones } }),
           mergeFn: syncMerge,
           writeLocal: (items, tombstones) =>
@@ -141,6 +142,53 @@ async function setup() {
   };
   return { keys, store, handler, fetchFn, pc, tick: (ms = 1000) => (clock += ms) };
 }
+
+/** Daña en el servidor la versión vigente de `id` (cifrado basura con formato válido). */
+function damage(store, id) {
+  const key = versionKeys(store).find((k) => k.split('/')[2] === id);
+  const blob = JSON.parse(store._map.get(key));
+  store._map.set(key, JSON.stringify({ ...blob, ct: Buffer.from('dato dañado '.repeat(4)).toString('base64') }));
+}
+
+describe('datos dañados', () => {
+  test('un dato que no se descifra se aparta y la sincronización sigue con lo demás', async () => {
+    const { store, pc, tick } = await setup();
+    const A = pc();
+    const r1 = { ...minimalRecord(), id: 'a1', updated: 1000, f: { paciente_nombre: 'Uno' } };
+    const r2 = { ...minimalRecord(), id: 'a2', updated: 1000, f: { paciente_nombre: 'Dos' } };
+    A.state.records = [r1, r2];
+    await A.sync();
+    damage(store, 'a1');
+    tick();
+    // Un PC que ya sincronizó con esta clave: el dato dañado no detiene nada.
+    const B = pc({ keyProven: true });
+    const rb = await B.sync();
+    assert.deepEqual(rb.damaged, ['a1']);
+    assert.deepEqual(
+      B.state.records.map((r) => r.id),
+      ['a2'],
+      'lo demás llega igual',
+    );
+    // Y sigue funcionando en las siguientes (sin subir nada encima de lo dañado).
+    B.state.records.push({ ...minimalRecord(), id: 'b1', updated: 2000 });
+    const again = await B.sync();
+    assert.deepEqual(again.damaged, ['a1']);
+    assert.equal(again.pushed, 1);
+    assert.equal(versionKeys(store).filter((k) => k.split('/')[2] === 'a1').length, 1);
+  });
+
+  test('si nada se descifra y la clave nunca funcionó en este PC, es la clave: se detiene con el error', async () => {
+    const { store, pc } = await setup();
+    const A = pc();
+    A.state.records = [{ ...minimalRecord(), id: 'a1', updated: 1000 }];
+    await A.sync();
+    damage(store, 'a1');
+    await assert.rejects(pc().sync(), DecryptError);
+    // Un dato dañado que este PC no tiene no se borra del servidor (podría ser de una versión más nueva).
+    await pc({ keyProven: true }).sync();
+    assert.equal(versionKeys(store).filter((k) => k.split('/')[2] === 'a1').length, 1);
+  });
+});
 
 describe('servidor', () => {
   test('rechaza sin configuración, sin token o con token incorrecto', async () => {
@@ -228,7 +276,7 @@ describe('convergencia de varios PC', () => {
 
     // Sincronizar de nuevo no cambia nada.
     const again = await pcs[1].sync();
-    assert.deepEqual(again, { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false });
+    assert.deepEqual(again, { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false, damaged: [] });
   });
 
   test('un PC con otra contraseña no puede leer ni escribir', async () => {
@@ -795,6 +843,20 @@ describe('límite de intentos fallidos', () => {
     // Pasado el bloqueo, vuelve a 401 (y cuenta de nuevo).
     clock.t += AUTH_LIMIT.blockMs + 1;
     assert.equal((await req('malo')).status, 401);
+  });
+
+  test('fallos simultáneos desde una red: todos cuentan (antes se pisaban y quedaba uno)', async () => {
+    const keys = await deriveTeamKeys(PASS, 1000);
+    const store = memoryBlobStore();
+    for (const m of ['get', 'setJSON', 'list', 'delete']) {
+      const f = store[m].bind(store);
+      store[m] = async (...args) => (await new Promise((r) => setTimeout(r, 2)), f(...args));
+    }
+    const handler = createSyncHandler({ store, tokenHash: tokenHash(keys.token) });
+    const req = (token) => handler(new Request('https://x.test/api/sync/list', { headers: { authorization: `Bearer ${token}` } }));
+    await Promise.all(Array.from({ length: AUTH_LIMIT.maxFails * 3 }, () => req('malo')));
+    assert.equal((await req('malo')).status, 429);
+    assert.equal((await req(keys.token)).status, 200, 'la contraseña correcta nunca se bloquea');
   });
 
   test('los fallos espaciados (fuera de la ventana) no bloquean', async () => {

@@ -9,7 +9,7 @@
 import { nameParts, personName } from '../core/names.js';
 import { profileNameFields, profileNameValues } from './patientFields.js';
 import { ROLES } from '../config/catalogs.js';
-import { accountRut, initialPassword, newUserId, rutBody, INITIAL_PASSWORD_DAYS } from '../core/accounts.js';
+import { accountRut, initialPassword, newUserId, rutBody, INITIAL_PASSWORD_HOURS } from '../core/accounts.js';
 import { rolLabel } from '../core/catalog.js';
 import { formatRut, fmtDate, normalizeText } from '../core/format.js';
 import { importEncKey } from '../sync/crypto.js';
@@ -203,7 +203,7 @@ export function initUsersView(ctx) {
       await load();
       uiAlert({
         title: 'Cuenta creada',
-        message: `${p.nombre} entra con su RUT (${formatRut(p.rut)}) y la clave inicial ${rutBody(p.rut)}, que vence en ${INITIAL_PASSWORD_DAYS} días. Al entrar, deberá crear su clave personal.`,
+        message: `${p.nombre} entra con su RUT (${formatRut(p.rut)}) y la clave inicial ${rutBody(p.rut)}, que vence en ${INITIAL_PASSWORD_HOURS} horas. Al entrar, deberá crear su clave personal.`,
         tone: 'ok',
       });
     } catch (e) {
@@ -273,7 +273,7 @@ export function initUsersView(ctx) {
   async function reset(u) {
     const ok = await uiConfirm({
       title: 'Restablecer clave',
-      message: `La clave de ${u.nombre} volverá a ser la inicial: su RUT sin dígito verificador (${rutBody(u.rut)}), válida por ${INITIAL_PASSWORD_DAYS} días. Sus sesiones abiertas se cierran y al entrar deberá crear una clave nueva.`,
+      message: `La clave de ${u.nombre} volverá a ser la inicial: su RUT sin dígito verificador (${rutBody(u.rut)}), válida por ${INITIAL_PASSWORD_HOURS} horas. Sus sesiones abiertas se cierran y al entrar deberá crear una clave nueva.`,
       tone: 'warn',
       okLabel: 'Restablecer',
     });

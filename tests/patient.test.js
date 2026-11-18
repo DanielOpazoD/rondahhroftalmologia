@@ -179,7 +179,7 @@ test('mergePatients: completa los datos vacíos, marca la absorbida y no une RUT
 test('ficha eliminada (creada por error): viaja campo a campo, sale de duplicados y una atención la restaura', async () => {
   const { deletePatient, restorePatient, isDeletedPatient, DELETED_FIELD } = await import('../src/core/patient.js');
   const { patientUpdateFromRecord } = await import('../src/app/attentions.js');
-  const T = 1_800_000_000_000;
+  const T = 1_760_000_000_000; // oct. 2025: fechas pasadas (una edición «del futuro» se acota al fusionar)
   const p = normalizePatient({
     id: 'p_a',
     created: T,

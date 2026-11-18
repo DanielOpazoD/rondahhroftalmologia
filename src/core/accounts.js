@@ -3,15 +3,16 @@
  *
  * - Una cuenta se identifica por el RUT de la persona.
  * - La clave inicial es el RUT sin dígito verificador; sirve solo para el
- *   primer ingreso (que exige cambiarla) y vence a los INITIAL_PASSWORD_DAYS.
+ *   primer ingreso (que exige cambiarla) y vence a las INITIAL_PASSWORD_HOURS (24 h
+ *   desde 2.31.0; antes 7 días): quien conozca el RUT tiene una ventana corta.
  * - Clave nueva: al menos 8 caracteres, con 1 mayúscula, 1 número y 1 símbolo,
  *   y distinta de la inicial y de la actual (desde 2.28.0; antes, 6 caracteres
  *   sin símbolo). Una clave anterior que no cumple se cambia al entrar.
  */
 import { cleanRut, isValidRut, rutKey } from './format.js';
 
-/** Días que dura la clave inicial sin usarse. */
-export const INITIAL_PASSWORD_DAYS = 7;
+/** Horas que dura la clave inicial sin usarse. */
+export const INITIAL_PASSWORD_HOURS = 24;
 const PASSWORD_MIN = 8;
 /** Las reglas de la clave, como se muestran al crearla. */
 export const PASSWORD_RULES = 'Al menos 8 caracteres, con una mayúscula, un número y un símbolo (por ejemplo ! ? # . -).';

@@ -28,6 +28,7 @@
  */
 import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
+import { createAttempts, waitMs } from './attempts.js';
 
 /** @typedef {import('../domain').SyncVersion} SyncVersion */
 /** @typedef {import('../domain').SyncBlob} SyncBlob */
@@ -244,20 +245,6 @@ function validItem(it, now, withPayload) {
 }
 
 /**
- * Estado del límite de intentos de una red tras un fallo más. La cuenta
- * empieza de nuevo si no había, si la ventana pasó o si un bloqueo ya venció;
- * al llegar a `maxFails` la red queda bloqueada `blockMs`.
- * @param {{first?: number, fails?: number, until?: number} | null} cur
- * @param {number} t
- * @param {{maxFails: number, windowMs: number, blockMs: number}} limit
- */
-function afterFailure(cur, t, limit) {
-  const fresh = !cur?.first || t - cur.first > limit.windowMs || Boolean(cur.until && cur.until <= t);
-  const fails = (fresh ? 0 : cur?.fails || 0) + 1;
-  return { first: fresh ? t : /** @type {number} */ (cur?.first), fails, until: fails >= limit.maxFails ? t + limit.blockMs : 0 };
-}
-
-/**
  * @param {{
  *   store: BlobStore,
  *   tokenHash?: string | ((esp: string) => string | undefined),
@@ -272,6 +259,7 @@ function afterFailure(cur, t, limit) {
  * @returns {(req: Request) => Promise<Response>}
  */
 export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.now, log = () => {}, authLimit = AUTH_LIMIT, accounts }) {
+  const attempts = createAttempts(store);
   /**
    * Toda respuesta declara la versión de protocolo del servidor. Un cliente
    * que declara una versión menor a la mínima recibe 426 con el aviso de
@@ -324,13 +312,14 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
    */
   async function registerFailure(req, secret) {
     if (!authLimit) return 0;
-    const key = '_limites/' + toHex(hmacSha256(secret, 'ip:' + clientIp(req))).slice(0, 32);
+    const id = toHex(hmacSha256(secret, 'ip:' + clientIp(req))).slice(0, 32);
     const t = now();
-    const cur = /** @type {{first?: number, fails?: number, until?: number} | null} */ (await store.get(key, { type: 'json' }));
-    if (cur?.until && cur.until > t) return cur.until - t;
-    const next = afterFailure(cur, t, authLimit);
-    await store.setJSON(key, next);
-    return next.until ? next.until - t : 0;
+    const before = await attempts.recent('red', id, t, authLimit.windowMs);
+    // Ya bloqueada: el intento no suma (el bloqueo no se alarga con cada reintento).
+    const wait = waitMs(before, authLimit.maxFails, t, authLimit.windowMs);
+    if (wait) return wait;
+    await attempts.add('red', id, t);
+    return waitMs([...before, t], authLimit.maxFails, t, authLimit.windowMs);
   }
 
   /**

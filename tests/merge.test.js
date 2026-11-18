@@ -4,6 +4,7 @@ import { flatten, unflatten } from '../src/core/fields.js';
 import { changedPaths, stampChanges, ensureFt, mergeRecords, sameContent, ftOf } from '../src/core/merge.js';
 import { normalizeRecord } from '../src/core/record.js';
 import { minimalRecord } from './fixtures.js';
+import { MAX_AHEAD_MS } from '../src/core/clock.js';
 
 const base = () =>
   normalizeRecord({
@@ -172,4 +173,17 @@ test('vínculo con el paciente: el cambio fechado gana sin importar el orden de 
       assert.equal(m.f.od_pio, '18');
     }
   }
+});
+
+test('fusión: un campo fechado muy en el futuro (reloj malo o dato manipulado) no gana para siempre', () => {
+  const NOW = Date.UTC(2026, 10, 17, 12);
+  const rogue = { id: 'a1', updated: 1, f: { plan: 'del futuro' }, ft: { 'f.plan': Date.UTC(2099, 0, 1) } };
+  // Mientras el dato sea creíble (hasta 12 h adelante) se respeta; más allá cuenta como «ahora + 12 h».
+  const soon = { id: 'a1', updated: 2, f: { plan: 'editado ahora' }, ft: { 'f.plan': NOW } };
+  assert.equal(mergeRecords(soon, rogue, { maxT: NOW + MAX_AHEAD_MS }).f.plan, 'del futuro');
+  // Una edición posterior a ese tope sí gana (antes perdía siempre contra 2099).
+  const later = { id: 'a1', updated: 3, f: { plan: 'editado mañana' }, ft: { 'f.plan': NOW + MAX_AHEAD_MS + 1 } };
+  const m = mergeRecords(later, rogue, { maxT: NOW + MAX_AHEAD_MS });
+  assert.equal(m.f.plan, 'editado mañana');
+  assert.ok(m.ft['f.plan'] <= NOW + MAX_AHEAD_MS + 1, 'la fecha guardada también queda acotada');
 });
