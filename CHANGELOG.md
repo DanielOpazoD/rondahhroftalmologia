@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.29.0 — 2026-11-17
+
+### Seguridad: datos de cada PC cifrados con la clave personal ([ADR 0016](docs/adr/0016.md))
+- Con cuentas de usuario, lo que la app guarda en cada PC (atenciones, fichas, bitácora, adjuntos, borrador, perfiles) queda **cifrado con una llave del PC**, que se abre con la clave personal de quien entra. También la **clave del equipo**, que antes quedaba legible en el navegador.
+- Antes de entrar no se carga ningún dato. Antes, la pantalla de ingreso solo los tapaba.
+- **Recargar la página pide la clave**: la llave del PC no se guarda en ningún lado.
+- La primera vez, al entrar con conexión, la app cifra lo que ya estaba guardado. Si se interrumpe, termina en el siguiente ingreso, sin pisar lo guardado mientras tanto.
+- Una clave restablecida por el administrador o una persona que nunca entró en ese PC abren los datos al entrar con conexión. Sin conexión, entra quien ya entró antes en ese PC.
+
 ## 2.28.0 — 2026-11-17
 
 ### Seguridad

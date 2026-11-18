@@ -92,10 +92,33 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await syncNow(C);
   await tab(C, 'Pacientes');
   await expect(C.locator('#regList')).toContainText('Paciente Antes De Cuentas');
-  // Recargar la pestaña conserva la sesión.
+  // Los datos de este PC quedaron cifrados con la clave personal (ADR 0016): en el disco no se leen.
+  const disk = await C.evaluate(async () => {
+    const keys = Object.keys(localStorage);
+    const db = await new Promise((ok) => (indexedDB.open('hhr-rondas-oftalmologia').onsuccess = (e) => ok(e.target.result)));
+    const docs = await new Promise(
+      (ok) => (db.transaction('atenciones').objectStore('atenciones').getAll().onsuccess = (e) => ok(e.target.result)),
+    );
+    return {
+      pcKey: keys.some((k) => k.endsWith('llave_pc_v1')),
+      sync: localStorage.getItem(keys.find((k) => k.endsWith('sync_v1'))),
+      docs: JSON.stringify(docs),
+    };
+  });
+  expect(disk.pcKey).toBe(true);
+  expect(disk.sync).toMatch(/^enc1:/);
+  expect(disk.docs).not.toContain('Paciente Antes De Cuentas');
+  expect(disk.docs).toContain('"ct"'); // hay atenciones guardadas, cifradas
+  // Recargar pide la clave (la llave del PC no se guarda en ningún lado); al entrar, vuelven los datos.
   await C.reload();
-  await expect(C.locator('#userChip')).toContainText(NOMBRE);
+  await expect(C.locator('#loginDlg')).toBeVisible();
+  await expect(C.locator('#regList')).not.toContainText('Paciente Antes De Cuentas');
+  await C.locator('#loginPass').fill('Ojo#2026');
+  await C.locator('#loginGo').click();
   await expect(C.locator('#loginDlg')).toBeHidden();
+  await expect(C.locator('#userChip')).toContainText(NOMBRE);
+  await tab(C, 'Pacientes');
+  await expect(C.locator('#regList')).toContainText('Paciente Antes De Cuentas');
 
   // Bloquear: pide la clave de la persona.
   await C.locator('#userChip').click();
@@ -271,20 +294,21 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
   await expect(A.locator('#plan')).toBeEnabled();
 
   // Registro de accesos: lo que abrió y descargó Ana, con el nombre del paciente.
-  await syncNow(B); // envía los eventos pendientes
-  await expect
-    .poll(
-      async () =>
-        B.evaluate(() => Object.keys(localStorage).some((k) => k.endsWith('cuentas_eventos_v1') && localStorage.getItem(k) === '[]')),
-      { timeout: 15_000 },
-    )
-    .toBe(true);
+  await syncNow(B); // envía los eventos pendientes (la cola está cifrada en el PC: se espera a verlos en el servidor)
   await ajustes(A, 'Administración');
   await expect(A.locator('#auditCard')).toBeVisible();
-  await A.locator('#audLoad').click();
   const result = A.locator('#audResult');
-  await expect(result).toContainText('Sesiones', { timeout: 20_000 });
-  await A.locator('#audUser').selectOption({ label: 'Ana Admisión' });
+  await expect
+    .poll(
+      async () => {
+        await A.locator('#audLoad').click();
+        await expect(result).toContainText('Sesiones', { timeout: 20_000 });
+        await A.locator('#audUser').selectOption({ label: 'Ana Admisión' });
+        return result.textContent();
+      },
+      { timeout: 30_000 },
+    )
+    .toContain('Descargó el PDF');
   await expect(result).toContainText('Abrió la ficha');
   await expect(result).toContainText('Abrió la atención');
   await expect(result).toContainText('Descargó el PDF');
