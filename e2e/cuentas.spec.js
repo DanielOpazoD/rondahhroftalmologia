@@ -44,12 +44,17 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await expect(A.locator('#pwForm')).toBeVisible();
   await expect(A.locator('#pwHint')).toContainText(NOMBRE);
   // La clave nueva cumple las reglas.
-  await A.locator('#pwNew').fill('abcdef');
-  await A.locator('#pwNew2').fill('abcdef');
+  await expect(A.locator('#pwRules')).toContainText('8 caracteres');
+  await A.locator('#pwNew').fill('abcdefgh');
+  await A.locator('#pwNew2').fill('abcdefgh');
   await A.locator('#pwGo').click();
   await expect(A.locator('#loginErr')).toContainText('mayúscula');
-  await A.locator('#pwNew').fill('Ojo2026');
-  await A.locator('#pwNew2').fill('Ojo2026');
+  await A.locator('#pwNew').fill('Ojo20266');
+  await A.locator('#pwNew2').fill('Ojo20266');
+  await A.locator('#pwGo').click();
+  await expect(A.locator('#loginErr')).toContainText('símbolo');
+  await A.locator('#pwNew').fill('Ojo#2026');
+  await A.locator('#pwNew2').fill('Ojo#2026');
   await A.locator('#pwGo').click();
   await expect(A.locator('#loginDlg')).toBeHidden();
   await expect(A.locator('#userChip')).toContainText(NOMBRE);
@@ -71,7 +76,7 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await ajustes(B, 'Este equipo');
   await B.locator('#syncNowBtn').click();
   await expect(B.locator('#loginDlg')).toBeVisible({ timeout: 20_000 });
-  await login(B, RUT, 'Ojo2026');
+  await login(B, RUT, 'Ojo#2026');
   await expect(B.locator('#loginDlg')).toBeHidden();
   await syncNow(B);
   await tab(B, 'Pacientes');
@@ -81,7 +86,7 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await C.goto('/');
   await login(C, RUT, 'Mala123');
   await expect(C.locator('#loginErr')).toContainText('incorrectos');
-  await C.locator('#loginPass').fill('Ojo2026');
+  await C.locator('#loginPass').fill('Ojo#2026');
   await C.locator('#loginGo').click();
   await expect(C.locator('#loginDlg')).toBeHidden();
   await syncNow(C);
@@ -108,7 +113,7 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await C.reload();
   await expect(C.locator('#loginDlg')).toBeVisible();
   await expect(C.locator('#regList')).not.toContainText('Paciente Antes De Cuentas');
-  await C.locator('#loginPass').fill('Ojo2026');
+  await C.locator('#loginPass').fill('Ojo#2026');
   await C.locator('#loginGo').click();
   await expect(C.locator('#loginDlg')).toBeHidden();
   await expect(C.locator('#userChip')).toContainText(NOMBRE);
@@ -122,7 +127,7 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await C.locator('#lockPin').fill('Mala123');
   await C.locator('#lockGo').click();
   await expect(C.locator('#lockErr')).toHaveText('Clave incorrecta.');
-  await C.locator('#lockPin').fill('Ojo2026');
+  await C.locator('#lockPin').fill('Ojo#2026');
   await C.locator('#lockGo').click();
   await expect(C.locator('#lockDlg')).toBeHidden();
 
@@ -131,7 +136,7 @@ test('cuentas: activar, primer ingreso con el RUT, crear clave, sincronizar con 
   await C.getByRole('menuitem', { name: 'Cerrar sesión' }).click();
   await expect(C.locator('#loginDlg')).toBeVisible();
   await cc.setOffline(true);
-  await login(C, RUT, 'Ojo2026');
+  await login(C, RUT, 'Ojo#2026');
   await expect(C.locator('#loginDlg')).toBeHidden();
   await expect(C.locator('#toast')).toContainText('Sin conexión');
   // Al volver la conexión, sincroniza sin volver a pedir la clave.
@@ -146,8 +151,8 @@ async function adminReady(page) {
   await activateSync(page);
   await activateAccounts(page);
   await login(page, RUT, '17752753');
-  await page.locator('#pwNew').fill('Ojo2026');
-  await page.locator('#pwNew2').fill('Ojo2026');
+  await page.locator('#pwNew').fill('Ojo#2026');
+  await page.locator('#pwNew2').fill('Ojo#2026');
   await page.locator('#pwGo').click();
   await expect(page.locator('#loginDlg')).toBeHidden();
 }
@@ -182,8 +187,8 @@ test('usuarios: el administrador crea, restablece y desactiva cuentas; siempre q
   // Ana entra en otro PC y crea su clave; no ve la administración de usuarios.
   await B.goto('/');
   await login(B, '11.111.111-1', '11111111');
-  await B.locator('#pwNew').fill('Admis1');
-  await B.locator('#pwNew2').fill('Admis1');
+  await B.locator('#pwNew').fill('Admis#01');
+  await B.locator('#pwNew2').fill('Admis#01');
   await B.locator('#pwGo').click();
   await expect(B.locator('#loginDlg')).toBeHidden();
   await expect(B.locator('#userChip')).toContainText('Ana Admisión');
@@ -243,8 +248,8 @@ test('permisos: una administrativa ve las atenciones sin editarlas, hace el ingr
 
   await B.goto('/');
   await login(B, '11.111.111-1', '11111111');
-  await B.locator('#pwNew').fill('Admis1');
-  await B.locator('#pwNew2').fill('Admis1');
+  await B.locator('#pwNew').fill('Admis#01');
+  await B.locator('#pwNew2').fill('Admis#01');
   await B.locator('#pwGo').click();
   await expect(B.locator('#loginDlg')).toBeHidden();
   await syncNow(B);

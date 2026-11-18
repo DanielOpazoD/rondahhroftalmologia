@@ -9,6 +9,12 @@
 - La primera vez, al entrar con conexión, la app cifra lo que ya estaba guardado. Si se interrumpe, termina en el siguiente ingreso, sin pisar lo guardado mientras tanto.
 - Una clave restablecida por el administrador o una persona que nunca entró en ese PC abren los datos al entrar con conexión. Sin conexión, entra quien ya entró antes en ese PC.
 
+## 2.28.0 — 2026-11-17
+
+### Seguridad
+- **Claves personales más fuertes:** al menos 8 caracteres, con una mayúscula, un número y un símbolo (antes, 6 caracteres sin símbolo).
+- Quien tenga una clave anterior que no cumple la regla debe crear una nueva al entrar con conexión. Sin conexión puede entrar igual, y se le pide al volver a entrar con conexión.
+
 ## 2.27.1 — 2026-11-17
 
 ### Receta para lentes

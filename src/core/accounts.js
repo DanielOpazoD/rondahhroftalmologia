@@ -4,14 +4,17 @@
  * - Una cuenta se identifica por el RUT de la persona.
  * - La clave inicial es el RUT sin dígito verificador; sirve solo para el
  *   primer ingreso (que exige cambiarla) y vence a los INITIAL_PASSWORD_DAYS.
- * - Clave nueva: al menos 6 caracteres, 1 mayúscula y 1 número, y distinta
- *   de la inicial.
+ * - Clave nueva: al menos 8 caracteres, con 1 mayúscula, 1 número y 1 símbolo,
+ *   y distinta de la inicial y de la actual (desde 2.28.0; antes, 6 caracteres
+ *   sin símbolo). Una clave anterior que no cumple se cambia al entrar.
  */
 import { cleanRut, isValidRut, rutKey } from './format.js';
 
 /** Días que dura la clave inicial sin usarse. */
 export const INITIAL_PASSWORD_DAYS = 7;
-const PASSWORD_MIN = 6;
+const PASSWORD_MIN = 8;
+/** Las reglas de la clave, como se muestran al crearla. */
+export const PASSWORD_RULES = 'Al menos 8 caracteres, con una mayúscula, un número y un símbolo (por ejemplo ! ? # . -).';
 const PASSWORD_MAX = 128;
 /** Intentos fallidos seguidos que bloquean la cuenta, y por cuánto tiempo. */
 export const ACCOUNT_LOCK = Object.freeze({ maxFails: 5, lockMs: 15 * 60_000 });
@@ -65,6 +68,7 @@ export function passwordProblem(password, { rut, current } = {}) {
   if (p.length > PASSWORD_MAX) return `La clave puede tener como máximo ${PASSWORD_MAX} caracteres.`;
   if (!/[A-ZÁÉÍÓÚÜÑ]/.test(p)) return 'La clave debe tener al menos una mayúscula.';
   if (!/[0-9]/.test(p)) return 'La clave debe tener al menos un número.';
+  if (!/[^\p{L}\p{N}\s]/u.test(p)) return 'La clave debe tener al menos un símbolo (por ejemplo ! ? # . -).';
   if (rut && p === initialPassword(rut)) return 'La clave nueva no puede ser la inicial (tu RUT).';
   if (current && p === current) return 'La clave nueva debe ser distinta de la actual.';
   return null;
