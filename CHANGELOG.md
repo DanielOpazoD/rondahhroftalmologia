@@ -1,5 +1,20 @@
 # Cambios
 
+## 2.38.0 — 2026-11-18
+
+### Accesibilidad
+- **Contrastes AA en el modo práctica:**
+  - la marca «Práctica» en tema oscuro pasa de 2,5:1 a 6,6:1;
+  - «hecho» en Ingreso pasa de 4,2:1 a 5,0:1.
+- **Título de la página para lectores de pantalla:** se agregó un `<h1>` oculto a la vista.
+- **Colores en tokens:**
+  - no quedan blancos, negros ni grises sueltos en el CSS;
+  - los colores de hover, papel e impresión tienen nombre;
+  - la apariencia no cambia.
+- **Pruebas:**
+  - axe audita ahora el modo práctica en ambos temas y la pestaña Ingreso con pasos hechos;
+  - se cubre el borde de la edad el día del nacimiento.
+
 ## 2.37.0 — 2026-11-18
 
 ### Cimientos: contratos y documentación verificada
