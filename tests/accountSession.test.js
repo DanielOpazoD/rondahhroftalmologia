@@ -432,3 +432,77 @@ test('sesión: una clave anterior a las reglas actuales (6 caracteres, sin símb
   D.net.online = false;
   assert.equal((await D.session.login(RUT, 'Ojo#2026')).status, 'offline');
 });
+
+test('sesión: con los datos del PC cifrados, entrar abre la llave, recargar pide la clave y cambiarla rehace el estuche', async () => {
+  const w = await world();
+  const A = w.pc();
+  A.store.saveSyncConfig({ encKey: w.keys.encKey, token: w.keys.token });
+  await A.session.activate({ rut: RUT, nombre: 'Dra. Admin', rol: 'medico' });
+  await A.session.login(RUT, '17752753');
+  await A.session.changePassword('Ojo#2026');
+  // Un PC con su llave (ADR 0016), simulada: registra lo que la sesión le pide.
+  const calls = [];
+  const vault = {
+    state: 'locked',
+    unlockOnline: async (o) => {
+      calls.push(['online', o.uid, o.teamKeyB64 === w.keys.encKey]);
+      vault.state = 'open';
+    },
+    unlockOffline: async (o) => (calls.push(['offline', o.uid]), vault.answer),
+    rewrap: async (o) => calls.push(['rewrap', o.uid]),
+    forget: (o) => calls.push(['forget', o.uid ?? o.keep]),
+  };
+  const B = w.pc();
+  let tab = null;
+  const net = { online: true };
+  const fetchFn = async (url, init) => {
+    if (!net.online) throw new TypeError('Failed to fetch');
+    if (net.deactivated && url.includes('entrar')) {
+      return new Response(JSON.stringify({ error: 'Cuenta desactivada', code: 'cuenta_desactivada' }), { status: 403 });
+    }
+    return w.accounts.handler(new Request(`https://x${url}`, init));
+  };
+  const session = createAccountSession({
+    api: createAccountsApi({ fetchFn }),
+    store: B.store,
+    session: { get: () => tab, set: (v) => (tab = v) },
+    now: () => w.clock.t,
+    iterations: ITER,
+    vault,
+  });
+  assert.equal((await session.login(RUT, 'Ojo#2026')).status, 'ok');
+  assert.deepEqual(calls.shift(), ['online', session.user.id, true], 'se abre con la clave del equipo, antes de guardar nada');
+  assert.deepEqual(calls.shift(), ['forget', [session.user.id]], 'quedan solo los estuches de cuentas de este PC');
+  // Recargar: con la llave cerrada, la sesión de la pestaña no basta.
+  vault.state = 'locked';
+  assert.equal(session.restore(), false);
+  // Sin conexión, la clave se comprueba abriendo el estuche.
+  await session.logout();
+  net.online = false;
+  vault.answer = 'wrong';
+  await assert.rejects(session.login(RUT, 'Ojo#2026'), /incorrectos/);
+  vault.answer = 'missing';
+  await assert.rejects(session.login(RUT, 'Ojo#2026'), /entra una vez con conexión/);
+  vault.answer = 'ok';
+  assert.equal((await session.login(RUT, 'Ojo#2026')).status, 'offline');
+  // Cambiar la clave rehace el estuche de la cuenta.
+  net.online = true;
+  vault.state = 'open';
+  await session.logout();
+  await session.login(RUT, 'Ojo#2026');
+  calls.length = 0;
+  await session.changeMyPassword('Ojo#2026', 'Nueva#22');
+  assert.deepEqual(calls.at(-1), ['rewrap', session.user.id]);
+  // Cuenta desactivada: en la sesión o al intentar entrar, se olvida su estuche.
+  const uid = session.user.id;
+  calls.length = 0;
+  session.handleAuthError('cuenta_desactivada');
+  assert.deepEqual(calls, [['forget', uid]]);
+  // Vuelve a entrar en este PC; después la desactivan y lo intenta de nuevo.
+  await session.login(RUT, 'Nueva#22');
+  await session.logout();
+  calls.length = 0;
+  net.deactivated = true;
+  await assert.rejects(session.login(RUT, 'Nueva#22'));
+  assert.deepEqual(calls, [['forget', uid]]);
+});

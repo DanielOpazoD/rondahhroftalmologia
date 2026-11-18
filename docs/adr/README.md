@@ -18,5 +18,6 @@ Cada ADR explica una decisión de fondo: el contexto, qué se decidió, sus cons
 | [0012](0012.md) | Lector tolerante entre versiones de la app | Aceptada |
 | [0013](0013.md) | Respaldos diarios del servidor, cifrados | Aceptada |
 | [0014](0014.md) | Cuentas de usuario por RUT, roles y registro de accesos | Aceptada |
+| [0016](0016.md) | Datos de cada PC cifrados con la clave personal | Aceptada |
 
 Plantilla para una nueva: **Estado** (Propuesta / Aceptada / Reemplazada por ADR N), **Contexto**, **Decisión**, **Consecuencias** y **Alternativas descartadas**.

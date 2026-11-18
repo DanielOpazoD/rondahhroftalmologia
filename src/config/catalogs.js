@@ -69,7 +69,33 @@ export const STORAGE_KEYS = Object.freeze({
   accountEvents: `${P}cuentas_eventos_v1`,
   /** Minutos sin uso para bloquear la sesión (con cuentas). */
   sessionLock: `${P}cuentas_bloqueo_v1`,
+  /** Llave que cifra los datos de este PC, en sus estuches (ADR 0016); nunca legible. */
+  pcKey: `${P}llave_pc_v1`,
 });
+
+/**
+ * Claves de localStorage con datos de pacientes o secretos: con la llave del PC
+ * se guardan cifradas (ADR 0016). Las demás (ajustes, catálogos, reloj, PIN,
+ * cuentas locales para la pantalla de ingreso) siguen legibles.
+ */
+export const SEALED_KEYS = Object.freeze([
+  STORAGE_KEYS.sync,
+  STORAGE_KEYS.draft,
+  STORAGE_KEYS.medico,
+  STORAGE_KEYS.medicos,
+  STORAGE_KEYS.user,
+  STORAGE_KEYS.anonSecret,
+  STORAGE_KEYS.notDuplicates,
+  STORAGE_KEYS.accountEvents,
+  STORAGE_KEYS.attachmentsUploaded,
+  STORAGE_KEYS.attachmentPurges,
+  // Colecciones, si no hay IndexedDB (y las de versiones anteriores, antes de migrarlas).
+  STORAGE_KEYS.records,
+  STORAGE_KEYS.tombstones,
+  STORAGE_KEYS.audit,
+  STORAGE_KEYS.patients,
+  STORAGE_KEYS.attachments,
+]);
 
 /**
  * Roles de los perfiles profesionales. Solo los de rol `medico` aparecen como

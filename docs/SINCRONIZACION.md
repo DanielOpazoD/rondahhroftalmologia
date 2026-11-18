@@ -157,7 +157,7 @@ Una vez activadas las cuentas ([ADR 0014](adr/0014.md); cómo activarlas en [OPE
 
 - **Contraseña perdida:** si se pierde, nadie (tampoco Netlify) puede descifrar el servidor. Los datos de cada PC siguen ahí.
 - **Contraseña filtrada:** quien la tenga y conozca la dirección puede leer los datos. Trátala como una clave de acceso a fichas clínicas.
-- **Datos en cada PC:** se guardan sin cifrar en el navegador (como en la versión sin sincronización). Protege los PC con sesión de usuario y contraseña.
+- **Datos en cada PC:** con cuentas de usuario, desde 2.29.0 se guardan **cifrados con una llave del PC** que se abre con la clave personal de quien entra ([ADR 0016](adr/0016.md)): sin entrar, el disco solo tiene texto ilegible (también la clave del equipo). Recargar la página pide la clave. Sin cuentas, se guardan sin cifrar en el navegador. En ambos casos, protege los PC con sesión de usuario y contraseña, y no dejes respaldos ni PDF en Descargas.
 - **Normativa:** los datos de salud cifrados siguen siendo datos personales. Informa a TI o a protección de datos del Servicio de Salud.
 - **Seguridad del navegador:** la página solo puede conectarse a su propio servidor (`connect-src 'self'`) y no carga nada de terceros.
 

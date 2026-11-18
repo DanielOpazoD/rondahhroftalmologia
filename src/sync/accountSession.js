@@ -25,6 +25,13 @@ import {
  * @typedef {import('./accountCrypto.js').PerfilCuenta & {id: string, rol: string, admin: boolean, offline: boolean}} CuentaActiva
  * @typedef {import('./accountCrypto.js').PerfilCuenta & {uid: string, sal: string, iter: number, localHash: string, rol: string, admin: boolean}} CuentaLocal
  * @typedef {{get: () => any, set: (v: any) => void}} SesionGuardada  sesión de la pestaña (sessionStorage)
+ * @typedef {{
+ *   state: 'clear' | 'locked' | 'open',
+ *   unlockOnline: (o: {teamKeyB64: string, uid: string, local: string}) => Promise<void>,
+ *   unlockOffline: (o: {uid: string, local: string}) => Promise<'ok' | 'wrong' | 'missing'>,
+ *   rewrap: (o: {uid: string, local: string}) => Promise<void>,
+ *   forget: (o: {uid?: string, keep?: string[]}) => void,
+ * }} LlavePc  llave que cifra los datos de este PC (storage/pcVault.js, ADR 0016)
  */
 
 /** Huella del valor `local` (lo que se guarda en el PC para entrar sin conexión). @param {string} local */
@@ -48,6 +55,7 @@ export function errorMessage(e) {
  *   online?: () => boolean,
  *   iterations?: number,
  *   hooks?: {needLogin?: (message: string) => void, changed?: () => void, renewed?: () => void},
+ *   vault?: LlavePc,
  * }} deps
  */
 export function createAccountSession({
@@ -59,6 +67,7 @@ export function createAccountSession({
   online = () => true,
   iterations = ACCOUNT_ITERATIONS,
   hooks = {},
+  vault,
 }) {
   const st = {
     on: store.loadAccountsOn(),
@@ -92,6 +101,8 @@ export function createAccountSession({
     const all = locals();
     delete all[uid];
     persist(() => store.saveLocalAccounts(all));
+    // Y su estuche: sin conexión ya no abre los datos de este PC.
+    vault?.forget({ uid });
   }
   const saveSession = () => st.token && session.set({ uid: st.user?.id, token: st.token, exp: st.exp });
   function clear() {
@@ -127,10 +138,17 @@ export function createAccountSession({
       throw e;
     }
     const sec = await deriveAccountSecrets(password, s.sal, s.iter);
-    const r = await api.entrar(rut, sec.acceso);
+    const r = await api.entrar(rut, sec.acceso).catch((e) => {
+      // Cuenta desactivada: se olvida en este PC (sin conexión tampoco debe poder entrar).
+      const known = /** @type {any} */ (e).code === 'cuenta_desactivada' && localByRut(rut);
+      if (known) removeLocal(known.uid);
+      throw e;
+    });
     const u = r.usuario;
     const teamKey = await unwrapTeamKey(u.envuelta, { envoltura: sec.envoltura, complemento: u.complemento, uid: u.id });
     const perfil = await decryptProfile(await importEncKey(teamKey), u.id, u.perfil);
+    // Datos de este PC (ADR 0016): se abren (o se empiezan a cifrar) antes de guardar nada.
+    await vault?.unlockOnline({ teamKeyB64: teamKey, uid: u.id, local: sec.local });
     // La clave del equipo queda en este PC para sincronizar (como con la contraseña del equipo).
     const cfg = store.loadSyncConfig();
     if (!cfg || cfg.encKey !== teamKey || cfg.mode !== 'cuenta') {
@@ -167,6 +185,8 @@ export function createAccountSession({
       rol: u.rol,
       admin: u.admin === true,
     });
+    // Estuches solo de cuentas que siguen en este PC (las quitadas no abren sin conexión).
+    vault?.forget({ keep: Object.keys(locals()) });
     if (u.debeCambiar) return { status: 'change', nombre: perfil.nombre };
     // Una clave anterior a las reglas actuales (p. ej. 6 caracteres sin símbolo) se cambia ahora.
     if (passwordProblem(password)) {
@@ -182,7 +202,12 @@ export function createAccountSession({
     const local = localByRut(rut);
     if (!local) throw new Error('Sin conexión. Para entrar por primera vez en este PC se necesita internet.');
     const sec = await deriveAccountSecrets(password, local.sal, local.iter);
-    if (localHashOf(sec.local) !== local.localHash) throw new Error('RUT o clave incorrectos.');
+    if (vault?.state === 'locked') {
+      // Con datos cifrados, la clave se comprueba abriendo su estuche.
+      const r = await vault.unlockOffline({ uid: local.uid, local: sec.local });
+      if (r === 'missing') throw new Error('Sin conexión. Este PC aún no tiene tu llave: entra una vez con conexión.');
+      if (r === 'wrong') throw new Error('RUT o clave incorrectos.');
+    } else if (localHashOf(sec.local) !== local.localHash) throw new Error('RUT o clave incorrectos.');
     st.user = {
       id: local.uid,
       rut: local.rut,
@@ -227,6 +252,7 @@ export function createAccountSession({
     st.acceso = c.acceso;
     st.weakPassword = false;
     saveLocal(st.user.id, { sal: c.sal, iter: c.iter, localHash: localHashOf(c.local) });
+    await vault?.rewrap({ uid: st.user.id, local: c.local });
     complete();
   }
 
@@ -240,8 +266,9 @@ export function createAccountSession({
     await changePassword(nueva, cur.acceso);
   }
 
-  /** Recupera la sesión de esta pestaña (al recargar la página). */
+  /** Recupera la sesión de esta pestaña (al recargar la página). Con datos cifrados, no: hay que entrar con la clave. */
   function restore() {
+    if (vault?.state === 'locked') return false;
     const s = session.get();
     const local = s?.uid ? locals()[s.uid] : null;
     if (!s || !local || !(s.exp > now()) || typeof s.token !== 'string') return false;
