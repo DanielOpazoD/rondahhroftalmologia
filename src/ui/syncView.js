@@ -79,8 +79,7 @@ async function activate(ctx) {
 export function renderSyncView(ctx) {
   const s = ctx.sync?.state;
   if (!s) return;
-  // El controlador solo usa estos estados (ver STATUS_LABELS en syncController.js).
-  const label = STATUS_LABELS[/** @type {keyof typeof STATUS_LABELS} */ (s.status)];
+  const label = STATUS_LABELS[s.status];
   const on = s.configured;
   $('#syncUnavailable').hidden = s.available;
   $('#syncUnavailable').textContent = ctx.practice

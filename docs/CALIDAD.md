@@ -98,3 +98,32 @@ Lo que no se hizo, con su motivo:
 
 - **Que el servidor rechace escrituras del rol administrativo:** el ingreso también escribe atenciones y fichas, y el servidor no ve el contenido. Sigue siendo una regla de la interfaz, con el registro de accesos como disuasión (ADR 0014).
 - **Acortar a 12 h la tolerancia del servidor para versiones en el futuro:** no pierde datos y podría dejar sin sincronizar a un PC con el reloj adelantado.
+
+## Fases 1 a 3 y reevaluación (2.32.0 a 2.34.0)
+
+- **Fase 1 (2.32.0), contratos.** El contexto de la interfaz pasa a tener un contrato tipado. El servidor de cuentas se divide en módulos, se quitan los `any` de los bordes y los temas de eventos quedan cerrados.
+- **Fase 2 (2.33.0), operación.**
+  - El respaldo diario lee en paralelo y su estado se ve en la app.
+  - Restaurar no repone cuentas salvo que se pida.
+  - Al desactivar una cuenta, el cierre de sus sesiones se acota a los días posibles.
+- **Fase 3 (2.34.0), interfaz.**
+  - Los avisos de error quedan a la vista hasta cerrarlos, encima de los diálogos y usables con el teclado.
+  - La lista de pacientes se divide en páginas de 500.
+  - El foco es visible y los controles táctiles miden 44 px.
+  - Se corrige el contraste del texto sobre rojo.
+
+Tras la fase 3, tres revisores independientes volvieron a evaluar la app (escala de 1 a 7) en la misma versión:
+
+| Área | Antes (2.30.0) | 2.34.0 | Lo que más pesa en la nota |
+|---|---|---|---|
+| Arquitectura y código | — | 5,9 | Contexto armado en dos pasos (`ctx.x = …`). El núcleo conoce la especialidad. Archivos grandes en `sync/`. |
+| Seguridad, sincronización y operación | — | 5,3 | Rotación manual de la llave del equipo. Secreto del servidor atado a ella. PBKDF2 en 310 000. Carreras en cuentas. |
+| Interfaz, accesibilidad y pruebas | — | 5,6 | `styles.css` de 2.850 líneas sin capas. Dos contrastes AA en el modo práctica. Pruebas e2e por CSS más que por rol. |
+| **Global** | **5,3** | **5,6** | |
+
+Los bloques siguientes salen de esas listas y se limitan a deuda, sin funciones nuevas:
+
+- `$('#id')` tipado y ningún `any` escrito en `src/` (2.35.0). Los tipos encontraron un error real: validar la atención borraba los mensajes de error de otras pantallas.
+- Un RUT sin cuenta se bloquea igual que uno con cuenta: la respuesta de bloqueo ya no revela qué RUT existe (2.36.0).
+- Prueba del respaldo de ida y vuelta (2.36.0).
+- Tipos cerrados para el estado de la sincronización, migraciones en orden y una prueba que falla si un documento cita un archivo inexistente.

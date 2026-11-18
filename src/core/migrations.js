@@ -41,14 +41,6 @@ export const isFutureVersion = (raw) => versionOf(raw) > SCHEMA_VERSION;
  * @type {Record<number, (r: RegistroCrudo) => RegistroCrudo>}
  */
 export const STEPS = {
-  // v5 -> v6: borradores de formularios en f.form_<tipo>_<campo>, con sus sellos ft.
-  5: (r) => ({ ...r, v: 6 }),
-  // v4 -> v5: nombres separados, opcionales. No se adivinan los apellidos ni se cambia pacienteId.
-  4: (r) => {
-    // Una ficha antigua sin vínculo explícito conserva la llave basada en su nombre anterior.
-    const pacienteId = r.pacienteId || patientIdFor(/** @type {Record<string, unknown>} */ (r.f) || {});
-    return pacienteId ? { ...r, v: 5, pacienteId } : { ...r, v: 5 };
-  },
   // v1 -> v2: se agregó `paciente_sexo` (opcional); sin cambios estructurales.
   1: (r) => ({ ...r, v: 2 }),
   // v2 -> v3: separación por especialidad y fechas de edición por campo (`ft`, opcional).
@@ -58,6 +50,14 @@ export const STEPS = {
     const pacienteId = r.pacienteId || patientIdFor(/** @type {Record<string, unknown>} */ (r.f) || {});
     return pacienteId ? { ...r, v: 4, pacienteId } : { ...r, v: 4 };
   },
+  // v4 -> v5: nombres separados, opcionales. No se adivinan los apellidos ni se cambia pacienteId.
+  4: (r) => {
+    // Una ficha antigua sin vínculo explícito conserva la llave basada en su nombre anterior.
+    const pacienteId = r.pacienteId || patientIdFor(/** @type {Record<string, unknown>} */ (r.f) || {});
+    return pacienteId ? { ...r, v: 5, pacienteId } : { ...r, v: 5 };
+  },
+  // v5 -> v6: borradores de formularios en f.form_<tipo>_<campo>, con sus sellos ft.
+  5: (r) => ({ ...r, v: 6 }),
 };
 
 /**

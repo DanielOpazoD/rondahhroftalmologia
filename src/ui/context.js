@@ -4,8 +4,11 @@
  * aquí queda el estado y lo transversal (persistir, re-dibujar, pestañas).
  *
  * Flujo de datos:
- *   evento de UI -> acción del contexto -> store (localStorage) -> render de vistas
- * Las vistas nunca escriben en localStorage directamente.
+ *   evento de UI -> acción del contexto -> store (storage/store.js) -> render de vistas
+ * Los datos de la app (atenciones, fichas, catálogos, ajustes) solo se escriben
+ * a través del store. Fuera de él, el almacenamiento del navegador se usa para
+ * arrancar (main.js elige IndexedDB o localStorage), para el modo práctica
+ * (ui/practice.js) y para recordar cosas de la pestaña (sesión, sección abierta).
  */
 import { APP, ESPECIALIDAD } from '../config/catalogs.js';
 import { blankRecord, normalizeRecord } from '../core/record.js';
@@ -62,14 +65,23 @@ const AUTOSAVE_MS = 1200;
  */
 
 /**
+ * Estado de la sincronización (las etiquetas están en STATUS_LABELS, syncController.js).
+ * @typedef {'off' | 'idle' | 'syncing' | 'offline' | 'error'} SyncStatus
+ */
+/**
+ * Lo que se sabe del servidor: tiene contraseña, no la tiene, o aún no se sabe.
+ * @typedef {'configured' | 'unconfigured' | 'unknown'} SyncServer
+ */
+
+/**
  * @typedef {object} SyncState
  * @property {boolean} available
  * @property {boolean} configured
- * @property {string} status off | idle | syncing | offline | error
+ * @property {SyncStatus} status
  * @property {string} message
  * @property {number | null} lastSync
  * @property {number} skewMin
- * @property {string} server configured | unconfigured | unknown
+ * @property {SyncServer} server
  * @property {string} hash valor para SYNC_TOKEN_SHA256
  * @property {number | null | undefined} lastBackupAt último respaldo diario del servidor (null: sin registro; undefined: aún no se sabe)
  */

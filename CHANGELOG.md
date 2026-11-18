@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.37.0 — 2026-11-18
+
+### Cimientos: contratos y documentación verificada
+- **Estado de la sincronización con tipos cerrados.** Un estado mal escrito ya no pasa la revisión de tipos, y cada estado exige su etiqueta.
+- **Pasos de migración en orden ascendente.** La prueba de que no falta ninguno ya existía.
+- **Documentos verificados:** una prueba falla si un documento cita un archivo del repo que no existe. Se corrigieron un comentario falso del contexto y cifras fijas de rendimiento en ARQUITECTURA (ahora remite a RENDIMIENTO).
+- docs/CALIDAD.md: fases 1 a 3 y la reevaluación experta (5,3 → 5,6).
+
 ## 2.36.0 — 2026-11-18
 
 ### Seguridad

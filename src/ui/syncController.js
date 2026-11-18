@@ -30,9 +30,9 @@ const DEBOUNCE_MS = 4000;
  *   config: ReturnType<import('./context.js').AppContext['store']['loadSyncConfig']>,
  *   key: CryptoKey | null,
  *   running: boolean,
- *   server: string,
+ *   server: import('./context.js').SyncServer,
  *   again: boolean,
- *   status: string,
+ *   status: import('./context.js').SyncStatus,
  *   message: string,
  *   timer: ReturnType<typeof setTimeout> | undefined,
  *   interval: ReturnType<typeof setInterval> | undefined,
@@ -46,6 +46,7 @@ const DEBOUNCE_MS = 4000;
  *   `skewMin`: minutos de desfase del reloj con el servidor; `skewWarned` / `newerWarned`: ya se avisó.
  */
 
+/** Texto de cada estado (el tipo exige uno por estado). @type {Readonly<Record<import('./context.js').SyncStatus, string>>} */
 export const STATUS_LABELS = Object.freeze({
   off: 'Desactivada',
   idle: 'Activa',
@@ -66,9 +67,9 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
     config: store.loadSyncConfig(),
     key: null,
     running: false,
-    server: 'unknown', // configured | unconfigured | unknown
+    server: 'unknown',
     again: false,
-    status: 'off', // off | idle | syncing | offline | error
+    status: 'off',
     message: '',
     timer: undefined,
     interval: undefined,
@@ -85,7 +86,7 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
   const available = () => !ctx.practice && cryptoAvailable() && /^https?:$/.test(location.protocol);
 
   /**
-   * @param {string} status off | idle | syncing | offline | error
+   * @param {import('./context.js').SyncStatus} status
    * @param {string} [message]
    */
   const setStatus = (status, message = '') => {
