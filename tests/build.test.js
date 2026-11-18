@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildHtml, buildSite, cspOf, cspHash, expandPartials, PDF_FONTS } from '../scripts/build.mjs';
+import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+import { buildHtml, buildSite, cspOf, cspHash, expandPartials, PDF_FONTS, specialtyFile, especialidadPlugin } from '../scripts/build.mjs';
+import pkg from '../package.json' with { type: 'json' };
 
 test('el build produce un HTML autocontenido y sin recursos externos', async () => {
   const html = await buildHtml();
@@ -122,5 +125,42 @@ test('PDF: el código solo usa fuentes estándar incluidas en el build (PDF_FONT
       PDF_FONTS.includes(names[/** @type {keyof typeof names} */ (k)]),
       `StandardFonts.${k} no está en PDF_FONTS (scripts/build.mjs)`,
     );
+  }
+});
+
+test('especialidad activa: #especialidad/ apunta a la carpeta elegida y falla fuerte si falta un archivo', async () => {
+  const dir = (/** @type {string} */ id) => fileURLToPath(new URL(`../src/specialties/${id}/`, import.meta.url));
+  // Sin build (Node, tsc, ESLint), package.json apunta a oftalmología.
+  assert.deepEqual(pkg.imports, { '#especialidad/*': './src/specialties/oftalmologia/*' });
+  assert.equal(specialtyFile('orl', '#especialidad/config.js'), join(dir('orl'), 'config.js'));
+  assert.equal(specialtyFile('oftalmologia', '#especialidad/plantilla.pdf'), join(dir('oftalmologia'), 'plantilla.pdf'));
+  // Plantilla PDF opcional: una especialidad sin ella recibe una vacía.
+  assert.equal(specialtyFile('orl', '#especialidad/plantilla.pdf'), null);
+  assert.throws(() => specialtyFile('orl', '#especialidad/no-existe.js'), /La especialidad "orl" no tiene no-existe\.js/);
+  assert.throws(() => specialtyFile('noexiste', '#especialidad/config.js'), /La especialidad "noexiste" no tiene config\.js/);
+  assert.throws(() => specialtyFile('orl', '#especialidad/../oftalmologia/config.js'), /sale de la carpeta/);
+  // En el build, el error detiene la compilación (antes, un import que no se redirigía caía en silencio en oftalmología).
+  await assert.rejects(
+    build({
+      stdin: { contents: "export * from '#especialidad/no-existe.js';", resolveDir: dir('activa') },
+      bundle: true,
+      write: false,
+      logLevel: 'silent',
+      plugins: [especialidadPlugin('orl')],
+    }),
+    /no tiene no-existe\.js/,
+  );
+});
+
+test('el build de otra especialidad (orl) usa su formulario y no incluye plantillas PDF', async () => {
+  const before = process.env.ESPECIALIDAD;
+  process.env.ESPECIALIDAD = 'orl';
+  try {
+    const html = await buildHtml();
+    assert.ok(html.includes('id="otoscopia_od"'), 'formulario de ORL');
+    assert.ok(!html.includes('JVBERi0'), 'sin plantillas PDF (ORL dibuja su PDF desde cero)');
+  } finally {
+    if (before === undefined) delete process.env.ESPECIALIDAD;
+    else process.env.ESPECIALIDAD = before;
   }
 });

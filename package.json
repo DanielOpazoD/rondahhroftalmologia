@@ -4,6 +4,9 @@
   "private": true,
   "description": "Hoja de atención oftalmológica offline para rondas y operativos del Hospital Hanga Roa.",
   "type": "module",
+  "imports": {
+    "#especialidad/*": "./src/specialties/oftalmologia/*"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev-server.mjs",
