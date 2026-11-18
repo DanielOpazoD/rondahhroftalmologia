@@ -11,6 +11,7 @@ import { isLogin } from './validate.js';
 import { safeEqual } from './secrets.js';
 import { dayOf } from './store.js';
 import { waitMs } from '../attempts.js';
+import { ACCOUNT_ITERATIONS } from '../accountCrypto.js';
 import { accountRut, loginState, ACCOUNT_LOCK, SESSION_MS } from '../../core/accounts.js';
 
 /** @typedef {import('./store.js').Cuenta} Cuenta */
@@ -18,8 +19,8 @@ import { accountRut, loginState, ACCOUNT_LOCK, SESSION_MS } from '../../core/acc
 
 /** Límite por red de origen (varios PC del hospital comparten la IP pública). */
 const ACCOUNT_IP_LIMIT = Object.freeze({ maxFails: 30, windowMs: 15 * 60_000, blockMs: 15 * 60_000 });
-/** Iteraciones de la sal ficticia (las de una cuenta nueva). */
-const FAKE_ITERATIONS = 310_000;
+/** Iteraciones de la sal ficticia: las de una cuenta nueva, para no delatar qué RUT tiene cuenta. */
+const FAKE_ITERATIONS = ACCOUNT_ITERATIONS;
 
 /**
  * @param {{

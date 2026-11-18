@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryBlobStore } from '../src/sync/server.js';
-import { dailyBackup, listBackups, restoreBackup, KEEP_DAYS, dayOf } from '../src/sync/backup.js';
+import { dailyBackup, listBackups, restoreBackup, KEEP_DAYS, dayOf, BACKUP_STATUS_KEY } from '../src/sync/backup.js';
 
 const DAY = 24 * 3600 * 1000;
 const T0 = Date.UTC(2026, 10, 16, 3);
@@ -141,8 +141,59 @@ test('cuentas y registro de accesos: las cuentas van en el respaldo diario y se 
   // Restaurar sobre un servidor donde la cuenta ya cambió su clave: no se pisa.
   const live = memoryBlobStore();
   await live.setJSON('_cuentas/u/uaaaaaaaaaaaaaaaa', { id: 'uaaaaaaaaaaaaaaaa', verificador: 'V2' });
-  const res = await restoreBackup({ source: target, target: live, day: dayOf(T0) });
+  // Sin pedirlo, las cuentas no se reponen (una descartada no vuelve sola).
+  assert.equal((await restoreBackup({ source: target, target: live, day: dayOf(T0) })).escritas, 0);
+  assert.equal(await live.get('_cuentas/rut/abc'), null);
+  const res = await restoreBackup({ source: target, target: live, day: dayOf(T0), accounts: true });
   assert.equal(res.escritas, 2, 'config e índice por RUT (faltaban)');
   assert.equal((await live.get('_cuentas/u/uaaaaaaaaaaaaaaaa')).verificador, 'V2');
   assert.deepEqual(await restoreAuditLog({ source: target, target: live }), { eventos: 3, escritos: 3 });
+});
+
+test('respaldo diario: lee en paralelo (acotado), así miles de versiones caben en el tiempo de la función', async () => {
+  const source = memoryBlobStore();
+  for (let i = 0; i < 200; i++) await source.setJSON(`oftalmologia/r/a${i}/100`, { iv: 'IV', ct: `C${i}` });
+  let inFlight = 0;
+  let peak = 0;
+  const get = source.get.bind(source);
+  source.get = async (...args) => {
+    peak = Math.max(peak, ++inFlight);
+    await new Promise((r) => setTimeout(r, 2));
+    inFlight--;
+    return get(...args);
+  };
+  const target = memoryBlobStore();
+  const r = await dailyBackup({ source, target, now: T0 });
+  assert.equal(r.claves, 200);
+  assert.ok(peak > 1 && peak <= 16, `lecturas simultáneas: ${peak}`);
+  // El documento conserva el orden de las claves (mismo resultado que leyendo de a una).
+  const doc = await target.get(`${dayOf(T0)}.json`);
+  const listed = (await source.list()).blobs.map((b) => b.key).filter((k) => k !== BACKUP_STATUS_KEY);
+  assert.deepEqual(Object.keys(doc.claves), listed);
+});
+
+test('estado del respaldo: el diario lo anota, el servidor lo informa en la lista completa y la app avisa si es antiguo', async () => {
+  const { createSyncHandler } = await import('../src/sync/server.js');
+  const { createSyncApi } = await import('../src/sync/client.js');
+  const { deriveTeamKeys, tokenHash } = await import('../src/sync/crypto.js');
+  const { backupText } = await import('../src/core/serverBackup.js');
+  const source = await filled();
+  const keys = await deriveTeamKeys('K7QM3-XRT9P-ZAWD4-N8F2C', 1000);
+  const handler = createSyncHandler({ store: source, tokenHash: tokenHash(keys.token) });
+  const api = createSyncApi({ token: keys.token, fetchFn: (url, init) => handler(new Request('https://x' + url, init)) });
+  // Antes del primer respaldo: sin registro.
+  await api.list();
+  assert.equal(api.lastBackupAt, null);
+  await dailyBackup({ source, target: memoryBlobStore(), now: T0 });
+  assert.deepEqual(await source.get(BACKUP_STATUS_KEY), { at: T0, dia: dayOf(T0), claves: 2 });
+  await api.list();
+  assert.equal(api.lastBackupAt, T0);
+  // La lista incremental no lo trae (no se pisa lo sabido).
+  await api.list(Date.now() - 1000);
+  assert.equal(api.lastBackupAt, T0);
+  // Texto: reciente, antiguo (más de 48 h) y sin registro.
+  assert.match(backupText(T0, T0 + 3600_000), /Último respaldo del servidor/);
+  assert.match(backupText(T0, T0 + 3 * DAY), /⚠ El último respaldo del servidor es del/);
+  assert.match(backupText(null), /aún no informa/);
+  assert.equal(backupText(undefined), '');
 });

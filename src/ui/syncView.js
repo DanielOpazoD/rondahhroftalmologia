@@ -9,6 +9,7 @@ import { STATUS_LABELS } from './syncController.js';
 import { $, toast, copyText, required } from './dom.js';
 import { uiAlert, uiConfirm } from './modal.js';
 import { html } from './html.js';
+import { backupText } from '../core/serverBackup.js';
 
 /**
  * El motor de sincronización: main.js lo asigna antes de iniciar esta vista.
@@ -135,6 +136,7 @@ function syncInfoText(s) {
   return (
     (s.lastSync ? `Última sincronización: ${fmtDateTime(new Date(s.lastSync))}.` : 'Aún no se ha sincronizado.') +
     (s.message ? ' ' + s.message : '') +
-    (s.skewMin ? ` Atención: la hora de este equipo difiere ${Math.abs(s.skewMin)} min de la del servidor; ajústala.` : '')
+    (s.skewMin ? ` Atención: la hora de este equipo difiere ${Math.abs(s.skewMin)} min de la del servidor; ajústala.` : '') +
+    backupText(s.lastBackupAt)
   );
 }

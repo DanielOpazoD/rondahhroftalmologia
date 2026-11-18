@@ -7,7 +7,7 @@
  *   _cuentas/s/<AAAAMMDD>/<sid>     sesión {uid, inicio, ultimo, exp, fin?, motivo?}
  *   _auditoria/<AAAAMMDD>/<t>.<r>   evento (solo se agregan)
  */
-import { accountRut, USER_ID_RE } from '../../core/accounts.js';
+import { accountRut, USER_ID_RE, SESSION_MS } from '../../core/accounts.js';
 
 /** @typedef {import('../server.js').BlobStore} BlobStore */
 /**
@@ -32,7 +32,6 @@ export const dayOf = (t) => new Date(t).toISOString().slice(0, 10).replace(/-/g,
 const K = Object.freeze({
   config: '_cuentas/config',
   users: '_cuentas/u/',
-  sessions: '_cuentas/s/',
   /** @param {string} uid */
   user: (uid) => `_cuentas/u/${uid}`,
   /** @param {string} rh */
@@ -102,8 +101,11 @@ export function createAccountStore({ store, now, randId, rutHashOf }) {
     /** Cierra todas las sesiones abiertas de una cuenta. @param {string} uid @param {string} motivo */
     async closeSessionsOf(uid, motivo) {
       const t = now();
-      const { blobs } = await store.list({ prefix: K.sessions });
-      for (const b of blobs) {
+      // Una sesión dura a lo más SESSION_MS: solo las creadas hoy o ayer pueden seguir abiertas.
+      // (Antes se leían todas las del historial, que crece con cada ingreso.)
+      const days = [...new Set([dayOf(t), dayOf(t - SESSION_MS)])];
+      const lists = await Promise.all(days.map((day) => store.list({ prefix: K.sessionsOn(day) })));
+      for (const b of lists.flatMap((l) => l.blobs)) {
         const s = /** @type {Sesion | null} */ (await read(b.key));
         if (s && s.uid === uid && !s.fin && s.exp > t) await store.setJSON(b.key, { ...s, fin: t, motivo });
       }

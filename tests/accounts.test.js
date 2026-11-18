@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { deriveTeamKeys, tokenHash, importEncKey, encryptPayload } from '../src/sync/crypto.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createAccounts } from '../src/sync/accounts.js';
-import { credentialsFor, deriveAccountSecrets, unwrapTeamKey, encryptProfile, decryptProfile } from '../src/sync/accountCrypto.js';
+import {
+  credentialsFor,
+  deriveAccountSecrets,
+  unwrapTeamKey,
+  encryptProfile,
+  decryptProfile,
+  ACCOUNT_ITERATIONS,
+} from '../src/sync/accountCrypto.js';
 import {
   passwordProblem,
   rutBody,
@@ -211,6 +218,7 @@ describe('servidor de cuentas', () => {
     // Sal de un RUT sin cuenta: estable y con la misma forma.
     const a = await env.call('cuentas/sal', { body: { rut: '11.111.111-1' } });
     const b = await env.call('cuentas/sal', { body: { rut: '11.111.111-1' } });
+    assert.equal(a.body.iter, ACCOUNT_ITERATIONS, 'las mismas iteraciones que una cuenta real: no delata que no existe');
     assert.equal(a.body.sal, b.body.sal);
     assert.equal(a.body.sal.length, 24);
     assert.equal((await env.login('11.111.111-1', '11111111')).status, 401);
@@ -864,4 +872,31 @@ test('recuperar un administrador: valida RUT, activación y credenciales antes d
     credentialsFor({ password: '22222222', teamKeyB64: env.keys.encKey, uid: id, complemento, iterations: ITER });
   const perfil = (id) => encryptProfile(env.teamKey, id, { nombre: 'Otra', rut: '22222222-2', rol: 'medico' });
   await assert.rejects(accounts.recoverAdmin({ rut: '22.222.222-2', credentials: creds, perfil }), /No se pudo crear/);
+});
+
+test('desactivar cierra la sesión abierta aunque haya empezado ayer, sin leer todo el historial de sesiones', async () => {
+  const env = await activated();
+  env.clock.t = Date.UTC(2026, 10, 15, 23); // 23:00 UTC: la sesión queda en el día 15
+  const { uid } = await addUser(env, { rut: '22.222.222-2', password: 'Otra#2026' });
+  env.clock.t = Date.UTC(2026, 10, 16, 5); // 05:00 del día 16: sigue abierta (dura 12 h)
+  const admin = (await env.login(ADMIN_RUT, 'Ojo2026')).body.token;
+  const prefixes = [];
+  const list = env.store.list.bind(env.store);
+  env.store.list = (o) => (prefixes.push(o?.prefix), list(o));
+  const r = await env.call('cuentas/editar', { token: admin, body: { id: uid, estado: 'desactivado' } });
+  assert.equal(r.status, 200);
+  const sessionLists = prefixes.filter((p) => p?.startsWith('_cuentas/s/'));
+  assert.deepEqual(sessionLists.sort(), ['_cuentas/s/20261115/', '_cuentas/s/20261116/'], 'solo hoy y ayer');
+  const keys = (await list({ prefix: '_cuentas/s/20261115/' })).blobs.map((b) => b.key);
+  const mine = (await Promise.all(keys.map((k) => env.store.get(k, { type: 'json' })))).filter((s) => s.uid === uid);
+  assert.ok(mine.length && mine.every((s) => s.fin && s.motivo), 'la sesión de ayer quedó cerrada');
+});
+
+test('iteraciones de PBKDF2: las de todas las cuentas (subirlas sin migrar delataría qué RUT tiene cuenta)', async () => {
+  // La sal falsa de un RUT sin cuenta responde ACCOUNT_ITERATIONS. Si cambia,
+  // las cuentas existentes (310 000) se distinguirían de las inexistentes.
+  assert.equal(ACCOUNT_ITERATIONS, 310_000, 'antes de subirlas, migra todas las cuentas al entrar (ADR 0014)');
+  const keys = await deriveTeamKeys('K7QM3-XRT9P-ZAWD4-N8F2C', 1000);
+  const c = await credentialsFor({ password: 'Ojo#2026', teamKeyB64: keys.encKey, uid: 'u0123456789abcdef', complemento: 'ab'.repeat(32) });
+  assert.equal(c.iter, ACCOUNT_ITERATIONS);
 });

@@ -29,6 +29,8 @@
 import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
 import { createAttempts, waitMs } from './attempts.js';
+import { mapLimit } from '../lib/async.js';
+import { BACKUP_STATUS_KEY } from './backup.js';
 import { isObject } from './crypto.js';
 
 /** @typedef {import('../domain').SyncVersion} SyncVersion */
@@ -170,27 +172,6 @@ const json = (status, body) =>
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
-
-/**
- * Ejecuta `fn` sobre los elementos con concurrencia limitada.
- * @template T, R
- * @param {T[]} items
- * @param {number} limit
- * @param {(item: T) => Promise<R>} fn
- * @returns {Promise<R[]>}
- */
-async function mapLimit(items, limit, fn) {
-  const out = new Array(items.length);
-  let i = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (i < items.length) {
-      const k = i++;
-      out[k] = await fn(items[k]);
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
 
 /**
  * Versiones existentes de un id, de la más nueva a la más antigua: [{u, h, key}].
@@ -440,7 +421,10 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
     const { blobs: marks } = await store.list({ prefix: `${esp}/c/` });
     const old = marks.filter((b) => b.key.slice(esp.length + 3, esp.length + 11) < cutoff);
     await mapLimit(old, 8, (b) => store.delete(b.key));
-    return json(200, { items: v.items(), now: t0, full: true });
+    // Cuándo fue el último respaldo diario (para que la app avise si es antiguo).
+    const status = await store.get(BACKUP_STATUS_KEY, { type: 'json' });
+    const respaldo = isObject(status) && typeof status.at === 'number' ? status.at : null;
+    return json(200, { items: v.items(), now: t0, full: true, respaldo });
   }
 
   /** GET list: incremental si `since` es reciente; si no, completa. @param {Peticion} p */
