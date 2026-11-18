@@ -181,7 +181,7 @@
 </section>
 
 <!-- ================= ESTADÍSTICA ================= -->
-<section id="t-est" class="tab" role="tabpanel" aria-label="Reportes">
+<section id="t-est" class="tab reportes" role="tabpanel" aria-label="Reportes">
   <div class="viewhead">
     <div class="filterSlot"></div>
     <button type="button" class="btn sm p noprint" id="repDownload" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-export"/></svg>Descargar</button>
@@ -320,7 +320,7 @@
     <div class="card">
       <h2>Procedimientos realizados</h2>
       <p class="muted">Agrega, ordena o quita procedimientos. «PIO» indica los que piden la presión intraocular por ojo y «Texto», los que admiten una descripción (va en el examen físico del PDF). Un procedimiento quitado deja de mostrarse y de contarse (si lo restauras, vuelve con sus datos).</p>
-      <div class="list" id="ajList"></div>
+      <div class="list ajlist" id="ajList"></div>
       <div data-perm="ajustes" class="row u-mt10">
         <input id="ajNew" aria-label="Nuevo procedimiento" placeholder="Nuevo procedimiento" class="u-grow u-minw160">
         <label class="row muted u-gap4"><input type="checkbox" id="ajPio"> PIO</label>
@@ -392,7 +392,7 @@
   <span class="badge" id="fCount">0</span>
 </div>
 
-<dialog id="dlg" aria-labelledby="dlgTitle">
+<dialog id="dlg" class="formdlg" aria-labelledby="dlgTitle">
   <h3 id="dlgTitle"></h3>
   <div id="dlgBody"></div>
   <small class="msg err" id="dlgErr"></small>
@@ -405,7 +405,7 @@
 <dialog id="msgDlg" class="msgdlg" aria-labelledby="msgTitle">
   <div class="msghead"><span class="msgicon" id="msgIcon"></span><h3 id="msgTitle"></h3></div>
   <div class="msgtext" id="msgText"></div>
-  <textarea id="msgCopy" readonly rows="8" hidden aria-label="Texto para copiar"></textarea>
+  <textarea id="msgCopy" class="msgcopy" readonly rows="8" hidden aria-label="Texto para copiar"></textarea>
   <div class="dlg-actions">
     <button type="button" class="btn" id="msgCancel" hidden></button>
     <button type="button" class="btn" id="msgAlt" hidden></button>
@@ -430,7 +430,7 @@
     <p class="muted" id="lockHint">Ingresa el PIN de este equipo para continuar.</p>
     <form id="lockForm" autocomplete="off">
       <label class="sr" for="lockPin" id="lockPinLabel">PIN</label>
-      <input id="lockPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="PIN">
+      <input id="lockPin" class="lockpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="PIN">
       <button type="submit" class="btn p" id="lockGo">Desbloquear</button>
     </form>
     <p class="msg err" id="lockErr" role="alert"></p>
