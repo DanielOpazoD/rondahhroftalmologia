@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { deriveTeamKeys, tokenHash, importEncKey, encryptPayload } from '../src/sync/crypto.js';
 import { createSyncHandler, memoryBlobStore } from '../src/sync/server.js';
 import { createAccounts } from '../src/sync/accounts.js';
+import { createAccountStore } from '../src/sync/accounts/store.js';
 import {
   credentialsFor,
   deriveAccountSecrets,
@@ -933,4 +934,262 @@ test('iteraciones de PBKDF2: las de todas las cuentas (subirlas sin migrar delat
   const keys = await deriveTeamKeys('K7QM3-XRT9P-ZAWD4-N8F2C', 1000);
   const c = await credentialsFor({ password: 'Ojo#2026', teamKeyB64: keys.encKey, uid: 'u0123456789abcdef', complemento: 'ab'.repeat(32) });
   assert.equal(c.iter, ACCOUNT_ITERATIONS);
+});
+
+/**
+ * Detiene la próxima llamada a `store[method]` con una clave que cumple `match`
+ * justo después de que lee (antes de que su operación siga y escriba): así otra
+ * operación se intercala en medio, como dos solicitudes simultáneas en Netlify.
+ * `reached` se cumple al detenerse; `release()` la deja seguir.
+ * @param {(key: string) => boolean} match
+ */
+function pauseOnce(store, method, match) {
+  const original = store[method].bind(store);
+  let release;
+  let reached;
+  const gate = new Promise((r) => (release = r));
+  const stopped = new Promise((r) => (reached = r));
+  let armed = true;
+  store[method] = async (k, ...rest) => {
+    const out = await original(k, ...rest);
+    if (armed && match(k)) {
+      armed = false;
+      reached();
+      await gate;
+    }
+    return out;
+  };
+  return { reached: stopped, release };
+}
+
+/**
+ * `first` lee la cuenta `uid` para cambiarla y, antes de que escriba, `second`
+ * se hace completa. Devuelve las respuestas de ambas.
+ */
+async function race(env, uid, first, second) {
+  const pause = pauseOnce(env.store, 'getWithMetadata', (k) => k === `_cuentas/u/${uid}`);
+  const a = first();
+  await pause.reached;
+  const b = await second();
+  pause.release();
+  return [await a, b];
+}
+
+/** Credenciales nuevas (clave inicial) para restablecer la cuenta `uid`. */
+async function resetBody(env, uid, password) {
+  const { body: prep } = await env.call('cuentas/preparar', { token: env.adminToken, body: { id: uid, existente: true } });
+  const c = await credentialsFor({ password, teamKeyB64: env.keys.encKey, uid, complemento: prep.complemento, iterations: ITER });
+  return { id: uid, ...c };
+}
+
+describe('servidor de cuentas: escrituras simultáneas en una cuenta', () => {
+  const RUT = '22.222.222-2';
+  /** La cuenta tal como está guardada. */
+  const stored = (env, uid) => env.store.get(`_cuentas/u/${uid}`, { type: 'json' });
+
+  test('desactivar y entrar a la vez: la cuenta queda desactivada y el ingreso no abre sesión', async () => {
+    const env = await activated();
+    const { uid } = await addUser(env, { rut: RUT, password: 'Otra2026' });
+    const [entrada, edicion] = await race(
+      env,
+      uid,
+      () => env.login(RUT, 'Otra2026'),
+      () => env.call('cuentas/editar', { token: env.adminToken, body: { id: uid, estado: 'desactivado' } }),
+    );
+    assert.equal(edicion.status, 200);
+    assert.equal((await stored(env, uid)).estado, 'desactivado', 'el ingreso no deshizo la desactivación');
+    assert.equal(entrada.status, 403);
+    assert.equal(entrada.body.code, 'cuenta_desactivada');
+    assert.equal(entrada.body.token, undefined);
+    const { blobs } = await env.store.list({ prefix: '_cuentas/s/' });
+    const sessions = await Promise.all(blobs.map((b) => env.store.get(b.key, { type: 'json' })));
+    assert.ok(
+      sessions.filter((x) => x.uid === uid).every((x) => x.fin),
+      'no queda ninguna sesión abierta de la cuenta',
+    );
+  });
+
+  test('restablecer la clave y bloquear por intentos a la vez: la clave restablecida no se pierde', async () => {
+    const env = await activated();
+    const { uid } = await addUser(env, { rut: RUT, password: 'Otra2026' });
+    for (let i = 1; i < ACCOUNT_LOCK.maxFails; i++) assert.equal((await env.login(RUT, 'Mala' + i)).status, 401);
+    const body = await resetBody(env, uid, '22222222');
+    // El 5.º intento fallido bloquea: se detiene entre leer la cuenta y escribir el bloqueo.
+    const [fallo, reset] = await race(
+      env,
+      uid,
+      () => env.login(RUT, 'Mala5'),
+      () => env.call('cuentas/restablecer', { token: env.adminToken, body }),
+    );
+    assert.equal(reset.status, 200);
+    assert.equal(fallo.status, 401);
+    const back = await env.login(RUT, '22222222');
+    assert.equal(back.status, 200, 'la clave restablecida sirve y la cuenta no quedó bloqueada');
+    assert.equal(back.body.usuario.debeCambiar, true);
+    assert.equal((await env.login(RUT, 'Otra2026')).status, 401, 'la clave anterior ya no sirve');
+  });
+
+  test('cambiar la propia clave mientras un administrador la restablece: gana la restablecida', async () => {
+    const env = await activated();
+    const { uid } = await addUser(env, { rut: RUT, password: 'Otra2026' });
+    const s = await env.login(RUT, 'Otra2026');
+    const body = await resetBody(env, uid, '22222222');
+    const [cambio, reset] = await race(
+      env,
+      uid,
+      () => env.changePassword(s.body.token, uid, s.body.usuario.complemento, 'Nueva#2026', s.sec.acceso),
+      () => env.call('cuentas/restablecer', { token: env.adminToken, body }),
+    );
+    assert.equal(reset.status, 200);
+    assert.equal(cambio.status, 401);
+    assert.equal(cambio.body.code, 'sesion_invalida');
+    assert.equal((await env.login(RUT, '22222222')).status, 200, 'la clave restablecida sirve');
+    assert.equal((await env.login(RUT, 'Nueva#2026')).status, 401);
+  });
+
+  test('entrar con la clave correcta mientras otros intentos bloquean la cuenta: el bloqueo se respeta', async () => {
+    const env = await activated();
+    await addUser(env, { rut: RUT, password: 'Otra2026' });
+    const uid = (await env.login(RUT, 'Otra2026')).body.usuario.id;
+    const [entrada] = await race(
+      env,
+      uid,
+      () => env.login(RUT, 'Otra2026'),
+      async () => {
+        for (let i = 1; i <= ACCOUNT_LOCK.maxFails; i++) await env.login(RUT, 'Mala' + i);
+      },
+    );
+    assert.equal(entrada.status, 423);
+    assert.equal(entrada.body.code, 'cuenta_bloqueada');
+    assert.equal((await env.login(RUT, 'Otra2026')).status, 423, 'el ingreso no deshizo el bloqueo');
+  });
+
+  test('entrar mientras un administrador restablece la clave: no abre sesión con la clave anterior', async () => {
+    const env = await activated();
+    const { uid } = await addUser(env, { rut: RUT, password: 'Otra2026' });
+    const body = await resetBody(env, uid, '22222222');
+    const [entrada, reset] = await race(
+      env,
+      uid,
+      () => env.login(RUT, 'Otra2026'),
+      () => env.call('cuentas/restablecer', { token: env.adminToken, body }),
+    );
+    assert.equal(reset.status, 200);
+    assert.equal(entrada.status, 401);
+    assert.equal(entrada.body.token, undefined);
+    assert.equal((await env.login(RUT, '22222222')).status, 200, 'la clave restablecida sirve');
+  });
+
+  test('dos ediciones de administrador a la vez: ninguna se pierde', async () => {
+    const env = await activated();
+    const { uid } = await addUser(env, { rut: RUT });
+    const edit = (body) => env.call('cuentas/editar', { token: env.adminToken, body: { id: uid, ...body } });
+    const [rol, admin] = await race(
+      env,
+      uid,
+      () => edit({ rol: 'enfermeria' }),
+      () => edit({ admin: true }),
+    );
+    assert.equal(rol.status, 200);
+    assert.equal(admin.status, 200);
+    const u = await stored(env, uid);
+    assert.deepEqual([u.rol, u.admin], ['enfermeria', true]);
+    assert.deepEqual([rol.body.usuario.rol, rol.body.usuario.admin], ['enfermeria', true], 'responde la cuenta como quedó');
+  });
+
+  test('dos altas simultáneas con el mismo RUT: solo una crea la cuenta', async () => {
+    const env = await activated();
+    const accounts = [];
+    for (let i = 0; i < 2; i++) {
+      const uid = newUserId();
+      const { body: prep } = await env.call('cuentas/preparar', { token: env.adminToken, body: { id: uid } });
+      accounts.push(await env.newAccount({ rut: RUT, nombre: 'Persona ' + i, rol: 'medico', complemento: prep.complemento, uid }));
+    }
+    const before = (await env.store.list({ prefix: '_cuentas/u/' })).blobs.length;
+    // La primera ve que el RUT está libre y se detiene; la segunda se completa entretanto.
+    const pause = pauseOnce(env.store, 'get', (k) => k.startsWith('_cuentas/rut/'));
+    const first = env.call('cuentas/crear', { token: env.adminToken, body: accounts[0] });
+    await pause.reached;
+    const second = await env.call('cuentas/crear', { token: env.adminToken, body: accounts[1] });
+    pause.release();
+    const r = await first;
+    assert.deepEqual([r.status, r.body.code, second.status], [409, 'rut_existe', 200]);
+    assert.equal((await env.store.list({ prefix: '_cuentas/u/' })).blobs.length, before + 1, 'una sola cuenta nueva');
+    const back = await env.login(RUT, initialPassword(RUT));
+    assert.equal(back.body.usuario.id, accounts[1].id);
+  });
+});
+
+describe('almacén de cuentas: updateUser', () => {
+  /** Almacén de cuentas en memoria con una cuenta mínima `{id, n}`. */
+  async function withAccount() {
+    const store = memoryBlobStore();
+    const db = createAccountStore({ store, now: () => 0, randId: () => 'x', rutHashOf: () => 'h' });
+    const uid = newUserId();
+    await store.setJSON(`_cuentas/u/${uid}`, { id: uid, n: 0 });
+    return { store, db, uid };
+  }
+  /** Otra escritura se cuela tras cada una de las primeras `times` lecturas (suma 1 a `n`). */
+  function interfere(store, times) {
+    const read = store.getWithMetadata.bind(store);
+    let left = times;
+    store.getWithMetadata = async (k, o) => {
+      const r = await read(k, o);
+      if (r && left-- > 0) await store.setJSON(k, { ...r.data, n: r.data.n + 1 });
+      return r;
+    };
+  }
+
+  test('ante un conflicto vuelve a leer y aplica el cambio sobre la versión nueva', async () => {
+    const { store, db, uid } = await withAccount();
+    interfere(store, 2);
+    const r = await db.updateUser(uid, (u) => ({ ...u, x: 1 }));
+    assert.deepEqual(r.despues, { id: uid, n: 2, x: 1 });
+    assert.deepEqual(r.antes, { id: uid, n: 2 });
+    assert.deepEqual(await store.get(`_cuentas/u/${uid}`), { id: uid, n: 2, x: 1 });
+  });
+
+  test('si la cuenta cambia en cada intento, falla con un error claro sin escribir', async () => {
+    const { store, db, uid } = await withAccount();
+    interfere(store, Infinity);
+    await assert.rejects(
+      db.updateUser(uid, (u) => ({ ...u, x: 1 })),
+      /cambió 5 veces mientras se guardaba/,
+    );
+    assert.equal((await store.get(`_cuentas/u/${uid}`)).x, undefined);
+  });
+
+  test('cuenta inexistente o id inválido → null; `change` null no escribe; sin etag escribe sin condición (no deja a nadie fuera)', async () => {
+    const { store, db, uid } = await withAccount();
+    assert.equal(await db.updateUser(newUserId(), (u) => u), null);
+    assert.equal(await db.updateUser('../config', (u) => u), null);
+    assert.deepEqual(await db.updateUser(uid, () => null), { antes: { id: uid, n: 0 }, despues: null });
+    const real = store.getWithMetadata.bind(store);
+    store.getWithMetadata = async (/** @type {string} */ k, /** @type {any} */ o) => ({ data: (await real(k, o))?.data });
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      assert.deepEqual(await db.updateUser(uid, (u) => ({ ...u, x: 1 })), { antes: { id: uid, n: 0 }, despues: { id: uid, n: 0, x: 1 } });
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal((await db.getUser(uid))?.x, 1);
+  });
+
+  test('memoryBlobStore: etag nuevo en cada escritura; onlyIfMatch y onlyIfNew no pisan', async () => {
+    const store = memoryBlobStore();
+    assert.equal(await store.getWithMetadata('k', { type: 'json' }), null);
+    assert.equal((await store.setJSON('k', 1, { onlyIfNew: true })).modified, true);
+    assert.equal((await store.setJSON('k', 2, { onlyIfNew: true })).modified, false);
+    const { etag } = await store.getWithMetadata('k', { type: 'json' });
+    await store.setJSON('k', 3);
+    assert.notEqual((await store.getWithMetadata('k', { type: 'json' })).etag, etag);
+    assert.equal((await store.setJSON('k', 4, { onlyIfMatch: etag })).modified, false);
+    assert.equal(await store.get('k'), 3);
+    const fresh = (await store.getWithMetadata('k', { type: 'json' })).etag;
+    assert.equal((await store.setJSON('k', 5, { onlyIfMatch: fresh })).modified, true);
+    assert.equal(await store.get('k'), 5);
+    await store.delete('k');
+    assert.equal((await store.setJSON('k', 6, { onlyIfMatch: fresh })).modified, false, 'borrada, su etag ya no sirve');
+  });
 });

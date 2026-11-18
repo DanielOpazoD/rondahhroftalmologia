@@ -28,6 +28,9 @@ import { accountRut, USER_ID_RE, SESSION_MS } from '../../core/accounts.js';
 /** Día UTC de un momento, como AAAAMMDD (prefijo de sesiones y eventos). @param {number} t */
 export const dayOf = (t) => new Date(t).toISOString().slice(0, 10).replace(/-/g, '');
 
+/** Intentos de `updateUser` antes de rendirse si la cuenta cambia entre su lectura y su escritura. */
+const UPDATE_TRIES = 5;
+
 /** Claves del almacén. */
 const K = Object.freeze({
   config: '_cuentas/config',
@@ -53,8 +56,40 @@ export function createAccountStore({ store, now, randId, rutHashOf }) {
 
   /** @returns {Promise<Cuenta | null>} @param {string} uid */
   const getUser = async (uid) => /** @type {Cuenta | null} */ (USER_ID_RE.test(uid) ? await read(K.user(uid)) : null);
-  /** @param {Cuenta} u */
-  const putUser = (u) => store.setJSON(K.user(u.id), u);
+  /**
+   * Cambia una cuenta sin pisar otra escritura simultánea (un administrador
+   * que la edita, un ingreso, un bloqueo): lee la versión vigente con su etag,
+   * aplica `change` y escribe solo si nadie la cambió entretanto; si alguien
+   * lo hizo, vuelve a leer y a aplicar `change` sobre la versión nueva.
+   * `change` decide sobre la cuenta ACTUAL: devuelve la cuenta nueva, o null
+   * para no escribir.
+   * @param {string} uid
+   * @param {(u: Cuenta) => Cuenta | null} change
+   * @returns {Promise<{antes: Cuenta, despues: Cuenta | null} | null>} null si la cuenta no
+   *   existe; si no, la versión sobre la que se decidió y la escrita (null si `change` no escribió)
+   */
+  async function updateUser(uid, change) {
+    if (!USER_ID_RE.test(uid)) return null;
+    const key = K.user(uid);
+    for (let i = 0; i < UPDATE_TRIES; i++) {
+      const cur = await store.getWithMetadata(key, { type: 'json' });
+      if (!cur) return null;
+      const antes = /** @type {Cuenta} */ (cur.data);
+      const despues = change(antes);
+      if (!despues) return { antes, despues: null };
+      if (!cur.etag) {
+        // Un almacén que no entrega versión (p. ej. el servidor local de la
+        // biblioteca) no permite escribir condicionado: se escribe como antes
+        // de 2.39, sin protección ante escrituras simultáneas, en vez de dejar
+        // a todos sin poder entrar.
+        console.warn(`cuentas: el almacén no entregó la versión de ${uid}; escritura sin condición`);
+        await store.setJSON(key, despues);
+        return { antes, despues };
+      }
+      if ((await store.setJSON(key, despues, { onlyIfMatch: cur.etag })).modified) return { antes, despues };
+    }
+    throw new Error(`La cuenta ${uid} cambió ${UPDATE_TRIES} veces mientras se guardaba; no se guardó. Reintenta.`);
+  }
   /** @param {string} sid @returns {Promise<Sesion | null>} */
   const getSession = async (sid) => /** @type {Sesion | null} */ (await read(K.session(sid)));
 
@@ -70,7 +105,7 @@ export function createAccountStore({ store, now, randId, rutHashOf }) {
 
   return {
     getUser,
-    putUser,
+    updateUser,
     getSession,
     audit,
     /** @param {string} sid @param {Sesion} ses */
@@ -111,14 +146,19 @@ export function createAccountStore({ store, now, randId, rutHashOf }) {
       }
     },
 
-    /** Crea la cuenta y su índice por RUT (falla si el RUT ya tiene cuenta). @param {Cuenta} u */
+    /**
+     * Crea la cuenta y su índice por RUT (falla si el id o el RUT ya tienen
+     * cuenta). Ambas escrituras son solo-si-no-existe: dos altas simultáneas
+     * no se pisan; si otra ganó el RUT, la cuenta recién escrita se retira.
+     * @param {Cuenta} u
+     */
     async insertAccount(u) {
       const idx = K.rut(u.rutHash);
       if (await read(idx)) return false;
-      if (await getUser(u.id)) return false;
-      await putUser(u);
-      await store.setJSON(idx, { uid: u.id });
-      return true;
+      if (!(await store.setJSON(K.user(u.id), u, { onlyIfNew: true })).modified) return false;
+      if ((await store.setJSON(idx, { uid: u.id }, { onlyIfNew: true })).modified) return true;
+      await store.delete(K.user(u.id));
+      return false;
     },
 
     /**

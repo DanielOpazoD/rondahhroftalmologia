@@ -1,5 +1,12 @@
 # Cambios
 
+## 2.40.0 — 2026-11-18
+
+### Seguridad: cuentas sin escrituras que se pisen
+- **Los cambios de una cuenta ya no se pisan entre sí.** Antes, si un ingreso, un bloqueo, un cambio de clave y una edición del administrador ocurrían a la vez, uno podía perder al otro (por ejemplo, una desactivación o una clave restablecida). Ahora cada cambio se aplica sobre la versión vigente y se escribe solo si nadie la cambió entretanto (escritura condicional de Netlify Blobs); si alguien la cambió, se reintenta.
+- **Ya no se pueden crear a la vez dos cuentas con el mismo RUT.**
+- **Si el almacén no informa la versión de la cuenta,** se escribe como antes, para no dejar a nadie sin poder entrar.
+
 ## 2.39.0 — 2026-11-18
 
 ### Cimientos: CSS por capas

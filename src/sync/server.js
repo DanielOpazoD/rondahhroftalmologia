@@ -37,11 +37,17 @@ import { isObject } from './crypto.js';
 /** @typedef {import('../domain').SyncBlob} SyncBlob */
 /**
  * Interfaz mínima de almacenamiento (la de Netlify Blobs que se usa aquí).
- * `get` devuelve el JSON guardado (o null si no existe).
+ * `get` devuelve el JSON guardado (o null si no existe); `getWithMetadata`,
+ * además, su `etag` (cambia con cada escritura).
+ * `setJSON` con `onlyIfMatch: etag` escribe solo si nadie escribió después de
+ * esa lectura, y con `onlyIfNew` solo si la clave no existe; si no escribe,
+ * devuelve `{modified: false}`. Así se cambia un registro sin pisar otra
+ * escritura simultánea (Netlify Blobs no tiene transacciones).
  * @typedef {{
  *   list: (opts?: {prefix?: string}) => Promise<{blobs: {key: string}[]}>,
  *   get: (key: string, opts?: {type: 'json'}) => Promise<unknown>,
- *   setJSON: (key: string, value: unknown) => Promise<unknown>,
+ *   getWithMetadata: (key: string, opts: {type: 'json'}) => Promise<{data: unknown, etag?: string} | null>,
+ *   setJSON: (key: string, value: unknown, opts?: {onlyIfMatch: string} | {onlyIfNew: true}) => Promise<{modified: boolean}>,
  *   delete: (key: string) => Promise<unknown>,
  * }} BlobStore
  */
@@ -550,11 +556,14 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
 export function memoryBlobStore() {
   /** @type {Map<string, string>} */
   const m = new Map();
+  /** etag de cada clave: uno nuevo en cada escritura. @type {Map<string, string>} */
+  const etags = new Map();
+  let version = 0;
   return {
     /** @param {{prefix?: string}} [opts] */
     async list({ prefix = '' } = {}) {
       return {
-        blobs: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, etag: '' })),
+        blobs: [...m.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key, etag: etags.get(key) || '' })),
         directories: /** @type {string[]} */ ([]),
       };
     },
@@ -563,16 +572,28 @@ export function memoryBlobStore() {
       const stored = m.get(key);
       return stored === undefined ? null : JSON.parse(stored);
     },
+    /** @param {string} key */
+    async getWithMetadata(key) {
+      const stored = m.get(key);
+      return stored === undefined ? null : { data: JSON.parse(stored), etag: etags.get(key), metadata: {} };
+    },
     /**
      * @param {string} key
      * @param {unknown} v
+     * @param {{onlyIfMatch: string} | {onlyIfNew: true}} [opts]
      */
-    async setJSON(key, v) {
+    async setJSON(key, v, opts) {
+      if (opts && 'onlyIfNew' in opts && m.has(key)) return { modified: false };
+      if (opts && 'onlyIfMatch' in opts && etags.get(key) !== opts.onlyIfMatch) return { modified: false };
+      const etag = `"${++version}"`;
       m.set(key, JSON.stringify(v));
+      etags.set(key, etag);
+      return { modified: true, etag };
     },
     /** @param {string} key */
     async delete(key) {
       m.delete(key);
+      etags.delete(key);
     },
     _map: m,
   };
