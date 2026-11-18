@@ -3,10 +3,9 @@
  * promesas rechazadas sin manejar y los fallos que la app ya informa
  * (sincronización, almacenamiento, acciones). Se ve, se copia y se vacía en
  * Ajustes → Registro de errores. Nunca sale del equipo por sí solo.
- *
- * No importa ui/dom.js (dom.js registra sus errores aquí; se evita el ciclo).
  */
 import { APP } from '../config/catalogs.js';
+import { $ } from './dom.js';
 import { errorEntry, pushEntry, formatLog } from '../core/errlog.js';
 
 /** @typedef {import('../core/errlog.js').ErrorEntry} ErrorEntry */
@@ -27,18 +26,15 @@ export function logError(where, err) {
   else pending.push(e);
 }
 
-/** Como `$` de dom.js (aquí no se importa para evitar el ciclo); `any` por la misma razón que `$`. @param {string} sel */
-const q = (sel) => /** @type {any} */ (document.querySelector(sel));
-
 /** @param {import('./context.js').AppContext} ctx */
 export function initErrorLog(ctx) {
   const { store } = ctx;
   const render = () => {
     const list = store.loadErrors();
-    q('#errCount').textContent = String(list.length);
-    q('#errEmpty').hidden = list.length > 0;
-    q('#errText').hidden = !list.length;
-    q('#errText').textContent = formatLog(list);
+    $('#errCount').textContent = String(list.length);
+    $('#errEmpty').hidden = list.length > 0;
+    $('#errText').hidden = !list.length;
+    $('#errText').textContent = formatLog(list);
   };
   sink = (e) => {
     try {
@@ -51,16 +47,16 @@ export function initErrorLog(ctx) {
   for (const e of pending.splice(0)) sink(e);
   window.addEventListener('error', (ev) => logError('inesperado', ev.error || ev.message));
   window.addEventListener('unhandledrejection', (ev) => logError('promesa', ev.reason));
-  q('#errCopy').addEventListener('click', async () => {
+  $('#errCopy').addEventListener('click', async () => {
     const text = formatLog(store.loadErrors(), `Oftalmología HHR ${APP.version} · ${navigator.userAgent}`);
     try {
       await navigator.clipboard.writeText(text);
-      q('#errCopy').textContent = 'Copiado';
+      $('#errCopy').textContent = 'Copiado';
     } catch {
-      q('#errText').focus();
+      $('#errText').focus();
     }
   });
-  q('#errClear').addEventListener('click', () => {
+  $('#errClear').addEventListener('click', () => {
     store.saveErrors([]);
     render();
   });

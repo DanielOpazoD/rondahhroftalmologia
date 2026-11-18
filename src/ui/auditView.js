@@ -28,7 +28,7 @@ const attentionCount = (n) => `${n} ${n === 1 ? 'atención' : 'atenciones'}`;
 /** @param {import('./context.js').AppContext} ctx */
 export function initAuditView(ctx) {
   const api = createAccountsApi();
-  /** @type {{eventos: any[], sesiones: any[]} | null} */
+  /** @type {{eventos: EventoAuditoria[], sesiones: import('../core/accessLog.js').SesionAcceso[]} | null} */
   let data = null;
   /** @type {Map<string, string>} */
   let names = new Map();

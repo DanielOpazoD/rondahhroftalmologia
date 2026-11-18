@@ -1,5 +1,17 @@
 # Cambios
 
+## 2.35.0 — 2026-11-18
+
+### Cimientos: tipos precisos en toda la interfaz
+- **`$('#id')` devuelve el tipo real del elemento** (un `<input>` es `HTMLInputElement`), tomado de la plantilla. `npm run elementos -- --write` genera `src/ui/elements.d.ts`, y una prueba falla si queda desactualizado.
+- **En `src/` ya no queda ningún `any` escrito (antes había 20).** Lo reemplazan:
+  - genéricos en estadística;
+  - respuestas tipadas de la API de cuentas y de sincronización;
+  - `unknown` con guardas en los datos guardados.
+
+### Corrección
+- Al validar la atención se borraban los mensajes de error de otras pantallas (usuarios, auditoría, bloqueo, ingreso), porque se recorría todo `.msg` de la página. Ahora solo se tocan los de la atención. Lo encontraron los tipos; tiene su prueba en el navegador.
+
 ## 2.34.0 — 2026-11-18
 
 ### Interfaz: fase 3 de la deuda (accesibilidad y listas grandes)

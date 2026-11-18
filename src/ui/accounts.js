@@ -133,7 +133,7 @@ export function createAccountsController(ctx, { vault } = {}) {
 
   /** @param {boolean} on @param {string} [label] */
   async function busy(on, label) {
-    for (const id of ['#loginGo', '#pwGo']) {
+    for (const id of /** @type {const} */ (['#loginGo', '#pwGo'])) {
       const b = $(id);
       b.disabled = on;
       if (on && label) b.dataset.label ||= b.textContent;

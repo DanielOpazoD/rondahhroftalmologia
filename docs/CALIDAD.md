@@ -7,13 +7,14 @@ npm run check     # lint, formato, tipos, pruebas y build (lo mismo que la CI, s
 npm run calidad   # informe: tipos estrictos, complejidad, capas, código muerto, manejo de errores
 npm run perf      # tamaño y rendimiento con datos sintéticos (docs/RENDIMIENTO.md)
 npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
+npm run elementos # tipo de cada elemento de la plantilla, por su id (src/ui/elements.d.ts)
 ```
 
 ## Prácticas y dónde se hacen cumplir
 
 | Práctica | Se hace cumplir en | Detalle |
 | --- | --- | --- |
-| **Tipos estrictos en todo el código** | `npm run typecheck` (`jsconfig.json`, `strict: true`) + `tests/calidad.test.js` | JSDoc + `tsc --checkJs --strict`: sin `any` implícito ni nulos sin revisar. Sin `@ts-ignore`. Los tipos del dominio están en `src/domain.d.ts`. Tres configuraciones, cada una con las APIs de donde corre el código: `jsconfig.json` (la app, navegador), `jsconfig.node.json` (scripts y funciones de Netlify, con `@types/node`) y `jsconfig.sw.json` (service worker). Ambas heredan el modo estricto; una prueba exige que cubran todo su código. |
+| **Tipos estrictos en todo el código** | `npm run typecheck` (`jsconfig.json`, `strict: true`) + `tests/calidad.test.js` | JSDoc + `tsc --checkJs --strict`: sin `any` implícito ni nulos sin revisar. Sin `@ts-ignore`. En `src/` tampoco hay `any` escrito: lo que llega de afuera es `unknown` y se valida. `$('#id')` (`src/ui/dom.js`) tiene el tipo del elemento de la plantilla (un `<input>` da `HTMLInputElement`), según `src/ui/elements.d.ts`, que genera `npm run elementos -- --write` desde `src/index.html`; `tests/elementos.test.js` falla si no está al día. Los tipos del dominio están en `src/domain.d.ts`. Tres configuraciones, cada una con las APIs de donde corre el código: `jsconfig.json` (la app, navegador), `jsconfig.node.json` (scripts y funciones de Netlify, con `@types/node`) y `jsconfig.sw.json` (service worker). Ambas heredan el modo estricto; una prueba exige que cubran todo su código. |
 | **Capas sin ciclos** | `tests/deps.test.js` | `core/` y `lib/` son puros (sin DOM ni almacenamiento); `ui/` solo la usa `main.js`; la especialidad se usa a través de `specialties/activa/`. Ver `scripts/deps.mjs` (`LAYERS`). |
 | **Sin código muerto** | `tests/deps.test.js` (`exportUsage`) | Cada `export` de `src/` lo importa otro archivo. Si solo se usa en su archivo, no se exporta: la interfaz de cada módulo es lo que de verdad usan los demás. Las que solo usan las pruebas se cuentan en `npm run calidad`. |
 | **Pocas dependencias, conocidas** | `tests/deps.test.js` | Cada paquete externo está en `package.json` con versión fija y documentado en `scripts/deps.mjs` (`EXTERNAL`): para qué y dónde. Máximo 5. |

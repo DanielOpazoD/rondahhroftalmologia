@@ -195,6 +195,6 @@ export function renderCatalogSettings(ctx) {
     $('#opList'),
     ctx.operativos.length ? html`${ctx.operativos.map((o) => row(o))}` : html`<p class="hint">Aún no hay operativos.</p>`,
   );
-  $('#medCount').textContent = ctx.medicos.length;
-  $('#opCount').textContent = ctx.operativos.length;
+  $('#medCount').textContent = String(ctx.medicos.length);
+  $('#opCount').textContent = String(ctx.operativos.length);
 }

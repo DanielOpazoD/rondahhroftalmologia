@@ -23,6 +23,13 @@ const FIELDS = {
   ing_fono: 'paciente_fono',
 };
 
+/**
+ * Campo del ingreso por su id: los de FIELDS e `ing_edad` son <input> de
+ * src/partials/paciente.html (el id se arma en ejecución, por eso se indica el tipo).
+ * @param {string} id
+ */
+const fieldOf = (id) => /** @type {HTMLInputElement} */ ($('#' + id));
+
 /** @param {import('./context.js').AppContext} ctx */
 export function initIntakeView(ctx) {
   ctx.intakeSexo = '';
@@ -101,7 +108,7 @@ function fillFromRegistry(ctx) {
   }
   ctx.intakePatientId = p.id;
   for (const [el, key] of Object.entries(FIELDS)) {
-    const input = $('#' + el);
+    const input = fieldOf(el);
     if (!input.value.trim() && p.f[key]) input.value = p.f[key];
   }
   if (!ctx.intakeSexo && p.f.paciente_sexo) {
@@ -118,7 +125,7 @@ function fillFromRegistry(ctx) {
 /** @param {import('./context.js').AppContext} ctx */
 function clearForm(ctx) {
   ctx.intakePatientId = null;
-  for (const id of [...Object.keys(FIELDS), 'ing_edad']) $('#' + id).value = '';
+  for (const id of [...Object.keys(FIELDS), 'ing_edad']) fieldOf(id).value = '';
   $('#ing_edad').readOnly = false;
   ctx.intakeSexo = '';
   renderSexo(ctx);
@@ -171,8 +178,8 @@ export function renderIntake(ctx) {
     .filter((r) => r.f.fecha_atencion === date && (!op || r.f.operativo === op))
     .sort((a, b) => (a.created || 0) - (b.created || 0));
   const pending = list.filter((r) => !isAttended(r)).length;
-  $('#ingCount').textContent = list.length;
-  $('#ingPend').textContent = pending;
+  $('#ingCount').textContent = String(list.length);
+  $('#ingPend').textContent = String(pending);
 
   if (!list.length) {
     setHtml(

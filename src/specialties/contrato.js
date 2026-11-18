@@ -61,22 +61,22 @@ const REQUIRED_FUNCTIONS = [
 const SAFE_KEY = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
- * Módulo de la especialidad (export * de su index.js). `any` a propósito: su
- * forma es justo lo que se valida, y cada miembro se revisa antes de usarlo.
- * @typedef {Record<string, any>} ModuloEspecialidad
+ * Módulo de la especialidad (export * de su index.js). Sus miembros son
+ * `unknown`: su forma es justo lo que se valida, y cada uno se revisa antes de usarlo.
+ * @typedef {Record<string, unknown>} ModuloEspecialidad
  */
 
 /** Identidad: id, nombre y prefijo. @param {ModuloEspecialidad} mod @param {string[]} p */
 function checkIdentity(mod, p) {
-  const e = mod.ESPECIALIDAD;
-  if (!e || !/^[a-z][a-z0-9-]{1,39}$/.test(e.id || '')) p.push('ESPECIALIDAD.id debe ser un identificador en minúsculas (a-z, 0-9, -)');
+  const e = isRecord(mod.ESPECIALIDAD) ? mod.ESPECIALIDAD : undefined;
+  if (!/^[a-z][a-z0-9-]{1,39}$/.test(String(e?.id || ''))) p.push('ESPECIALIDAD.id debe ser un identificador en minúsculas (a-z, 0-9, -)');
   if (!e?.nombre) p.push('ESPECIALIDAD.nombre es obligatorio');
-  if (!/^[a-z]{2,6}_$/.test(e?.prefijo || '')) p.push('ESPECIALIDAD.prefijo debe ser 2–6 letras y "_" (p. ej. "oft_")');
+  if (!/^[a-z]{2,6}_$/.test(String(e?.prefijo || ''))) p.push('ESPECIALIDAD.prefijo debe ser 2–6 letras y "_" (p. ej. "oft_")');
 }
 
 /**
  * Una lista del catálogo: cada entrada válida (`ok`) y con clave única entre las listas que comparten `seen`.
- * @param {unknown} list @param {string} name @param {(x: any) => string | undefined} keyOf clave si la entrada es válida
+ * @param {unknown} list @param {string} name @param {(x: unknown) => string | undefined} keyOf clave si la entrada es válida
  * @param {Set<string>} seen @param {string} repeated prefijo del mensaje de clave repetida @param {string[]} p
  */
 function checkList(list, name, keyOf, seen, repeated, p) {
@@ -120,7 +120,9 @@ function checkFields(mod, html, p) {
   if (!fields.length) p.push('TEXT_FIELDS no puede estar vacío');
   for (const f of PLATFORM_FIELDS) if (!fields.includes(f)) p.push(`TEXT_FIELDS debe incluir "${f}" (lo usa la plataforma)`);
   for (const f of fields) checkField(mod, html, f, p);
-  for (const f of mod.FREE_TEXT_FIELDS || []) if (!fields.includes(f)) p.push(`FREE_TEXT_FIELDS: "${f}" no está en TEXT_FIELDS`);
+  // Se recorre tal como viene (claves de campos): cada una debe estar en TEXT_FIELDS.
+  const free = /** @type {Iterable<string>} */ (mod.FREE_TEXT_FIELDS || []);
+  for (const f of free) if (!fields.includes(f)) p.push(`FREE_TEXT_FIELDS: "${f}" no está en TEXT_FIELDS`);
 }
 
 /**
@@ -129,7 +131,7 @@ function checkFields(mod, html, p) {
  */
 function checkField(mod, html, f, p) {
   if (!SAFE_KEY.test(f)) p.push(`Campo inválido: ${f}`);
-  if (!mod.ETIQUETAS?.[f]) p.push(`Falta la etiqueta (ETIQUETAS) del campo "${f}"`);
+  if (!isRecord(mod.ETIQUETAS) || !mod.ETIQUETAS[f]) p.push(`Falta la etiqueta (ETIQUETAS) del campo "${f}"`);
   // Los de la plataforma están en la parte común del formulario.
   if (html !== undefined && !PLATFORM_FIELDS.includes(f) && !html.includes(`id="${f}"`)) {
     p.push(`formulario.html no tiene el campo id="${f}"`);

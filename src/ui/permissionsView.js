@@ -62,15 +62,15 @@ export function guardActions(ctx) {
   const allowed = (/** @type {string} */ perm) => can(user(ctx), perm);
   /** El contexto como mapa de métodos, para reemplazarlos por nombre. */
   const methods = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (ctx));
-  /** @param {string} name @param {string} perm @param {(...a: any[]) => boolean} [when] permitido también si… */
+  /** @param {string} name @param {string} perm @param {(...a: unknown[]) => boolean} [when] permitido también si… */
   const wrap = (name, perm, when) => {
     const fn = methods[name];
     if (typeof fn !== 'function') return;
-    methods[name] = (/** @type {any[]} */ ...args) => (allowed(perm) || when?.(...args) ? fn(...args) : deny());
+    methods[name] = (/** @type {unknown[]} */ ...args) => (allowed(perm) || when?.(...args) ? fn(...args) : deny());
   };
   // Guardar sin permiso: no hace nada (el formulario está en solo lectura; el autoguardado no debe avisar).
   const save = ctx.save;
-  ctx.save = (/** @type {any[]} */ ...args) => (allowed(PERMISSIONS.EDITAR_CLINICO) ? save(...args) : Promise.resolve(false));
+  ctx.save = (...args) => (allowed(PERMISSIONS.EDITAR_CLINICO) ? save(...args) : Promise.resolve(false));
   wrap('newAttention', PERMISSIONS.EDITAR_CLINICO);
   wrap('newAttentionFor', PERMISSIONS.EDITAR_CLINICO);
   wrap('openForms', PERMISSIONS.EDITAR_CLINICO);

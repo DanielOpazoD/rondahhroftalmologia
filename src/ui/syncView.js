@@ -64,7 +64,8 @@ async function activate(ctx) {
   }
   $('#syncPass').value = '';
   if (!r.serverReady) {
-    $('#syncActive details.setup').open = true;
+    // El selector no es un id: se indica el tipo (es un <details> de la plantilla).
+    /** @type {HTMLDetailsElement} */ ($('#syncActive details.setup')).open = true;
     return uiAlert({
       title: 'Falta configurar el servidor',
       tone: 'warn',

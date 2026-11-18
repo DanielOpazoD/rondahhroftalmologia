@@ -3,20 +3,36 @@
  */
 
 /**
- * Busca un elemento. Tipado como `any`: la interfaz accede a propiedades de
- * inputs/selects por id; los ids se verifican en tests/build.test.js.
- * @param {string} sel selector CSS
- * @param {ParentNode} [root]
- * @returns {any}
+ * Tipo del elemento que devuelve un selector:
+ * - `'#id'` de la plantilla → el tipo de ese elemento (un `<input>` da
+ *   HTMLInputElement; ver elements.d.ts, que se genera desde src/index.html);
+ * - el nombre de una etiqueta (`'nav'`, `'select'`) → el de esa etiqueta;
+ * - cualquier otro selector → HTMLElement.
+ * @template {string} S
+ * @typedef {S extends keyof ElementosPorId ? ElementosPorId[S]
+ *   : S extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[S]
+ *   : HTMLElement} ElementoDe
  */
-export const $ = (sel, root = document) => root.querySelector(sel);
+/** @typedef {import('./elements').ElementosPorId} ElementosPorId */
+
 /**
- * Busca todos los elementos (como arreglo). `any` por la misma razón que `$`.
- * @param {string} sel selector CSS
+ * Busca un elemento que la interfaz sabe que existe: los ids que se buscan
+ * con `$('#…')` están en la plantilla (lo verifica tests/build.test.js). El
+ * tipo sale del selector (ver ElementoDe).
+ * @template {string} S
+ * @param {S} sel selector CSS
  * @param {ParentNode} [root]
- * @returns {any[]}
+ * @returns {ElementoDe<S>}
  */
-export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+export const $ = (sel, root = document) => /** @type {ElementoDe<S>} */ (root.querySelector(sel));
+/**
+ * Busca todos los elementos (como arreglo), con el tipo que da el selector (ver ElementoDe).
+ * @template {string} S
+ * @param {S} sel selector CSS
+ * @param {ParentNode} [root]
+ * @returns {ElementoDe<S>[]}
+ */
+export const $$ = (sel, root = document) => /** @type {ElementoDe<S>[]} */ ([...root.querySelectorAll(sel)]);
 
 /**
  * Valor que siempre existe en este punto (un elemento de la plantilla, un

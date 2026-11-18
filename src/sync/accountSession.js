@@ -11,7 +11,7 @@
 import { nameParts } from '../core/names.js';
 import { accountRut, initialPassword, newUserId, passwordProblem } from '../core/accounts.js';
 import { sha256, toHex } from '../lib/sha256.js';
-import { importEncKey, DecryptError } from './crypto.js';
+import { importEncKey, DecryptError, isObject } from './crypto.js';
 import { SyncHttpError } from './client.js';
 import {
   deriveAccountSecrets,
@@ -25,7 +25,10 @@ import {
 /**
  * @typedef {import('./accountCrypto.js').PerfilCuenta & {id: string, rol: string, admin: boolean, offline: boolean}} CuentaActiva
  * @typedef {import('./accountCrypto.js').PerfilCuenta & {uid: string, sal: string, iter: number, localHash: string, rol: string, admin: boolean}} CuentaLocal
- * @typedef {{get: () => any, set: (v: any) => void}} SesionGuardada  sesión de la pestaña (sessionStorage)
+ * @typedef {{get: () => unknown, set: (v: unknown) => void}} SesionGuardada  sesión de la pestaña (sessionStorage; lo leído se valida)
+ * @typedef {Pick<ReturnType<typeof import('../storage/store.js').createStore>,
+ *   'loadAccountsOn' | 'saveAccountsOn' | 'loadLocalAccounts' | 'saveLocalAccounts' |
+ *   'loadSyncConfig' | 'saveSyncConfig' | 'loadAccountEvents' | 'saveAccountEvents'>} AlmacenCuentas  lo que la sesión usa del almacén (storage/store.js; solo el tipo)
  * @typedef {{
  *   state: 'clear' | 'locked' | 'open',
  *   unlockOnline: (o: {teamKeyB64: string, uid: string, local: string}) => Promise<void>,
@@ -57,7 +60,7 @@ export function errorMessage(e) {
 /**
  * @param {{
  *   api: ReturnType<typeof import('./accountsApi.js').createAccountsApi>,
- *   store: any,
+ *   store: AlmacenCuentas,
  *   session: SesionGuardada,
  *   persist?: (fn: () => void) => boolean,
  *   now?: () => number,
@@ -283,8 +286,8 @@ export function createAccountSession({
   function restore() {
     if (vault?.state === 'locked') return false;
     const s = session.get();
-    const local = s?.uid ? locals()[s.uid] : null;
-    if (!s || !local || !(s.exp > now()) || typeof s.token !== 'string') return false;
+    const local = isObject(s) && typeof s.uid === 'string' && s.uid ? locals()[s.uid] : null;
+    if (!isObject(s) || !local || !(typeof s.exp === 'number' && s.exp > now()) || typeof s.token !== 'string') return false;
     st.token = s.token;
     st.exp = s.exp;
     st.user = {

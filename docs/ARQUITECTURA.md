@@ -73,6 +73,9 @@ flowchart TD
   - Deducirlo con `ReturnType` sería circular, porque el contexto incluye las acciones.
   - Al quitar el `any` aparecieron 20 inconsistencias reales: la atención en blanco aceptaba cualquier texto como ojo; la configuración de sincronización con cuentas no declaraba `mode`; el bloqueo no declaraba `render`; y había ids que podían ser nulos sin revisarse.
 - **Datos que llegan de afuera** (respaldos, adjuntos, archivo de la llave del PC, contrato de la especialidad) se revisan con guardas de tipo (`core/guards.js`, `isRecord`) en vez de convertirlos a `any`.
+- **Elementos de la plantilla con su tipo** (`ui/dom.js` y `ui/elements.d.ts`): `$('#syncPass')` es un `HTMLInputElement` porque en `index.html` es un `<input>`; el verificador de tipos revisa cada `.value`, `.checked` o `.showModal()` contra el elemento real.
+  - `ui/elements.d.ts` se genera desde `index.html` (con los datos del paciente expandidos) y los ids que tienen todos los `formulario.html`: `npm run elementos -- --write`. Una prueba falla si quedó desactualizado.
+  - Con otro selector (una clase, un id armado en ejecución) `$` devuelve `HTMLElement`; donde hace falta más, se indica el tipo con un comentario que dice por qué.
 
 - **Paciente como unidad** (`core/patient.js`): cada atención es un episodio vinculado a la ficha de su paciente (`pacienteId`). Ver [MODELO_DATOS.md](MODELO_DATOS.md).
 
