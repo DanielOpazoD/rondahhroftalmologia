@@ -1,5 +1,13 @@
 # Cambios
 
+## 2.31.0 — 2026-11-17
+
+### Seguridad y sincronización (fase 0 de la deuda; docs/CALIDAD.md)
+- **El bloqueo por intentos ya no se puede saltar** enviando muchos a la vez. Antes, 100 intentos simultáneos con una clave mala no bloqueaban la cuenta; ahora la clave se revisa como máximo 5 veces y la cuenta queda bloqueada. Lo mismo para el límite por red.
+- **Un dato dañado en el servidor ya no detiene la sincronización:** se omite, se avisa una vez y el resto se sincroniza. Se puede recuperar del respaldo diario.
+- Un campo con una fecha de edición muy adelantada (reloj malo o dato manipulado) ya no gana para siempre al fusionar.
+- **La clave inicial (RUT sin dígito verificador) vence a las 24 horas** en vez de 7 días.
+
 ## 2.30.0 — 2026-11-17
 
 ### Interfaz

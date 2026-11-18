@@ -36,6 +36,7 @@ const DEBOUNCE_MS = 4000;
  *   timer: ReturnType<typeof setTimeout> | undefined,
  *   interval: ReturnType<typeof setInterval> | undefined,
  *   caches: {pacientes: import('../sync/client.js').SyncCache, especialidad: import('../sync/client.js').SyncCache},
+ *   damagedSeen: Set<string>,
  *   skewMin?: number,
  *   skewWarned?: boolean,
  *   newerWarned?: boolean,
@@ -71,6 +72,8 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
     interval: undefined,
     /** Estado entre sincronizaciones por espacio (solo cambios, huellas verificadas). */
     caches: { pacientes: createSyncCache(), especialidad: createSyncCache() },
+    /** Datos dañados ya avisados en esta sesión. @type {Set<string>} */
+    damagedSeen: new Set(),
   };
   const resetCaches = () => {
     st.caches = { pacientes: createSyncCache(), especialidad: createSyncCache() };
@@ -202,7 +205,8 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
    */
   async function syncSpaces(token, encKey) {
     const key = await getKey(encKey);
-    const common = { key, mergeFn: syncMerge, fingerprint: syncFingerprint, encKey };
+    // Si esta clave ya sincronizó en este PC, lo que no se pueda descifrar es un dato dañado, no una clave equivocada.
+    const common = { key, mergeFn: syncMerge, fingerprint: syncFingerprint, encKey, keyProven: Boolean(st.config?.lastSync) };
     // 1) Fichas de pacientes: espacio COMÚN a todas las especialidades.
     const resP = await syncOnce({
       ...common,
@@ -225,7 +229,27 @@ export function createSyncController(ctx, { onChange = () => {}, notify = () => 
       cache: st.caches.especialidad,
     });
     const got = resP.added + resP.updated + resP.deleted + resE.added + resE.updated + resE.deleted;
+    reportDamaged([...resP.damaged, ...resE.damaged]);
     return { key, api, got };
+  }
+
+  /**
+   * Datos del servidor que no se pudieron descifrar: se apartaron y la
+   * sincronización siguió. Se avisa una vez por sesión (y queda en el registro de errores).
+   * @param {string[]} ids
+   */
+  function reportDamaged(ids) {
+    const fresh = ids.filter((id) => !st.damagedSeen.has(id));
+    if (!fresh.length) return;
+    for (const id of fresh) st.damagedSeen.add(id);
+    logError(
+      'sincronización',
+      new Error(`${fresh.length} dato(s) del servidor no se pudieron descifrar y se apartaron: ${fresh.join(', ')}`),
+    );
+    notify(
+      `${fresh.length === 1 ? 'Un dato' : `${fresh.length} datos`} del servidor no se pudo leer (dañado) y se omitió; lo demás se sincronizó. Avisa al administrador: se puede recuperar del respaldo diario.`,
+      8000,
+    );
   }
 
   /**

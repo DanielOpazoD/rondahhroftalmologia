@@ -6,7 +6,7 @@
  *   2. sube (cifradas) las atenciones y eliminaciones locales más nuevas;
  *   3. baja y descifra las más nuevas del servidor y las aplica localmente.
  */
-import { encryptPayload, decryptPayload, b64ToBytes } from './crypto.js';
+import { encryptPayload, decryptPayload, b64ToBytes, DecryptError } from './crypto.js';
 import { hmacSha256, toHex } from '../lib/sha256.js';
 import { localVersions, remoteVersions, planSync, applyPulled, chunks, PROTOCOL_VERSION, PROTOCOL_HEADER } from './protocol.js';
 
@@ -163,6 +163,7 @@ export function createSyncApi({
  *   batchSize?: number,
  *   opaqueIds?: boolean | ((localId: string) => boolean),
  *   cache?: SyncCache,
+ *   keyProven?: boolean,
  * }} SyncDeps
  */
 
@@ -182,19 +183,33 @@ export function createSyncApi({
  *   deriva de datos personales: fichas de pacientes y perfiles de médico usan
  *   una huella del RUT, que se podría adivinar probando RUTs. Los ids en claro
  *   que subieron versiones anteriores se migran solos (ver `syncPass`);
+ *   `keyProven`: esta clave ya sincronizó antes en este PC. Un elemento que no se
+ *   puede descifrar es entonces un dato dañado (se aparta y sigue la
+ *   sincronización), no una clave equivocada (que sí detiene todo).
  *   `cache`: estado entre sincronizaciones de un mismo espacio (ver `createSyncCache`).
  *   Con él, después de la primera sincronización solo se pide al servidor lo
  *   cambiado y no se recalculan huellas ya verificadas.
- * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean}>}
+ * @returns {Promise<{pushed: number, added: number, updated: number, deleted: number, skipped: number, merged: number, needsPush: boolean, damaged: string[]}>}
+ *   `damaged`: ids del servidor que no se pudieron descifrar (apartados).
  */
 export async function syncOnce(deps) {
   // Si al bajar se fusionó algo que el servidor aún no tiene, una segunda
   // pasada lo sube de inmediato (así los otros equipos lo reciben antes).
-  const total = { pushed: 0, skipped: 0, merged: 0, added: 0, updated: 0, deleted: 0, needsPush: false };
+  const total = {
+    pushed: 0,
+    skipped: 0,
+    merged: 0,
+    added: 0,
+    updated: 0,
+    deleted: 0,
+    needsPush: false,
+    damaged: /** @type {string[]} */ ([]),
+  };
   const pass0 = deps.opaqueIds ? withOpaqueIds(deps) : { ...deps, lids: null, wire: null };
   for (let pass = 0; pass < 3; pass++) {
     const r = await syncPass(pass0);
     for (const k of /** @type {const} */ (['pushed', 'skipped', 'merged', 'added', 'updated', 'deleted'])) total[k] += r[k];
+    for (const id of r.damaged) if (!total.damaged.includes(id)) total.damaged.push(id);
     total.needsPush = r.needsPush;
     if (!r.needsPush) break;
   }
@@ -426,6 +441,7 @@ async function syncPass(deps) {
     deleted: result.deleted,
     // Lo migrado se sube con id opaco en la próxima pasada, y entonces se borra lo antiguo.
     needsPush: result.needsPush || skipped > 0 || p.plan.conflicts.length > 0 || legacyPulled.length > 0,
+    damaged: p.damaged.map((d) => d.id),
   };
 }
 
@@ -504,6 +520,10 @@ async function preparePass(deps) {
     extraPush: /** @type {string[]} */ ([]),
     /** Eliminaciones locales que suben de versión para ganar un conflicto. */
     tombBumps: /** @type {Record<string, number>} */ ({}),
+    /** Versiones del servidor que no se pudieron descifrar (datos dañados). */
+    damaged: /** @type {SyncVersion[]} */ ([]),
+    /** Algo se descifró con esta clave en esta pasada: la clave es la correcta. */
+    keyOk: false,
   };
 }
 
@@ -532,20 +552,41 @@ export function resolveLocalId(content, sid, wire, fromLegacy) {
  * @returns {Promise<ElementoBajado[]>}
  */
 async function fetchItems(p, list, { fromLegacy = false } = {}) {
-  const { api, key, batchSize = 100, lids, wire } = p.deps;
+  const { api, batchSize = 100, lids, wire } = p.deps;
   /** @type {ElementoBajado[]} */
   const out = [];
   for (const batch of chunks(list, batchSize)) {
     const res = await api.get(batch);
     for (const it of res.items || []) {
       if (it.missing) continue; // fue reemplazado mientras tanto: llegará en la próxima sincronización
-      const content = await decryptPayload(key, it.id, it.u, it);
+      const content = await openPulled(p, it);
+      if (!content) continue;
       const id = pulledId(lids, wire, content, it.id, fromLegacy);
       if (id === null) continue;
       out.push(pulledItem(content, id, it.u, fromLegacy));
     }
   }
   return out;
+}
+
+/**
+ * Descifra una versión bajada; null si está dañada (queda en `p.damaged`).
+ * Si nada se descifra y la clave nunca funcionó, el problema es la clave: se
+ * lanza el error, como siempre (no se aparta todo como «dañado»).
+ * @param {PassState} p
+ * @param {SyncBlob} it
+ * @returns {Promise<any>} contenido descifrado, o null
+ */
+async function openPulled(p, it) {
+  try {
+    const content = await decryptPayload(p.deps.key, it.id, it.u, it);
+    p.keyOk = true;
+    return content;
+  } catch (e) {
+    if (!(e instanceof DecryptError) || (!p.keyOk && !p.deps.keyProven)) throw e;
+    p.damaged.push({ id: it.id, u: it.u });
+    return null;
+  }
 }
 
 /**

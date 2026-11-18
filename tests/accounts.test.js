@@ -270,7 +270,7 @@ describe('servidor de cuentas', () => {
     ]);
   });
 
-  test('clave inicial: vence a los 7 días; restablecer da otra y cierra las sesiones', async () => {
+  test('clave inicial: vence a las 24 horas; restablecer da otra y cierra las sesiones', async () => {
     const env = await activated();
     const uid = newUserId();
     const { body: prep } = await env.call('cuentas/preparar', { token: env.adminToken, body: { id: uid } });
@@ -278,7 +278,7 @@ describe('servidor de cuentas', () => {
       token: env.adminToken,
       body: await env.newAccount({ rut: '11.111.111-1', nombre: 'Luis Tardío', rol: 'medico', complemento: prep.complemento, uid }),
     });
-    env.clock.t += 8 * DAY;
+    env.clock.t += 25 * 3600_000; // más de 24 h
     const late = await env.login('11.111.111-1', '11111111');
     assert.equal(late.status, 403);
     assert.equal(late.body.code, 'clave_inicial_vencida');
@@ -631,6 +631,21 @@ describe('servidor de cuentas: entrar y límites', () => {
     env.clock.t += 15 * 60_000;
     assert.equal((await from('10.0.0.1', bad)).status, 401);
     assert.equal((await from('10.0.0.1', good)).status, 200);
+  });
+
+  test('intentos simultáneos con clave mala: no se saltan el bloqueo de la cuenta (antes 300 contaban como 1)', async () => {
+    const env = await activated();
+    await addUser(env, { rut: '22.222.222-2', password: 'Otra2026' });
+    // Latencia como la de Netlify Blobs: las solicitudes simultáneas se intercalan.
+    for (const m of ['get', 'setJSON', 'list', 'delete']) {
+      const f = env.store[m].bind(env.store);
+      env.store[m] = async (...args) => (await new Promise((r) => setTimeout(r, 2)), f(...args));
+    }
+    const bad = { rut: '22.222.222-2', acceso: HEX };
+    const rs = await Promise.all(Array.from({ length: 100 }, () => env.call('cuentas/entrar', { body: bad })));
+    const checked = rs.filter((r) => r.status === 401).length; // las que llegaron a revisar la clave
+    assert.ok(checked <= ACCOUNT_LOCK.maxFails, `se revisó la clave ${checked} veces`);
+    assert.equal((await env.login('22.222.222-2', 'Otra2026')).status, 423, 'la cuenta quedó bloqueada');
   });
 
   test('límite por red: los fallos espaciados más de 15 min no se acumulan', async () => {

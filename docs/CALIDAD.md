@@ -76,3 +76,23 @@ Los scripts, las funciones de Netlify (la puerta de entrada del servidor) y el s
 - **Tablas sin tipo** en `scripts/deps.mjs` (`LAYERS`, `EXTERNAL`) se leían con conversiones a `any`; ahora tienen su tipo y las conversiones sobran.
 - **Servidor local**: pasaba las cabeceras de Node (que pueden ser listas o faltar) directo a `Request`; ahora las convierte de forma explícita.
 - **Dos guardados a la vez** (`src/ui/actions/attention.js`, `src/ui/userView.js`): una prueba en navegador fallaba «a veces». En vez de reintentarla, se buscó la causa: el guardado automático llegaba mientras «¿Quién registra?» estaba abierta y abría una segunda pregunta que reemplazaba la primera. Ahora los guardados se hacen de a uno y la pregunta se comparte. Una prueba nueva lo reproduce siempre (espera más que la pausa del guardado automático con la pregunta abierta) y falla sin el arreglo.
+
+## Evaluación experta y fase 0 de la deuda (2.31.0)
+
+Tres revisiones independientes (arquitectura, seguridad, interfaz y pruebas) calificaron la app con 5,3 de 7 y propusieron un plan por fases. La fase 0 corrigió lo que reprodujeron. Cada arreglo tiene su prueba, verificada: falla con el código anterior.
+
+- **Límite de intentos que se saltaba con concurrencia** (`src/sync/attempts.js`). Netlify Blobs no tiene contadores atómicos: leer, sumar y escribir perdía intentos simultáneos.
+  - Antes, 100 intentos a la vez con una clave mala revisaban la clave 100 veces y no bloqueaban nada.
+  - Ahora cada intento es una clave propia y se anota antes de revisar la clave: se revisa como máximo 5 veces y la cuenta queda bloqueada.
+  - El límite por red de la sincronización (20) y el de las cuentas (30) usan el mismo registro.
+- **Un dato dañado detenía la sincronización de todos** (`src/sync/client.js`, `openPulled`).
+  - Si la clave ya sincronizó antes en el PC, o algo se descifró en la misma pasada, lo que no se descifra se aparta, se avisa una vez y se sigue.
+  - Si nada se descifra y la clave nunca funcionó, sigue siendo un error de clave.
+  - Lo dañado no se borra ni se pisa: podría ser de una versión más nueva de la app.
+- **Un campo fechado en el futuro ganaba para siempre** (`src/core/merge.js`). Al fusionar, una fecha más allá de «ahora + 12 h» (el margen del reloj lógico) cuenta como ese tope.
+- **Clave inicial:** vence a las 24 horas en vez de 7 días. Por decisión del usuario se mantiene el RUT; el riesgo que queda está en ADR 0014.
+
+Lo que no se hizo, con su motivo:
+
+- **Que el servidor rechace escrituras del rol administrativo:** el ingreso también escribe atenciones y fichas, y el servidor no ve el contenido. Sigue siendo una regla de la interfaz, con el registro de accesos como disuasión (ADR 0014).
+- **Acortar a 12 h la tolerancia del servidor para versiones en el futuro:** no pierde datos y podría dejar sin sincronizar a un PC con el reloj adelantado.

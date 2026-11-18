@@ -34,7 +34,8 @@
  */
 import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { bytesToB64 } from './crypto.js';
-import { accountRut, loginState, newUserId, USER_ID_RE, INITIAL_PASSWORD_DAYS, ACCOUNT_LOCK, SESSION_MS } from '../core/accounts.js';
+import { createAttempts, waitMs } from './attempts.js';
+import { accountRut, loginState, newUserId, USER_ID_RE, INITIAL_PASSWORD_HOURS, ACCOUNT_LOCK, SESSION_MS } from '../core/accounts.js';
 import { ROLES } from '../config/catalogs.js';
 
 /** @typedef {import('./server.js').BlobStore} BlobStore */
@@ -196,7 +197,6 @@ export function createAccounts({
     /** @param {string} sid */
     session: (sid) => `_cuentas/s/${sid.slice(0, 8)}/${sid}`,
     /** @param {string} h */
-    ipLimit: (h) => `_limites/cuentas/${h}`,
   };
 
   /** @returns {Promise<Cuenta | null>} @param {string} uid */
@@ -291,22 +291,19 @@ export function createAccounts({
 
   /* ------------------------------------------------- límite por red */
 
-  /** @param {Request} req */
+  // Intentos anotados uno por uno (attempts.js): muchos a la vez no se pierden.
+  const attempts = createAttempts(store, '_limites/cuentas/');
+  /** Red de origen como HMAC (la IP no se guarda). @param {Request} req */
+  const netId = (req) => mac('ip', clientIp(req)).slice(0, 32);
+
+  /** ms que falta esperar si la red de origen está bloqueada (0 si no). @param {Request} req */
   async function ipBlocked(req) {
-    const key = K.ipLimit(mac('ip', clientIp(req)).slice(0, 32));
-    const cur = /** @type {{until?: number} | null} */ (await store.get(key, { type: 'json' }));
-    return cur?.until && cur.until > now() ? cur.until - now() : 0;
+    const t = now();
+    const times = await attempts.recent('red', netId(req), t, ACCOUNT_IP_LIMIT.windowMs);
+    return waitMs(times, ACCOUNT_IP_LIMIT.maxFails, t, ACCOUNT_IP_LIMIT.windowMs);
   }
   /** @param {Request} req */
-  async function ipFailure(req) {
-    const key = K.ipLimit(mac('ip', clientIp(req)).slice(0, 32));
-    const t = now();
-    const cur = /** @type {{first?: number, fails?: number, until?: number} | null} */ (await store.get(key, { type: 'json' }));
-    const fresh = !cur?.first || t - cur.first > ACCOUNT_IP_LIMIT.windowMs || (cur.until && cur.until <= t);
-    const next = { first: fresh ? t : cur?.first, fails: (fresh ? 0 : cur?.fails || 0) + 1, until: 0 };
-    if (next.fails >= ACCOUNT_IP_LIMIT.maxFails) next.until = t + ACCOUNT_IP_LIMIT.blockMs;
-    await store.setJSON(key, next);
-  }
+  const ipFailure = (req) => attempts.add('red', netId(req), now());
 
   /* ------------------------------------------------------- vistas */
 
@@ -340,7 +337,7 @@ export function createAccounts({
       admin: b.admin === true,
       estado: 'activo',
       debeCambiar: true,
-      tempExpira: t + INITIAL_PASSWORD_DAYS * DAY_MS,
+      tempExpira: t + INITIAL_PASSWORD_HOURS * 3600_000,
       sal: b.sal,
       iter: b.iter,
       verificador: verifierOf(b.acceso),
@@ -414,20 +411,59 @@ export function createAccounts({
     return json(200, { sal: s, iter: u ? u.iter : 310_000 });
   }
 
-  /** Respuesta a un intento fallido: cuenta fallos y bloquea la cuenta al llegar al máximo. @param {Request} req @param {Cuenta | null} u @param {number} t */
-  async function loginFailed(req, u, t) {
+  /**
+   * Respuesta a un intento fallido. El intento ya quedó anotado (ver `entrar`):
+   * con `tries` (los recientes, incluido este) al máximo, la cuenta se bloquea.
+   * @param {Request} req @param {Cuenta | null} u @param {number} t @param {number} tries
+   */
+  async function loginFailed(req, u, t, tries) {
     await ipFailure(req);
-    if (u) {
-      const fallos = (u.fallos || 0) + 1;
-      const lock = fallos >= ACCOUNT_LOCK.maxFails;
-      await putUser({ ...u, fallos: lock ? 0 : fallos, bloqueadaHasta: lock ? t + ACCOUNT_LOCK.lockMs : u.bloqueadaHasta || 0 });
-      await audit({ ev: lock ? 'sesion.bloqueada' : 'sesion.fallida', u: u.id });
-    } else await audit({ ev: 'sesion.fallida' });
+    if (!u) {
+      await audit({ ev: 'sesion.fallida' });
+    } else if (tries >= ACCOUNT_LOCK.maxFails) {
+      await lockAccount(u, t);
+    } else await audit({ ev: 'sesion.fallida', u: u.id });
     return fail(401, 'credenciales', 'RUT o clave incorrectos.');
   }
 
-  /** @param {Peticion} p */
-  async function entrar({ req, b, t }) {
+  /** Bloquea la cuenta por intentos fallidos (si no lo estaba ya). @param {Cuenta} u @param {number} t */
+  async function lockAccount(u, t) {
+    if ((u.bloqueadaHasta || 0) > t) return;
+    await putUser({ ...u, fallos: 0, bloqueadaHasta: t + ACCOUNT_LOCK.lockMs });
+    await audit({ ev: 'sesion.bloqueada', u: u.id });
+  }
+
+  /** @param {Cuenta} u @param {number} t */
+  function lockedResponse(u, t) {
+    const min = Math.ceil(((u.bloqueadaHasta || t + ACCOUNT_LOCK.lockMs) - t) / 60_000);
+    return fail(
+      423,
+      'cuenta_bloqueada',
+      `Cuenta bloqueada por intentos fallidos. Espera ${min} min o pide a un administrador que restablezca tu clave.`,
+    );
+  }
+
+  /**
+   * Anota el intento ANTES de revisar la clave, y cuenta los recientes. Si ya
+   * había el máximo, no se revisa la clave: así muchos intentos simultáneos no
+   * se saltan el límite. Devuelve cuántos hay (incluido este), o null si se rechaza.
+   * @param {Cuenta} u @param {number} t
+   */
+  async function admitAttempt(u, t) {
+    const mine = await attempts.add('cuenta', u.id, t);
+    const tries = (await attempts.recent('cuenta', u.id, t, ACCOUNT_LOCK.lockMs)).length;
+    if (tries <= ACCOUNT_LOCK.maxFails) return tries;
+    await attempts.remove(mine); // un rechazo no alarga el bloqueo
+    await lockAccount(u, t);
+    return null;
+  }
+
+  /**
+   * Lo que impide intentar entrar antes de mirar la cuenta: red bloqueada,
+   * cuentas sin activar o datos mal formados. null si se puede seguir.
+   * @param {Peticion} p
+   */
+  async function refusedLogin({ req, b }) {
     const blocked = await ipBlocked(req);
     if (blocked) {
       const r = fail(429, 'demasiados_intentos', 'Demasiados intentos desde esta red. Espera unos minutos.');
@@ -436,16 +472,11 @@ export function createAccounts({
     }
     if (!(await isActive())) return fail(409, 'cuentas_inactivas', 'Las cuentas de usuario aún no están activadas.');
     if (!accountRut(b.rut) || typeof b.acceso !== 'string' || !HEX64.test(b.acceso)) return fail(400, 'datos_invalidos', 'Datos inválidos');
-    const u = await userByRut(b.rut);
-    if (u && loginState(u, t) === 'bloqueada') {
-      const min = Math.ceil((u.bloqueadaHasta - t) / 60_000);
-      return fail(
-        423,
-        'cuenta_bloqueada',
-        `Cuenta bloqueada por intentos fallidos. Espera ${min} min o pide a un administrador que restablezca tu clave.`,
-      );
-    }
-    if (!u || !safeEqual(verifierOf(b.acceso), u.verificador)) return loginFailed(req, u, t);
+    return null;
+  }
+
+  /** Clave correcta: abre la sesión (si la cuenta puede entrar). @param {Cuenta} u @param {number} t */
+  async function openSession(u, t) {
     const state = loginState(u, t);
     if (state === 'desactivada') return fail(403, 'cuenta_desactivada', 'Tu cuenta está desactivada. Habla con un administrador.');
     if (state === 'clave_inicial_vencida') {
@@ -463,6 +494,21 @@ export function createAccounts({
       sesion: sid,
       usuario: { id, rol, admin, debeCambiar, tempExpira, perfil, envuelta, complemento: complementOf(u.id) },
     });
+  }
+
+  /** @param {Peticion} p */
+  async function entrar(p) {
+    const { req, b, t } = p;
+    const refused = await refusedLogin(p);
+    if (refused) return refused;
+    const u = await userByRut(b.rut);
+    if (!u) return loginFailed(req, null, t, 0);
+    if (loginState(u, t) === 'bloqueada') return lockedResponse(u, t);
+    const tries = await admitAttempt(u, t);
+    if (tries === null) return lockedResponse({ ...u, bloqueadaHasta: t + ACCOUNT_LOCK.lockMs }, t);
+    if (!safeEqual(verifierOf(b.acceso), u.verificador)) return loginFailed(req, u, t, tries);
+    await attempts.clear('cuenta', u.id);
+    return openSession(u, t);
   }
 
   /** Primer administrador: con la contraseña del equipo, antes de activar las cuentas. @param {Peticion} p */
@@ -571,11 +617,12 @@ export function createAccounts({
       verificador: verifierOf(b.acceso),
       envuelta: b.envuelta,
       debeCambiar: true,
-      tempExpira: t + INITIAL_PASSWORD_DAYS * DAY_MS,
+      tempExpira: t + INITIAL_PASSWORD_HOURS * 3600_000,
       fallos: 0,
       bloqueadaHasta: 0,
       actualizado: t,
     });
+    await attempts.clear('cuenta', u.id);
     await closeSessionsOf(u.id, 'clave_restablecida');
     await audit({ ev: 'usuario.restablecer', u: me.id, s: a.sid, obj: u.id });
     return json(200, { ok: true });
@@ -801,11 +848,12 @@ export function createAccounts({
         verificador: verifierOf(c.acceso),
         envuelta: c.envuelta,
         debeCambiar: true,
-        tempExpira: t + INITIAL_PASSWORD_DAYS * DAY_MS,
+        tempExpira: t + INITIAL_PASSWORD_HOURS * 3600_000,
         fallos: 0,
         bloqueadaHasta: 0,
         actualizado: t,
       });
+      await attempts.clear('cuenta', uid);
       await closeSessionsOf(uid, 'clave_restablecida');
     } else {
       if (!perfil) throw new Error('No hay cuenta con ese RUT: indica el nombre para crearla.');

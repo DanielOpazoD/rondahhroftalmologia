@@ -14,7 +14,7 @@ Diseño completo: [ADR 0014](adr/0014.md).
 Desde ese momento, **todos los PC** piden RUT y clave, y la contraseña del equipo deja de servir para sincronizar. **Guárdala igual**: es la llave de respaldo de los datos y la que permite recuperar un administrador.
 
 **Día a día (Ajustes → Usuarios, solo administradores):**
-- **Nuevo usuario** o **Crear desde perfiles**: la clave inicial es su RUT sin dígito verificador y vence en 7 días.
+- **Nuevo usuario** o **Crear desde perfiles**: la clave inicial es su RUT sin dígito verificador y vence en 24 horas: entrégala cuando la persona vaya a entrar.
 - **Olvidó su clave / clave inicial vencida:** «Restablecer clave» (ícono del candado) la vuelve a la inicial.
 - **Ya no trabaja aquí:** «Desactivar». Su sesión se corta de inmediato. Lo que registró se conserva.
 - Siempre debe quedar al menos un administrador activo.
