@@ -38,6 +38,13 @@ import {
 /** Huella del valor `local` (lo que se guarda en el PC para entrar sin conexión). @param {string} local */
 const localHashOf = (local) => toHex(sha256(local));
 
+/**
+ * Código con que el servidor rechazó una solicitud, o null si no fue el
+ * servidor (sin conexión: se reintenta después; otro fallo no cambia la sesión).
+ * @param {unknown} e
+ */
+const rejectionCode = (e) => (e instanceof SyncHttpError && e.status !== 0 ? e.code : null);
+
 /** Mensaje para un error de cuentas. @param {unknown} e @returns {string} */
 export function errorMessage(e) {
   if (e instanceof DecryptError) {
@@ -327,8 +334,8 @@ export function createAccountSession({
       hooks.changed?.();
       return st.token;
     } catch (e) {
-      // Sin conexión se reintenta después; otro error que no es del servidor no cambia la sesión.
-      if (e instanceof SyncHttpError && e.status !== 0) handleAuthError(e.code);
+      const code = rejectionCode(e);
+      if (code !== null) handleAuthError(code);
       return null;
     }
   }

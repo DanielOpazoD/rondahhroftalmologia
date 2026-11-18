@@ -137,8 +137,7 @@ export function createAccounts({
    */
   async function handle(req) {
     const url = new URL(req.url);
-    const action = url.pathname.split('/').filter(Boolean).pop() || '';
-    const route = Object.hasOwn(ROUTES, action) ? ROUTES[action] : null;
+    const { action, route } = routeOf(url);
     if (!route) return fail(404, 'ruta', 'Ruta no encontrada');
     const refused = refusedBeforeBody(req, route.method, action, keys.ready);
     if (refused) return refused;
@@ -153,6 +152,15 @@ export function createAccounts({
     const a = await session.authenticate(req);
     if ('response' in a) return a.response;
     return accessDenied(route.acceso, a) || route.run({ ...p, a, me: a.user });
+  }
+
+  /**
+   * Acción pedida (último tramo de la ruta) y su definición; `route` null si no existe.
+   * @param {URL} url
+   */
+  function routeOf(url) {
+    const action = url.pathname.split('/').filter(Boolean).pop() || '';
+    return { action, route: Object.hasOwn(ROUTES, action) ? ROUTES[action] : null };
   }
 
   return {

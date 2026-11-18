@@ -83,6 +83,9 @@ const isSealed = (p) =>
   p.ct.length <= 4000 &&
   B64_RE.test(p.ct);
 
+/** Iteraciones de PBKDF2 aceptables (entero de 100 000 a 5 000 000). @param {unknown} n @returns {n is number} */
+const isIterations = (n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 100_000 && n <= 5_000_000;
+
 /**
  * Credenciales válidas de una clave (calculadas en el PC).
  * @param {unknown} c
@@ -93,10 +96,7 @@ export const isCredentials = (c) =>
   typeof c.sal === 'string' &&
   c.sal.length === 24 &&
   B64_RE.test(c.sal) &&
-  typeof c.iter === 'number' &&
-  Number.isSafeInteger(c.iter) &&
-  c.iter >= 100_000 &&
-  c.iter <= 5_000_000 &&
+  isIterations(c.iter) &&
   typeof c.acceso === 'string' &&
   HEX64.test(c.acceso) &&
   isSealed(c.envuelta);
