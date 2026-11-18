@@ -1,2 +1,2 @@
 // El build usa una plantilla vacía si la especialidad no tiene constancia GES.
-export { default } from '../oftalmologia/ges-plantilla.pdf';
+export { default } from '#especialidad/ges-plantilla.pdf';

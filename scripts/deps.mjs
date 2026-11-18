@@ -83,6 +83,28 @@ function specifiers(code) {
   return out;
 }
 
+/**
+ * Archivo al que apunta un import interno, o null si es un paquete externo:
+ * una ruta relativa, o un alias de package.json → "imports" (`#especialidad/*`,
+ * que sin build apunta a oftalmología, como en Node y tsc).
+ * @param {string} root
+ * @param {string} from archivo que importa
+ * @param {string} spec
+ * @returns {string | null}
+ */
+function importTarget(root, from, spec) {
+  if (spec.startsWith('.')) return resolve(dirname(from), spec);
+  if (!spec.startsWith('#')) return null;
+  /** @type {Record<string, string>} */
+  const imports = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).imports || {};
+  for (const [pattern, target] of Object.entries(imports)) {
+    const [pre, post = ''] = pattern.split('*');
+    if (!spec.startsWith(pre) || !spec.endsWith(post)) continue;
+    return resolve(root, target.replace('*', spec.slice(pre.length, spec.length - post.length)));
+  }
+  throw new Error(`Alias sin definir en package.json ("imports"): ${spec}`);
+}
+
 /** Capa de un archivo de src/ («main» para el punto de entrada). @param {string} rel */
 export const layerOf = (rel) => (rel.includes('/') ? rel.split('/')[0] : 'main');
 
@@ -151,8 +173,9 @@ function readImports(root) {
     const code = readFileSync(f, 'utf8');
     const deps = [];
     for (const spec of specifiers(code)) {
-      if (spec.startsWith('.')) {
-        const target = relative(src, resolve(dirname(f), spec));
+      const to = importTarget(root, f, spec);
+      if (to) {
+        const target = relative(src, to);
         if (!target.startsWith('..')) deps.push(target);
       } else note(spec, `src/${rel}`);
     }
@@ -160,7 +183,7 @@ function readImports(root) {
   }
   for (const dir of ['netlify/functions', 'scripts']) {
     for (const f of walk(join(root, dir))) {
-      for (const spec of specifiers(readFileSync(f, 'utf8'))) if (!spec.startsWith('.')) note(spec, relative(root, f));
+      for (const spec of specifiers(readFileSync(f, 'utf8'))) if (!importTarget(root, f, spec)) note(spec, relative(root, f));
     }
   }
   return { graph, external };
@@ -264,7 +287,7 @@ export function exportUsage(root = ROOT) {
   const modules = new Map();
   for (const f of srcFiles) {
     const code = read(f);
-    const stars = [...code.matchAll(/^export\s*\*\s*from\s+['"]([^'"]+)['"]/gm)].map((m) => resolve(dirname(f), m[1]));
+    const stars = [...code.matchAll(/^export\s*\*\s*from\s+['"]([^'"]+)['"]/gm)].flatMap((m) => importTarget(root, f, m[1]) || []);
     modules.set(f, { names: declaredExports(code), stars });
   }
   const specialties = readdirSync(join(src, 'specialties')).filter(
@@ -304,7 +327,8 @@ export function exportUsage(root = ROOT) {
   ];
   for (const { f, into } of consumers) {
     for (const { spec, names } of importedNames(read(f))) {
-      if (spec.startsWith('.')) mark(into, resolve(dirname(f), spec), names);
+      const to = importTarget(root, f, spec);
+      if (to) mark(into, to, names);
     }
   }
   /** @type {string[]} */

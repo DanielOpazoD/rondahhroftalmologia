@@ -29,6 +29,7 @@
 import { sha256, hmacSha256, toHex } from '../lib/sha256.js';
 import { PROTOCOL_VERSION, MIN_CLIENT_PROTOCOL, PROTOCOL_HEADER } from './protocol.js';
 import { createAttempts, waitMs } from './attempts.js';
+import { isObject } from './crypto.js';
 
 /** @typedef {import('../domain').SyncVersion} SyncVersion */
 /** @typedef {import('../domain').SyncBlob} SyncBlob */
@@ -93,7 +94,7 @@ class BodyError extends Error {
 /**
  * Lee el cuerpo JSON con límite de tamaño.
  * @param {Request} req
- * @returns {Promise<any>} JSON de la solicitud, sin validar
+ * @returns {Promise<unknown>} JSON de la solicitud, sin validar
  */
 async function readJson(req) {
   const declared = Number(req.headers.get('content-length'));
@@ -121,6 +122,8 @@ const ESP_RE = /^[a-z][a-z0-9-]{1,39}$/;
  * borrar ids con esta forma (nunca atenciones ni ids opacos).
  */
 const LEGACY_ID_RE = /^(?:m_[0-9a-z]{8}|p_[0-9a-z]{10})$/;
+/** @param {unknown} id @returns {id is string} */
+const isLegacyId = (id) => typeof id === 'string' && LEGACY_ID_RE.test(id);
 const DEFAULT_ESP = 'oftalmologia';
 const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
@@ -208,20 +211,29 @@ async function versionsOf(store, esp, id) {
 }
 
 /**
+ * Como `re.test(v)` sin revisar antes el tipo: RegExp#test convierte `v` a
+ * texto. Así se validó siempre el id y la huella de cada elemento.
+ * @param {RegExp} re
+ * @param {unknown} v
+ */
+const matchesAsText = (re, v) => re.test(String(v));
+
+/**
  * ¿Tiene id seguro, versión (fecha) plausible y huella bien formada?
- * @param {any} it elemento del cuerpo JSON, sin validar
+ * @param {Record<string, unknown>} it elemento del cuerpo JSON, sin validar
  * @param {number} now
  */
 const validVersion = (it, now) =>
-  ID_RE.test(it.id) &&
+  matchesAsText(ID_RE, it.id) &&
+  typeof it.u === 'number' &&
   Number.isSafeInteger(it.u) &&
   it.u > 0 &&
   it.u <= now + LIMITS.futureSkewMs &&
-  (it.h === undefined || H_RE.test(it.h));
+  (it.h === undefined || matchesAsText(H_RE, it.h));
 
 /**
  * ¿Trae contenido cifrado válido? iv de 12 bytes y texto cifrado no vacío, dentro del tope.
- * @param {any} it
+ * @param {Record<string, unknown>} it
  */
 const validPayload = (it) =>
   typeof it.iv === 'string' &&
@@ -234,13 +246,14 @@ const validPayload = (it) =>
 
 /**
  * ¿Es un elemento válido de `get` (sin contenido) o `put` (con iv y ct)?
- * @param {any} it elemento del cuerpo JSON, sin validar
+ * En `get` no se usan `iv` ni `ct`.
+ * @param {unknown} it elemento del cuerpo JSON, sin validar
  * @param {number} now
  * @param {boolean} withPayload
- * @returns {boolean}
+ * @returns {it is SyncBlob}
  */
 function validItem(it, now, withPayload) {
-  if (!it || typeof it !== 'object' || !validVersion(it, now)) return false;
+  if (!isObject(it) || !validVersion(it, now)) return false;
   return !withPayload || validPayload(it);
 }
 
@@ -443,8 +456,8 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
    */
   async function readItems(req, withContent) {
     const body = await readJson(req);
-    /** @type {SyncBlob[] | null} validados abajo con validItem */
-    const items = Array.isArray(body?.items) ? body.items : null;
+    /** @type {unknown[] | null} */
+    const items = isObject(body) && Array.isArray(body.items) ? body.items : null;
     if (!items || items.length > LIMITS.itemsPerRequest) {
       return fail(400, 'lote_invalido', `Se esperan entre 0 y ${LIMITS.itemsPerRequest} elementos en "items"`);
     }
@@ -504,13 +517,13 @@ export function createSyncHandler({ store, tokenHash: tokenHashOpt, now = Date.n
   async function purge({ req, esp }) {
     const body = await readJson(req);
     /** @type {unknown[] | null} */
-    const ids = Array.isArray(body?.ids) ? body.ids : null;
-    if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every((id) => typeof id === 'string' && LEGACY_ID_RE.test(id))) {
+    const ids = isObject(body) && Array.isArray(body.ids) ? body.ids : null;
+    if (!ids || ids.length > LIMITS.itemsPerRequest || !ids.every(isLegacyId)) {
       return fail(400, 'purga_invalida', 'Solo se pueden borrar ids antiguos en claro');
     }
     /** @type {string[]} */
     const purged = [];
-    await mapLimit(/** @type {string[]} */ (ids), 8, async (id) => {
+    await mapLimit(ids, 8, async (id) => {
       const existing = await versionsOf(store, esp, id);
       await Promise.all(existing.map((old) => store.delete(old.key)));
       if (existing.length) purged.push(id);

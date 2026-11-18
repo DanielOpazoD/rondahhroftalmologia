@@ -15,6 +15,8 @@ El mapa completo y generado (capas, qué usa cada una, módulos y paquetes exter
 
 Cada flecha es una dependencia permitida (ESLint impide las demás: las capas puras no tocan el DOM, y la plataforma solo ve la especialidad a través de `specialties/activa/`).
 
+`specialties/activa/*.js` nombra la especialidad con el alias `#especialidad/<archivo>` (`package.json` → `"imports"`). Sin build (Node, pruebas, `tsc`, ESLint) el alias apunta a `oftalmologia/`; el build lo apunta a la elegida con `ESPECIALIDAD=<id>` (`especialidadPlugin` en `scripts/build.mjs`) y se detiene si a esa especialidad le falta un archivo (salvo las plantillas PDF, opcionales). ESLint impide que otra carpeta use el alias y que `activa/` importe una especialidad por ruta directa.
+
 ```mermaid
 flowchart TD
   UI["ui/ — vistas, diálogos, context.js<br/>ui/actions/ (orquestan) · events.js (bus)"]
@@ -46,7 +48,14 @@ flowchart TD
 - **Cuentas de usuario** ([ADR 0014](adr/0014.md)):
   - reglas puras en `core/accounts.js`, `core/permissions.js` y `core/accessLog.js`;
   - criptografía del PC en `sync/accountCrypto.js`, y la **sesión** (entrar con y sin conexión, crear la clave, renovar, salir, activar, cola del registro) en `sync/accountSession.js`, sin pantalla y probada contra el servidor en memoria;
-  - servidor en `sync/accounts.js` (función `cuentas`), y la sincronización exige su sesión;
+  - servidor en `sync/accounts.js` (función `cuentas`; la sincronización exige su sesión). Es la entrada pública: arma las piezas de `sync/accounts/` y tiene el router (qué acceso exige cada ruta):
+    - `validate.js` valida cuerpos y consultas, sin almacén ni secreto: recibe `unknown` y sus funciones son *type guards*, así que lo que sigue ya está tipado (probado aparte en `tests/accountsValidate.test.js`);
+    - `http.js`: respuestas JSON con `code` estable, cuerpo con tope de tamaño, token `Bearer`, IP;
+    - `secrets.js`: lo que se deriva de `SYNC_TOKEN_SHA256` (huellas del RUT y de la IP, verificador de la clave, tokens de sesión, contraseña del equipo);
+    - `store.js`: las claves del almacén y la lectura/escritura de cuentas, sesiones y registro de accesos;
+    - `login.js`: `sal` y `entrar`, con los límites de intentos por cuenta y por red;
+    - `session.js`: verificar la sesión, salir, cambiar la clave, eventos;
+    - `admin.js`: activar, preparar, crear, editar, restablecer, auditoría y recuperar un administrador;
   - interfaz: `ui/accounts.js` (solo pantallas: ingreso, crear la clave, tarjeta de la sesión), `ui/usersView.js`, `ui/auditView.js` y `ui/permissionsView.js`;
   - `ui/guard.js` mantiene el ingreso y el bloqueo por encima de cualquier diálogo.
 
