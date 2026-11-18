@@ -1,5 +1,14 @@
 # Cambios
 
+## 2.39.0 — 2026-11-18
+
+### Cimientos: CSS por capas
+- **`styles.css` organizado en capas** (`@layer tokens, base, layout, components, utilities, print`). La apariencia es la misma: los estilos calculados son idénticos en 176 capturas (22 vistas × 8 configuraciones: temas claro y oscuro, escritorio, celular, movimiento reducido e impresión).
+- `@media` pasa de 30 a 15, y las reglas de celular de 10 bloques a 2.
+- Una sola regla de impresión y una de movimiento reducido.
+- `!important` pasa de 8 a 1 (el de `[hidden]`, justificado).
+- Selectores por id pasan de 36 a 19; los que quedan, con su motivo.
+
 ## 2.38.0 — 2026-11-18
 
 ### Accesibilidad
