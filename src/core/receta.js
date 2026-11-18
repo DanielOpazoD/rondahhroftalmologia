@@ -1,8 +1,9 @@
 /** Autocompletado y relleno de la receta para lentes proporcionada por el hospital. */
-import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts, TextAlignment } from 'pdf-lib';
 import { ageAt, fileSafe, fmtDate, isValidRut } from './format.js';
 import { hospitalDateTime } from './ges.js';
-import { personName } from './names.js';
+import { givenNamesFirst, personName } from './names.js';
+import { clinicalFormValues } from './clinicalForms.js';
 
 /** @param {Pick<import('../domain').Atencion, 'f'>} rec @param {Date} [now] */
 export function recetaDefaults(rec, now = new Date()) {
@@ -10,7 +11,7 @@ export function recetaDefaults(rec, now = new Date()) {
   const { fecha } = hospitalDateTime(now);
   const age = ageAt(f.paciente_fnac, fecha);
   return {
-    paciente_nombre: personName(f, 'paciente_'),
+    paciente_nombre: givenNamesFirst(f, 'paciente_'),
     paciente_rut: f.paciente_rut || '',
     paciente_edad: age !== null ? String(age) : f.fecha_atencion === fecha ? f.paciente_edad || '' : '',
     lejos_od: '',
@@ -21,12 +22,31 @@ export function recetaDefaults(rec, now = new Date()) {
     cerca_dp: '',
     tabo_eje_od: '',
     tabo_eje_oi: '',
-    oftalmologo_nombre: personName(f, 'medico_'),
+    oftalmologo_nombre: givenNamesFirst(f, 'medico_'),
     fecha,
   };
 }
 
 /** @typedef {ReturnType<typeof recetaDefaults>} DatosReceta */
+
+/**
+ * Valores con que se abre la receta: lo guardado en la atención sobre lo propuesto.
+ * Hasta la 2.27.0 se proponían los apellidos primero; un nombre guardado igual a
+ * esa propuesta antigua se reemplaza por la nueva (nombres primero).
+ * @param {import('../domain').Atencion} rec @param {Date} [now]
+ * @returns {DatosReceta}
+ */
+export function recetaValues(rec, now = new Date()) {
+  const proposed = recetaDefaults(rec, now);
+  const values = clinicalFormValues(rec, 'receta', proposed);
+  for (const [key, prefix] of /** @type {const} */ ([
+    ['paciente_nombre', 'paciente_'],
+    ['oftalmologo_nombre', 'medico_'],
+  ])) {
+    if (values[key] === personName(rec.f, prefix)) values[key] = proposed[key];
+  }
+  return values;
+}
 
 export const RECETA_LABELS = Object.freeze({
   paciente_nombre: 'Nombre del paciente',
@@ -100,6 +120,8 @@ export async function buildRecetaPdf(template, data, { now = new Date() } = {}) 
     if (appearance) field.acroField.setDefaultAppearance(appearance);
     field.setText(text);
     field.setFontSize(size);
+    // Centrado en su casilla (la plantilla deja algunos campos pegados al borde izquierdo).
+    field.setAlignment(TextAlignment.Center);
   }
   // No se escribe ni aplana oftalmologo_firma (/Sig): no constituye una firma del profesional.
   form.updateFieldAppearances(font);

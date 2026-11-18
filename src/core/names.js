@@ -23,6 +23,18 @@ export function personName(source, prefix = '') {
     .join(' ');
 }
 
+/** Nombres, apellido paterno y apellido materno (como se escribe en una receta);
+ * el texto anterior es el respaldo.
+ * @param {Record<string, unknown>} source @param {string} [prefix]
+ */
+export function givenNamesFirst(source, prefix = '') {
+  if (!hasNameParts(source, prefix)) return String(source[prefix + 'nombre'] ?? '').trim();
+  return ['nombres', 'apellido_paterno', 'apellido_materno']
+    .map((k) => String(source[prefix + k] ?? '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 /** Mantiene el nombre completo para lectores y exportaciones anteriores.
  * Los componentes siguen siendo la fuente del nombre cuando existen.
  * @param {Record<string, string>} fields

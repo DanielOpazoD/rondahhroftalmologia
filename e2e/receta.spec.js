@@ -33,10 +33,10 @@ test('receta: propone paciente y profesional, permite correcciones y descarga lo
   await page.clock.install({ time: new Date('2026-11-16T03:30:00Z') });
   await prepare(page);
   const dlg = await openReceta(page);
-  await expect(dlg.getByLabel('Nombre del paciente')).toHaveValue('Ejemplo Ficticio Paciente de Prueba');
+  await expect(dlg.getByLabel('Nombre del paciente')).toHaveValue('Paciente de Prueba Ejemplo Ficticio');
   await expect(dlg.getByLabel('RUT del paciente')).toHaveValue('12.345.678-5');
   await expect(dlg.getByLabel('Edad', { exact: true })).toHaveValue('67');
-  await expect(dlg.getByLabel('Nombre del profesional')).toHaveValue('Prueba Ficticio Profesional');
+  await expect(dlg.getByLabel('Nombre del profesional')).toHaveValue('Profesional Prueba Ficticio');
   await expect(dlg.getByLabel('Fecha de la receta')).toHaveValue('2026-11-15');
   await expect(dlg.getByLabel('Lejos OD', { exact: true })).toHaveValue('');
   await dlg.getByLabel('Lejos OD', { exact: true }).fill('-1,00 '.repeat(100));

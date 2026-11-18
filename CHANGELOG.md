@@ -9,6 +9,12 @@
 - La primera vez, al entrar con conexión, la app cifra lo que ya estaba guardado. Si se interrumpe, termina en el siguiente ingreso, sin pisar lo guardado mientras tanto.
 - Una clave restablecida por el administrador o una persona que nunca entró en ese PC abren los datos al entrar con conexión. Sin conexión, entra quien ya entró antes en ese PC.
 
+## 2.27.1 — 2026-11-17
+
+### Receta para lentes
+- El nombre se escribe **nombres, apellido paterno y apellido materno** (antes, apellidos primero), para el paciente y el profesional. Una receta ya abierta que guardó el orden antiguo se reabre con el nuevo; un nombre escrito a mano se respeta.
+- Cada texto queda **centrado en su casilla** (antes, nombre, RUT, prescripción y profesional partían pegados al borde izquierdo).
+
 ## 2.27.0 — 2026-11-16
 
 ### Correcciones
