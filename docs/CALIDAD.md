@@ -29,6 +29,7 @@ npm run deps      # mapa de capas y paquetes (docs/DEPENDENCIAS.md)
 ## Cómo se simplificó una función compleja (ejemplos)
 
 - **Servidor de cuentas** (`src/sync/accounts.js`): `handle` tenía complejidad 108 (un `if` por ruta, con la verificación de sesión y de administrador entremezclada). Ahora cada acción es una función y una tabla `ROUTES` declara su método y su **acceso** (`publica`, `sesion`, `usuario`, `admin`); `handle` solo valida y delega. Quién puede usar cada ruta se lee en una línea.
+- **Servidor de cuentas en piezas** (`src/sync/accounts/`, fase 1): la fábrica de 888 líneas que mezclaba validación, almacén, criptografía, sesión, rutas y router quedó en módulos con una responsabilidad cada uno (`validate`, `http`, `secrets`, `store`, `login`, `session`, `admin`); `accounts.js` solo los arma y enruta (179 líneas). La validación recibe `unknown` y son *type guards*: en `src/sync/` no queda ningún `{any}` (había 14). Un guion diferencial de 133 solicitudes comparó respuestas y almacén completo con la versión anterior: idénticos.
 - **Servidor de sincronización** (`src/sync/server.js`): `route` (37, anidamiento 6) pasó a `list` / `getItems` / `putItems` / `purge`, con `listSince` / `listAll` y `putOne`.
 - **Respaldo** (`src/core/backup.js`): `mergeBackup` (36) une cada tipo de dato con su propia función (`mergeRecordsById`, `mergeFuture`, `mergeAuditById`, `mergePatientsById`).
 - **Validación** (`src/core/record.js`): `validateRecord` separa identidad, fechas y datos demográficos.
