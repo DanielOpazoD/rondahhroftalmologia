@@ -70,6 +70,34 @@ NETLIFY_SITE_ID=… NETLIFY_AUTH_TOKEN=… node scripts/restore-backup.mjs 2026-
 - Restaurar **no borra nada**: vuelve a escribir las versiones del respaldo. Si un elemento ya tiene una versión más nueva en el servidor, sigue ganando esa.
 - Después, **recarga la app en los PC**: la primera sincronización al abrir pide la lista completa y recibe lo restaurado.
 
+## Custodia de la contraseña del equipo
+
+Con cuentas de usuario nadie la escribe en el día a día, pero sigue siendo la **llave de respaldo**:
+- abre los datos del servidor y de sus respaldos;
+- permite recuperar un administrador;
+- abre la llave cifrada de cada PC tras un ingreso con conexión (ADR 0016).
+
+- **Guárdala en dos lugares físicos distintos**: por ejemplo, un sobre sellado en la dirección del hospital y otro con el jefe de servicio. Anota en cada sobre la fecha y quién lo selló.
+- No la guardes en el mismo PC ni en el correo.
+- Si alguien que la conocía deja el equipo, sigue «Si la contraseña del equipo se filtró».
+
+### Si la contraseña del equipo se perdió
+
+- **Con al menos un PC que tenga todos los datos y alguien que pueda entrar en él:** descarga un respaldo completo (Ajustes → Datos → Descargar respaldo). Guárdalo como dato clínico sensible y sigue «Si la contraseña del equipo se filtró» para crear una nueva.
+- **Sin ningún PC con los datos:** el servidor y sus respaldos no se pueden descifrar. Por diseño, nadie puede, tampoco Netlify.
+
+### Si la contraseña del equipo se filtró
+
+Con cuentas de usuario, cambiar la contraseña del equipo **todavía no es automático**: cada cuenta y cada PC guardan su copia envuelta con la anterior. El procedimiento:
+
+1. En un PC con todos los datos, **sincroniza y descarga un respaldo completo**. Verifica que esté completo: el respaldo dice cuántas atenciones trae.
+2. Genera una contraseña nueva (Ajustes → Este equipo → Generar) y guárdala como se indica arriba.
+3. En Netlify, cambia `SYNC_TOKEN_SHA256` por el valor nuevo y vuelve a publicar. Luego borra el almacén `hhr-rondas` (*Blobs*).
+4. **En cada PC**, borra los datos del sitio en el navegador (configuración del sitio → borrar datos). Los datos locales están cifrados con una llave que solo abría la contraseña anterior, así que el PC ya no podría abrirlos. Hazlo **solo después del paso 1**: lo que un PC no alcanzó a sincronizar se pierde.
+5. En el PC del paso 1, importa el respaldo, activa la sincronización con la contraseña nueva y vuelve a activar las cuentas de usuario. Crea las cuentas otra vez: cada persona entra con su RUT y crea su clave.
+
+*Pendiente (deuda conocida): que la app cambie la contraseña del equipo con cuentas activas sin pasar por un respaldo, y que un PC cuya llave ya no abre ofrezca empezar de cero tras confirmarlo.*
+
 ## Si algo falla
 
 | Síntoma | Qué revisar |
