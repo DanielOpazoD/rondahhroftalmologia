@@ -21,7 +21,7 @@ test('guardar una atención completa y verla en Pacientes', async ({ page }) => 
   const row = page.locator('#regList .prow', { hasText: 'Ana Tuki Prueba' });
   await expect(row).toBeVisible();
   await expect(row.locator('.tag', { hasText: 'Glaucoma' })).toBeVisible();
-  await expect(row.locator('.tag', { hasText: '1 atención' })).toBeVisible();
+  await expect(row.locator('.plast', { hasText: '1 atención' })).toBeVisible(); // junto a la última fecha
 });
 
 test('no guarda sin nombre ni RUT y lo indica junto al campo', async ({ page }) => {
@@ -137,7 +137,8 @@ test('ficha creada por error: aparece en «sin atenciones» y se elimina; volver
   await showPatientRecord(page, 'Ficha Por Error');
   await page.locator('#patAttentions .prow').first().locator('[data-a="del"]').click();
   await page.locator('#msgDlg').getByRole('button', { name: 'Eliminar' }).click();
-  await page.locator('#patBack').click();
+  // Sin atenciones, deja la lista (se despliega en su lugar: no hay que «volver»).
+  await expect(page.locator('#regList button[data-p]', { hasText: 'Ficha Por Error' })).toHaveCount(0);
   const box = page.locator('#orphBox');
   await expect(box).toBeVisible();
   await expect(page.locator('#orphTitle')).toHaveText('1 ficha sin atenciones');
@@ -243,7 +244,7 @@ test('editar datos del paciente: corrige RUT y nombre en la ficha y sus atencion
   await page.locator('#dlgOk').click();
   await expect(page.locator('#toast')).toContainText('en 1 atención');
   await expect(page.locator('#patCard h2')).toHaveText('Pérez Juan');
-  await expect(page.locator('#patCard')).toContainText('12.345.678-5');
+  await expect(page.locator('#regList button[data-p]', { hasText: 'Pérez Juan' })).toContainText('12.345.678-5');
   await expect(page.locator('#patAttentions .prow')).toHaveCount(1);
   // La atención muestra los datos corregidos y su historial lo registra.
   await page.locator('#patAttentions .pmain').first().click();
@@ -262,4 +263,29 @@ test('editar datos del paciente: corrige RUT y nombre en la ficha y sus atencion
   await save(page);
   await showPatientRecord(page, 'Pérez Juan');
   await expect(page.locator('#patAttentions .prow')).toHaveCount(2);
+});
+
+test('pacientes: cada ficha se despliega en la misma lista, una a la vez, sin otra pantalla', async ({ page }) => {
+  for (const nombre of ['Ana Primera', 'Berta Segunda']) {
+    await tab(page, 'Atención');
+    await page.locator('#bNew').click();
+    await fillPatient(page, { nombre });
+    await save(page);
+  }
+  await showPatientRecord(page, 'Ana Primera');
+  const ana = page.locator('#regList button[data-p]', { hasText: 'Ana Primera' });
+  const berta = page.locator('#regList button[data-p]', { hasText: 'Berta Segunda' });
+  await expect(page.locator('#patAttentions .prow')).toHaveCount(1);
+  await expect(berta).toBeVisible(); // la lista sigue a la vista
+  // Abrir otra pliega la anterior; volver a tocarla la pliega.
+  await berta.click();
+  await expect(ana).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#patCard h2')).toHaveText('Berta Segunda');
+  await berta.click();
+  await expect(berta).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#patCard')).toHaveCount(0);
+  // Desde la ficha desplegada se abre la atención.
+  await ana.click();
+  await page.locator('#patAttentions .pmain').first().click();
+  await expect(page.locator('#t-at')).toBeVisible();
 });

@@ -9,7 +9,7 @@ import { patientIdFor, attentionsOf } from '../core/patient.js';
 import { refreshRutMarks } from './rut.js';
 import { validateRecord, applyBirthDate, findDuplicate } from '../core/record.js';
 import { renderCatalogSelects } from './catalogView.js';
-import { initSexSelector, renderSexSelector, renderLegacyName } from './patientFields.js';
+import { initSexSelector, renderSexSelector } from './patientFields.js';
 import { refreshNames } from '../core/names.js';
 import { $, $$, toast, dataOf } from './dom.js';
 import { renderAttachments } from './attachmentsView.js';
@@ -144,7 +144,6 @@ export function initAttentionView(ctx) {
       ctx.rec.f[k] = target.value;
       refreshNames(ctx.rec.f);
       $('#paciente_nombre').value = ctx.rec.f.paciente_nombre || '';
-      renderLegacyName('paciente_', ctx.rec.f);
       // La edad se calcula sola desde la fecha de nacimiento.
       const ageChanged = (k === 'paciente_fnac' || k === 'fecha_atencion') && applyBirthDate(ctx.rec);
       if (k === 'paciente_fnac' && !isIsoDate(target.value)) $('#paciente_edad').readOnly = false;
@@ -199,7 +198,6 @@ const setPressed = (b, on) => {
 export function syncAttentionView(ctx) {
   const rec = ctx.rec;
   refreshNames(rec.f);
-  renderLegacyName('paciente_', rec.f);
   // El aviso de cambios de otro equipo es de una atención: se oculta al cambiar de atención.
   const notice = $('#remoteBanner');
   if (!notice.hidden && notice.dataset.id !== rec.id) notice.hidden = true;

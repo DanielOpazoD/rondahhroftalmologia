@@ -1,6 +1,7 @@
 /**
- * Pestaña Pacientes: registro de pacientes (la unidad) y, por paciente, su
- * historial de atenciones de esta especialidad a lo largo del tiempo.
+ * Pestaña Pacientes: una sola lista. Cada paciente se despliega en su lugar
+ * (sin otra pantalla ni «volver») y muestra sus datos, sus acciones y su
+ * historial de atenciones de esta especialidad.
  */
 import { SEXOS } from '../config/catalogs.js';
 import { fmtDate, normalizeText, cleanRut, ageAt, isIsoDate, todayIso, isValidRut, compareCode, compareEs } from '../core/format.js';
@@ -29,36 +30,40 @@ export function initRegistryView(ctx) {
   $('#regOp').addEventListener('change', () => renderRegistry(ctx));
   $('#regList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
     const b = closestTo(e, 'button[data-p]');
-    if (b) showPatient(ctx, dataOf(b, 'p'));
+    if (b) return togglePatient(ctx, dataOf(b, 'p'));
+    if (closestTo(e, '#patNew')) return ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId);
+    if (closestTo(e, '#patEdit')) return ctx.openPatientId && ctx.editPatient(ctx.openPatientId);
+    attentionAction(ctx, /** @type {HTMLButtonElement | null} */ (closestTo(e, '#patAttentions button[data-a]')));
   });
-  $('#patBack').addEventListener('click', () => showPatient(ctx, null));
   $('#dupList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
     const b = closestTo(e, 'button[data-a]');
     if (!b) return;
     if (b.dataset.a === 'merge') ctx.mergePatients(dataOf(b, 'keep'), dataOf(b, 'drop'));
     if (b.dataset.a === 'distinct') ctx.notDuplicates(dataOf(b, 'keep'), dataOf(b, 'drop'));
-    if (b.dataset.a === 'view') showPatient(ctx, dataOf(b, 'p'));
+    if (b.dataset.a === 'view') revealPatient(ctx, dataOf(b, 'p'));
   });
   $('#orphList').addEventListener('click', (/** @type {MouseEvent} */ e) => {
     const b = closestTo(e, 'button[data-a]');
     if (b?.dataset.a === 'delp') void ctx.deletePatient(dataOf(b, 'p'));
   });
-  $('#patNew').addEventListener('click', () => ctx.openPatientId && ctx.newAttentionFor(ctx.openPatientId));
-  $('#patEdit').addEventListener('click', () => ctx.openPatientId && ctx.editPatient(ctx.openPatientId));
-  $('#patAttentions').addEventListener('click', (/** @type {MouseEvent} */ e) => {
-    const b = /** @type {HTMLButtonElement | null} */ (closestTo(e, 'button[data-a]'));
-    if (!b) return;
-    const rec = ctx.records.find((r) => r.id === b.dataset.id);
-    if (!rec) return;
-    /** @type {Record<string, () => unknown>} */
-    const actions = {
-      open: () => ctx.openRecord(rec.id),
-      pdf: () => ctx.downloadPdf(rec, b),
-      copy: () => ctx.copyNote(rec),
-      del: () => ctx.deleteRecord(rec.id),
-    };
-    actions[dataOf(b, 'a')]?.();
-  });
+}
+
+/**
+ * Acción sobre una atención del paciente desplegado (abrir, PDF, nota, eliminar).
+ * @param {AppContext} ctx
+ * @param {HTMLButtonElement | null} b
+ */
+function attentionAction(ctx, b) {
+  const rec = b && ctx.records.find((r) => r.id === b.dataset.id);
+  if (!b || !rec) return;
+  /** @type {Record<string, () => unknown>} */
+  const actions = {
+    open: () => ctx.openRecord(rec.id),
+    pdf: () => ctx.downloadPdf(rec, b),
+    copy: () => ctx.copyNote(rec),
+    del: () => ctx.deleteRecord(rec.id),
+  };
+  actions[dataOf(b, 'a')]?.();
 }
 
 /**
@@ -101,16 +106,35 @@ const ageNow = (p, fallback) => (isIsoDate(p.f.paciente_fnac) ? ageAt(p.f.pacien
 const sexLabel = (k) => SEXOS.find((s) => s.key === k)?.label || '';
 
 /**
+ * Despliega la ficha (o la pliega, si ya estaba abierta). Una a la vez.
  * @param {AppContext} ctx
- * @param {string | null} id ficha a mostrar; null: la lista
+ * @param {string} id
  */
-function showPatient(ctx, id) {
-  ctx.openPatientId = id;
-  if (id) ctx.accounts?.event('ficha.ver', id);
-  $('#patListView').hidden = Boolean(id);
-  $('#patDetailView').hidden = !id;
+function togglePatient(ctx, id) {
+  ctx.openPatientId = ctx.openPatientId === id ? null : id;
+  if (ctx.openPatientId) ctx.accounts?.event('ficha.ver', id);
   renderRegistry(ctx);
-  scrollTo(0, 0);
+  focusPatient(id);
+}
+
+/**
+ * Despliega una ficha aunque la búsqueda la oculte (p. ej. desde «Posibles duplicados»).
+ * @param {AppContext} ctx
+ * @param {string} id
+ */
+function revealPatient(ctx, id) {
+  $('#regSearch').value = '';
+  $('#regOp').value = '';
+  ctx.openPatientId = null;
+  togglePatient(ctx, id);
+}
+
+/** Mantiene a la vista y con el foco la fila de la ficha. @param {string} id */
+function focusPatient(id) {
+  const row = /** @type {HTMLElement | null} */ (document.querySelector(`#regList button[data-p="${CSS.escape(id)}"]`));
+  if (!row) return;
+  row.focus({ preventScroll: true });
+  row.scrollIntoView?.({ block: 'nearest' });
 }
 
 /** @param {AppContext} ctx */
@@ -121,7 +145,6 @@ export function renderRegistry(ctx) {
     ? `Hay ${future} atención(es) guardadas con una versión más nueva de la app. Recarga la página para verlas y editarlas.`
     : '';
   const groups = byPatient(ctx.records);
-  if (ctx.openPatientId) return renderPatient(ctx, ctx.openPatientId, groups.get(ctx.openPatientId) || []);
 
   const sel = $('#regOp');
   const ops = ctx.operativos.map((o) => o.nombre);
@@ -152,26 +175,7 @@ export function renderRegistry(ctx) {
     setHtml($('#regList'), html`<div class="empty">${empty}</div>`);
     return;
   }
-  const rows = patients.slice(0, 500).map(({ p, recs }) => {
-    const last = recs[0];
-    const age = ageNow(p, last.f.paciente_edad);
-    const meta = [
-      p.f.paciente_rut,
-      age !== '' && age != null ? `${age} a` : '',
-      p.f.paciente_sexo,
-      `última: ${fmtDate(last.f.fecha_atencion)}`,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    const dx = diagnosesList(last, { withOthers: false }).slice(0, 2);
-    const count = `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'}`;
-    const pending = recs.some((r) => !isAttended(r));
-    return html`<div class="prow"><button type="button" class="pmain" data-p="${p.id}" title="Ver paciente">
-        <span class="pname">${patientLabel(p)}</span>
-        <span class="pmeta">${meta}</span>
-        <span class="ptags">${pending ? html`<span class="state pend">Por atender</span>` : ''}${dx.map((d) => html`<span class="tag">${d}</span>`)}<span class="tag soft">${count}</span></span>
-      </button></div>`;
-  });
+  const rows = patients.slice(0, 500).map(({ p, recs }) => patientRow(ctx, p, recs));
   const more =
     patients.length > 500 ? html`<p class="hint">Se muestran los 500 más recientes: usa la búsqueda para encontrar otros.</p>` : '';
   setHtml($('#regList'), html`<section class="pgroup">${rows}</section>${more}`);
@@ -189,17 +193,15 @@ function rutMark(rut) {
 }
 
 /**
- * Datos de la ficha que se conocen (RUT, nacimiento, edad, sexo, fono).
+ * Datos de la ficha desplegada que no están ya en su fila (RUT, edad y sexo sí lo están):
+ * nacimiento, fono y si el RUT es válido.
  * @param {Paciente} p
- * @param {ReturnType<typeof ageNow>} age
  */
-function patientMeta(p, age) {
+function patientMeta(p) {
   const f = p.f;
   return [
-    f.paciente_rut && html`RUT ${f.paciente_rut}${rutMark(f.paciente_rut)}`,
+    f.paciente_rut && html`RUT${rutMark(f.paciente_rut)}`,
     f.paciente_fnac && html`Nac. ${fmtDate(f.paciente_fnac)}`,
-    age !== '' && age != null && html`${String(age)} años`,
-    sexLabel(f.paciente_sexo) && html`${sexLabel(f.paciente_sexo)}`,
     f.paciente_fono && html`Fono ${f.paciente_fono}`,
   ].filter(Boolean);
 }
@@ -216,53 +218,100 @@ function patientSummary(recs, especialidad) {
   return `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'} de ${especialidad}${since}`;
 }
 
+/** Iniciales para la marca de la fila («Ana Tepano» → «AT»). @param {Paciente} p */
+function initials(p) {
+  const words = patientLabel(p).split(/\s+/).filter(Boolean);
+  return (
+    words
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join('') || '?'
+  ).toUpperCase();
+}
+
 /**
- * Ficha abierta y sus atenciones.
+ * Fila de un paciente y, si está desplegado, su ficha y sus atenciones debajo.
  * @param {AppContext} ctx
- * @param {string} id ficha abierta
+ * @param {Paciente} p
+ * @param {AtencionGuardada[]} recs de la más reciente a la más antigua (al menos una)
+ */
+function patientRow(ctx, p, recs) {
+  const open = ctx.openPatientId === p.id;
+  const last = recs[0];
+  const age = ageNow(p, last.f.paciente_edad);
+  const meta = [p.f.paciente_rut || 'sin RUT', age !== '' && age != null ? `${age} años` : '', sexLabel(p.f.paciente_sexo)]
+    .filter(Boolean)
+    .join(' · ');
+  const dx = diagnosesList(last, { withOthers: false }).slice(0, 2);
+  const pending = recs.some((r) => !isAttended(r));
+  const count = `${recs.length} ${recs.length === 1 ? 'atención' : 'atenciones'}`;
+  return html`<div class="pitem${open ? ' open' : ''}">
+    <div class="prow">
+      <button type="button" class="pmain ppat" data-p="${p.id}" aria-expanded="${open ? 'true' : 'false'}" title="${open ? 'Plegar' : 'Ver atenciones'}">
+        <span class="pavatar" aria-hidden="true">${initials(p)}</span>
+        <span class="pname">${patientLabel(p)}</span>
+        <span class="pmeta">${meta}</span>
+        <span class="ptags">${pending ? html`<span class="state pend">Por atender</span>` : ''}${dx.map((d) => html`<span class="tag">${d}</span>`)}</span>
+        <span class="plast"><span>${fmtDate(last.f.fecha_atencion) || 'Sin fecha'}</span><small>${count}</small></span>
+        <svg class="chev" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </div>
+    ${open ? patientDetail(ctx, p, recs) : ''}
+  </div>`;
+}
+
+/**
+ * Ficha desplegada: datos, acciones y atenciones (los ids son únicos: se despliega una a la vez).
+ * @param {AppContext} ctx
+ * @param {Paciente} p
  * @param {AtencionGuardada[]} recs
  */
-function renderPatient(ctx, id, recs) {
-  const p = ctx.store.getPatient(id);
-  if (!p) return showPatient(ctx, null);
-  const meta = patientMeta(p, ageNow(p, recs[0]?.f.paciente_edad));
+function patientDetail(ctx, p, recs) {
+  const meta = patientMeta(p);
   const summary = patientSummary(recs, ctx.especialidadNombre);
-  setHtml(
-    $('#patCardInfo'),
-    html`<h2>${patientLabel(p)}</h2><div class="patmeta">${join(meta, ' · ')}</div>${summary ? html`<div class="patsum">${summary}</div>` : ''}`,
-  );
-  const rows = recs.map((r) => {
-    const done = isAttended(r);
-    const dx = diagnosesList(r, { withOthers: false }).slice(0, 3);
-    const procs = proceduresDone(r, ctx.procs).map((x) => x.nombre);
-    const nAtt = ctx.store.supportsAttachments() ? ctx.store.loadAttachments(r.id).length : 0;
-    const rmeta = [
-      r.f.operativo,
-      r.f.medico_nombre,
-      procs.length && (procs.length <= 2 ? procs.join(', ') : `${procs.length} procedimientos`),
-      nAtt && `${nAtt} ${nAtt === 1 ? 'adjunto' : 'adjuntos'}`,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    return html`<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
-            <button type="button" class="pmain" data-a="open" data-id="${r.id}" title="Abrir atención">
-              <span class="pname">${fmtDate(r.f.fecha_atencion) || 'Sin fecha'}</span>
-              <span class="pmeta">${rmeta}</span>
-              <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}${done ? '' : html`<span class="state pend">Por atender</span>`}</span>
-            </button>
-            <div class="pact">
-              <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${icon('copy')}</button>
-              <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu">${icon('pdf')}</button>
-              <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${icon('trash')}</button>
-            </div>
-          </div>`;
-  });
-  setHtml(
-    $('#patAttentions'),
-    recs.length
-      ? html`<section class="pgroup"><h3><span>Atenciones de ${ctx.especialidadNombre}</span><span>${recs.length}</span></h3>${rows}</section>`
-      : html`<div class="empty">Este paciente aún no tiene atenciones en esta especialidad.</div>`,
-  );
+  const rows = recs.map((r) => attentionRow(ctx, r));
+  return html`<div class="pdetail">
+    <div class="patcard" id="patCard">
+      <div id="patCardInfo"><h2 class="vh">${patientLabel(p)}</h2><div class="patmeta">${join(meta, ' · ')}</div>${summary ? html`<div class="patsum">${summary}</div>` : ''}</div>
+      <div class="row u-gap8">
+        <button type="button" class="btn sm" id="patEdit">${icon('edit')}Editar datos</button>
+        <button type="button" class="btn p sm" id="patNew" data-perm="clinico">${icon('plus')}Nueva atención</button>
+      </div>
+    </div>
+    <div id="patAttentions" class="plist">${rows}</div>
+  </div>`;
+}
+
+/**
+ * Una atención en la ficha desplegada.
+ * @param {AppContext} ctx
+ * @param {AtencionGuardada} r
+ */
+function attentionRow(ctx, r) {
+  const done = isAttended(r);
+  const dx = diagnosesList(r, { withOthers: false }).slice(0, 3);
+  const procs = proceduresDone(r, ctx.procs).map((x) => x.nombre);
+  const nAtt = ctx.store.supportsAttachments() ? ctx.store.loadAttachments(r.id).length : 0;
+  const rmeta = [
+    r.f.operativo,
+    r.f.medico_nombre,
+    procs.length && (procs.length <= 2 ? procs.join(', ') : `${procs.length} procedimientos`),
+    nAtt && `${nAtt} ${nAtt === 1 ? 'adjunto' : 'adjuntos'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return html`<div class="prow${ctx.rec.id === r.id ? ' active' : ''}">
+    <button type="button" class="pmain" data-a="open" data-id="${r.id}" title="Abrir atención">
+      <span class="pname">${fmtDate(r.f.fecha_atencion) || 'Sin fecha'}</span>
+      <span class="pmeta">${rmeta}</span>
+      <span class="ptags">${dx.map((d) => html`<span class="tag">${d}</span>`)}${done ? '' : html`<span class="state pend">Por atender</span>`}</span>
+    </button>
+    <div class="pact">
+      <button type="button" class="ib sm" data-a="copy" data-id="${r.id}" title="Copiar nota" aria-label="Copiar nota">${icon('copy')}</button>
+      <button type="button" class="ib sm" data-a="pdf" data-id="${r.id}" title="Descargar PDF" aria-label="Descargar PDF" aria-haspopup="menu">${icon('pdf')}</button>
+      <button type="button" class="ib sm danger" data-perm="clinico" data-a="del" data-id="${r.id}" title="Eliminar" aria-label="Eliminar atención">${icon('trash')}</button>
+    </div>
+  </div>`;
 }
 
 /**
