@@ -1,10 +1,9 @@
 /** Receta para lentes: revisión por paciente, PDF editable e impresión. */
 import templateB64 from '../specialties/activa/recetaPlantilla.js';
-import { recetaDefaults, validateReceta, buildRecetaPdf, recetaFileName, RECETA_LABELS } from '../core/receta.js';
+import { recetaValues, validateReceta, buildRecetaPdf, recetaFileName, RECETA_LABELS } from '../core/receta.js';
 import { html } from './html.js';
 import { base64ToBytes } from './dom.js';
 import { openClinicalForm, clinicalInput } from './clinicalForm.js';
-import { clinicalFormValues } from '../core/clinicalForms.js';
 
 /**
  * @param {import('./context.js').AppContext} ctx
@@ -13,7 +12,7 @@ import { clinicalFormValues } from '../core/clinicalForms.js';
  * @returns {Promise<void>}
  */
 export function downloadReceta(ctx, rec, anchor) {
-  const initial = clinicalFormValues(rec, 'receta', recetaDefaults(rec));
+  const initial = recetaValues(rec);
   /** @param {keyof typeof RECETA_LABELS} key @param {string} [type] */
   const input = (key, type = 'text') => clinicalInput(initial, key, RECETA_LABELS[key], type);
   return openClinicalForm(ctx, {
